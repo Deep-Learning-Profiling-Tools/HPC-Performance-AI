@@ -103,7 +103,7 @@ inline bool compareArrays(const char* name, const Real_ptr ref, const Real_ptr t
   }
   if (max_err > tol) {
     printf("  %s: FAIL max rel err %.3e at %ld (ref %.17g vs gpu %.17g)\n",
-           name, max_err, (long)bad, ref[bad], test[bad], tol);
+           name, max_err, (long)bad, ref[bad], test[bad]);
     return false;
   }
   printf("  %s: max rel err %.3e (tol %.1e)\n", name, max_err, tol);
