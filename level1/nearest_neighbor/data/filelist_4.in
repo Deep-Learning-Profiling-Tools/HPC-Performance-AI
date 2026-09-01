@@ -1,0 +1,4 @@
+@CMAKE_CURRENT_SOURCE_DIR@/data/cane4_0.db
+@CMAKE_CURRENT_SOURCE_DIR@/data/cane4_1.db
+@CMAKE_CURRENT_SOURCE_DIR@/data/cane4_2.db
+@CMAKE_CURRENT_SOURCE_DIR@/data/cane4_3.db

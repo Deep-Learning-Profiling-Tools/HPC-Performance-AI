@@ -1,0 +1,24 @@
+# project-local environments and tools (machine-specific, never committed)
+.conda_env/
+.venv/
+.tools/
+_upstream/
+build/
+cmake-build-*/
+results/
+
+# python
+__pycache__/
+*.pyc
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# profiler output
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+rocprof*.csv
+rocprof*.json

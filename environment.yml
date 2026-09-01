@@ -1,0 +1,22 @@
+# HPC-Performance-AI project-local Conda environment.
+#
+# Every package is pinned to the exact version the benchmark suite was
+# validated with, so `./setup_env.sh` reproduces the same user-space
+# toolchain on any Linux x86_64 machine. Create/update via ./setup_env.sh
+# (installs into <repo>/.conda_env; never touches conda base or $HOME).
+#
+# Deliberately NOT managed by Conda (system GPU toolchain, see README):
+#   NVIDIA driver / CUDA Toolkit / NVCC / Nsight Compute / ROCm / hipcc
+name: hpcperf
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.3
+  - cmake=3.28.4
+  - ninja=1.13.2
+  - pip=26.2.1
+  - gcc_linux-64=13.3.0        # NVCC host compiler (validated with CUDA 13.2)
+  - gxx_linux-64=13.3.0
+  - numpy=2.5.2                # used by the verify.py correctness checks
+  - scipy=1.18.0
+  - perl=5.32.1                # runs .tools/bin/cloc (cloc is not on conda-forge)
