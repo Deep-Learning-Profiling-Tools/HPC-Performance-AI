@@ -42,6 +42,14 @@ cmake -S . -B build/all -DBACKEND=CUDA -DCMAKE_BUILD_TYPE=Release
 cmake --build build/all -j
 ```
 
+## Contributing
+
+> **All collaborators must follow the contribution workflow: create a
+> `<scope>/<short-description>` branch from the latest `main` and open a pull
+> request -- do not push development work directly to `main`.**
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and pull request guidelines.
+
 ## Environment
 
 The suite was validated with the following configuration. Everything in the
