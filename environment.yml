@@ -20,3 +20,13 @@ dependencies:
   - numpy=2.5.2                # used by the verify.py correctness checks
   - scipy=1.18.0
   - perl=5.32.1                # runs .tools/bin/cloc (cloc is not on conda-forge)
+  # ---- Level 2 mini-app dependencies (added 2026-09-01) ----------------------
+  # CUDA-aware Open MPI (conda-forge "cuda" build variant, pinned by build
+  # string so the solver picks the same variant on every machine).
+  - openmpi=5.0.10=hee33aa4_2
+  - metis=5.1.0                # MFEM / Branson mesh partitioning
+  - yaml-cpp=0.8.0             # Kripke / SHAW input parsing
+  - openblas=0.3.34            # hipBone
+  - fftw=3.3.11=mpi_openmpi_*  # heFFTe (Cabana) CPU backend
+  - hdf5=2.2.0=mpi_openmpi_*   # parallel HDF5 (Cabana / ExaMPM / branson optional)
+  - libpnetcdf=1.15.0=mpi_openmpi_*  # miniWeather output

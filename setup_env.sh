@@ -66,6 +66,10 @@ else
 fi
 
 # ------------------------------------------- 2. project-local Conda environment
+# The pinned Open MPI build is the CUDA-aware conda-forge variant, which
+# depends on the virtual package __cuda. conda detects it from the driver; if
+# no driver is visible during setup, tell the solver which CUDA to assume.
+export CONDA_OVERRIDE_CUDA="${CONDA_OVERRIDE_CUDA:-13.2}"
 if [ -d "$CONDA_ENV_PREFIX" ]; then
     say "Updating existing project env: $CONDA_ENV_PREFIX"
     conda env update --prefix "$CONDA_ENV_PREFIX" -f "$ROOT/environment.yml" \

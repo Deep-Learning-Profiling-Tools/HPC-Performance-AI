@@ -1,0 +1,27 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4162042..5ca4f2d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -691,6 +691,22 @@ endforeach()
+ 
+ if (MFEM_USE_CUDA)
+   set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE CUDA)
++  # HPC-Performance-AI (patches/mfem-v4.10-blackwell-cicc-O1.patch): with CUDA
++  # 13.2 targeting Blackwell (sm_100) the device front end (cicc) at its default
++  # -O3 takes hours on the translation units below (measured on a B200 host:
++  # bilininteg_convection_ea >11 h, unfinished, 140 MB of PTX; lor_batched 5.2 h;
++  # bilininteg_diffusion_ea 1.6 h; the same files build in seconds to minutes
++  # for sm_90 and with -Xcicc -O1). Compare mfem/mfem#5363 (sm_120, CUDA 12.8).
++  # Only the device optimization level of these three files is lowered; they
++  # hold element-assembly (AssemblyLevel::ELEMENT) and batched-LOR kernels,
++  # which neither Laghos nor Remhos ever executes.
++  if (CMAKE_CUDA_ARCHITECTURES MATCHES "(^|;)1[0-9][0-9]")
++    set_source_files_properties(
++      ${PROJECT_SOURCE_DIR}/fem/integ/bilininteg_convection_ea.cpp
++      ${PROJECT_SOURCE_DIR}/fem/integ/bilininteg_diffusion_ea.cpp
++      ${PROJECT_SOURCE_DIR}/fem/lor/lor_batched.cpp
++      PROPERTIES COMPILE_OPTIONS "-Xcicc=-O1")
++  endif()
+ endif()
+ 
+ add_subdirectory(config)

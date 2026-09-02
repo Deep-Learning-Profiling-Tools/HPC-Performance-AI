@@ -18,6 +18,7 @@ EXP_NINJA="1.13.2"
 EXP_CLOC="2.06"
 EXP_CUDA_MM="13.2"      # CUDA major.minor the suite was validated with
 EXP_NCU="2026.1.1"      # optional (profiling only)
+EXP_OMPI="5.0.10"       # Level 2 (conda Open MPI, CUDA-aware build)
 
 ROOT="${HPC_PERFORMANCE_AI_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)}"
 STATUS=0
@@ -108,6 +109,32 @@ if [ -n "$ACT_NCU" ]; then
     [ "$ACT_NCU" = "$EXP_NCU" ] && ok "Nsight Compute $ACT_NCU" || info "Nsight Compute $ACT_NCU (validated with $EXP_NCU)"
 else
     info "Nsight Compute not found (optional; only needed for profiling)"
+fi
+
+# --- MPI (Level 2 mini-apps; conda Open MPI, installed by setup_env.sh)
+if command -v mpicxx >/dev/null 2>&1; then
+    check_version "Open MPI" "$EXP_OMPI" "$(mpirun --version 2>/dev/null | sed -n 's/^mpirun (Open MPI) //p')"
+    case "$(command -v mpicxx)" in
+        "$ROOT"/.conda_env/*) ok "mpicxx resolves into project env" ;;
+        *) warn "mpicxx does not resolve into $ROOT/.conda_env: $(command -v mpicxx)" ;;
+    esac
+    info "MPI runtime defaults: pml=${OMPI_MCA_pml:-<default>} btl=${OMPI_MCA_btl:-<default>} (single-node; HPCPERF_MPI_SINGLE_NODE=0 to unset); opal_cuda_support=${OMPI_MCA_opal_cuda_support:-<conf file: 0>}"
+else
+    warn "mpicxx not found -- Level 2 mini-apps need MPI (re-run setup_env.sh to update .conda_env)"
+fi
+
+# --- Level 2 framework libraries (setup_level2_deps.sh -> .deps/install/<name>)
+if [ -d "$ROOT/.deps/install" ]; then
+    for _dep in "$ROOT"/.deps/install/*/; do
+        _dep="${_dep%/}"; _name="${_dep##*/}"
+        if [ -f "$_dep/.hpcperf-built" ]; then
+            ok "Level 2 dep: $_name ($(cat "$_dep/.hpcperf-built" 2>/dev/null))"
+        else
+            warn "Level 2 dep: $_name present but not marked built (incomplete build?)"
+        fi
+    done
+else
+    info "Level 2 framework libraries not built (run ./setup_level2_deps.sh; only needed for Level 2)"
 fi
 
 # --- ROCm (optional; HIP backends are unverified without it)

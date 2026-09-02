@@ -115,7 +115,54 @@ fi
 export CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
 export CUDAARCHS="${CUDAARCHS:-native}"
 
-# ----------------------------------------------- 8. optional ROCm environment
+# ------------------------------------- 8. Level 2 framework libraries (.deps)
+# setup_level2_deps.sh installs Kokkos, RAJA, hypre, MFEM, Cabana, heFFTe, ...
+# into .deps/install/<name>. Expose every installed prefix to CMake so the
+# Level 2 mini-apps find them with plain find_package().
+if [ -d "$HPC_PERFORMANCE_AI_ROOT/.deps/install" ]; then
+    for _dep in "$HPC_PERFORMANCE_AI_ROOT"/.deps/install/*/; do
+        _dep="${_dep%/}"
+        [ -f "$_dep/.hpcperf-built" ] || continue
+        # The *environment* variable CMAKE_PREFIX_PATH is ':'-separated (like PATH).
+        case ":${CMAKE_PREFIX_PATH:-}:" in
+            *":$_dep:"*) ;;
+            *) export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH}:}$_dep" ;;
+        esac
+        [ -d "$_dep/lib" ]   && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib"
+        [ -d "$_dep/lib64" ] && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib64"
+    done
+    unset _dep
+fi
+# Kokkos' nvcc_wrapper must call the same host compiler as everything else.
+export NVCC_WRAPPER_DEFAULT_COMPILER="$CXX"
+
+# MPI (conda Open MPI 5, used by the Level 2 mini-apps). Inside a Slurm
+# allocation with fewer tasks than requested ranks, PRRTE refuses to start
+# without oversubscription; allow it so `mpirun -np N` works as documented.
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+    export PRTE_MCA_rmaps_default_mapping_policy="${PRTE_MCA_rmaps_default_mapping_policy:-:oversubscribe}"
+fi
+# All Level 2 runs are single-node. Open MPI's default component selection
+# (pml ucx, btl ofi/uct) probes every InfiniBand / libfabric device at start-up,
+# which costs ~5 s in every MPI_Init on the dev machine; the shared-memory
+# transports are all a single node needs (smcuda keeps CUDA IPC between ranks).
+# Measured: MPI_Init 5.6 s -> 0.8 s. Set HPCPERF_MPI_SINGLE_NODE=0 (or set
+# OMPI_MCA_pml / OMPI_MCA_btl yourself) for multi-node runs.
+if [ "${HPCPERF_MPI_SINGLE_NODE:-1}" = "1" ]; then
+    export OMPI_MCA_pml="${OMPI_MCA_pml:-ob1}"
+    export OMPI_MCA_btl="${OMPI_MCA_btl:-self,sm,smcuda}"
+fi
+
+# CUDA-aware MPI. The conda Open MPI is built with CUDA support, but its
+# etc/openmpi-mca-params.conf ships `opal_cuda_support = 0`, which makes the
+# accelerator component return NULL before any CUDA call -- passing a device
+# buffer to MPI_Send/Isend then segfaults (seen in ExaMiniMD, ExaMPM, and
+# every Cabana multi-rank halo exchange). Turn it on for every shell; the
+# environment overrides the conf file, and nothing in the repository is
+# modified. Set OMPI_MCA_opal_cuda_support=false yourself to disable.
+export OMPI_MCA_opal_cuda_support="${OMPI_MCA_opal_cuda_support:-true}"
+
+# ----------------------------------------------- 9. optional ROCm environment
 if [ -d /opt/rocm ]; then
     export ROCM_PATH=/opt/rocm
     _hpcperf_prepend PATH "$ROCM_PATH/bin"
