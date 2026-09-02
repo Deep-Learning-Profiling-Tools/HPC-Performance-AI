@@ -1,0 +1,72 @@
+###############################################################################
+# HPC-Performance-AI benchmark indat for pmkokkos (HACCabanaPM).
+#
+# Derived from upstream apps/demo/indat.params (kept verbatim alongside).  The
+# cosmology (HACC M000), seed and transfer function are unchanged; only the
+# problem size and the evolution window differ:
+#   NG/NP/RL  128 -> 256   (same 1 Mpc/h particle spacing; upstream's own
+#                          advice is "NG=256 or larger" for a loaded run)
+#   Z_FIN     50  -> 0.0   } upstream's validated reference window:
+#   N_STEPS    5  -> 500   } z=200 -> z=0 in 500 DKD steps
+# Sized for one NVIDIA B200 (~10-120 s wall for pm_run).
+###############################################################################
+
+
+OMEGA_CDM 0.22
+DEUT 0.02258
+OMEGA_NU 0.0
+HUBBLE 0.71
+SS8 0.8
+NS 0.963
+W_DE -1.0
+WA_DE 0.0
+T_CMB 2.726
+T_CMB_UU 2.726
+Z_DEC 129.0
+N_EFF_MASSLESS 0.0
+N_EFF_MASSIVE 0.0
+
+Z_IN 200.0
+USE_WHITE_NOISE_INIT YES
+TRANS CMB
+# pmkokkos resolves INPUT_BASE_NAME via the working directory; the demo
+# script copies cmbM000.tf next to the indat before invoking pm_ic.
+INPUT_BASE_NAME cmbM000.tf
+VELTRANSFER_BASE_NAME cmbM000.tf
+INPUT_TYPE INIT
+DISTRIBUTE_TYPE 170
+MAX_MINUTES 115
+PM_SUBCYCLE_REDSHIFT 300.00
+
+WRITE_IC YES
+USE_MPI_IO YES
+OUTPUT_BASE_NAME output/m000
+REFRESH_ALWAYS YES
+
+I_SEED 5126873
+NG 256
+NP 256
+RL 256.0
+Z_FIN 0.0
+N_STEPS 500
+N_SUB 4
+OL 4.0
+ANALYSIS_OL 8.0
+RSM 0.01
+RCB_TREE_PPN 256
+RCB_TREE_PPN_SPH 256
+USE_CBRNG YES
+
+NP_1 128
+NP_2 128
+SPEC_1 1
+SPEC_2 2
+CHECK_START_1 NO
+CHECK_START_2 NO
+GLASS_START_1 NO
+GLASS_START_2 NO
+GRID_OFFSET_1 0.0
+GRID_OFFSET_2 0.5
+
+CM_SIZE 4.0
+ALPHA 1.0

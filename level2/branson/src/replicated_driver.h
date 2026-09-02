@@ -1,0 +1,164 @@
+//----------------------------------*-C++-*----------------------------------//
+/*!
+ * \file   replicated_driver.h
+ * \author Alex Long
+ * \date   March 3 2017
+ * \brief  Functions to run IMC with a replicated domain
+ * \note   Copyright (C) 2017 Los Alamos National Security, LLC.
+ *         All rights reserved
+ */
+//---------------------------------------------------------------------------//
+
+#ifndef replicated_driver_h_
+#define replicated_driver_h_
+
+#include <functional>
+#include <iostream>
+#include <mpi.h>
+#include <vector>
+
+#include "config.h"
+#include "census_functions.h"
+#include "info.h"
+#include "imc_parameters.h"
+#include "imc_state.h"
+#include "photon.h"
+#include "photon_array.h" // Include PhotonArray
+#include "mesh.h"
+#include "message_counter.h"
+#include "mpi_types.h"
+#include "replicated_transport.h"
+#include "source.h"
+#include "timer.h"
+#include "write_silo.h"
+
+template <typename Census_T>
+void imc_replicated_driver(Mesh &mesh, IMC_State &imc_state,
+                           const IMC_Parameters &imc_parameters,
+                           const MPI_Types &mpi_types, const Info &mpi_info) {
+  using std::vector;
+  vector<double> abs_E(mesh.get_n_global_cells(), 0.0);
+  vector<double> track_E(mesh.get_n_global_cells(), 0.0);
+  Census_T census_photons;
+  auto n_user_photons = imc_parameters.get_n_user_photons();
+  Message_Counter mctr;
+  const int rank = mpi_info.get_rank();
+  const int n_ranks = mpi_info.get_n_rank();
+
+  const uint32_t seed = imc_parameters.get_rng_seed();
+
+  // gpu setup object holds data structures used in cycle, mesh needs to be resynced and
+  // tallies need to be reset every cycle
+  GPU_Setup<Census_T> gpu_setup(rank, n_ranks, imc_parameters.get_use_gpu_transporter_flag(), mesh.get_cells(), n_user_photons);
+
+  while (!imc_state.finished()) {
+    if (rank == 0)
+      imc_state.print_timestep_header();
+
+    mctr.reset_counters();
+
+    // set opacity, Fleck factor, all energy to source
+    mesh.calculate_photon_energy(imc_state, n_user_photons);
+
+    // reset gpu setup with new mesh cells, reset tallies, and update emission group data
+    gpu_setup.update_cells_and_reset_tallies(rank, n_ranks, mesh.get_cells(), n_user_photons);
+
+    // all reduce to get total source energy to make correct number of articles on each rank
+    double global_source_energy = mesh.get_total_photon_E();
+    MPI_Allreduce(MPI_IN_PLACE, &global_source_energy, 1, MPI_DOUBLE, MPI_SUM,
+                  MPI_COMM_WORLD);
+
+
+    // setup source
+    Timer t_source;
+    t_source.start_timer("source");
+
+    make_photons<Census_T>(imc_state.get_dt(), mesh, rank, imc_state.get_step(),  seed, n_user_photons, global_source_energy, gpu_setup);
+    auto &all_photons = gpu_setup.get_census_photons();
+    imc_state.set_pre_census_E(get_photon_list_census_E(all_photons));
+
+    // make emission and source photons
+    t_source.stop_timer("source");
+    if (rank ==0)
+      std::cout<<"source time: "<<t_source.get_time("source")<<std::endl;
+
+    imc_state.set_transported_particles(all_photons.size());
+
+    imc_state.print_memory_estimate(rank, n_ranks,  mesh.get_n_local_cells(), all_photons.size());
+
+    // Print theoretical batch memory calculation once at the start (for CPU event-based)
+    if (imc_parameters.get_transport_algorithm() == Constants::EVENT) {
+        if (rank == 0) {
+        auto event_batch_size = imc_parameters.get_event_batch_size();
+        size_t batch_memory = 0;
+        if constexpr (std::is_same_v<Census_T, std::vector<Photon>>) {
+          batch_memory = event_batch_size * sizeof(Photon);
+          std::cout << "\n=== AoS CPU Event Batch Memory Estimate ===" << std::endl;
+        }
+        else if constexpr (std::is_same_v<Census_T, PhotonArray>) {
+          batch_memory =
+            event_batch_size * sizeof(uint32_t) +          // cell_ID vector
+            event_batch_size * sizeof(uint32_t) +          // group vector
+            event_batch_size * sizeof(uint32_t) +          // source_type vector
+            event_batch_size * sizeof(unsigned char) +      // descriptors vector
+            event_batch_size * sizeof(std::array<double, 3>) + // position vector
+            event_batch_size * sizeof(std::array<double, 3>) + // angle vector
+            event_batch_size * sizeof(double) +            // E vector
+            event_batch_size * sizeof(double) +            // E0 vector
+            event_batch_size * sizeof(double) +            // life_dx vector
+            event_batch_size * sizeof(RNG);                // rng vector
+          std::cout << "\n=== SoA CPU Event Batch Memory Estimate ===" << std::endl;
+        }
+         if (event_batch_size > 0) {
+              double batch_mb = static_cast<double>(batch_memory) / (1024.0 * 1024.0);
+              std::cout << "Batch size: " << event_batch_size << " particles" << std::endl;
+              std::cout << "Batch memory: " << batch_memory << " bytes (" << batch_mb << " MB)" << std::endl;
+              std::cout << "Bytes per particle: " << static_cast<double>(batch_memory) / event_batch_size << std::endl;
+         }
+      }
+    }
+
+    // add barrier here to make sure the transport timer starts at roughly the same time
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    replicated_transport<Census_T>(mesh, gpu_setup, imc_state, abs_E, track_E, all_photons, imc_parameters);
+
+    // reduce the abs_E and the track weighted energy (for T_r)
+    MPI_Allreduce(MPI_IN_PLACE, &abs_E[0], mesh.get_n_global_cells(),
+                  MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &track_E[0], mesh.get_n_global_cells(),
+                  MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    mesh.update_temperature(abs_E, track_E, imc_state);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    // for replicated, just let root do conservation
+    if (rank) {
+      imc_state.set_absorbed_E(0.0);
+      imc_state.set_pre_mat_E(0.0);
+      imc_state.set_post_mat_E(0.0);
+    }
+
+    imc_state.print_conservation(imc_parameters.get_dd_mode());
+
+    // write SILO file if it's enabled and it's the right cycle
+    if (imc_parameters.get_write_silo_flag() &&
+        !(imc_state.get_step() % imc_parameters.get_output_frequency())) {
+      // write SILO file
+      double fake_mpi_runtime = 0.0;
+      constexpr bool replicated_flag = true;
+      write_silo(mesh, imc_state.get_time(), imc_state.get_step(),
+                 imc_state.get_rank_transport_runtime(), fake_mpi_runtime, rank,
+                 n_ranks, replicated_flag);
+    }
+
+    // update time for next step
+    imc_state.next_time_step();
+  }
+}
+
+#endif // replicated_driver_h_
+
+//---------------------------------------------------------------------------//
+// end of replicated_driver.h
+//---------------------------------------------------------------------------//
