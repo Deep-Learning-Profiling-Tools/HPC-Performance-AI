@@ -101,6 +101,22 @@ node need `HPCPERF_MPI_SINGLE_NODE=1`** (the `mpi_cuda_check` tool sets the
 shared-memory transport itself for this reason). The profile is cleanly
 reversible: re-sourcing with it unset clears exactly what it set.
 
+**GPU-aware MPI (hypre / MFEM).** The bundled hypre and MFEM are built with
+`HYPRE_ENABLE_GPU_AWARE_MPI=OFF` -- the validated default. A GPU-aware **ON**
+variant was also built (`.deps/install/{hypre,mfem}-gpuaware`, not disturbing
+the default tree) and checked at 4 rank x 4 B200 under the SM transport:
+AMG2023 (19 iterations, residual `7.582795e-13`), Laghos (`-gam`, energy
+`3.3909635545e+03`) and Remhos (`-gam`, mass `0.1163086683`) all reproduce the
+OFF results to the last printed digit; the FOM difference is within run-to-run
+noise on a loaded node. It is **not** made the Level 2 default, deliberately:
+(1) with GPU-aware ON, hypre passes device buffers to MPI internally, which
+would hang on this node's default UCX transport unless the SM profile is used,
+whereas OFF is safe under either transport; (2) single-node `smcuda` already
+moves data by CUDA IPC, so the GPU-aware (RDMA) benefit is a multi-node / at-
+scale property not measurable here; (3) the validated OFF dependency tree
+should not be disturbed. Revisit ON with a controlled A/B on an idle or
+multi-node allocation.
+
 **Rank-to-GPU binding differs by framework:**
 
 - *Automatic* -- no wrapper needed: hypre (AMG2023) via `hypre_bind_device`;
