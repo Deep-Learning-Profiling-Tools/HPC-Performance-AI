@@ -68,6 +68,31 @@ libfabric probing that cost ~5 s per `MPI_Init` on the dev machine; set
 device buffers to MPI and segfault without it), and oversubscription inside a
 Slurm allocation so that `mpirun -np N` works with fewer allocated tasks.
 
+## Multi-rank / multi-GPU runs
+
+Verified 2026-09-03 on a 4x B200 allocation (64 CPUs, 800 GB): a bare
+CUDA-aware MPI test (device-buffer ring + Allreduce over 4 ranks, one GPU
+each) passes, and Laghos, AMG2023, ExaMiniMD, HACCabanaPM and CloverLeaf all
+run correctly with `mpirun --oversubscribe -np 4` (Laghos reproduces the
+upstream reference energies to all printed digits; HACCabanaPM passes its full
+validation at a 2x2x1 topology). Two things to know:
+
+- **Rank-to-GPU binding differs by framework.** hypre (AMG2023) binds each
+  rank to a GPU by itself (`hypre_bind_device`), and Kokkos/Cabana apps map
+  the device by local MPI rank automatically. MFEM apps (Laghos, Remhos) and
+  the flag-based backends (e.g. CloverLeaf `--device`) default every rank to
+  GPU 0 -- give each rank its own GPU with a wrapper:
+
+  ```bash
+  mpirun --oversubscribe -np 4 bash -c \
+    'CUDA_VISIBLE_DEVICES=$OMPI_COMM_WORLD_LOCAL_RANK exec "$@"' -- <exe> <args>
+  ```
+
+- **The standard decks are sized for one GPU.** Strong-scaling them across 4
+  GPUs is communication-bound (e.g. ExaMiniMD 160^3: 49 s of a 53 s run is
+  halo exchange); grow the problem with the per-app size overrides for
+  meaningful multi-GPU measurements.
+
 ## Status legend
 
 - `Working` -- configure + build + run + correctness validation all verified on
