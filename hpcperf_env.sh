@@ -142,24 +142,34 @@ export NVCC_WRAPPER_DEFAULT_COMPILER="$CXX"
 if [ -n "${SLURM_JOB_ID:-}" ]; then
     export PRTE_MCA_rmaps_default_mapping_policy="${PRTE_MCA_rmaps_default_mapping_policy:-:oversubscribe}"
 fi
-# All Level 2 runs are single-node. Open MPI's default component selection
-# (pml ucx, btl ofi/uct) probes every InfiniBand / libfabric device at start-up,
-# which costs ~5 s in every MPI_Init on the dev machine; the shared-memory
-# transports are all a single node needs (smcuda keeps CUDA IPC between ranks).
-# Measured: MPI_Init 5.6 s -> 0.8 s. Set HPCPERF_MPI_SINGLE_NODE=0 (or set
-# OMPI_MCA_pml / OMPI_MCA_btl yourself) for multi-node runs.
-if [ "${HPCPERF_MPI_SINGLE_NODE:-1}" = "1" ]; then
+# Optional single-node MPI transport profile (OPT-IN, off by default). By
+# default no PML/BTL is forced: Open MPI / the site stack chooses the
+# transport itself. Setting HPCPERF_MPI_SINGLE_NODE=1 pins the shared-memory
+# transports (smcuda keeps CUDA IPC between ranks), which skips the
+# InfiniBand / libfabric probing that costs ~5 s in every MPI_Init on the dev
+# machine (measured: 5.6 s -> 0.8 s). Useful for tight single-node run loops;
+# never use it for multi-node runs. Re-sourcing with the variable unset (or
+# =0) explicitly clears exactly what the profile set (via the _HPCPERF
+# sentinel), so no values linger from an earlier source -- values you set
+# yourself are never touched.
+if [ "${HPCPERF_MPI_SINGLE_NODE:-0}" = "1" ]; then
     export OMPI_MCA_pml="${OMPI_MCA_pml:-ob1}"
     export OMPI_MCA_btl="${OMPI_MCA_btl:-self,sm,smcuda}"
+    export _HPCPERF_MPI_SN_PROFILE=1
+elif [ "${_HPCPERF_MPI_SN_PROFILE:-0}" = "1" ]; then
+    unset OMPI_MCA_pml OMPI_MCA_btl _HPCPERF_MPI_SN_PROFILE
 fi
 
-# CUDA-aware MPI. The conda Open MPI is built with CUDA support, but its
+# CUDA-aware MPI (REQUESTED here; runtime capability is a separate check).
+# The conda Open MPI is built with CUDA support, but its
 # etc/openmpi-mca-params.conf ships `opal_cuda_support = 0`, which makes the
 # accelerator component return NULL before any CUDA call -- passing a device
 # buffer to MPI_Send/Isend then segfaults (seen in ExaMiniMD, ExaMPM, and
 # every Cabana multi-rank halo exchange). Turn it on for every shell; the
 # environment overrides the conf file, and nothing in the repository is
 # modified. Set OMPI_MCA_opal_cuda_support=false yourself to disable.
+# To CONFIRM the capability actually works at runtime (device-buffer MPI
+# traffic, numerically checked), run: ./check_env.sh --mpi-cuda
 export OMPI_MCA_opal_cuda_support="${OMPI_MCA_opal_cuda_support:-true}"
 
 # ----------------------------------------------- 9. optional ROCm environment

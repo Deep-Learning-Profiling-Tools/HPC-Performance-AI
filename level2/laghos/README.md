@@ -113,7 +113,17 @@ except for one file:
   pragma removes only dead replicas: same instructions executed, same
   numerical results (all 16 built-in `--checks` at 1e-13 relative and all
   eight README reference runs reproduce to the last printed digit, see
-  Validation).
+  Validation; a 4 rank x 4 B200 run also reproduces the 1-rank energies to
+  the last printed digit).
+
+  **Status of this workaround:** *Blackwell / CUDA 13.2 source-level compiler
+  workaround; performance impact pending A/B validation.* Correctness is
+  established (identical results at 1 and 4 ranks), but that does not by itself
+  prove the pragma has no runtime cost on the `UpdateQuadratureData` kernel.
+  It is kept as-is; a proper A/B of vanilla vs patched Laghos runtime / FOM /
+  kernel latency should be done on a Hopper (sm_90) or fixed-CUDA machine where
+  the vanilla file compiles, before this is described as a pure build-only
+  compatibility change.
 
   **Measured effect** (same nvcc flags, `-O3`, sm_100): `laghos_solver.cpp`
   now compiles in 16 s (cicc 5 s, 1.1 MB of PTX) instead of failing after

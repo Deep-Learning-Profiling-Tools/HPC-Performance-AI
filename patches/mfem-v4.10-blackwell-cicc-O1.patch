@@ -2,12 +2,13 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 4162042..5ca4f2d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -691,6 +691,22 @@ endforeach()
+@@ -691,6 +691,26 @@ endforeach()
  
  if (MFEM_USE_CUDA)
    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE CUDA)
-+  # HPC-Performance-AI (patches/mfem-v4.10-blackwell-cicc-O1.patch): with CUDA
-+  # 13.2 targeting Blackwell (sm_100) the device front end (cicc) at its default
++  # HPC-Performance-AI (patches/mfem-v4.10-blackwell-cicc-O1.patch):
++  # DEPENDENCY BUILD WORKAROUND, not a benchmark optimization. With CUDA 13.2
++  # targeting Blackwell (sm_100) the device front end (cicc) at its default
 +  # -O3 takes hours on the translation units below (measured on a B200 host:
 +  # bilininteg_convection_ea >11 h, unfinished, 140 MB of PTX; lor_batched 5.2 h;
 +  # bilininteg_diffusion_ea 1.6 h; the same files build in seconds to minutes
@@ -15,7 +16,10 @@ index 4162042..5ca4f2d 100644
 +  # Only the device optimization level of these three files is lowered; they
 +  # hold element-assembly (AssemblyLevel::ELEMENT) and batched-LOR kernels,
 +  # which neither Laghos nor Remhos ever executes.
-+  if (CMAKE_CUDA_ARCHITECTURES MATCHES "(^|;)1[0-9][0-9]")
++  # Scope: verified ONLY with MFEM v4.10 + CUDA 13.2 + sm_100, so the guard
++  # matches the Blackwell 10x family, not every future arch >= 100. After a
++  # CUDA toolkit upgrade, retry the vanilla build (drop this patch) first.
++  if (CMAKE_CUDA_ARCHITECTURES MATCHES "(^|;)10[0-9]")
 +    set_source_files_properties(
 +      ${PROJECT_SOURCE_DIR}/fem/integ/bilininteg_convection_ea.cpp
 +      ${PROJECT_SOURCE_DIR}/fem/integ/bilininteg_diffusion_ea.cpp

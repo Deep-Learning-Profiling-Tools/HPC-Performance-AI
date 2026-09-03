@@ -3,12 +3,24 @@
 #
 # Usage:
 #   source hpcperf_env.sh
-#   ./check_env.sh
+#   ./check_env.sh                 # environment version report (read-only)
+#   ./check_env.sh --mpi-cuda [NP] # ALSO run the CUDA-aware MPI runtime smoke
+#                                  # test (default NP=2; builds a tiny binary)
 #
 # Compares the active environment against the versions this suite was
 # validated with, printing [OK]/[WARN]/[FAIL]/[INFO] per component and
-# Expected/Actual on any mismatch. Read-only.
+# Expected/Actual on any mismatch. The plain form is read-only; --mpi-cuda
+# additionally compiles and runs level2/tools/mpi_cuda_check.
 set -u
+
+DO_MPI_CUDA=0; MPI_CUDA_NP=2
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --mpi-cuda) DO_MPI_CUDA=1; shift
+                    case "${1:-}" in ''|-*) : ;; *) MPI_CUDA_NP="$1"; shift ;; esac ;;
+        *) echo "check_env.sh: unknown argument '$1'" >&2; exit 2 ;;
+    esac
+done
 
 # Validated environment (what the pinned environment.yml + dev machine provide)
 EXP_GCC="13.3.0"
@@ -118,7 +130,7 @@ if command -v mpicxx >/dev/null 2>&1; then
         "$ROOT"/.conda_env/*) ok "mpicxx resolves into project env" ;;
         *) warn "mpicxx does not resolve into $ROOT/.conda_env: $(command -v mpicxx)" ;;
     esac
-    info "MPI runtime defaults: pml=${OMPI_MCA_pml:-<default>} btl=${OMPI_MCA_btl:-<default>} (single-node; HPCPERF_MPI_SINGLE_NODE=0 to unset); opal_cuda_support=${OMPI_MCA_opal_cuda_support:-<conf file: 0>}"
+    info "MPI transport: pml=${OMPI_MCA_pml:-<default/UCX>} btl=${OMPI_MCA_btl:-<default>}; single-node SM profile is opt-in (HPCPERF_MPI_SINGLE_NODE=1). opal_cuda_support=${OMPI_MCA_opal_cuda_support:-<conf file: 0>} (run ./check_env.sh --mpi-cuda to confirm the runtime capability)"
 else
     warn "mpicxx not found -- Level 2 mini-apps need MPI (re-run setup_env.sh to update .conda_env)"
 fi
@@ -135,6 +147,23 @@ if [ -d "$ROOT/.deps/install" ]; then
     done
 else
     info "Level 2 framework libraries not built (run ./setup_level2_deps.sh; only needed for Level 2)"
+fi
+
+# --- CUDA-aware MPI runtime capability (opt-in: --mpi-cuda)
+if [ "$DO_MPI_CUDA" = "1" ]; then
+    if ! command -v mpicc >/dev/null 2>&1; then
+        fail "CUDA-aware MPI: mpicc not found (source hpcperf_env.sh first)"
+    else
+        info "CUDA-aware MPI requested: OMPI_MCA_opal_cuda_support=${OMPI_MCA_opal_cuda_support:-<conf file: 0>}"
+        out="$("$ROOT/level2/tools/mpi_cuda_check/run.sh" "$MPI_CUDA_NP" 2>&1)"
+        rc=$?
+        echo "$out" | grep -E 'mpi_cuda_check:|rank [0-9]' | sed 's/^/       /'
+        if [ "$rc" = 0 ]; then
+            ok "CUDA-aware MPI runtime capability confirmed (device-buffer MPI, ${MPI_CUDA_NP} ranks, numerically checked)"
+        else
+            fail "CUDA-aware MPI runtime check failed (rc=$rc; see output above)"
+        fi
+    fi
 fi
 
 # --- ROCm (optional; HIP backends are unverified without it)
