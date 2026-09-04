@@ -51,10 +51,10 @@ fi
 RUN_DIR="$BUILD_DIR/run"
 mkdir -p "$RUN_DIR"
 
-N_RANKS="${HPCPERF_GPUS:-${HPCPERF_NP:-1}}"
-if [ "$N_RANKS" = all ]; then
-    N_RANKS="$(( ${SLURM_JOB_NUM_NODES:-1} * ${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')} ))"
-fi
+# shellcheck disable=SC1091
+source "$R/level2/tools/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks examinimd yes)" || exit 2
+hpcperf_forbid_args examinimd -il -- "$@" || exit 2   # the deck is generated and size-checked here
 MODE="${HPCPERF_SCALE_MODE:-strong}"
 STEPS="${HPCPERF_EXAMINIMD_STEPS:-1000}"
 THERMO="${HPCPERF_EXAMINIMD_THERMO:-100}"
@@ -68,7 +68,8 @@ else
         smoke)  LX=40; LY=40; LZ=40; STEPS="${HPCPERF_EXAMINIMD_STEPS:-100}" ;;
         strong) L="${HPCPERF_EXAMINIMD_LATTICE:-160}"; LX=$L; LY=$L; LZ=$L ;;
         weak)   L="${HPCPERF_EXAMINIMD_LOCAL:-100}"
-                read -r PX PY PZ <<< "$("$R/level2/tools/hpcperf_topology.py" "$N_RANKS")"
+                TOPO="$(hpcperf_topology examinimd "$N_RANKS")" || exit 2
+                read -r PX PY PZ <<< "$TOPO"
                 LX=$((L * PX)); LY=$((L * PY)); LZ=$((L * PZ)) ;;
         *) echo "run.sh: HPCPERF_SCALE_MODE must be smoke|strong|weak (got '$MODE')" >&2; exit 2 ;;
     esac

@@ -62,19 +62,36 @@ fi
 # ~13 ms per CG iteration; a handful of threads is plenty for a GPU run.
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 
-NP="${HIPBONE_NP:-1}"
-MPIRUN=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    MPIRUN+=(--oversubscribe)
-fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+if [ -n "${HIPBONE_NP:-}" ] && [ -z "${HPCPERF_GPUS:-}${HPCPERF_NP:-}" ]; then export HPCPERF_NP="$HIPBONE_NP"; fi   # legacy alias
+N_RANKS="$(hpcperf_ranks hipbone no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP/HIPBONE_NP); no scale modes yet
 
 if [ $# -gt 0 ]; then
     ARGS=("$@")
 else
     ARGS=(-nx 24 -ny 24 -nz 24 -p 14)
 fi
+# hipBone distributes the box over a px x py x pz rank grid: without explicit
+# -px/-py/-pz the rank count must be a perfect cube (LIBP_ABORT otherwise);
+# with them the product must equal the rank count. Checked here, not left to
+# a crash inside the app.
+if [ "$N_RANKS" -gt 1 ]; then
+    _px=""; _py=""; _pz=""; _prev=""
+    for _a in "${ARGS[@]}"; do
+        case "$_prev" in -px) _px="$_a";; -py) _py="$_a";; -pz) _pz="$_a";; esac; _prev="$_a"
+    done
+    if [ -n "$_px$_py$_pz" ]; then
+        [ -n "$_px" ] && [ -n "$_py" ] && [ -n "$_pz" ] || { echo "run.sh: give all three of -px -py -pz" >&2; exit 2; }
+        [ $(( _px * _py * _pz )) -eq "$N_RANKS" ] || { echo "run.sh: -px $_px -py $_py -pz $_pz product $((_px*_py*_pz)) != $N_RANKS ranks" >&2; exit 2; }
+    else
+        _c="$(python3 -c 'import sys; n=int(sys.argv[1]); c=round(n**(1/3)); print(c if c**3==n else 0)' "$N_RANKS")"
+        [ "$_c" -gt 0 ] || { echo "run.sh: $N_RANKS ranks is not a perfect cube; pass -px -py -pz with product $N_RANKS (e.g. from level2/tools/hpcperf_topology.py $N_RANKS)" >&2; exit 2; }
+    fi
+fi
+# One rank per GPU through the common launcher; hipBone binds each rank to its
+# node-local GPU itself (hostname-based local rank), so the launcher only audits.
+MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind app --)
 
 cd "$BUILD"
 echo "== hipBone $BACKEND: ${MPIRUN[*]} ./hipBone -m $BACKEND ${ARGS[*]}  (OMP_NUM_THREADS=$OMP_NUM_THREADS)"

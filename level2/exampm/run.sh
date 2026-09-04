@@ -96,13 +96,22 @@ export OMP_PLACES="${OMP_PLACES:-threads}"
 # non-periodic and a single rank has no neighbour, so it runs either way.
 export OMPI_MCA_opal_cuda_support="${OMPI_MCA_opal_cuda_support:-true}"
 
-NP="${HPCPERF_NP:-1}"
-LAUNCH=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    LAUNCH+=(--oversubscribe)
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks exampm no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+# The upstream examples hard-code a 1 x N x 1 slab decomposition along Y and
+# never check that a slab is at least the halo width (3 cells); thinner slabs
+# would be silently wrong. cell size = first deck argument, Y cells = 1/cell.
+if [ "$N_RANKS" -gt 1 ]; then
+    _ycells="$(python3 -c 'import sys; c=float(sys.argv[1]); print(int(round(1.0/c)))' "${ARGS[0]}" 2>/dev/null || echo 0)"
+    if [ "$_ycells" -lt $(( 3 * N_RANKS )) ]; then
+        echo "run.sh: ExaMPM decomposes only along Y (1x${N_RANKS}x1): $_ycells Y-cells / $N_RANKS ranks < 3-cell halo; refine the cell size (arg 1) or use fewer ranks" >&2
+        exit 2
+    fi
 fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# One rank per GPU through the common launcher; Kokkos binds each rank to its
+# GPU by local rank, so the launcher only audits (--bind app).
+LAUNCH=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind app --)
 
 # ExaMPM writes its particle dumps into the cwd: run inside the build tree.
 RUN_DIR="${HPCPERF_EXAMPM_RUN_DIR:-$BUILD_DIR/run}"

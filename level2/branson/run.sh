@@ -40,7 +40,6 @@ fi
 BUILD="$R/build/level2/branson/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 EXE="$BUILD/BRANSON"
 DECK="$HERE/inputs/3D_hohlraum_single_node.xml"
-NP="${HPCPERF_NP:-1}"
 
 if [ ! -x "$EXE" ]; then
     echo "error: $EXE not found -- run $HERE/build.sh $BACKEND first" >&2
@@ -51,12 +50,14 @@ if ! command -v mpirun >/dev/null 2>&1; then
     exit 1
 fi
 
-MPIRUN=( mpirun -np "$NP" )
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    MPIRUN+=(--oversubscribe)
-fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks branson no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+# One rank per GPU through the common launcher. Branson's own set_device_ID()
+# uses the GLOBAL rank modulo the visible device count; with the wrapper each
+# rank sees exactly one device, which makes that mapping correct under any
+# rank placement (--bind wrapper).
+MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
 
 echo "== Branson $BACKEND: ${MPIRUN[*]} $EXE $DECK $*"
 exec "${MPIRUN[@]}" "$EXE" "$DECK" "$@"

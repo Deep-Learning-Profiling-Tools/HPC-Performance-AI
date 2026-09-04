@@ -51,15 +51,18 @@ fi
 OUT_DIR="$BUILD_DIR/run"
 mkdir -p "$OUT_DIR"
 
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks tealeaf no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+hpcperf_forbid_args tealeaf --device -d -- "$@" || exit 2   # per-rank GPU comes from the launcher's wrapper
 LAUNCH=()
 if grep -q '^ENABLE_MPI:[A-Z]*=ON' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
-    NP="${HPCPERF_NP:-1}"
-    LAUNCH=(mpirun -np "$NP")
-    if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-        echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-        LAUNCH+=(--oversubscribe)
-    fi
-    # For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+    # One rank per GPU through the common launcher; TeaLeaf's --device is one
+    # shared value for all ranks, so the wrapper narrows CUDA_VISIBLE_DEVICES.
+    LAUNCH=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
+elif [ "$N_RANKS" -ne 1 ]; then
+    echo "run.sh: this TeaLeaf build has ENABLE_MPI=OFF but $N_RANKS ranks were requested" >&2
+    exit 2
 fi
 
 echo "# TeaLeaf $BACKEND: ${LAUNCH[*]:-} $EXE --file $DECK"

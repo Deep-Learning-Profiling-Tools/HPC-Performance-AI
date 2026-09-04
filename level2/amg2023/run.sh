@@ -53,30 +53,29 @@ PROBLEM="${HPCPERF_AMG_PROBLEM:-1}"
 MODE="${HPCPERF_SCALE_MODE:-weak}"
 
 # ----- rank count (one per GPU); HPCPERF_AMG_P may imply it for compatibility
-N_RANKS="${HPCPERF_GPUS:-${HPCPERF_NP:-}}"
+# shellcheck disable=SC1091
+source "$R/level2/tools/hpcperf_launch_common.sh"
+hpcperf_forbid_args amg2023 -P -n -- "$@" || exit 2   # topology/size only via the checked variables
 if [ -n "${HPCPERF_AMG_P:-}" ]; then
     read -r PX PY PZ <<< "$HPCPERF_AMG_P"
     P_PROD=$((PX * PY * PZ))
-    if [ -z "$N_RANKS" ]; then N_RANKS=$P_PROD
-    elif [ "$N_RANKS" != all ] && [ "$N_RANKS" -ne "$P_PROD" ]; then
-        echo "run.sh: HPCPERF_AMG_P=$HPCPERF_AMG_P (product $P_PROD) does not match HPCPERF_GPUS=$N_RANKS" >&2
-        exit 2
-    fi
+    if [ -z "${HPCPERF_GPUS:-}${HPCPERF_NP:-}" ]; then export HPCPERF_GPUS="$P_PROD"; fi
 fi
-N_RANKS="${N_RANKS:-1}"
-if [ "$N_RANKS" = all ]; then
-    N_RANKS="$(( ${SLURM_JOB_NUM_NODES:-1} * ${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')} ))"
+N_RANKS="$(hpcperf_ranks amg2023 yes)" || exit 2
+if [ -n "${HPCPERF_AMG_P:-}" ] && [ "$N_RANKS" -ne "$P_PROD" ]; then
+    echo "run.sh: HPCPERF_AMG_P=$HPCPERF_AMG_P (product $P_PROD) does not match the rank count $N_RANKS (HPCPERF_GPUS)" >&2
+    exit 2
 fi
 
 # ----- topology
 if [ -z "${HPCPERF_AMG_P:-}" ]; then
     if [ "$MODE" = strong ]; then
         G="${HPCPERF_AMG_GLOBAL:-512}"
-        read -r PX PY PZ <<< "$("$R/level2/tools/hpcperf_topology.py" "$N_RANKS" --divides "$G,$G,$G")" \
-            || { echo "run.sh: no topology for $N_RANKS ranks dividing the ${G}^3 global grid (see message above)" >&2; exit 2; }
+        TOPO="$(hpcperf_topology amg2023 "$N_RANKS" --divides "$G,$G,$G")" || exit 2
     else
-        read -r PX PY PZ <<< "$("$R/level2/tools/hpcperf_topology.py" "$N_RANKS")"
+        TOPO="$(hpcperf_topology amg2023 "$N_RANKS")" || exit 2
     fi
+    read -r PX PY PZ <<< "$TOPO"
 fi
 
 # ----- local size per mode

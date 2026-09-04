@@ -117,10 +117,19 @@ export CUDAARCHS="${CUDAARCHS:-native}"
 
 # ------------------------------------- 8. Level 2 framework libraries (.deps)
 # setup_level2_deps.sh installs Kokkos, RAJA, hypre, MFEM, Cabana, heFFTe, ...
-# into .deps/install/<name>. Expose every installed prefix to CMake so the
-# Level 2 mini-apps find them with plain find_package().
-if [ -d "$HPC_PERFORMANCE_AI_ROOT/.deps/install" ]; then
-    for _dep in "$HPC_PERFORMANCE_AI_ROOT"/.deps/install/*/; do
+# into the install root of ONE dependency profile (HPCPERF_DEPS_PROFILE,
+# default "level2" = .deps/install/<name>; any other value = the isolated tree
+# .deps/<profile>/install/<name>, e.g. level3). Exactly that profile's marked
+# prefixes (.hpcperf-built present) go on CMAKE_PREFIX_PATH -- never two
+# profiles at once, and never unmarked/experimental installs.
+_hpcperf_deps_profile="${HPCPERF_DEPS_PROFILE:-level2}"
+if [ "$_hpcperf_deps_profile" = level2 ]; then
+    _hpcperf_deps_root="$HPC_PERFORMANCE_AI_ROOT/.deps/install"
+else
+    _hpcperf_deps_root="$HPC_PERFORMANCE_AI_ROOT/.deps/$_hpcperf_deps_profile/install"
+fi
+if [ -d "$_hpcperf_deps_root" ]; then
+    for _dep in "$_hpcperf_deps_root"/*/; do
         _dep="${_dep%/}"
         [ -f "$_dep/.hpcperf-built" ] || continue
         # The *environment* variable CMAKE_PREFIX_PATH is ':'-separated (like PATH).

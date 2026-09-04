@@ -54,10 +54,10 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP] [extra laghos args]" >&2; exit 2 ;;
 esac
 
-N_RANKS="${HPCPERF_GPUS:-${HPCPERF_NP:-1}}"
-if [ "$N_RANKS" = all ]; then
-    N_RANKS="$(( ${SLURM_JOB_NUM_NODES:-1} * ${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')} ))"
-fi
+# shellcheck disable=SC1091
+source "$R/level2/tools/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks laghos yes)" || exit 2
+hpcperf_forbid_args laghos -m -rs -rp -epm -nx -ny -nz -dev -d -- "$@" || exit 2   # mesh/size/device only via the checked variables
 MODE="${HPCPERF_SCALE_MODE:-strong}"
 
 if [ -n "${HPCPERF_LAGHOS_ARGS:-}" ]; then
