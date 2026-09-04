@@ -1,0 +1,69 @@
+//----------------------------------*-C++-*----------------------------------//
+/*!
+ * \file   constants.h
+ * \author Alex Long
+ * \date   July 18 2014
+ * \brief  Physical constants, custom enumerations and MPI tags
+ * \note   Copyright (C) 2017 Los Alamos National Security, LLC.
+ *         All rights reserved
+ */
+//---------------------------------------------------------------------------//
+
+#ifndef constants_h_
+#define constants_h_
+
+namespace Constants {
+constexpr double pi(3.1415926535897932384626433832795); //!< Pi
+constexpr double sqrt_pi(1.7724538509055159); //!< Pi**0.5
+
+constexpr double c(299.792458); //!< speed of light in cm/shake
+constexpr double inv_c(1.0/c); //!< inverse speed of light in shake/cm
+constexpr double c_SO(1.0);     //!< speed of light for Su-Olson problem
+constexpr double h(6.62606957e-34 * 1.0e-9 /
+               1.0e-8);      //!< Planck's constant in GJ/sh
+constexpr double k(1.60219e-31); //!< energy conversion constant GJ/keV
+constexpr double a(0.01372);     //!< Boltzmann constant in GJ/cm^3/keV^4
+constexpr double a_SO(1.0);      //!< Boltzmann constant for SO problems
+constexpr double cutoff_fraction = 0.01; // note: get this from IMC_state in the future
+//constexpr double cutoff_fraction = 1.0e-6; // note: get this from IMC_state in the future
+
+// parameters used in intensive scattering
+constexpr double m_1 = 495.0;       // keV
+constexpr double one_over_m_1 = 1.0 / m_1; // 1/keV
+constexpr double intensive_scatter_fraction = 0.1; // this fraction of scatters will add more work
+constexpr double lower_frequency_bound = 0.01; // keV
+constexpr double upper_frequency_bound = 100.0; // keV
+constexpr double delta_frequency_bounds=upper_frequency_bound - lower_frequency_bound; // keV
+
+enum bc_type { REFLECT, VACUUM, ELEMENT, SOURCE, PROCESSOR }; //!< Boundary conditions
+enum dir_type { X_NEG, X_POS, Y_NEG, Y_POS, Z_NEG, Z_POS }; //!< Directions
+enum event_type : unsigned char { EXIT, PASS, CENSUS, SCATTER, KILLED, BOUND, BORN_SOURCE }; //!< Events
+enum source_particle_type {CENSUS_SOURCE, BOUNDARY_SOURCE, EMISSION_SOURCE};
+enum {
+  PARTICLE_PASS,
+  REPLICATED
+};                                 //!< Parallel types
+enum {AOS, SOA};                   //!< Particle array types
+enum {HISTORY, EVENT};             //!< Transport algorithm
+enum { NO_DECOMP, METIS, CUBE };   //!< Mesh decomposition method
+constexpr int grip_id_tag(1);          //!< MPI tag for grip ID messages
+constexpr int cell_id_tag(2);          //!< MPI tag for requested cell ID messages
+constexpr int count_tag(3);            //!< MPI tag for completion count messages
+constexpr int photon_tag(4);           //!< MPI tag for photon messages
+constexpr int n_photon_tag(5);         //!< MPI tag for work packet messages
+constexpr int work_tag(6);             //!< MPI tag for work packet messages
+constexpr int n_work_tag(7);           //!< MPI tag for work packet messages
+constexpr int tally_tag(8);            //!< MPI tag for tally messages
+constexpr int n_tally_tag(9);          //!< MPI tag for number of tally messages
+
+//! MPI tag for cell messages NOTE: the number of grips in the message will
+// added to the end of this number
+constexpr int cell_tag(10);
+
+constexpr int n_threads_per_block = 128;
+}; // namespace Constants
+
+#endif // constants_h_
+//---------------------------------------------------------------------------//
+// end of constants.h
+//---------------------------------------------------------------------------//

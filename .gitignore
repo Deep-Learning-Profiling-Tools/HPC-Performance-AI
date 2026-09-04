@@ -3,6 +3,7 @@
 .venv/
 .tools/
 _upstream/
+.deps/
 build/
 cmake-build-*/
 results/

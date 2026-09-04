@@ -1,0 +1,377 @@
+//----------------------------------*-C++-*-----------------------------------//
+/*!
+ * \file   config.h.in
+ * \author Alex Long
+ * \date   July 25 2016
+ * \brief  Config file that CMake uses to generate config.h given available
+ *  libraries
+ * \note   Copyright (C) 2017 Los Alamos National Security, LLC.
+ *         All rights reserved
+ */
+//----------------------------------------------------------------------------//
+
+#ifndef config_h_
+#define config_h_
+
+#include <mpi.h>
+#include <cstddef>
+#include <cstdint>
+
+#cmakedefine VIZ_LIBRARIES_FOUND
+#cmakedefine METIS_FOUND
+#cmakedefine caliper_FOUND
+#cmakedefine MOONLIGHT_NODE
+#cmakedefine SNOW_NODE
+#cmakedefine TRINITITE_NODE
+#cmakedefine TRINITY_NODE
+#cmakedefine CCS_NODE
+
+#cmakedefine USE_OPENMP
+#cmakedefine USE_UMPIRE
+
+// For faux multigroup array sizing
+#cmakedefine BRANSON_N_GROUPS @BRANSON_N_GROUPS@
+
+#cmakedefine ENABLE_VERBOSE_GPU_TRANSPORT @ENABLE_VERBOSE_GPU_TRANSPORT@
+
+/*----------------------------------------------------------------------------*/
+/* Mark functions for compilation on host and device */
+
+
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
+
+#ifdef caliper_FOUND
+#include <caliper/cali.h>
+#include <adiak.hpp>
+#endif
+
+// since the main.cc as marked as a CUDA file in CUDA mode, this allows the tests to compile
+// without marking them as cuda files (CMake doesn't point to include paths for cuda if it's a
+// C++ main)
+#ifdef __NVCC__
+#define USE_CUDA ON
+#define USE_GPU ON
+static constexpr uint32_t WARP_SIZE=32;
+#endif
+
+#ifdef __HIPCC__
+#define USE_HIP ON
+#define USE_GPU
+static constexpr uint32_t WARP_SIZE=64;
+#endif
+
+/*------------------------------------------------------------------------------------------------*/
+/* HIP Support */
+#ifdef USE_HIP
+#define HIP_ENABLE_WARP_SYNC_BUILTINS
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
+#define cudaDevAttrClockRate hipDeviceAttributeClockRate
+#define cudaDevAttrMaxRegistersPerBlock hipDeviceAttributeMaxRegistersPerBlock
+#define cudaDevAttrPciBusId hipDeviceAttributePciBusId
+#define cudaDevAttrTextureAlignment hipDeviceAttributeTextureAlignment
+#define cudaDevAttrTotalConstantMemory hipDeviceAttributeTotalConstantMemory
+#define cudaDeviceGetAttribute hipDeviceGetAttribute
+#define cudaDeviceProp hipDeviceProp_t
+#define cudaDeviceReset hipDeviceReset
+#define cudaDeviceSynchronize hipDeviceSynchronize
+#define cudaError_t hipError_t
+#ifdef USE_UMPIRE
+cudaError_t umpireMalloc(void** devPtr, size_t size);
+cudaError_t umpireFree(void* devPtr);
+template <typename T>
+cudaError_t umpireMalloc(T** devPtr, size_t size);
+#define cudaMalloc umpireMalloc
+#define cudaFree umpireFree
+#else
+#define cudaMalloc hipMalloc
+#define cudaFree hipFree
+#endif
+#define cudaGetDevice hipGetDevice
+#define cudaGetDeviceCount hipGetDeviceCount
+#define cudaGetDeviceProperties hipGetDeviceProperties
+#define cudaGetErrorName hipGetErrorName
+#define cudaGetErrorString hipGetErrorString
+#define cudaGetLastError hipGetLastError
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaSetDevice hipSetDevice
+#define cudaSuccess hipSuccess
+#define cudaMemSet hipMemSet
+#define cudaMemset hipMemset
+#endif // USE_HIP
+
+#ifdef USE_CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+#ifdef USE_UMPIRE
+cudaError_t umpireMalloc(void** devPtr, size_t size);
+cudaError_t umpireFree(void* devPtr);
+template <typename T>
+cudaError_t umpireMalloc(T** devPtr, size_t size);
+#define cudaFree umpireFree
+#define cudaMalloc umpireMalloc
+#endif
+#include <device_launch_parameters.h>
+#include <thrust/device_vector.h>
+#include <thrust/execution_policy.h>
+#include <thrust/sort.h>
+
+#endif
+
+inline void Insist(const bool pass, const std::string &message) {
+  if (!pass) {
+    std::cout<<"Insist at "<< __FILE__ <<" "<<__LINE__<<" fails with: "<<message<<std::endl;
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+}
+
+#ifdef USE_GPU
+
+// mark functions for GPU execution
+#define GPU_HOST_DEVICE __host__ __device__
+#define GPU_DEVICE __device__
+#define GPU_KERNEL __global__
+#define CONSTANT __constant__
+
+#ifdef USE_UMPIRE
+#include <umpire/Umpire.hpp>
+#include <umpire/strategy/QuickPool.hpp>
+
+void makeUmpireDevicePool(int device_pool_size) {
+  auto &rm = umpire::ResourceManager::getInstance();
+  const char * allocator_name = "BRANSON_DEVICE_POOL";
+  size_t umpire_device_pool_size = ((size_t) device_pool_size) * 1024 * 1024 * 1024;
+  size_t umpire_dev_block_size = 512;
+  auto device_pool_allocator = rm.makeAllocator<umpire::strategy::QuickPool>(allocator_name, rm.getAllocator("DEVICE"), umpire_device_pool_size, umpire_dev_block_size);
+  // force allocation of GPU memory pool
+  void* tmp = device_pool_allocator.allocate(100);
+  device_pool_allocator.deallocate(tmp);
+}
+
+cudaError_t umpireMalloc(void** devPtr, size_t size) {
+  auto &rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("BRANSON_DEVICE_POOL");
+  *devPtr = allocator.allocate(size);
+  return cudaSuccess;
+}
+
+template <typename T>
+cudaError_t umpireMalloc(T** devPtr, size_t size) {
+  void* raw_ptr = nullptr;
+  auto err = umpireMalloc(&raw_ptr, size);
+  *devPtr = static_cast<T*>(raw_ptr);
+  return err;
+}
+
+cudaError_t umpireFree(void* devPtr) {
+  auto &rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("BRANSON_DEVICE_POOL");
+  allocator.deallocate(devPtr);
+  return cudaSuccess;
+}
+
+double getDeviceMemoryHighWatermark() {
+  auto &rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("BRANSON_DEVICE_POOL");
+  return ((double) allocator.getHighWatermark()) / (1024 * 1024 * 1024);
+}
+#endif
+
+//! Add addend to t, use atomicAdd if built on a CUDA device
+template <class T>
+GPU_HOST_DEVICE inline void accumulate(T &target, T const addend) {
+  #if defined(__HIP_DEVICE_COMPILE__) or defined(__CUDA_ARCH__)
+  atomicAdd(&target, addend);
+  return;
+  #endif
+}
+
+// Function to perform warp-level atomic increment with ballot
+GPU_DEVICE inline bool warp_atomic_inc_ballot(unsigned int* counter, bool pred, unsigned int& position) {
+  #if defined(__HIP_DEVICE_COMPILE__) or defined(__CUDA_ARCH__)
+    // Perform ballot operation to get a mask of threads satisfying the predicate
+    auto ballot_result = __ballot_sync(__activemask(), pred);
+    // If the current thread doesn't satisfy the predicate, return false
+    if (!pred) {
+        return false;
+    }
+    // Get the lane ID within the warp
+    unsigned int lane_id = threadIdx.x % WARP_SIZE;
+
+    // Get the mask of active threads in the warp
+    auto active = __ballot_sync(__activemask(), true);
+    // Find the ID of the first active thread (leader)
+    #ifdef USE_CUDA
+    // Count the number of active threads
+    int num_active = __popc(active);
+    auto leader_lane = __ffs(ballot_result) - 1;
+    // Create a mask of threads before the current one
+    uint64_t mask_before = ballot_result & ((1U << lane_id) - 1);
+    // Count how many threads are active before this one
+    unsigned int local_rank = __popc(mask_before);
+
+    int warp_base_offset = 0;
+    // If this is the leader thread, perform atomic addition to get the base offset
+    if (lane_id == leader_lane) {
+        warp_base_offset = atomicAdd(counter, __popc(ballot_result));
+    }
+    #else
+    // Count the number of active threads
+    int num_active = __popcll(active);
+    auto leader_lane = __ffsll(ballot_result) - 1;
+    // Create a mask of threads before the current one
+    uint64_t mask_before = ballot_result & ((1UL << lane_id) - 1UL);
+    // Count how many threads are active before this one
+    unsigned int local_rank = __popcll(mask_before);
+
+    int warp_base_offset = 0;
+    // If this is the leader thread, perform atomic addition to get the base offset
+    if (lane_id == leader_lane) {
+        warp_base_offset = atomicAdd(counter, __popcll(ballot_result));
+    }
+    #endif
+
+    // Broadcast the base offset to all threads in the warp
+    unsigned int base_index = __shfl_sync(ballot_result, warp_base_offset, leader_lane);
+    // Calculate the final position for this thread
+    position = base_index + local_rank;
+    #endif
+    return true;
+}
+
+GPU_HOST_DEVICE inline void warp_atomic_addh(double *address, uint32_t cell_idx, double val) {
+  #if defined(__HIP_DEVICE_COMPILE__) or defined(__CUDA_ARCH__)
+    // Get the mask of active threads in the warp
+    const auto active_mask = __activemask();
+
+    // Get the mask of threads with matching cell_idx
+    const auto group_mask = __match_any_sync(active_mask, cell_idx);
+
+    // Calculate the lane ID within the warp (0-32 or 0-64)
+    unsigned int lane_id = threadIdx.x % WARP_SIZE;
+
+    #ifdef USE_CUDA
+    auto first_lane = __ffs(group_mask) - 1;
+    #else
+    auto first_lane = __ffsll(group_mask) - 1;
+    #endif
+
+    double subgroup_sum = 0.0;
+    for (int i = 0; i < WARP_SIZE; i++) {
+      if ((group_mask >> i) & 1) {
+        subgroup_sum += __shfl_sync(group_mask, val, i);
+      }
+    }
+    if (lane_id == first_lane) {
+      atomicAdd(address, subgroup_sum);
+    }
+  #endif
+}
+
+GPU_HOST_DEVICE inline void warp_atomic_add(double *address, uint32_t cell_idx, double val) {
+  #if defined(__HIP_DEVICE_COMPILE__) or defined(__CUDA_ARCH__)
+    // Get the mask of active threads in the warp
+    const auto active_mask = __activemask();
+
+    // Get the mask of threads with matching cell_idx
+    const auto group_mask = __match_any_sync(active_mask, cell_idx);
+
+    // Calculate the lane ID within the warp (0-31 or 0-64)
+    unsigned int lane_id = threadIdx.x % WARP_SIZE;
+
+    #ifdef USE_CUDA
+    auto first_lane = __ffs(group_mask) - 1;
+    #else
+    auto first_lane = __ffsll(group_mask) - 1;
+    #endif
+
+    double subgroup_sum = 0.0;
+    #pragma unroll
+    for (int i = 0; i < WARP_SIZE; i++) {
+      if ((group_mask >> i) & 1) {
+        subgroup_sum += __shfl_sync(group_mask, val, i);
+      }
+    }
+    if (lane_id == first_lane) {
+      atomicAdd(address, subgroup_sum);
+    }
+    #endif
+}
+
+inline void device_debug_print(size_t n_photons, const std::string &alg_type) {
+#ifdef ENABLE_VERBOSE_GPU_TRANSPORT
+  int my_device = 0;
+  auto device_err = cudaGetDevice(&my_device);
+  Insist(!device_err, "error in get device");
+  std::cout <<"--"<<alg_type<<"-- device: " << my_device << ", photons: " << n_photons << std::endl;
+#endif
+}
+
+
+#else
+
+#define GPU_HOST_DEVICE
+#define GPU_DEVICE
+#define GPU_KERNEL
+#define CONSTANT constexpr
+
+//! Add addend to t, non-atomic version
+template <class T> inline void accumulate(T &target, T const addend) {
+  target += addend;
+  return;
+}
+
+// Function to perform warp-level atomic increment with ballot stub
+inline bool warp_atomic_inc_ballot(unsigned int* /*counter*/, bool /*pred*/, unsigned int& /*position*/) {
+  return false;
+}
+
+inline void warp_atomic_addh(double * /*address*/, uint32_t /*cell_idx*/, double /*val*/) {}
+
+template <typename T>
+inline T warp_reduce_sum(T /*val*/, unsigned int /*mask*/) {return {0.0};}
+
+inline void warp_atomic_add(double * /*address*/, uint32_t /*cell_idx*/, double /*val*/) {}
+
+inline void device_debug_print(size_t n_photons, const std::string &alg_type) {}
+
+#endif // USE_GPU
+
+#ifdef caliper_FOUND
+
+/*
+void wrapped_cali_mark_begin(const char *timer_name) {
+    CALI_MARK_BEGIN(timer_name);
+}
+void wrapped_cali_mark_end(const char *timer_name) {
+    CALI_MARK_END(timer_name);
+}
+
+#else
+void wrapped_cali_mark_begin(const char *timer_name) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == 0) {
+    std::cout<<"Branson built without caliper, not starting timer: "<<timer_name<<std::endl;
+  }
+}
+void wrapped_cali_mark_end(const char *timer_name) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == 0) {
+    std::cout<<"Branson built without caliper, not ending timer: "<<timer_name<<std::endl;
+  }
+}
+*/
+
+#endif
+
+
+#endif // def config_h_
+//----------------------------------------------------------------------------//
+// end of config.h
+//----------------------------------------------------------------------------//

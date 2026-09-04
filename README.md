@@ -7,7 +7,7 @@ An End-to-End AI Framework for Performance Prediction and Optimization in HPC Ap
 | Level | Content | Status |
 |-------|---------|--------|
 | [level1/](level1/) | 50 standalone GPU benchmarks (independently buildable / runnable / validatable) | 50/50 working, CUDA-validated |
-| [level2/](level2/) | proxy applications / mini-apps | planned |
+| [level2/](level2/) | 20 proxy applications / mini-apps (upstream build systems kept, wrapped by `build.sh` / `run.sh` / `validate.sh`) | 19/20 working, CUDA-validated; MiniEM pending (Trilinos) |
 | [level3/](level3/) | production / end-to-end HPC applications | planned |
 
 Level 1 benchmarks are extracted (or faithfully ported) from six upstream
@@ -16,6 +16,13 @@ as correctness-preserving, standalone, reproducible programs. Each benchmark
 records its upstream provenance (repository + commit), verified build/run
 commands, validation method, and measured LOC in its own README. See
 [level1/README.md](level1/README.md) for the full catalog.
+
+Level 2 mini-apps (Kokkos, RAJA, MFEM, hypre, Cabana, OCCA, YAKL and plain
+CUDA/HIP codes) are copied from their upstream repositories with their own
+build systems and made to build against the same pinned toolchain plus a set
+of framework libraries built inside the clone by `./setup_level2_deps.sh`.
+See [level2/README.md](level2/README.md) for the catalog and the Level 2
+environment additions.
 
 ## Quick Start (fresh clone)
 
@@ -68,6 +75,16 @@ the machine, setup bootstraps a project-local Miniforge into `.tools/`.
 | Python | 3.12.3 |
 | numpy / scipy (used by validation scripts) | 2.5.2 / 1.18.0 |
 | cloc (downloaded into `.tools/bin`) | 2.06 |
+| Open MPI (CUDA-aware; Level 2) | 5.0.10 |
+| METIS / yaml-cpp / OpenBLAS (Level 2) | 5.1.0 / 0.8.0 / 0.3.34 |
+| FFTW / parallel HDF5 / PnetCDF (openmpi builds; Level 2) | 3.3.11 / 2.2.0 / 1.15.0 |
+
+Level 2 additionally needs the framework libraries built by
+`./setup_level2_deps.sh` into `.deps/install/` (Kokkos + Kokkos Kernels 5.2.1,
+Cabana 0.8.0, heFFTe 2.4.1, RAJA / Umpire / CHAI 2026.07.0, hypre 3.2.0,
+MFEM 4.10 -- pinned tags, built for the detected GPU; see
+[level2/README.md](level2/README.md)). Build-system patches applied to those
+checkouts live in [patches/](patches/).
 
 The GPU stack is a **system prerequisite** (deliberately not managed by conda);
 install it once per machine before running `setup_env.sh`:
@@ -126,10 +143,17 @@ host machine and is a prerequisite, not something this repository installs;
   chosen host compiler in `.tools/compiler_source`).
 - `hpcperf_env.sh` -- per-shell loader (must be `source`d): activates
   `.conda_env`, sets `CC`/`CXX`/`CUDAHOSTCXX`, puts the system CUDA on
-  `PATH`/`LD_LIBRARY_PATH`, and sets `CMAKE_GENERATOR=Ninja` and
-  `CUDAARCHS=native`. Safe to source repeatedly; works from any clone path.
+  `PATH`/`LD_LIBRARY_PATH`, sets `CMAKE_GENERATOR=Ninja` and
+  `CUDAARCHS=native`, puts `.deps/install/*` on `CMAKE_PREFIX_PATH`, and sets
+  the single-node, CUDA-aware Open MPI defaults used by Level 2 (documented in
+  [level2/README.md](level2/README.md)). Safe to source repeatedly; works from
+  any clone path.
 - `check_env.sh` -- read-only report of the active environment vs. the
-  validated configuration above.
+  validated configuration above (including which Level 2 framework libraries
+  are built).
+- `setup_level2_deps.sh` -- Level 2 only, idempotent: clones the pinned
+  framework libraries into `.deps/src/`, applies `patches/`, builds and
+  installs them into `.deps/install/<name>` for the detected GPU architecture.
 
 ## Validation
 

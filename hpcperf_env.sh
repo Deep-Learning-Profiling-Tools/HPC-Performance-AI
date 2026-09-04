@@ -115,7 +115,67 @@ fi
 export CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
 export CUDAARCHS="${CUDAARCHS:-native}"
 
-# ----------------------------------------------- 8. optional ROCm environment
+# ------------------------------------- 8. Level 2 framework libraries (.deps)
+# setup_level2_deps.sh installs Kokkos, RAJA, hypre, MFEM, Cabana, heFFTe, ...
+# into .deps/install/<name>. Expose every installed prefix to CMake so the
+# Level 2 mini-apps find them with plain find_package().
+if [ -d "$HPC_PERFORMANCE_AI_ROOT/.deps/install" ]; then
+    for _dep in "$HPC_PERFORMANCE_AI_ROOT"/.deps/install/*/; do
+        _dep="${_dep%/}"
+        [ -f "$_dep/.hpcperf-built" ] || continue
+        # The *environment* variable CMAKE_PREFIX_PATH is ':'-separated (like PATH).
+        case ":${CMAKE_PREFIX_PATH:-}:" in
+            *":$_dep:"*) ;;
+            *) export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH}:}$_dep" ;;
+        esac
+        [ -d "$_dep/lib" ]   && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib"
+        [ -d "$_dep/lib64" ] && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib64"
+    done
+    unset _dep
+fi
+# Kokkos' nvcc_wrapper must call the same host compiler as everything else.
+export NVCC_WRAPPER_DEFAULT_COMPILER="$CXX"
+
+# MPI oversubscription policy: NOT enabled globally. One rank per GPU is the
+# execution model; GPU/rank oversubscription is forbidden by default and only
+# HPCPERF_ALLOW_OVERSUBSCRIBE=1 permits it (debug only, with a loud warning).
+# Multi-rank launches go through level2/tools/hpcperf_mpi_launch.sh, which
+# validates ranks <= allocated GPUs and, only then, relaxes Slurm task-slot
+# accounting per launch (--map-by ...:OVERSUBSCRIBE) when the allocation was
+# requested with fewer tasks than GPUs -- that is bookkeeping, not GPU
+# sharing. (An earlier revision exported
+# PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe globally; removed.)
+# Optional single-node MPI transport profile (OPT-IN, off by default). By
+# default no PML/BTL is forced: Open MPI / the site stack chooses the
+# transport itself. Setting HPCPERF_MPI_SINGLE_NODE=1 pins the shared-memory
+# transports (smcuda keeps CUDA IPC between ranks), which skips the
+# InfiniBand / libfabric probing that costs ~5 s in every MPI_Init on the dev
+# machine (measured: 5.6 s -> 0.8 s). Useful for tight single-node run loops;
+# never use it for multi-node runs. Re-sourcing with the variable unset (or
+# =0) explicitly clears exactly what the profile set (via the _HPCPERF
+# sentinel), so no values linger from an earlier source -- values you set
+# yourself are never touched.
+if [ "${HPCPERF_MPI_SINGLE_NODE:-0}" = "1" ]; then
+    export OMPI_MCA_pml="${OMPI_MCA_pml:-ob1}"
+    export OMPI_MCA_btl="${OMPI_MCA_btl:-self,sm,smcuda}"
+    export _HPCPERF_MPI_SN_PROFILE=1
+elif [ "${_HPCPERF_MPI_SN_PROFILE:-0}" = "1" ]; then
+    unset OMPI_MCA_pml OMPI_MCA_btl _HPCPERF_MPI_SN_PROFILE
+fi
+
+# CUDA-aware MPI (REQUESTED here; runtime capability is a separate check).
+# The conda Open MPI is built with CUDA support, but its
+# etc/openmpi-mca-params.conf ships `opal_cuda_support = 0`, which makes the
+# accelerator component return NULL before any CUDA call -- passing a device
+# buffer to MPI_Send/Isend then segfaults (seen in ExaMiniMD, ExaMPM, and
+# every Cabana multi-rank halo exchange). Turn it on for every shell; the
+# environment overrides the conf file, and nothing in the repository is
+# modified. Set OMPI_MCA_opal_cuda_support=false yourself to disable.
+# To CONFIRM the capability actually works at runtime (device-buffer MPI
+# traffic, numerically checked), run: ./check_env.sh --mpi-cuda
+export OMPI_MCA_opal_cuda_support="${OMPI_MCA_opal_cuda_support:-true}"
+
+# ----------------------------------------------- 9. optional ROCm environment
 if [ -d /opt/rocm ]; then
     export ROCM_PATH=/opt/rocm
     _hpcperf_prepend PATH "$ROCM_PATH/bin"
