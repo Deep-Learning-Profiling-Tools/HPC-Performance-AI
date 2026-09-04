@@ -154,6 +154,18 @@ host machine and is a prerequisite, not something this repository installs;
 - `setup_level2_deps.sh` -- Level 2 only, idempotent: clones the pinned
   framework libraries into `.deps/src/`, applies `patches/`, builds and
   installs them into `.deps/install/<name>` for the detected GPU architecture.
+  Each install carries a `.hpcperf-fingerprint` (profile, GPU arch, compiler,
+  CUDA, MPI, patch hashes); a recorded fingerprint that does not match the
+  current toolchain fails fast instead of being reused silently (installs
+  predating fingerprints are accepted as legacy with a warning;
+  `--stamp-existing` records a labelled post-hoc one).
+  `HPCPERF_DEPS_PROFILE=<name>` (default `level2`) selects an isolated
+  `.deps/<name>/{build,install}` tree -- Level 3 uses its own profile and
+  never modifies the validated Level 2 installs; `hpcperf_env.sh` exposes
+  exactly one profile's prefixes.
+- `level2/tools/tests/run_all.sh` -- infrastructure regression tests that
+  need no GPU execution (topology, dependency markers, launcher dry-run
+  parsing, run.sh interface guards).
 
 ## Validation
 

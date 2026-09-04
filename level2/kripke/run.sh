@@ -43,13 +43,33 @@ ZONES="${KRIPKE_ZONES:-32,32,32}"
 NGROUPS="${KRIPKE_GROUPS:-64}"   # (GROUPS is a bash builtin)
 QUAD="${KRIPKE_QUAD:-128}"
 NITER="${KRIPKE_NITER:-10}"
-NP="${KRIPKE_NP:-1}"
-MPIRUN="${KRIPKE_MPIRUN:-mpirun -np ${NP}}"
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+if [ -n "${KRIPKE_NP:-}" ] && [ -z "${HPCPERF_GPUS:-}${HPCPERF_NP:-}" ]; then export HPCPERF_NP="$KRIPKE_NP"; fi   # legacy alias
+N_RANKS="$(hpcperf_ranks kripke no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP/KRIPKE_NP); no scale modes yet
+# Kripke requires --procs px,py,pz with px*py*pz == ranks (KRIPKE_ASSERT in
+# PartitionSpace) and every --zones dimension divisible by its procs factor.
+# The topology is not derived here yet, so > 1 rank without a matching
+# --procs in the extra arguments is an error rather than a silent 1-rank run.
+if [ "$N_RANKS" -gt 1 ]; then
+    PROCS=""; _prev=""
+    for _a in "$@"; do [ "$_prev" = --procs ] && PROCS="$_a"; _prev="$_a"; done
+    [ -n "$PROCS" ] || { echo "run.sh: $N_RANKS ranks requested but no '--procs px,py,pz' given (product must equal $N_RANKS)" >&2; exit 2; }
+    _prod=$(( $(echo "$PROCS" | tr ',' '*') ))
+    [ "$_prod" -eq "$N_RANKS" ] || { echo "run.sh: --procs $PROCS has product $_prod, not the $N_RANKS ranks requested" >&2; exit 2; }
+    IFS=, read -r _px _py _pz <<< "$PROCS"; IFS=, read -r _zx _zy _zz <<< "$ZONES"
+    for _pair in "$_zx:$_px" "$_zy:$_py" "$_zz:$_pz"; do
+        [ $(( ${_pair%%:*} % ${_pair##*:} )) -eq 0 ] || { echo "run.sh: --zones $ZONES not divisible by --procs $PROCS (dimension ${_pair%%:*} / ${_pair##*:})" >&2; exit 2; }
+    done
+fi
+# One rank per GPU through the common launcher; Kripke never calls
+# cudaSetDevice, so the wrapper narrows CUDA_VISIBLE_DEVICES per rank.
+MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
 
 ARGS=( --arch "${BACKEND_UPPER}" --layout "${LAYOUT}"
        --groups "${NGROUPS}" --legendre 4 --quad "${QUAD}" --zones "${ZONES}"
        --gset 1 --dset 8 --zset 1,1,1 --niter "${NITER}" )
 
 echo "== Kripke ${BACKEND_UPPER}: ${EXE}"
-echo "== ${MPIRUN} kripke.exe ${ARGS[*]} $*"
-exec ${MPIRUN} "${EXE}" "${ARGS[@]}" "$@"
+echo "== ${MPIRUN[*]} kripke.exe ${ARGS[*]} $*"
+exec "${MPIRUN[@]}" "${EXE}" "${ARGS[@]}" "$@"

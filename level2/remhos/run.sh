@@ -69,14 +69,13 @@ RS="${HPCPERF_REMHOS_RS:-4}"
 ORDER="${HPCPERF_REMHOS_ORDER:-2}"
 DT="${HPCPERF_REMHOS_DT:-0.0025}"
 TF="${HPCPERF_REMHOS_TF:-0.8}"
-NP="${HPCPERF_NP:-1}"
-
-LAUNCH=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    LAUNCH+=(--oversubscribe)
-fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks remhos no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+hpcperf_forbid_args remhos -m -rs -o -dt -tf -d -epm -- "$@" || exit 2
+# One rank per GPU through the common launcher. MFEM does not map ranks to
+# GPUs itself, so the launcher's wrapper narrows CUDA_VISIBLE_DEVICES per rank.
+LAUNCH=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
 
 # Remhos writes any optional output files (-save, -visit, errors.txt, si_init.gf) to the
 # current directory: run inside the build tree, not in level2/remhos.

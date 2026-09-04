@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run the standard miniWeather benchmark problem (YAKL parallel_for variant).
 #
-#   ./run.sh [CUDA|HIP] [mpirun options]      (default backend: CUDA)
+#   ./run.sh [CUDA|HIP]                       (default backend: CUDA)
+#   HPCPERF_GPUS=N|all selects the rank count (one rank per GPU, common launcher)
 #
 # Standard problem (fixed at build time by build.sh, see there): rising
 # thermal (DATA_SPEC_THERMAL) on upstream's GPU grid of 2048 x 1024 cells,
@@ -10,8 +11,7 @@
 #
 #   mpirun -np 1 ./parallelfor
 #
-# miniWeather takes no command-line arguments. Extra arguments, if given,
-# REPLACE the default "-np 1" mpirun options (e.g. via level2/tools/hpcperf_mpi_launch.sh).
+# miniWeather takes no command-line arguments; extra arguments are rejected.
 # The binary runs from its build directory so that output.nc (if OUT_FREQ >= 0
 # was configured) lands there. Prints upstream's normal output: device name,
 # grid/dt, "CPU Time: <s> sec" (wall time of the time-step loop) and the
@@ -42,10 +42,16 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     set -eu
 fi
 
-if [ "$#" -eq 0 ]; then
-    set -- -np 1
+# shellcheck disable=SC1091
+source "$R/level2/tools/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks miniweather no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+if [ "$#" -gt 0 ]; then
+    echo "run.sh: miniWeather takes no arguments; the rank count comes from HPCPERF_GPUS (extra mpirun options are no longer accepted here)" >&2
+    exit 2
 fi
-
+# miniWeather decomposes in x only (compile-time nx, default 2048 -> every
+# rank needs >= 1 column) and never calls cudaSetDevice: the launcher's
+# wrapper narrows CUDA_VISIBLE_DEVICES per rank.
 cd "$BUILD_DIR"
-echo "== mpirun $* ./parallelfor   (build dir: $BUILD_DIR)"
-exec mpirun "$@" ./parallelfor
+echo "== miniWeather $BACKEND: $N_RANKS rank(s) via hpcperf_mpi_launch.sh ./parallelfor   (build dir: $BUILD_DIR)"
+exec "$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper -- ./parallelfor

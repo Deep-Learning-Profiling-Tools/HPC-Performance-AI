@@ -30,13 +30,13 @@ fi
 
 DECK="${HPCPERF_CLOVERLEAF_DECK:-$HERE/InputDecks/clover_bm16.in}"
 OUT="$BUILD/clover.out"
-NP="${HPCPERF_NP:-1}"
-MPIRUN=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    MPIRUN+=(--oversubscribe)
-fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks cloverleaf no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+hpcperf_forbid_args cloverleaf --device -- "$@" || exit 2   # per-rank GPU comes from the launcher's wrapper
+# One rank per GPU through the common launcher; CloverLeaf's --device is one
+# shared value for all ranks, so the wrapper narrows CUDA_VISIBLE_DEVICES.
+MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
 
 echo "== CloverLeaf $BACKEND: ${MPIRUN[*]} $EXE --file $DECK --out $OUT $*"
 exec "${MPIRUN[@]}" "$EXE" --file "$DECK" --out "$OUT" "$@"

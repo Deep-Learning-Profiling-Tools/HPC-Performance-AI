@@ -92,6 +92,20 @@ The execution model is **one MPI rank per GPU**: `--gpus N` starts exactly N
 ranks even if the allocation has more GPUs, `--gpus all` uses every allocated
 GPU, ranks > allocated GPUs fails fast, and GPU sharing between ranks is
 forbidden unless `HPCPERF_ALLOW_OVERSUBSCRIBE=1` (debug only, loud warning).
+The launcher keeps three resource views apart: the **actual** allocation
+(Slurm; heterogeneous node groups are refused, nothing is assumed uniform), the
+**requested** subset (`HPCPERF_NODES` / `HPCPERF_GPUS_PER_NODE` may only shrink
+it, and a node subset is enforced in the placement via `mpirun --host` /
+`srun --nodelist`), and a **hypothetical** shape accepted only in dry-run and
+labelled as such. `HPCPERF_CPUS_PER_RANK=C` binds C cores per rank
+(mpirun `--map-by ppr:R:node:PE=C --bind-to core`, srun `--cpus-per-task`)
+after a CPU-capacity check; Slurm task-slot relaxation happens only after both
+the GPU and the CPU checks pass. The GPU binding audit reports, per rank, the
+**expected** GPU (arranged from the local rank, UUID resolved through
+nvidia-smi's own index table under `CUDA_DEVICE_ORDER=PCI_BUS_ID`) and the
+**observed** GPU (sampled from `nvidia-smi --query-compute-apps` while the
+job runs): `verified`, `MISMATCH`, or `unverified` -- never "verified" without
+an observation. GPU mode with no usable GPU fails (exit 13).
 `HPCPERF_NP` survives as a compatibility alias and must agree with
 `HPCPERF_GPUS` when both are set. Process grids for topology-parameterised
 apps come from `level2/tools/hpcperf_topology.py`, which fails with nearby
@@ -202,8 +216,11 @@ decks, scripts and READMEs.
 Column meanings -- Build/Smoke-1GPU: configure+build / single-GPU run+validate
 on the B200. Distributed model: what a multi-GPU run IS (native-mpi = one
 coupled decomposed workload; replica = independent copies, never counted as
-multi-GPU). Selectable N: `HPCPERF_GPUS` through the common launcher
-(`legacy` = still `HPCPERF_NP` without launcher integration). 1-node
+multi-GPU; "sharded-EP" = one global embarrassingly-parallel task divisible
+over ranks with a final reduction -- distinct from full-input replicas, and
+counted only once implemented). Selectable N: `HPCPERF_GPUS` through the
+common launcher ("no scale modes" = rank selection only; `HPCPERF_SCALE_MODE`
+is rejected with an error there, never silently ignored). 1-node
 multi-GPU: 4 rank x 4 B200 correctness (2026-09-03/04) -- correctness only,
 not scaling. Multi-node: BLOCKED site-wide (transport, see above). Strong /
 Weak deck: a size policy exists that scales the problem with N. Rank
@@ -214,23 +231,45 @@ constraints: legal rank counts.
 | amg2023 | PASS | PASS | native-mpi | yes (launcher) | validated (2x2x1) | BLOCKED (site) | yes (512^3 global) | yes (256^3/rank) | PASS | untested | product=N; global<2^31 (<=127 @256^3/rank) | hypre self-binds |
 | laghos | PASS | PASS | native-mpi | yes (launcher) | validated (4) | BLOCKED (site) | yes (-rs 4 deck) | yes (-epm/rank) | PASS | untested | N<=elements (strong); any N (weak) | MFEM_UNROLL workaround (perf A/B pending) |
 | examinimd | PASS | PASS | native-mpi | yes (launcher) | validated (4) | BLOCKED (site) | yes (160^3 box) | yes (100^3 cells/rank) | PASS | untested | any N; <=20M atoms/rank (int32) | CUDA-aware MPI required |
-| remhos | PASS | PASS | native-mpi | legacy | validated (4) | BLOCKED (site) | manual | manual (-epm exists) | PASS | untested | N<=elements; GPU combo rank-indep | launcher integration next phase |
-| exampm | PASS | PASS | native-mpi | legacy | validated (4) | BLOCKED (site) | manual (refine cell) | no clean knob | PASS | untested | 1xNx1 Y-slabs; N<~35 @cell 0.01 (halo>=3 unchecked) | fix 1D slab before 80 ranks |
-| haccabanapm | PASS | PASS | native-mpi | legacy | validated (2x2x1) | BLOCKED (site) | manual | manual (NG=NP=RL scale) | PASS | untested | any N; pm_ic/pm_run same N | heFFTe pencils; big IC files at scale |
-| cloverleaf | PASS | PASS | native-mpi | legacy | validated (4) | BLOCKED (site) | yes (same deck) | manual (bm family) | PASS | untested | any N (auto chunks) | needs binding wrapper |
-| tealeaf | PASS | PASS | native-mpi | legacy | validated (4) | BLOCKED (site) | yes (same deck) | manual (+tea.problems rows) | PASS | untested | any N (auto chunks) | needs binding wrapper |
-| kripke | PASS | PASS | native-mpi | legacy | validated (2,2,1) | BLOCKED (site) | manual (--zones div) | manual (32^3/rank) | PASS | untested | product=N; zones divisible; groups%gset | needs binding wrapper |
-| branson | PASS | PASS | native-mpi (replicated split) | legacy | validated (4) | BLOCKED (site) | yes (photons/N auto) | manual (--photons*N) | PASS | untested | any N | PARTICLE_PASS mode = later extension |
-| hipbone | PASS | PASS | native-mpi | legacy | not yet | BLOCKED (site) | manual (divide global) | native (-nx per rank) | PASS | untested | cube N unless -px/-py/-pz given | add -px/py/pz decks |
-| miniweather | PASS | PASS | native-mpi (1D x-split) | legacy | not yet | BLOCKED (site) | rebuild per size | rebuild per size | PASS | untested | N<=nx_glob | compile-time size -> supplemental |
+| remhos | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | manual | manual (-epm exists) | PASS | untested | N<=elements; GPU combo rank-indep | launcher integration next phase |
+| exampm | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | manual (refine cell) | no clean knob | PASS | untested | 1xNx1 Y-slabs; N<~35 @cell 0.01 (halo>=3 unchecked) | fix 1D slab before 80 ranks |
+| haccabanapm | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (2x2x1) | BLOCKED (site) | manual | manual (NG=NP=RL scale) | PASS | untested | any N; pm_ic/pm_run same N | heFFTe pencils; big IC files at scale |
+| cloverleaf | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (same deck) | manual (bm family) | PASS | untested | any N (auto chunks) | needs binding wrapper |
+| tealeaf | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (same deck) | manual (+tea.problems rows) | PASS | untested | any N (auto chunks) | needs binding wrapper |
+| kripke | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (2,2,1) | BLOCKED (site) | manual (--zones div) | manual (32^3/rank) | PASS | untested | product=N; zones divisible; groups%gset | needs binding wrapper |
+| branson | PASS | PASS | native-mpi (replicated split) | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (photons/N auto) | manual (--photons*N) | PASS | untested | any N | PARTICLE_PASS mode = later extension |
+| hipbone | PASS | PASS | native-mpi | yes (launcher; no scale modes) | not yet | BLOCKED (site) | manual (divide global) | native (-nx per rank) | PASS | untested | cube N unless -px/-py/-pz given | add -px/py/pz decks |
+| miniweather | PASS | PASS | native-mpi (1D x-split; compile-time size = limitations, not a disqualifier) | yes (launcher; no scale modes) | not yet | BLOCKED (site) | rebuild per size | rebuild per size | PASS | untested | N<=nx_glob | multi-GPU capable; limitations: compile-time nx, x-only split |
 | p3_heat3d | PASS | PASS | shardable (upstream heat3d_mpi ready) | n/a today | n/a | n/a | (sibling) | (sibling: nx/rank) | PASS | untested | sibling: product=N | adopt heat3d_mpi (extension) |
 | p3_vlp4d | PASS | PASS | shardable (upstream vlp4d_mpi ready) | n/a today | n/a | n/a | (sibling: same deck) | (sibling: scale grid) | PASS | untested | sibling: >=10 pts/cut | vlp4d_mpi changes interpolation scheme |
 | cabanapic | PASS | PASS | replica-only as shipped (shardable at rewrite cost) | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | shaw | PASS | PASS | shardable-not-implemented | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
-| exacmech | PASS | PASS | replica-only | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
-| minibude | PASS | PASS | replica-only | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
-| xsbench | PASS | PASS | replica-only (upstream-documented) | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
+| exacmech | PASS | PASS | sharded-EP possible (split points + Allreduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
+| minibude | PASS | PASS | sharded-EP possible (split poses + reduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
+| xsbench | PASS | PASS | sharded-EP possible (split lookups + reduce), not implemented; upstream MPI mode = full-input replicas | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | miniem | -- | -- | native-mpi (upstream) | -- | -- | -- | -- | -- | -- | -- | any N | pending Trilinos decision |
+
+### Per-app interface support
+
+Every `run.sh` resolves its rank count with `level2/tools/hpcperf_launch_common.sh`
+and launches through `hpcperf_mpi_launch.sh`; a request the script cannot
+honour is an error (exit 2), never a silent 1-rank run.
+
+| App | `HPCPERF_GPUS` | `HPCPERF_SCALE_MODE` | GPU binding | Rejected extra args (validated params) | App-specific guard |
+|---|---|---|---|---|---|
+| amg2023 | yes | smoke/strong/weak | app (hypre) | `-P`, `-n` | `HPCPERF_AMG_P` product must equal ranks; global unknowns < 2^31 |
+| laghos | yes | smoke/strong/weak | wrapper | `-m -rs -rp -epm -nx -ny -nz -dev -d` | serial elements >= ranks (strong/smoke) |
+| examinimd | yes | smoke/strong/weak | app (Kokkos) | `-il` | <= 20M atoms/rank |
+| remhos | yes | rejected | wrapper | `-m -rs -o -dt -tf -d -epm` | -- |
+| exampm | yes | rejected | app (Kokkos) | -- | Y-cells >= 3 x ranks (1xNx1 slab halo) |
+| haccabanapm | yes | rejected | app (Kokkos) | -- | pm_ic and pm_run launched with the same N |
+| cloverleaf | yes | rejected | wrapper | `--device` | -- |
+| tealeaf | yes | rejected | wrapper | `--device`, `-d` | MPI build required for N > 1 |
+| kripke | yes (also `KRIPKE_NP`) | rejected | wrapper | -- | N > 1 needs `--procs` with product N; zones divisible |
+| branson | yes | rejected | wrapper | -- | -- |
+| hipbone | yes (also `HIPBONE_NP`) | rejected | app (own local rank) | -- | N > 1 needs `-px -py -pz` (product N) or a cube N |
+| miniweather | yes | rejected | wrapper | any argument | -- |
+| cabanapic, exacmech, minibude, p3_heat3d, p3_vlp4d, shaw, xsbench | n/a (single process) | n/a | -- | -- | -- |
 
 ## Catalog (provenance and modifications)
 

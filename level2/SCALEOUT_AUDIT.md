@@ -12,9 +12,18 @@ Definitions (execution type):
   decomposition / distributed solve with inter-rank communication).
 - **naturally-shardable-but-not-implemented** -- one coupled global problem
   could be sharded, but the shipped code has no comm layer.
-- **independent-replica-only** -- any multi-GPU form is N copies of the same
-  problem (throughput mode). NEVER counted as distributed multi-GPU.
+- **sharded-embarrassingly-parallel (sharded-EP)** -- one GLOBAL task with no
+  inter-rank coupling except a final reduction (one global batch of lookups /
+  poses / material points divided over ranks and reduced). This IS a global
+  workload divided across GPUs, unlike replicas, but it counts only once a
+  sharding driver exists and is validated.
+- **independent-replica-only** -- each rank runs the FULL identical input
+  (throughput mode). NEVER counted as distributed multi-GPU.
 - **no-scaleout-path** -- not even replicas make sense.
+
+Do not conflate the last three: "no coupling" does not automatically mean
+"replica-only" -- if the input is one global set that can be partitioned, the
+app is sharded-EP (unimplemented until a driver exists).
 
 ## Executive matrix
 
@@ -31,22 +40,40 @@ Definitions (execution type):
 | kripke | native-mpi | wrapper needed (no binding code) | yes | optional (build flag exists) | `--procs x,y,z` (product == NP) | product == NP; zones divisible per dim; groups%gset, quad%dset | **keep-in-core** |
 | branson | native-mpi (replicated work-split + Allreduce; PARTICLE_PASS = true domain decomposition, unvalidated) | in-app (`set_device_ID(rank%ndev)` -- GLOBAL rank: needs block mapping) | yes (caveat above) | no (host-buffer MPI only) | none (REPLICATED); deck `<mesh_decomposition>` for PARTICLE_PASS | any N | **keep-in-core** (replicated); PARTICLE_PASS = later extension |
 | hipbone | native-mpi | in-app (hostname local-rank in OCCA props) | yes | optional (`-ga`) | `-px -py -pz` (product == NP; without them NP must be a cube) | any factorable N once -px/-py/-pz standardized in run.sh | **keep-in-core** (add -px/py/pz decks) |
-| miniweather | native-mpi | wrapper needed (no binding code) | yes | optional (`-DGPU_AWARE_MPI` compile flag) | none (1D x-split only) | N <= nx_glob; problem size is COMPILE-TIME (`MINIWEATHER_NX`) | **keep-as-supplemental** (compile-time size, 1D-only split) |
+| miniweather | native-mpi (1D x-split) | wrapper needed (no binding code) | yes | optional (`-DGPU_AWARE_MPI` compile flag) | none (1D x-split only) | N <= nx_glob; problem size is COMPILE-TIME (`MINIWEATHER_NX`) | **keep-in-core with limitations** (multi-GPU capable; compile-time size and 1D split are limitations to document, not disqualifiers) |
 | p3_heat3d | naturally-shardable; upstream sibling `heat3d_mpi` is native-mpi | sibling: in-app `cudaSetDevice(rank%n)` (global rank) | yes | **required** by sibling (device Views to MPI) | sibling: `--px --py --pz` (product == NP) | any factorable N; strong needs divisibility | **implement-distributed-extension** (adopt upstream heat3d_mpi) |
 | p3_vlp4d | naturally-shardable; upstream sibling `vlp4d_mpi` is native-mpi | sibling: in-app (same) | yes | **required** by sibling (halo + device Allreduce) | none (internal 4D recursive bisection) | any N with >=10 points per cut direction | **implement-distributed-extension** (adopt vlp4d_mpi; NOTE: it switches Lagrange->spline interpolation -- a sibling benchmark, not the same numbers) |
 | cabanapic | naturally-shardable-but-not-implemented (no comm layer at all; deck is 1D-in-y) | n/a (single process) | n/a | n/a | none | n/a | **keep-as-supplemental** (distributed PIC = rewrite; HACCabanaPM covers the Cabana-comm motif) |
 | shaw | naturally-shardable-but-not-implemented (global CSR SpMV, no partitioned mesh) | n/a | n/a | n/a | none | n/a | **keep-as-supplemental** |
-| exacmech | independent-replica-only (no inter-point coupling; real coupling lives in ExaConstit) | n/a | n/a | n/a | none | n/a | **keep-as-supplemental** |
-| minibude | independent-replica-only (independent pose energies) | per-process `--device` flag | n/a | n/a | none | n/a | **keep-as-supplemental** |
-| xsbench | independent-replica-only (upstream's own MPI mode is documented as "no decomposition ... all ranks accomplish the same work") | none (no cudaSetDevice) | n/a | no | none | n/a | **keep-as-supplemental** |
+| exacmech | sharded-EP possible (global point set split + 6-double Allreduce), NOT implemented; replica-only as shipped | n/a | n/a | n/a | none | n/a | **keep-as-supplemental** until a sharded driver exists (then a weakly-coupled global workload) |
+| minibude | sharded-EP possible (global pose batch split + reduce), NOT implemented; replica-only as shipped | per-process `--device` flag | n/a | n/a | none | n/a | **keep-as-supplemental** until a sharded driver exists |
+| xsbench | sharded-EP possible (global lookup batch split + reduce), NOT implemented; upstream's own MPI mode is full-input replicas ("no decomposition ... all ranks accomplish the same work") | none (no cudaSetDevice) | n/a | no | none | n/a | **keep-as-supplemental** until a sharded driver exists |
 | miniem | native-mpi upstream (Trilinos/Panzer + Tpetra) | Tpetra/Kokkos local rank | yes | optional | Tpetra maps | any N | **pending** (blocked on the Trilinos dependency decision) |
 
-Core set (distributed multi-GPU benchmarks): **amg2023, laghos, remhos,
-examinimd, exampm, haccabanapm, cloverleaf, tealeaf, kripke, branson,
-hipbone** (11). Distributed extensions to adopt: **p3_heat3d, p3_vlp4d** (from
-their own upstream repo). Supplemental (single-GPU motifs / throughput-only):
-**miniweather, cabanapic, shaw, exacmech, minibude, xsbench**. Pending:
-**miniem**.
+Current distributed core (native-mpi, validated single-node multi-GPU):
+**amg2023, laghos, remhos, examinimd, exampm, haccabanapm, cloverleaf,
+tealeaf, kripke, branson, hipbone** (11), plus **miniweather** as core with
+documented limitations (12 native-mpi motifs). Distributed extensions to adopt:
+**p3_heat3d, p3_vlp4d** (upstream MPI siblings). Sharded-EP candidates
+(drivers to write): **xsbench, minibude, exacmech**. Rewrite-cost shardable:
+**cabanapic, shaw**. Pending: **miniem**.
+
+## Completion criteria (unchanged target: ~20 distinct distributed motifs)
+
+The goal remains about twenty DIFFERENT motifs, each a logically distributed
+workload. The 11-12 native-mpi apps are the current progress, **not** the
+finish line. Path to the target and what may be counted:
+
+| Counted today | Path to ~20 | Counted only when |
+|---|---|---|
+| 12 native-mpi (11 core + miniweather with limitations) | -- | selectable-N runs validated |
+| -- | p3_heat3d, p3_vlp4d (adopt upstream heat3d_mpi / vlp4d_mpi) | integrated, built, validated at > 1 rank |
+| -- | xsbench, minibude, exacmech (sharded-EP drivers: split the global batch, reduce) | driver exists and is validated -- a sharded run, not N replicas |
+| -- | cabanapic, shaw (distributed extensions, rewrite cost) | same |
+| -- | miniem (Trilinos/Panzer) | dependency decision + build |
+
+Nothing in the right two columns is counted as done; unimplemented distributed
+paths remain unimplemented in every table of this repository.
 
 ## Why the previous architecture could not scale to 40/80 GPUs
 
@@ -155,6 +182,40 @@ blockers) were collected per app; the load-bearing facts are:
   checked, launched through the common launcher. Verified 1/2/4 GPUs on this
   allocation; 8/40/80 validated as dry-run configuration only.
 
+### Correctness / reproducibility revision (2026-09-04, rev 2)
+
+- Launcher resource model split into ACTUAL / REQUESTED / HYPOTHETICAL:
+  `HPCPERF_NODES` / `HPCPERF_GPUS_PER_NODE` may only select a subset outside
+  dry-run (enforced in placement: `mpirun --host node:ranks`, `srun
+  --nodelist`); larger values are accepted only in dry-run and labelled
+  HYPOTHETICAL. `all` is resolved before the `HPCPERF_NP` conflict check.
+  Heterogeneous allocations (task slots, CPUs or GPUs per node differing)
+  are refused explicitly; GPUs per node are verified from `scontrol show job
+  -d` node groups, not assumed from the current node.
+- CPU mapping for mpirun: `HPCPERF_CPUS_PER_RANK=C` -> `--map-by
+  ppr:R:node:PE=C --bind-to core` after a capacity check (R x C <= CPUs/node);
+  Slurm slot relaxation only after the GPU AND CPU checks pass; per-rank
+  `Cpus_allowed_list` is in the audit line. Verified on the B200 node:
+  4 ranks x 4 cores bound to cores 24-27 / 28-31 / 32-35 / 36-39 inside the
+  job's (non-contiguous) cpuset.
+- GPU binding audit split into expected (wrapper, from the local rank; UUID via
+  nvidia-smi's index table under `CUDA_DEVICE_ORDER=PCI_BUS_ID`, never a CUDA
+  ordinal used as a physical index) and observed (launcher samples
+  `nvidia-smi --query-compute-apps` during the run): verified / MISMATCH /
+  unverified. No usable GPU in GPU mode = failure (exit 13).
+- Every run.sh resolves ranks through `hpcperf_launch_common.sh`; unsupported
+  common parameters (`HPCPERF_SCALE_MODE` on an app without size policies) and
+  extra arguments overriding validated parameters are errors (exit 2).
+- Topology helper enumerates axis permutations under divisibility constraints
+  (N=6 on 8x6x4 -> 2x3x1) and has a self-test; run.sh scripts capture the
+  helper's exit status instead of `read <<< "$(cmd)"`.
+- `setup_level2_deps.sh`: `mark_built` writes the fingerprint first and the
+  completion marker only on success (no-patch case is normal); `is_built`
+  fails fast on a fingerprint mismatch (legacy unfingerprinted installs are
+  accepted with a warning; `--stamp-existing` records a labelled post-hoc
+  fingerprint); `HPCPERF_DEPS_PROFILE` gives Level 3 an isolated
+  `.deps/<profile>/{build,install}` tree. Tests: `level2/tools/tests/run_all.sh`.
+
 ## Common resource parameters (defined this round)
 
 | Variable | Meaning |
@@ -218,7 +279,16 @@ Proposed layout (not yet implemented -- do not break the working tree):
   a symlink `.deps/install/cuda-sm100-gmu -> .` preserves both paths during
   the transition.
 
-Minimal safe change made this round: `.hpcperf-fingerprint` is now written on
-every `mark_built` (new builds only; existing installs keep working
-unchanged), and the `*-gpuaware` experiment prefixes remain unmarked and
-therefore outside `CMAKE_PREFIX_PATH`.
+Implemented (rev 2): `HPCPERF_DEPS_PROFILE=<name>` selects
+`.deps/<name>/{build,install,logs}` (sources shared) in `setup_level2_deps.sh`
+and the matching install root in `hpcperf_env.sh` -- Level 3 uses e.g.
+`HPCPERF_DEPS_PROFILE=level3` and never touches the validated Level 2 tree.
+The fingerprint now PARTICIPATES in `is_built`: a recorded fingerprint that
+does not match the current toolchain/arch/patches fails fast; installs without
+a fingerprint (built before it existed) are accepted as legacy with a warning
+and can be stamped post-hoc (`--stamp-existing`, labelled as such -- a record
+from the current environment, not a build-time record; the nine Level 2
+installs on the dev node were stamped this way on 2026-09-04). The
+`*-gpuaware` experiment prefixes remain unmarked and outside
+`CMAKE_PREFIX_PATH`. Still open: profile-qualified paths for the default tree
+(`cuda-sm100-gmu/...`) and HIP/ROCm profiles.

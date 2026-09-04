@@ -75,13 +75,12 @@ mkdir -p "$OUT_DIR"
 IC="$OUT_DIR/ic_$TAG.h5"
 EVOLVED="$OUT_DIR/evolved_$TAG.h5"
 
-NP="${HPCPERF_NP:-1}"
-LAUNCH=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
-    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
-    LAUNCH+=(--oversubscribe)
-fi
-# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_common.sh"
+N_RANKS="$(hpcperf_ranks haccabanapm no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP); no scale modes yet
+# One rank per GPU through the common launcher for BOTH stages (pm_ic and
+# pm_run must use the same rank count); Kokkos binds by local rank (--bind app).
+LAUNCH=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind app --)
 
 # Cabana's halo exchange, the Distributor migration and heFFTe hand device
 # buffers straight to MPI (GPU-aware MPI is a hard requirement upstream, even
