@@ -98,7 +98,11 @@ export OMPI_MCA_opal_cuda_support="${OMPI_MCA_opal_cuda_support:-true}"
 
 NP="${HPCPERF_NP:-1}"
 LAUNCH=(mpirun -np "$NP")
-[ "$NP" -gt 1 ] && LAUNCH+=(--oversubscribe)
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    LAUNCH+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 # ExaMPM writes its particle dumps into the cwd: run inside the build tree.
 RUN_DIR="${HPCPERF_EXAMPM_RUN_DIR:-$BUILD_DIR/run}"

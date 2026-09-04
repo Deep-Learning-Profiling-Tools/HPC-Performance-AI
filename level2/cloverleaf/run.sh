@@ -6,7 +6,7 @@
 # Default deck: InputDecks/clover_bm16.in (3840 x 3840 cells, 2955 steps,
 # built-in reference check "test_problem 5"). Override with
 # HPCPERF_CLOVERLEAF_DECK=<path> or append e.g. `--file InputDecks/clover_bm16_short.in`
-# (later options win). Ranks: HPCPERF_NP (default 1; >1 adds --oversubscribe).
+# (later options win). Ranks: HPCPERF_NP (default 1; multi-GPU via level2/tools/hpcperf_mpi_launch.sh).
 # clover.out is written to the build tree, not the cwd.
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,7 +32,11 @@ DECK="${HPCPERF_CLOVERLEAF_DECK:-$HERE/InputDecks/clover_bm16.in}"
 OUT="$BUILD/clover.out"
 NP="${HPCPERF_NP:-1}"
 MPIRUN=(mpirun -np "$NP")
-if [ "$NP" -gt 1 ]; then MPIRUN+=(--oversubscribe); fi
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    MPIRUN+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 echo "== CloverLeaf $BACKEND: ${MPIRUN[*]} $EXE --file $DECK --out $OUT $*"
 exec "${MPIRUN[@]}" "$EXE" --file "$DECK" --out "$OUT" "$@"

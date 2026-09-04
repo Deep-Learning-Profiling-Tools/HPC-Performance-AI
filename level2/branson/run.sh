@@ -52,7 +52,11 @@ if ! command -v mpirun >/dev/null 2>&1; then
 fi
 
 MPIRUN=( mpirun -np "$NP" )
-[ "$NP" -gt 1 ] && MPIRUN+=( --oversubscribe )
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    MPIRUN+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 echo "== Branson $BACKEND: ${MPIRUN[*]} $EXE $DECK $*"
 exec "${MPIRUN[@]}" "$EXE" "$DECK" "$@"

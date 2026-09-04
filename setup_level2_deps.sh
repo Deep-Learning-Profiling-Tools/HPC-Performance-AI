@@ -111,7 +111,25 @@ apply_patches() {
 
 done_marker() { echo "$INST/$1/.hpcperf-built"; }
 is_built() { [ -f "$(done_marker "$1")" ] && [ "$(cat "$(done_marker "$1")")" = "$(pin_field "$1" 3)" ]; }
-mark_built() { pin_field "$1" 3 > "$(done_marker "$1")"; }
+# mark_built also records a build fingerprint (.hpcperf-fingerprint): what the
+# install was actually built with. is_built still keys on the tag only (no
+# behaviour change); the fingerprint makes stale variants detectable (backend,
+# GPU arch, compiler, MPI, GPU-aware flag, patch hashes) and is the first step
+# of the profile-based install layout designed in level2/SCALEOUT_AUDIT.md.
+mark_built() {
+  pin_field "$1" 3 > "$(done_marker "$1")"
+  {
+    echo "dep=$1 tag=$(pin_field "$1" 3)"
+    echo "backend=cuda arch=sm_${CUDA_ARCH}"
+    echo "compiler=$($CXX --version 2>/dev/null | head -1)"
+    echo "cuda=$(nvcc --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release \([^,]*\),.*/\1/p')"
+    echo "mpi=$(mpirun --version 2>/dev/null | head -1)"
+    echo "gpu_aware_mpi=off"
+    for _p in "$ROOT/patches/$1"-*.patch; do
+      [ -f "$_p" ] && echo "patch=$(basename "$_p") sha256=$(sha256sum "$_p" | cut -d' ' -f1)"
+    done
+  } > "$INST/$1/.hpcperf-fingerprint"
+}
 
 # cmake_build <name> <source subdir or .> <cmake args...>
 cmake_build() {

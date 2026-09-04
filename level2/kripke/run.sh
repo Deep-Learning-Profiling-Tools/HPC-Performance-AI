@@ -17,7 +17,7 @@
 #   KRIPKE_GROUPS   energy groups                      (default: 64)
 #   KRIPKE_QUAD     quadrature points (multiple of 8)  (default: 128)
 #   KRIPKE_NITER    solver iterations                  (default: 10)
-#   KRIPKE_NP       MPI ranks (needs --procs and --oversubscribe for >1) (default: 1)
+#   KRIPKE_NP       MPI ranks (needs --procs for >1; launch via level2/tools/hpcperf_mpi_launch.sh) (default: 1)
 #   KRIPKE_MPIRUN   launcher                           (default: mpirun -np $KRIPKE_NP)
 set -euo pipefail
 

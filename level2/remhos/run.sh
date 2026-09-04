@@ -72,8 +72,11 @@ TF="${HPCPERF_REMHOS_TF:-0.8}"
 NP="${HPCPERF_NP:-1}"
 
 LAUNCH=(mpirun -np "$NP")
-# mpirun inside this Slurm allocation needs --oversubscribe for >1 rank.
-[ "$NP" -gt 1 ] && LAUNCH+=(--oversubscribe)
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    LAUNCH+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 # Remhos writes any optional output files (-save, -visit, errors.txt, si_init.gf) to the
 # current directory: run inside the build tree, not in level2/remhos.

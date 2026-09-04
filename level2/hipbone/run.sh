@@ -64,7 +64,11 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 
 NP="${HIPBONE_NP:-1}"
 MPIRUN=(mpirun -np "$NP")
-[ "$NP" -gt 1 ] && MPIRUN+=(--oversubscribe)
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    MPIRUN+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 if [ $# -gt 0 ]; then
     ARGS=("$@")

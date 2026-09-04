@@ -11,7 +11,7 @@
 #   mpirun -np 1 ./parallelfor
 #
 # miniWeather takes no command-line arguments. Extra arguments, if given,
-# REPLACE the default "-np 1" mpirun options (e.g. ./run.sh CUDA --oversubscribe -np 2).
+# REPLACE the default "-np 1" mpirun options (e.g. via level2/tools/hpcperf_mpi_launch.sh).
 # The binary runs from its build directory so that output.nc (if OUT_FREQ >= 0
 # was configured) lands there. Prints upstream's normal output: device name,
 # grid/dt, "CPU Time: <s> sec" (wall time of the time-step loop) and the

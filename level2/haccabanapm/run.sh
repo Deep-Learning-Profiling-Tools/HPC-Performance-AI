@@ -26,7 +26,7 @@
 #   HPCPERF_HACCABANAPM_INDAT   indat file (absolute path, or relative to
 #                               level2/haccabanapm); apps/demo/indat.params is
 #                               upstream's 128^3, 5-step demo (validate.sh uses it)
-#   HPCPERF_NP                  MPI ranks (default 1; >1 adds --oversubscribe
+#   HPCPERF_NP                  MPI ranks (default 1; multi-GPU via level2/tools/hpcperf_mpi_launch.sh
 #                               and needs PMKOKKOS_TOPOLOGY="Px,Py,Pz" unless
 #                               the indat has TOPOLOGY)
 #   HPCPERF_HACCABANAPM_TIMING  1 (default) or 0 -> PMKOKKOS_TIMING
@@ -77,7 +77,11 @@ EVOLVED="$OUT_DIR/evolved_$TAG.h5"
 
 NP="${HPCPERF_NP:-1}"
 LAUNCH=(mpirun -np "$NP")
-[ "$NP" -gt 1 ] && LAUNCH+=(--oversubscribe)
+if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+    echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+    LAUNCH+=(--oversubscribe)
+fi
+# For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 
 # Cabana's halo exchange, the Distributor migration and heFFTe hand device
 # buffers straight to MPI (GPU-aware MPI is a hard requirement upstream, even

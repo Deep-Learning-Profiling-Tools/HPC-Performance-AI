@@ -55,7 +55,11 @@ LAUNCH=()
 if grep -q '^ENABLE_MPI:[A-Z]*=ON' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
     NP="${HPCPERF_NP:-1}"
     LAUNCH=(mpirun -np "$NP")
-    [ "$NP" -gt 1 ] && LAUNCH+=(--oversubscribe)
+    if [ "$NP" -gt 1 ] && [ "${HPCPERF_ALLOW_OVERSUBSCRIBE:-0}" = "1" ]; then
+        echo "WARNING: DEBUG ONLY: GPU/rank oversubscription is enabled." >&2
+        LAUNCH+=(--oversubscribe)
+    fi
+    # For one-rank-per-GPU multi-GPU runs use level2/tools/hpcperf_mpi_launch.sh.
 fi
 
 echo "# TeaLeaf $BACKEND: ${LAUNCH[*]:-} $EXE --file $DECK"

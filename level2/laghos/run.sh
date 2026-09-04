@@ -3,66 +3,89 @@
 #
 #   ./run.sh [CUDA|HIP] [extra laghos args...]
 #
-# Default problem: upstream's main problem of interest, the 3D Sedov blast
-# wave (-p 1) with partial assembly (-pa) on data/cube01_hex.mesh, i.e. the
-# README sample run / verification run 4
-#     -p 1 -m data/cube01_hex.mesh -E0 2 -rs 2 -tf 0.6 -pa
-# refined two more levels (-rs 4: 32768 Q2-Q1 hexahedra, 823,875 kinematic and
-# 262,144 thermodynamic dofs, 2408 RK4 time steps) and run with `-f` so that
-# Laghos prints its figure-of-merit table. About 2 min 20 s on a B200, of
-# which ~121 s are in the timed "major kernels" (see README).
+# Distributed model: MFEM parallel FEM -- the serially-refined mesh is
+# partitioned over the MPI ranks (METIS), one rank per GPU, halo/assembly
+# communication through hypre. Multi-rank launches go through
+# level2/tools/hpcperf_mpi_launch.sh, which also injects the per-rank GPU
+# binding wrapper (MFEM does not map ranks to GPUs itself) -- no manual
+# wrapping needed.
 #
-# Extra args are appended to the command line; MFEM's OptionsParser lets the
-# last occurrence win, so e.g. `./run.sh CUDA -rs 3` or `./run.sh CUDA -ok 3
-# -ot 2` override the defaults, and `./run.sh CUDA -ms 200` caps the number of
-# time steps.
+# Resource / size controls (common Level 2 parameters):
+#   HPCPERF_GPUS=N|all     ranks = GPUs (default 1)
+#   HPCPERF_SCALE_MODE     smoke | strong | weak    (default strong)
+#     strong : ONE fixed global problem: 3D Sedov (-p 1) on cube01_hex.mesh
+#              at -rs HPCPERF_LAGHOS_RS (default 4: 32,768 hexes, 823,875 H1
+#              dofs, 2408 steps -- the historical single-GPU FOM deck),
+#              partitioned over the ranks
+#     weak   : per-rank work held EXACTLY constant with upstream's
+#              -epm (elements per MPI rank) partitioner: every rank owns
+#              HPCPERF_LAGHOS_EPM elements (default 32768 = the single-GPU
+#              strong deck's zone count), any rank count
+#     smoke  : -rs 2 (512 hexes), -tf 0.05 -- seconds-fast bring-up run
+#   HPCPERF_LAGHOS_RS      serial refinements of cube01_hex.mesh (default 4;
+#                          elements = 8^(rs+1) / 8 * 8 = 8 * 8^rs)
+#   HPCPERF_LAGHOS_ARGS    replaces the whole problem line (except -d)
+#   HPCPERF_LAGHOS_DEVICE  MFEM device string (default cuda/hip by backend)
 #
-# Environment overrides:
-#   HPCPERF_LAGHOS_RS    serial refinement levels of cube01_hex.mesh (default 4)
-#   HPCPERF_LAGHOS_ARGS  replaces the whole default problem line (everything
-#                        except -d <device>); e.g.
-#                        HPCPERF_LAGHOS_ARGS="-p 3 -m data/box01_hex.mesh -rs 3 -tf 5.0 -pa -cgt 1e-12"
-#   HPCPERF_NP           number of MPI ranks (default 1; >1 adds --oversubscribe,
-#                        all ranks share the one visible GPU)
-#   HPCPERF_LAGHOS_DEVICE  MFEM device string (default: cuda / hip by backend)
+# Constraint checked here: the serial mesh must have at least as many
+# elements as ranks (METIS partition, one nonempty part per rank):
+# elements(rs) = 8 * 8^rs  (cube01_hex.mesh has 8 hexes at rs=0).
 #
-# The script cd's into the source directory so that the relative mesh paths
-# (`-m data/...`) used by upstream's documentation resolve.
-
+# Compatibility patch note: laghos_solver.cpp carries a 13-line MFEM_UNROLL(1)
+# Blackwell/CUDA 13.2 compiler workaround (see README, performance impact
+# pending A/B validation); nothing here changes it.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
-
 set -euo pipefail
-
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 BUILD_DIR="$R/build/level2/laghos/$MODEL"
 EXE="$BUILD_DIR/laghos"
-
 if [ ! -x "$EXE" ]; then
     echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first" >&2
     exit 1
 fi
-
 case "$BACKEND" in
     CUDA) DEVICE="${HPCPERF_LAGHOS_DEVICE:-cuda}" ;;
     HIP)  DEVICE="${HPCPERF_LAGHOS_DEVICE:-hip}" ;;
     *) echo "usage: $0 [CUDA|HIP] [extra laghos args]" >&2; exit 2 ;;
 esac
 
-RS="${HPCPERF_LAGHOS_RS:-4}"
-DEFAULT_ARGS="-p 1 -m data/cube01_hex.mesh -E0 2 -rs $RS -tf 0.6 -pa -f"
-# shellcheck disable=SC2206
-PROBLEM=(${HPCPERF_LAGHOS_ARGS:-$DEFAULT_ARGS})
+N_RANKS="${HPCPERF_GPUS:-${HPCPERF_NP:-1}}"
+if [ "$N_RANKS" = all ]; then
+    N_RANKS="$(( ${SLURM_JOB_NUM_NODES:-1} * ${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')} ))"
+fi
+MODE="${HPCPERF_SCALE_MODE:-strong}"
 
-NP="${HPCPERF_NP:-1}"
-LAUNCH=(mpirun -np "$NP")
-# mpirun inside this Slurm allocation needs --oversubscribe for >1 rank.
-[ "$NP" -gt 1 ] && LAUNCH+=(--oversubscribe)
+if [ -n "${HPCPERF_LAGHOS_ARGS:-}" ]; then
+    # shellcheck disable=SC2206
+    PROBLEM=(${HPCPERF_LAGHOS_ARGS})
+else
+    RS="${HPCPERF_LAGHOS_RS:-4}"
+    case "$MODE" in
+        smoke)  RS="${HPCPERF_LAGHOS_RS:-2}"
+                PROBLEM=(-p 1 -m data/cube01_hex.mesh -E0 2 -rs "$RS" -tf 0.05 -pa) ;;
+        strong) PROBLEM=(-p 1 -m data/cube01_hex.mesh -E0 2 -rs "$RS" -tf 0.6 -pa -f) ;;
+        weak)   EPM="${HPCPERF_LAGHOS_EPM:-32768}"
+                PROBLEM=(-p 1 -epm "$EPM" -E0 2 -tf 0.6 -pa -f) ;;
+        *) echo "run.sh: HPCPERF_SCALE_MODE must be smoke|strong|weak (got '$MODE')" >&2; exit 2 ;;
+    esac
+    if [ "$MODE" != weak ]; then
+        ELEMS=$((8 ** (RS + 1)))
+        if [ "$ELEMS" -lt "$N_RANKS" ]; then
+            echo "run.sh: serial mesh at -rs $RS has only $ELEMS elements for $N_RANKS ranks;" >&2
+            echo "run.sh: raise HPCPERF_LAGHOS_RS (elements = 8^(rs+1)) or use fewer ranks." >&2
+            exit 2
+        fi
+        echo "# Laghos $BACKEND: mode=$MODE ranks=$N_RANKS rs=$RS serial-elements=$ELEMS (~$((ELEMS / N_RANKS))/rank)"
+    else
+        echo "# Laghos $BACKEND: mode=weak ranks=$N_RANKS elements/rank=$EPM (global $((EPM * N_RANKS)))"
+    fi
+fi
 
 cd "$HERE"
-echo "# Laghos $BACKEND: ${LAUNCH[*]} $EXE ${PROBLEM[*]} -d $DEVICE $*"
-exec "${LAUNCH[@]}" "$EXE" "${PROBLEM[@]}" -d "$DEVICE" "$@"
+exec "$R/level2/tools/hpcperf_mpi_launch.sh" --gpus "$N_RANKS" --bind wrapper -- \
+    "$EXE" "${PROBLEM[@]}" -d "$DEVICE" "$@"

@@ -136,12 +136,15 @@ fi
 # Kokkos' nvcc_wrapper must call the same host compiler as everything else.
 export NVCC_WRAPPER_DEFAULT_COMPILER="$CXX"
 
-# MPI (conda Open MPI 5, used by the Level 2 mini-apps). Inside a Slurm
-# allocation with fewer tasks than requested ranks, PRRTE refuses to start
-# without oversubscription; allow it so `mpirun -np N` works as documented.
-if [ -n "${SLURM_JOB_ID:-}" ]; then
-    export PRTE_MCA_rmaps_default_mapping_policy="${PRTE_MCA_rmaps_default_mapping_policy:-:oversubscribe}"
-fi
+# MPI oversubscription policy: NOT enabled globally. One rank per GPU is the
+# execution model; GPU/rank oversubscription is forbidden by default and only
+# HPCPERF_ALLOW_OVERSUBSCRIBE=1 permits it (debug only, with a loud warning).
+# Multi-rank launches go through level2/tools/hpcperf_mpi_launch.sh, which
+# validates ranks <= allocated GPUs and, only then, relaxes Slurm task-slot
+# accounting per launch (--map-by ...:OVERSUBSCRIBE) when the allocation was
+# requested with fewer tasks than GPUs -- that is bookkeeping, not GPU
+# sharing. (An earlier revision exported
+# PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe globally; removed.)
 # Optional single-node MPI transport profile (OPT-IN, off by default). By
 # default no PML/BTL is forced: Open MPI / the site stack chooses the
 # transport itself. Setting HPCPERF_MPI_SINGLE_NODE=1 pins the shared-memory
