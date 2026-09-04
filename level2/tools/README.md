@@ -106,6 +106,8 @@ on the dev node (`HPCPERF_MPI_CUDA_MCA` overrides).
 
 `level2/tools/tests/run_all.sh` runs: the topology self-test; sandboxed
 `setup_level2_deps.sh` marker/fingerprint tests (no patch / with patch /
-unwritable dir / fingerprint mismatch / legacy / post-hoc stamp); launcher
-resource-parsing dry-run tests; and the run.sh interface guards (needs built
-apps; nothing is launched).
+unwritable dir / unknown CUDA version refused / fingerprint mismatch / legacy /
+post-hoc stamp / schema-1 migration); `hpcperf_env.sh` dependency-profile
+switching (level2 -> uninstalled -> level2 -> level3 -> level2, re-source,
+user entries preserved); launcher resource-parsing dry-run tests; and the
+run.sh interface guards (needs built apps; nothing is launched).

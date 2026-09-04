@@ -34,7 +34,9 @@
 #   ./setup_level2_deps.sh                # build every dependency (idempotent)
 #   ./setup_level2_deps.sh kokkos cabana  # build a subset (in dependency order)
 #   ./setup_level2_deps.sh --list         # show pinned versions
-#   ./setup_level2_deps.sh --stamp-existing  # fingerprint legacy installs
+#   ./setup_level2_deps.sh --stamp-existing  # fingerprint legacy installs (post-hoc)
+#   ./setup_level2_deps.sh --migrate-fingerprints  # re-record schema-1 fingerprints
+#                                                  # (post-hoc, labelled; not a rebuild)
 #   HPCPERF_DEPS_LIBMODE=1 source setup_level2_deps.sh   # functions only (tests)
 #
 # Prerequisites: ./setup_env.sh has been run and hpcperf_env.sh is sourced
@@ -83,14 +85,26 @@ done_marker() { echo "$INST/$1/.hpcperf-built"; }
 fp_file()     { echo "$INST/$1/.hpcperf-fingerprint"; }
 first_line()  { "$@" 2>/dev/null | head -n 1 || true; }
 
+# cuda_version: the full toolkit version from nvcc (e.g. 13.2.78), taken from
+# the "Cuda compilation tools, release X.Y, VX.Y.Z" line of the COMPLETE
+# `nvcc --version` output (the release line is not the first line). Empty if
+# nvcc is missing or its output is unrecognised -- callers must check.
+cuda_version() {
+  nvcc --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release [^,]*, V\([0-9][0-9.]*\).*$/\1/p' | head -n 1
+}
+
 # current_fingerprint <name>: what a build of <name> in THIS environment/profile
-# would be fingerprinted as. Pure (no side effects); tolerant of missing tools.
+# would be fingerprinted as (schema 2). Pure (no side effects). Prints
+# 'cuda=' empty when the toolkit version cannot be determined; mark_built
+# refuses to record such a fingerprint.
+FP_SCHEMA=2
 current_fingerprint() {
   local name=$1 p
+  echo "schema=$FP_SCHEMA"
   echo "dep=$name tag=$(pin_field "$name" 3)"
   echo "profile=$PROFILE backend=cuda arch=sm_${CUDA_ARCH:-unknown}"
   echo "compiler=$(first_line "${CXX:-c++}" --version)"
-  echo "cuda=$(first_line nvcc --version | sed -n 's/.*release \([^,]*\),.*/\1/p')"
+  echo "cuda=$(cuda_version)"
   echo "mpi=$(first_line mpirun --version)"
   echo "gpu_aware_mpi=off"
   for p in "$ROOT/patches/$name"-*.patch; do
@@ -100,13 +114,22 @@ current_fingerprint() {
   return 0
 }
 
+# fp_essential <file>: the comparable part of a fingerprint -- everything except
+# the informational provenance lines (stamped=, migrated=).
+fp_essential() { grep -v -e '^stamped=' -e '^migrated=' "$1"; }
+
 # mark_built <name>: write the fingerprint first (atomically), and only when
 # that succeeded write the completion marker. Returns non-zero (marker NOT
-# written) if anything could not be written. Works with or without patches.
+# written) if anything could not be written or the CUDA version is unknown.
+# Works with or without patches.
 mark_built() {
   local name=$1 dir fp tmp
   dir="$INST/$name"; fp="$(fp_file "$name")"
   [ -d "$dir" ] || return 1
+  if [ -z "$(cuda_version)" ]; then
+    warn "$name: cannot determine the CUDA toolkit version from 'nvcc --version'; refusing to record an incomplete fingerprint"
+    return 1
+  fi
   tmp="$(mktemp "$dir/.hpcperf-fingerprint.XXXXXX" 2>/dev/null)" || return 1
   if ! current_fingerprint "$name" > "$tmp"; then rm -f "$tmp"; return 1; fi
   mv -f "$tmp" "$fp" || { rm -f "$tmp"; return 1; }
@@ -116,15 +139,22 @@ mark_built() {
 
 # check_fingerprint <name>: 0 if the recorded fingerprint matches the current
 # environment (or is absent = legacy, accepted with a warning), 1 on mismatch
-# (prints the differing lines). 'stamped=' lines are informational only.
+# or on an outdated fingerprint schema (prints why). Provenance lines
+# (stamped=, migrated=) are informational and never compared.
 check_fingerprint() {
-  local name=$1 fp diffout
+  local name=$1 fp diffout rec_schema
   fp="$(fp_file "$name")"
   if [ ! -f "$fp" ]; then
-    warn "$name: install has no .hpcperf-fingerprint (built before fingerprinting existed); accepted as legacy -- run '$0 --stamp-existing' to record one"
+    warn "$name: install has no .hpcperf-fingerprint (built before fingerprinting existed); accepted as legacy -- run '$0 --stamp-existing' to record one (labelled post-hoc)"
     return 0
   fi
-  diffout="$(diff <(grep -v '^stamped=' "$fp") <(current_fingerprint "$name" | grep -v '^stamped=') || true)"
+  rec_schema="$(sed -n 's/^schema=//p' "$fp")"
+  if [ "${rec_schema:-1}" != "$FP_SCHEMA" ]; then
+    printf '[level2-deps] %s: fingerprint schema %s is outdated (current %s; schema 1 recorded an empty cuda= field because of a parsing bug). Run "%s --migrate-fingerprints" to re-record it -- the result is labelled as a post-hoc migration, it is NOT a rebuild verification.\n' \
+      "$name" "${rec_schema:-1}" "$FP_SCHEMA" "$0" >&2
+    return 1
+  fi
+  diffout="$(diff <(fp_essential "$fp") <(current_fingerprint "$name") || true)"
   if [ -n "$diffout" ]; then
     printf '[level2-deps] fingerprint mismatch for %s (recorded < vs current >):\n%s\n' "$name" "$diffout" >&2
     return 1
@@ -146,12 +176,38 @@ is_built() {
 # stamp_existing: post-hoc fingerprint for legacy installs (labelled as such).
 stamp_existing() {
   local d name
+  [ -n "$(cuda_version)" ] || fail "cannot determine the CUDA toolkit version from 'nvcc --version'; not stamping incomplete fingerprints"
   for d in "$INST"/*/; do
     d="${d%/}"; name="$(basename "$d")"
     [ -f "$d/.hpcperf-built" ] || continue
     if [ -f "$d/.hpcperf-fingerprint" ]; then say "$name: already fingerprinted"; continue; fi
     { current_fingerprint "$name"; echo "stamped=post-hoc $(date -u +%Y-%m-%dT%H:%MZ) (recorded after the build, from the current environment; not a build-time record)"; } > "$d/.hpcperf-fingerprint"
     say "$name: fingerprint stamped post-hoc"
+  done
+}
+
+# migrate_fingerprints: re-record fingerprints written with an older schema
+# (schema 1 had an empty cuda= field). The existing provenance lines are kept
+# and a 'migrated=' line is added: this is an explicit post-hoc re-record from
+# the current environment, NOT a rebuild and NOT a verification of the build.
+# Refuses to migrate a fingerprint whose recorded tag does not match the pin.
+migrate_fingerprints() {
+  local d name fp rec_schema old_prov
+  [ -n "$(cuda_version)" ] || fail "cannot determine the CUDA toolkit version from 'nvcc --version'; not migrating"
+  for d in "$INST"/*/; do
+    d="${d%/}"; name="$(basename "$d")"; fp="$d/.hpcperf-fingerprint"
+    [ -f "$d/.hpcperf-built" ] && [ -f "$fp" ] || continue
+    rec_schema="$(sed -n 's/^schema=//p' "$fp")"
+    if [ "${rec_schema:-1}" = "$FP_SCHEMA" ]; then say "$name: fingerprint already schema $FP_SCHEMA"; continue; fi
+    if ! grep -q "^dep=$name tag=$(pin_field "$name" 3)\$" "$fp"; then
+      warn "$name: recorded 'dep/tag' line does not match the pinned tag; not migrating (rebuild instead)"; continue
+    fi
+    old_prov="$(grep -e '^stamped=' -e '^migrated=' "$fp" || true)"
+    { current_fingerprint "$name"
+      [ -n "$old_prov" ] && printf '%s\n' "$old_prov"
+      echo "migrated=schema ${rec_schema:-1}->$FP_SCHEMA $(date -u +%Y-%m-%dT%H:%MZ) (re-recorded from the current environment; not a rebuild, not a build verification)"
+    } > "$fp.tmp" && mv -f "$fp.tmp" "$fp"
+    say "$name: fingerprint migrated to schema $FP_SCHEMA (post-hoc, labelled)"
   done
 }
 
@@ -340,6 +396,7 @@ CONDA="${CONDA_PREFIX:?conda env not active}"
 mkdir -p "$SRC" "$BLD" "$INST" "$LOGS"
 
 if [ "${1:-}" = "--stamp-existing" ]; then stamp_existing; exit 0; fi
+if [ "${1:-}" = "--migrate-fingerprints" ]; then migrate_fingerprints; exit 0; fi
 
 say "profile=$PROFILE install=$INST toolchain: CC=$CC CXX=$CXX nvcc=$(nvcc --version | grep -o 'release [0-9.]*') CUDA arch=sm_$CUDA_ARCH ($KOKKOS_ARCH) jobs=$JOBS"
 

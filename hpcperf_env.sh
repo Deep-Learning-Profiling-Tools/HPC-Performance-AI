@@ -122,12 +122,32 @@ export CUDAARCHS="${CUDAARCHS:-native}"
 # .deps/<profile>/install/<name>, e.g. level3). Exactly that profile's marked
 # prefixes (.hpcperf-built present) go on CMAKE_PREFIX_PATH -- never two
 # profiles at once, and never unmarked/experimental installs.
+#
+# Switching profiles: the entries THIS file added on an earlier `source` are
+# remembered in _HPCPERF_DEPS_ADDED_PREFIXES / _HPCPERF_DEPS_ADDED_LIBS and are
+# removed first, so `HPCPERF_DEPS_PROFILE=level3 source hpcperf_env.sh` (and
+# back to level2, or re-sourcing the same profile) never leaves stale
+# dependency paths behind. Entries that came from the system or the user are
+# never touched -- only what this block itself added.
+_hpcperf_remove() { # $1 = var name, $2 = exact entry to remove (every occurrence)
+    local _cur _new="" _e; eval "_cur=\${$1:-}"
+    local IFS=':'
+    for _e in $_cur; do
+        [ -n "$_e" ] && [ "$_e" != "$2" ] && _new="${_new:+$_new:}$_e"
+    done
+    if [ -n "$_new" ]; then eval "export $1=\"\$_new\""; else unset "$1"; fi
+}
 _hpcperf_deps_profile="${HPCPERF_DEPS_PROFILE:-level2}"
 if [ "$_hpcperf_deps_profile" = level2 ]; then
     _hpcperf_deps_root="$HPC_PERFORMANCE_AI_ROOT/.deps/install"
 else
     _hpcperf_deps_root="$HPC_PERFORMANCE_AI_ROOT/.deps/$_hpcperf_deps_profile/install"
 fi
+_hpcperf_ifs_save="$IFS"; IFS=':'
+for _old in ${_HPCPERF_DEPS_ADDED_PREFIXES:-}; do IFS="$_hpcperf_ifs_save"; _hpcperf_remove CMAKE_PREFIX_PATH "$_old"; IFS=':'; done
+for _old in ${_HPCPERF_DEPS_ADDED_LIBS:-};     do IFS="$_hpcperf_ifs_save"; _hpcperf_remove LD_LIBRARY_PATH "$_old";  IFS=':'; done
+IFS="$_hpcperf_ifs_save"; unset _hpcperf_ifs_save _old
+_HPCPERF_DEPS_ADDED_PREFIXES=""; _HPCPERF_DEPS_ADDED_LIBS=""
 if [ -d "$_hpcperf_deps_root" ]; then
     for _dep in "$_hpcperf_deps_root"/*/; do
         _dep="${_dep%/}"
@@ -135,13 +155,24 @@ if [ -d "$_hpcperf_deps_root" ]; then
         # The *environment* variable CMAKE_PREFIX_PATH is ':'-separated (like PATH).
         case ":${CMAKE_PREFIX_PATH:-}:" in
             *":$_dep:"*) ;;
-            *) export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH}:}$_dep" ;;
+            *) export CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+${CMAKE_PREFIX_PATH}:}$_dep"
+               _HPCPERF_DEPS_ADDED_PREFIXES="${_HPCPERF_DEPS_ADDED_PREFIXES:+$_HPCPERF_DEPS_ADDED_PREFIXES:}$_dep" ;;
         esac
-        [ -d "$_dep/lib" ]   && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib"
-        [ -d "$_dep/lib64" ] && _hpcperf_prepend LD_LIBRARY_PATH "$_dep/lib64"
+        for _libdir in "$_dep/lib" "$_dep/lib64"; do
+            [ -d "$_libdir" ] || continue
+            case ":${LD_LIBRARY_PATH:-}:" in
+                *":$_libdir:"*) ;;
+                *) _hpcperf_prepend LD_LIBRARY_PATH "$_libdir"
+                   _HPCPERF_DEPS_ADDED_LIBS="${_HPCPERF_DEPS_ADDED_LIBS:+$_HPCPERF_DEPS_ADDED_LIBS:}$_libdir" ;;
+            esac
+        done
     done
-    unset _dep
+    unset _dep _libdir
+elif [ "$_hpcperf_deps_profile" != level2 ]; then
+    echo "hpcperf_env.sh: dependency profile '$_hpcperf_deps_profile' has no installs yet ($_hpcperf_deps_root); no dependency prefixes exposed" >&2
 fi
+export _HPCPERF_DEPS_ADDED_PREFIXES _HPCPERF_DEPS_ADDED_LIBS
+export HPCPERF_DEPS_PROFILE_ACTIVE="$_hpcperf_deps_profile"
 # Kokkos' nvcc_wrapper must call the same host compiler as everything else.
 export NVCC_WRAPPER_DEFAULT_COMPILER="$CXX"
 
