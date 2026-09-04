@@ -288,7 +288,14 @@ does not match the current toolchain/arch/patches fails fast; installs without
 a fingerprint (built before it existed) are accepted as legacy with a warning
 and can be stamped post-hoc (`--stamp-existing`, labelled as such -- a record
 from the current environment, not a build-time record; the nine Level 2
-installs on the dev node were stamped this way on 2026-09-04). The
+installs on the dev node were stamped this way on 2026-09-04). Fingerprint
+schema 2 (2026-09-04) records the full CUDA toolkit version parsed from the
+complete `nvcc --version` output; schema-1 files had an empty `cuda=` field
+(the release line is not the first line of that output) and are re-recorded by
+`--migrate-fingerprints`, which keeps the old provenance line and adds a
+`migrated=` line -- again a post-hoc record from the current environment, not a
+rebuild verification. `mark_built` refuses to record a fingerprint whose CUDA
+version cannot be determined. The
 `*-gpuaware` experiment prefixes remain unmarked and outside
 `CMAKE_PREFIX_PATH`. Still open: profile-qualified paths for the default tree
 (`cuda-sm100-gmu/...`) and HIP/ROCm profiles.
