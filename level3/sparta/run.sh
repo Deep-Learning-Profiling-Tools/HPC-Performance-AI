@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Run the SPARTA collisional-flow benchmark (upstream bench/in.collide) on N GPUs.
+#
+#   ./run.sh [CUDA|HIP] [extra spa args...]
+#
+# Execution model (upstream Section_accelerate): one MPI rank per GPU, KOKKOS
+# package on the device (`-k on g 1 -sf kk`), particles/grid distributed by
+# SPARTA's own `balance_grid rcb part` -- any rank count is legal. Ranks go
+# through the common launcher with the per-rank GPU wrapper (each rank sees
+# exactly one GPU; mapping audited). GPU-aware MPI (`-pk kokkos gpu/aware
+# yes`, SPARTA's default on GPUs) matches this repository's CUDA-aware
+# Open MPI; HPCPERF_SPARTA_GPU_AWARE=no disables it.
+#
+# Resource / size controls (common Level 3 parameters):
+#   HPCPERF_GPUS=N|all        ranks = GPUs (default 1)
+#   HPCPERF_SCALE_MODE        smoke | strong | weak   (default smoke)
+#     smoke  : upstream deck as shipped: 10x10x10 cells, 10 particles/cell =
+#              10,000 particles; 30 equilibration + 100 benchmark steps
+#              (reference log bench/log.7Jul14.collide.icc.10K.1)
+#     strong : ONE fixed global grid, S^3 cells (S=HPCPERF_SPARTA_STRONG,
+#              default 100: 1,000,000 cells = 10,000,000 particles), split by
+#              SPARTA over the ranks
+#     weak   : fixed work per rank, L^3 cells per rank (L=HPCPERF_SPARTA_LOCAL,
+#              default 50: 125,000 cells = 1,250,000 particles/rank); grid
+#              L*PX x L*PY x L*PZ with PXxPYxPZ from hpcperf_topology.py
+#   HPCPERF_SPARTA_GPU_AWARE  yes|no (default yes)
+# The deck is upstream's bench/in.collide, unmodified; sizes enter through its
+# own -var x/y/z variables (particles = 10 * cells by construction).
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+R="$(cd "$HERE/../.." && pwd)"
+set +u; # shellcheck disable=SC1091
+source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
+# shellcheck disable=SC1091
+source "$R/level3/tools/l3_common.sh"
+
+BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
+MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
+BUILD_DIR="$R/build/level3/sparta/$MODEL"
+EXE="$(find "$BUILD_DIR" -maxdepth 2 -name "spa_kokkos_$MODEL" -type f 2>/dev/null | head -1)"
+[ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: spa_kokkos_$MODEL not found under $BUILD_DIR -- run ./build.sh $BACKEND first" >&2; exit 1; }
+SRC="$R/_upstream/level3/sparta"
+
+N_RANKS="$(hpcperf_ranks sparta yes)" || exit 2
+hpcperf_forbid_args sparta -in -i -var -v -k -kokkos -sf -suffix -pk -package -log -- "$@" || exit 2
+MODE="$(l3_scale_mode sparta)" || exit 2
+GAM="${HPCPERF_SPARTA_GPU_AWARE:-yes}"
+
+case "$MODE" in
+    smoke)  X=10; Y=10; Z=10 ;;
+    strong) S="${HPCPERF_SPARTA_STRONG:-100}"; X=$S; Y=$S; Z=$S ;;
+    weak)   L="${HPCPERF_SPARTA_LOCAL:-50}"
+            TOPO="$(hpcperf_topology sparta "$N_RANKS")" || exit 2
+            read -r PX PY PZ <<< "$TOPO"
+            X=$((L * PX)); Y=$((L * PY)); Z=$((L * PZ)) ;;
+esac
+CELLS=$((X * Y * Z)); PARTS=$((10 * CELLS))
+RUN_DIR="$BUILD_DIR/run"; mkdir -p "$RUN_DIR"
+LOG="$RUN_DIR/log.$MODE.np$N_RANKS.sparta"
+echo "# SPARTA $BACKEND: mode=$MODE ranks=$N_RANKS grid=${X}x${Y}x${Z} = $CELLS cells, $PARTS particles ($((PARTS / N_RANKS))/rank), gpu-aware=$GAM, log=$LOG"
+cd "$SRC/bench"   # ar.species / ar.vss are referenced relative to the deck
+exec "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
+    "$EXE" -k on g 1 -sf kk -pk kokkos gpu/aware "$GAM" \
+    -in in.collide -var x "$X" -var y "$Y" -var z "$Z" -log "$LOG" -echo none "$@"

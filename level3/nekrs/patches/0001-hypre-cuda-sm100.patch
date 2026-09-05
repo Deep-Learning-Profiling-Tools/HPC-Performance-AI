@@ -1,0 +1,11 @@
+--- a/cmake/hypre.cmake
++++ b/cmake/hypre.cmake
+@@ -58,7 +58,7 @@
+   set(HYPRE_BACKEND "--with-cuda" "--with-cuda-home=${CUDAToolkit_LIBRARY_ROOT}")
+ 
+   if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0.0")
+-    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=80 90")
++    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=80 90 100")
+     #disable for now as it might not play well with all MPI implementations
+     #set(HYPRE_CONFIGURE_FLAGS "--enable-device-malloc-async")
+   elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0.0")
