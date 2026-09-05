@@ -90,6 +90,40 @@ Memory estimate ~60 KB per element at N=7 (velocity, pressure, two scalars,
 multistep history, preconditioner). Derived `ethier.par` files change only
 `hrefine` and `numSteps` (class A).
 
+## Coarse-solver location: what runs on the GPU (read `COMPATIBILITY.md`)
+
+The ethier case's HYPRE BoomerAMG coarse solve runs where the cimode selects:
+
+- `--cimode 2` (and the default `.par`): `FLUID PRESSURE MULTIGRID COARSE SOLVER
+  LOCATION = CPU` -- the coarse solve is on the **host**. The nekRS main
+  application (advection, Helmholtz, pressure pMG smoother, gather-scatter) runs
+  on the **GPU** via OCCA/CUDA. So this is not a CPU-only application, but a
+  cimode-2 PASS does **not** exercise GPU HYPRE.
+- `--cimode 3`: `FLUID PRESSURE PRECONDITIONER = MULTIGRID+SEMFEM`, `COARSE
+  SOLVER LOCATION = DEVICE` -- the coarse solve runs on the **GPU** (this is the
+  mode that exercises the GPU HYPRE built by `ENABLE_HYPRE_GPU=ON` and the three
+  patches).
+
+Two build variants exist (isolated src/build/install/JIT-cache; select with
+`HPCPERF_NEKRS_HYPRE_GPU`/`HPCPERF_NEKRS_VARIANT`):
+
+| variant | `ENABLE_HYPRE_GPU` | patches | GPU HYPRE coarse (cimode 3) | CPU coarse (cimode 2) |
+|---|---|---|---|---|
+| `hypregpu` (default) | ON | 0001+0002+0003 | built + **verified** (cimode 3, 1/4 GPU, 9/9, coarse=DEVICE) | verified 1/2/4 |
+| `cpucoarse` (candidate) | OFF | none | not built; a DEVICE request is **explicitly rejected** by nekRS (`HYPRE+DEVICE not enabled!`, exit 1), no silent fallback | verified 1/2/4 (candidate, 0 patches, 113 s build) |
+
+Build/run isolation per variant: `hypregpu` keeps the legacy paths
+(`.deps/level3/nekrs/{src,install}`, `build/level3/nekrs/cuda`); other variants
+use `.deps/level3/nekrs/<variant>/{src,install}` and `build/level3/nekrs/<variant>.<backend>`
+with their own OCCA/nekRS JIT cache. The source-copy cache key is the upstream
+SHA plus the ordered patch-content hash, so the two variants never share a
+patched/unpatched tree.
+
+Which to make default is a decision for review: `cpucoarse` is minimal (no
+patches, fast build) and covers the current CPU-coarse workload; `hypregpu` is
+required if a case selects GPU (DEVICE) coarse. CPU-coarse scalability at 40/80
+GPUs is UNVERIFIED and is not claimed to be optimal at all scales.
+
 ## Validation (`validate.sh`, upstream mechanism)
 
 `nekrs --setup ethier --cimode 2` is one of the modes upstream's CI runs on this
@@ -101,10 +135,19 @@ relative tolerance EPS = 0.3) plus the iteration counts of the pressure,
 velocity and scalar solves. nekRS prints `CI test <...> passed|failed` per
 check and exits non-zero on failure; `validate.sh` uses that verdict unchanged
 (upstream runs it on CPUs with 2 ranks; here the CUDA backend on 1, 2 and 4
-ranks). Observed on dgx003 (2026-09-05): **PASS at 1, 2 and 4 GPUs, 9/9 checks
-each**; final L2 errors velocity 2.776e-10, pressure 6.983e-10, scalar00
-6.672e-12, scalar01 7.495e-12 -- identical to 5 significant digits across the
-three rank counts (CI references 2.77e-10 / 7.14e-10 / 7.49e-12 / 7.22e-12).
+ranks). The validator now (a) captures the run's real exit code (nonzero/timeout ->
+FAIL), (b) requires the COMPLETE set of CI checks (9 for cimode 2/3, not merely
+"some passed"), (c) asserts the coarse-solver LOCATION recorded in the log
+matches the cimode (CPU for 2, DEVICE for 3 -- no silent fallback), and (d)
+rejects NaN/Inf. `HPCPERF_NEKRS_CIMODE` selects the mode.
+
+Observed on dgx003 (2026-09-05), `hypregpu` variant:
+- `--cimode 2` (CPU coarse): **PASS at 1, 2, 4 GPUs, 9/9 checks, coarse=CPU**.
+- `--cimode 3` (DEVICE / GPU HYPRE coarse): **PASS at 1 and 4 GPUs, 9/9 checks,
+  coarse=DEVICE** -- this is the run that actually exercises the GPU HYPRE coarse
+  solve the three patches enable, verified against the analytic solution.
+Earlier CI L2 errors (cimode 2): velocity 2.78e-10, pressure 6.98e-10, scalars
+6.67e-12 / 7.49e-12 (CI references 2.77e-10 / 7.14e-10 / 7.49e-12 / 7.22e-12).
 
 ## Results on dgx003 (4x B200, CUDA 13.2.78, Slurm job 9552083)
 

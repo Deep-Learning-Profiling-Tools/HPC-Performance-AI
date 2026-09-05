@@ -44,10 +44,18 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 l3_paths nekrs
-BUILD_DIR="$R/build/level3/nekrs/$MODEL"
+# variant selection must match build.sh: the default 'hypregpu' uses the legacy layout; any other
+# variant (e.g. cpucoarse = ENABLE_HYPRE_GPU=OFF) has its own install and JIT cache.
+VARIANT="${HPCPERF_NEKRS_VARIANT:-$([ "${HPCPERF_NEKRS_HYPRE_GPU:-ON}" = ON ] && echo hypregpu || echo cpucoarse)}"
+if [ "$VARIANT" = hypregpu ]; then
+    BUILD_DIR="$R/build/level3/nekrs/$MODEL"
+else
+    L3_INSTALL="$L3_R/.deps/level3/nekrs/$VARIANT/install"
+    BUILD_DIR="$R/build/level3/nekrs/$VARIANT.$MODEL"
+fi
 export NEKRS_HOME="$L3_INSTALL"
 EXE="$NEKRS_HOME/bin/nekrs"
-[ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first" >&2; exit 1; }
+[ -x "$EXE" ] || { echo "run.sh: $EXE not found for variant '$VARIANT' -- run HPCPERF_NEKRS_VARIANT=$VARIANT ./build.sh $BACKEND first" >&2; exit 1; }
 CASE_SRC="$R/_upstream/level3/nekRS/examples/ethier"
 [ -f "$CASE_SRC/ethier.re2" ] || { echo "run.sh: $CASE_SRC missing (run fetch.sh)" >&2; exit 1; }
 
@@ -63,7 +71,8 @@ esac
 if [ "$H" -gt 0 ]; then ELEMS=$((32 * H * H * H)); else ELEMS=32; fi
 POINTS=$((ELEMS * (ORDER + 1) * (ORDER + 1) * (ORDER + 1)))
 
-RUN_DIR="$BUILD_DIR/run/$MODE.np$N_RANKS"; rm -rf "$RUN_DIR"; mkdir -p "$RUN_DIR"
+# l3_rundir: dry-run gets a throwaway dir instead of rm -rf'ing the real run directory.
+RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$MODE.np$N_RANKS")" || exit 2
 cp "$CASE_SRC"/* "$RUN_DIR"/     # complete upstream case directory (re2, usr, udf, CASEDATA include, ci.inc, par files)
 if [ "$MODE" = smoke ]; then
     sed -e "s/^numSteps *=.*/numSteps = $STEPS/" "$CASE_SRC/ethier.par" > "$RUN_DIR/ethier.par"
@@ -88,5 +97,13 @@ ulimit -s unlimited 2>/dev/null || ulimit -s "$(ulimit -H -s)"
 
 echo "# nekRS $BACKEND: mode=$MODE ranks=$N_RANKS case=ethier hrefine=$H elements=$ELEMS (~$((ELEMS / N_RANKS))/rank) N=$ORDER points=$POINTS steps=$STEPS gpu_mpi=$NEKRS_GPU_MPI run_dir=$RUN_DIR"
 cd "$RUN_DIR"
+RUN_ID="$(l3_run_id)"
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- "$EXE" --setup ethier --backend "$BACKEND" --device-id 0 "$@" 2>&1 | tee "$RUN_DIR/stdout.log"
-exit "${PIPESTATUS[0]}"
+rc=${PIPESTATUS[0]}
+if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=nekrs" "variant=$VARIANT" "backend=$BACKEND" "mode=$MODE" "ranks=$N_RANKS" \
+        "elements=$ELEMS" "order=$ORDER" "points=$POINTS" "steps=$STEPS" "gpu_mpi=$NEKRS_GPU_MPI" \
+        "osc=$OMPI_MCA_osc" "extra_args=$*" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
+        "par_sha256=$(l3_sha_file "$RUN_DIR/ethier.par")" "stdout=$RUN_DIR/stdout.log" "utc=$(date -u +%FT%TZ)"
+fi
+exit "$rc"

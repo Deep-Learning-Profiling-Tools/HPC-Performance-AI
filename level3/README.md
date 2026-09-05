@@ -13,6 +13,15 @@ dgx003 (4x B200, CUDA 13.2.78, Slurm job 9552083, 2026-09-04). Nothing is
 claimed validated beyond what the per-application README records for runs
 that actually happened on this node.
 
+Correctness / reproducibility hardening (post-review, 2026-09-05):
+[CORRECTNESS_FIXES.md](CORRECTNESS_FIXES.md) -- validators now capture the real
+exit code and fail on timeout/missing/non-finite output, reject NaN/Inf, require
+the expected steps/fields/traces, and write a per-run manifest; dry-runs can no
+longer overwrite real results; fingerprints record ordered patch-content hashes;
+Level 3 builds are isolated from Level 2 prefixes. CPU-only negative tests:
+`level3/tools/tests/run_all.sh` (13/13). nekRS CUDA/dependency decision:
+[nekrs/COMPATIBILITY.md](nekrs/COMPATIBILITY.md).
+
 ## Status
 
 | Application | Version | Build Strategy | CUDA Build | 1 GPU | 2 GPU | 4 GPU | HIP | Strong | Weak | Multi-node | Source Mod | Status |
@@ -21,7 +30,7 @@ that actually happened on this node.
 | [SPARTA](sparta/README.md) | 27Aug2026 | NATIVE (bundled Kokkos 5.0.2) | OK, 579 s | PASS | PASS | PASS | untested | 10M particles, 1/4 GPU run | 1.25M particles/rank, 4 GPU run | BLOCKED/UNVERIFIED | A | FIRST_BATCH done |
 | [WarpX](warpx/README.md) | 26.09 (+AMReX 26.09) | NATIVE (local AMReX source) | OK, 1219 s | PASS | PASS | PASS | untested | 33.6M particles, 1/4 GPU run | 4.2M particles/rank, 4 GPU run | BLOCKED/UNVERIFIED | A (derived inputs) | FIRST_BATCH done |
 | [SPECFEM3D Cartesian](specfem3d/README.md) | v4.1.1 (+2 devel back-ports) | NATIVE (autotools, bundled SCOTCH) | OK, 21 s | PASS | PASS | PASS | untested | 165,888 elements, 1/4 GPU run | 165,888 elements/rank, 4 GPU run | BLOCKED/UNVERIFIED | B+C+D (18 lines, upstream devel) | FIRST_BATCH done |
-| [nekRS](nekrs/README.md) | v26.0 | NATIVE (vendored OCCA/HYPRE) | OK, ~30 min | PASS | PASS | PASS | untested | 32,000 elements N=7, 1/4 GPU run | 8,000 elements/rank, 4 GPU run | BLOCKED/UNVERIFIED | B+C+D (39 lines; vendored HYPRE 2.32.0 vs CUDA 13) | FIRST_BATCH done |
+| [nekRS](nekrs/README.md) | v26.0 | NATIVE (vendored OCCA/HYPRE) | OK (hypregpu ~30 min; cpucoarse 113 s) | PASS | PASS | PASS | untested | 32,000 elements N=7, 1/4 GPU run | 8,000 elements/rank, 4 GPU run | BLOCKED/UNVERIFIED | B+C+D, hypregpu variant (39 lines; vendored HYPRE 2.32.0 vs CUDA 13); cpucoarse variant 0 patches | FIRST_BATCH done; GPU-coarse verified (cimode 3), CPU-coarse candidate verified -- see [COMPATIBILITY.md](nekrs/COMPATIBILITY.md) |
 | CP2K | v2026.2 | NATIVE+SPACK_DEPS | not started | -- | -- | -- | -- | H2O-N series (upstream) | QS_DM_LS NREP (upstream) | -- | -- | SECOND_BATCH (deps 3-6 h; DBCSR B200 patch) |
 | Nyx | 26.09 | NATIVE (shared AMReX 26.09) | not started | -- | -- | -- | -- | Exec/Scaling (upstream) | RandomPerCell init | -- | -- | SECOND_BATCH |
 | QMCPACK | v4.4.0 | NATIVE+SPACK_DEPS | not started | -- | -- | -- | -- | NiO S-series (download) | walkers_per_rank | -- | -- | SECOND_BATCH (needs Clang offload, Boost) |

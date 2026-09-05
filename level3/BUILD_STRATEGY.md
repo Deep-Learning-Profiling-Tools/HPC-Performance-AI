@@ -16,7 +16,7 @@ APPTAINER | SPACK+APPTAINER | SITE_NATIVE | DEFER`.
 | SPARTA | feasible, documented (`cmake -C presets/kokkos_cuda.cmake -DKokkos_ARCH_BLACKWELL100=ON`); deps = MPI + CUDA; **built in 579 s** | **no package** (Spack's `sparta` is a bioinformatics tool) | no runtime; no recipe | lmod broken | **NATIVE** |
 | WarpX | feasible, documented superbuild; small graph (AMReX local checkout, PICSAR/openPMD off); CUDA vs HIP one switch; upstream itself builds with CUDA 13.2 | possible only with a fresh spack-packages (26.09 missing; arch via `^amrex cuda_arch=100` legacy path); graph balloons with `+openpmd +python` | no runtime; only Perlmutter Containerfiles (sm_80) | lmod broken | **NATIVE** |
 | SPECFEM3D Cartesian | feasible, only documented route (autotools; bundled SCOTCH); needs two devel back-ports for CUDA 13 + make-time `GENCODE` for sm_100; Fortran via system gfortran + `OMPI_FC` | no package | none; tiny dependency graph, nothing to gain | lmod broken | **NATIVE** |
-| nekRS | feasible, only documented route (CMake; all TPLs vendored); CUDA/HIP separable by OCCA options; JIT needs host g++/nvcc/gfortran at run time anyway; 1-line hypre SM patch | recipe stale (23.0, wrong option names); deps vendored -> nothing for Spack to provide | none official; JIT couples to host toolchain | lmod broken | **NATIVE** |
+| nekRS | feasible, only documented route (CMake; all TPLs vendored); CUDA/HIP separable by OCCA options; two build variants (see below) | recipe stale (23.0, wrong option names); deps vendored -> nothing for Spack to provide | none official; JIT couples to host toolchain | lmod broken | **NATIVE** |
 | CP2K | feasible (CMake + `install_cp2k_toolchain.sh`); ~15 packages for a GPU-DFT build; needs the DBCSR B200 sed upstream master applies; 3-6 h | officially recommended (`make_cp2k.sh`, `spack install cp2k+cuda`) **but `cp2k` and `dbcsr` recipes hard-reject `cuda_arch=100`**; 60-100 packages; local checkout too old | official `cp2k/cp2k` images stop at H100; multi-node needs host MPI; no runtime here | lmod broken | **NATIVE+SPACK_DEPS** |
 | Nyx | feasible, only documented path (CMake superbuild or GNU make); can consume the WarpX AMReX 26.09 checkout (`AMREX_MINIMUM_VERSION 20.11`); SUNDIALS CUDA superbuild for HEATCOOL | no package | none | lmod broken | **NATIVE** |
 | QMCPACK | feasible today only for `QMC_GPU=cuda` (partial GPU); the recommended `openmp;cuda` needs Clang with NVPTX offload (absent) + Boost (absent) + tested HDF5 | package's `+cuda` is inert for 4.x (no `QMC_GPU`), no offload variant -> use Spack only for `llvm+cuda`, `boost`, `hdf5@1.14` | CI dependency images only (CPU) | lmod broken | **NATIVE+SPACK_DEPS** |
@@ -26,6 +26,17 @@ APPTAINER | SPACK+APPTAINER | SITE_NATIVE | DEFER`.
 No candidate gets `DEFER`: every one has an officially supported native CUDA
 path on this toolchain. `APPTAINER`/`SPACK+APPTAINER`/`SITE_NATIVE` are
 unavailable on this node regardless of application.
+
+nekRS has two verified variants (both NATIVE; select with
+`HPCPERF_NEKRS_HYPRE_GPU`/`HPCPERF_NEKRS_VARIANT`; isolated src/build/install/JIT
+cache; see `level3/nekrs/COMPATIBILITY.md`):
+- `hypregpu` (`ENABLE_HYPRE_GPU=ON`, 3 patches) -- required for a GPU (DEVICE)
+  HYPRE coarse solve; verified with cimode 3 (GPU coarse) at 1/4 GPU.
+- `cpucoarse` (`ENABLE_HYPRE_GPU=OFF`, 0 patches, 113 s build) -- covers the
+  current Ethier CPU-coarse workload; a DEVICE-coarse request is rejected by
+  nekRS itself, not silently down-graded. Recommended default only once the
+  workload's coarse-solver placement is fixed by review; the CPU-coarse option's
+  scalability at 40/80 GPUs is UNVERIFIED.
 
 ## Spack policy (Level 3)
 

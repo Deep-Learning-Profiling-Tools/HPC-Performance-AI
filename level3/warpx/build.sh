@@ -24,6 +24,7 @@ set +u; # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
+l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install prefixes
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"

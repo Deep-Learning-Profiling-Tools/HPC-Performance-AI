@@ -92,7 +92,10 @@ MGS=$BX; [ "$BY" -gt "$MGS" ] && MGS=$BY; [ "$BZ" -gt "$MGS" ] && MGS=$BZ
 CELLS=$((NX * NY * NZ))
 if [ "$CASE" = langmuir ]; then PARTS=$((2 * CELLS)); else PARTS=$((2 * CELLS)); fi
 
-RUN_DIR="$BUILD_DIR/run/$CASE.$MODE.np$N_RANKS"; rm -rf "$RUN_DIR"; mkdir -p "$RUN_DIR"
+# l3_rundir: real runs get a fresh dir; a dry-run gets a throwaway .dryrun/ dir so it
+# can never delete or overwrite a real result directory (the old code rm -rf'd the real
+# dir before the launcher's dry-run check ever ran).
+RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$CASE.$MODE.np$N_RANKS")" || exit 2
 IN="$RUN_DIR/inputs"
 {
     echo "# derived from upstream $(realpath --relative-to="$R/_upstream/level3/WarpX" "$BASE") (HPC-Performance-AI level3/warpx/run.sh)"
@@ -119,5 +122,13 @@ IN="$RUN_DIR/inputs"
 
 echo "# WarpX $BACKEND: case=$CASE mode=$MODE ranks=$N_RANKS grid=${NX}x${NY}x${NZ} ($CELLS cells, $PARTS particles, $((PARTS / N_RANKS))/rank) numprocs=${PX}x${PY}x${PZ} box=${BX}x${BY}x${BZ} steps=$STEPS run_dir=$RUN_DIR"
 cd "$RUN_DIR"
+RUN_ID="$(l3_run_id)"
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- "$EXE" "$IN" "$@" 2>&1 | tee "$RUN_DIR/stdout.log"
-exit "${PIPESTATUS[0]}"
+rc=${PIPESTATUS[0]}
+if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=warpx" "backend=$BACKEND" "case=$CASE" "mode=$MODE" \
+        "ranks=$N_RANKS" "grid=${NX}x${NY}x${NZ}" "numprocs=${PX}x${PY}x${PZ}" "particles=$PARTS" "steps=$STEPS" \
+        "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
+        "stdout=$RUN_DIR/stdout.log" "utc=$(date -u +%FT%TZ)"
+fi
+exit "$rc"

@@ -61,7 +61,10 @@ EX="$R/_upstream/level3/specfem3d/EXAMPLES/applications/homogeneous_halfspace"
 N_RANKS="$(hpcperf_ranks specfem3d yes)" || exit 2
 MODE="$(l3_scale_mode specfem3d)" || exit 2
 BUILD_DIR="$R/build/level3/specfem3d/$MODEL"
-RUN_DIR="$BUILD_DIR/run/$MODE.np$N_RANKS"; rm -rf "$RUN_DIR"; mkdir -p "$RUN_DIR/OUTPUT_FILES/DATABASES_MPI"
+# l3_rundir: dry-run gets a throwaway dir (the old code rm -rf'd the real run dir before the
+# per-stage dry-run checks, deleting real seismograms/databases when only a plan was requested).
+RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$MODE.np$N_RANKS")" || exit 2
+mkdir -p "$RUN_DIR/OUTPUT_FILES/DATABASES_MPI"
 cp -r "$EX/DATA" "$RUN_DIR/DATA"
 PAR="$RUN_DIR/DATA/Par_file"
 sed -i -e "s/^NPROC  *=.*/NPROC                           = $N_RANKS/" -e "s/^GPU_MODE  *=.*/GPU_MODE                        = .true./" "$PAR"
@@ -122,9 +125,17 @@ echo "# stage 2/3: xgenerate_databases on $N_RANKS ranks (CPU)"
 grep -E 'hpcperf-launch: (dry-run)' OUTPUT_FILES/output_generate_databases.log || true
 echo "# stage 3/3: xspecfem3D on $N_RANKS ranks (GPU_MODE)"
 t0=$(date +%s)
-"${LAUNCH[@]}" "$BIN/xspecfem3D" 2>&1 | tee OUTPUT_FILES/output_specfem3D.log | grep -E 'hpcperf-launch|Error|ERROR|GPU|Time loop|Elapsed|End of' || true
-rc=${PIPESTATUS[0]}
+# Capture the solver's real exit code directly (a `... | tee | grep || true` pipeline resets
+# PIPESTATUS via the trailing `true` and would report success even when the solver aborted).
+rc=0
+"${LAUNCH[@]}" "$BIN/xspecfem3D" > OUTPUT_FILES/output_specfem3D.log 2>&1 || rc=$?
+grep -E 'hpcperf-launch|Error|ERROR|GPU|Time loop|Elapsed|End of' OUTPUT_FILES/output_specfem3D.log || true
 [ "$rc" -eq 0 ] || { echo "run.sh: xspecfem3D exited $rc (see $RUN_DIR/OUTPUT_FILES/output_specfem3D.log)" >&2; exit "$rc"; }
 [ -n "${HPCPERF_DRY_RUN:-}" ] && exit 0
-echo "# solver wall time $(( $(date +%s)-t0 )) s; $(grep -E 'Total elapsed time in seconds|Time loop finished' OUTPUT_FILES/output_solver.txt 2>/dev/null | tr -s ' ' | tr '\n' ';')"
+WALL=$(( $(date +%s)-t0 ))
+echo "# solver wall time $WALL s; $(grep -E 'Total elapsed time in seconds|Time loop finished' OUTPUT_FILES/output_solver.txt 2>/dev/null | tr -s ' ' | tr '\n' ';')"
 echo "# seismograms: $(ls OUTPUT_FILES/*.semd 2>/dev/null | wc -l) files in $RUN_DIR/OUTPUT_FILES"
+l3_manifest "$RUN_DIR" "run_id=$(l3_run_id)" "app=specfem3d" "backend=$BACKEND" "mode=$MODE" \
+    "ranks=$N_RANKS" "elements=$ELEMS" "nstep=$STEPS" "dt=$DT" "solver_exit_code=$rc" \
+    "solver_wall_s=$WALL" "binary=$BIN/xspecfem3D" "binary_sha256=$(l3_sha_file "$BIN/xspecfem3D")" \
+    "par_file_sha256=$(l3_sha_file "$PAR")" "seismograms=$(ls OUTPUT_FILES/*.semd 2>/dev/null | wc -l)" "utc=$(date -u +%FT%TZ)"

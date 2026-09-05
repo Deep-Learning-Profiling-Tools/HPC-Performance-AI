@@ -61,8 +61,13 @@ case "$MODE" in
             PROCS=(-var px "$PX" -var py "$PY" -var pz "$PZ") ;;
 esac
 ATOMS=$(( 4 * 20 * X * 20 * Y * 20 * Z ))
-RUN_DIR="$R/build/level3/lammps/$MODEL/run"; mkdir -p "$RUN_DIR"
+RUN_DIR="$R/build/level3/lammps/$MODEL/run"
+# A dry-run must never touch real results: it writes its derived deck and would-be
+# log into a throwaway .dryrun/ subdir instead of the real run directory.
+[ -n "${HPCPERF_DRY_RUN:-}" ] && RUN_DIR="$RUN_DIR/.dryrun"
+mkdir -p "$RUN_DIR"
 LOG="$RUN_DIR/log.$MODE.np$N_RANKS.lammps"
+rm -f "$LOG"      # validate only against THIS run's output; never a stale log left by a failed run
 # Derived deck (upstream bench/in.lj untouched): `run 100` -> `run ${steps}`,
 # and in weak mode a `processors ${px} ${py} ${pz}` line before create_box so
 # the rank grid matches the box shape. With steps=100 and no processors line
@@ -77,7 +82,16 @@ IN="$RUN_DIR/in.lj.$MODE"
 } > "$IN"
 
 echo "# LAMMPS $BACKEND: mode=$MODE ranks=$N_RANKS box=$((20*X))x$((20*Y))x$((20*Z)) fcc cells = $ATOMS atoms ($((ATOMS / N_RANKS))/rank), $STEPS steps, gpu-aware=$GAM, log=$LOG"
-exec "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
+RUN_ID="$(l3_run_id)"
+rc=0
+"$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
     "$EXE" -k on g 1 t "${HPCPERF_CPUS_PER_RANK:-1}" -sf kk -pk kokkos newton on neigh half gpu/aware "$GAM" \
     -in "$IN" -var x "$X" -var y "$Y" -var z "$Z" "${PROCS[@]}" -var steps "$STEPS" \
-    -log "$LOG" -echo none "$@"
+    -log "$LOG" -echo none "$@" || rc=$?
+if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=lammps" "backend=$BACKEND" "mode=$MODE" \
+        "ranks=$N_RANKS" "atoms=$ATOMS" "steps=$STEPS" "gpu_aware=$GAM" "exit_code=$rc" \
+        "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
+        "log=$LOG" "utc=$(date -u +%FT%TZ)"
+fi
+exit "$rc"
