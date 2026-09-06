@@ -36,6 +36,24 @@ l3_paths() {
     mkdir -p "$L3_SRC" "$L3_BUILD_DEPS" "$L3_INSTALL" "$L3_LOGS"
 }
 
+# l3_paths_profile <app> <profile>: second-batch layout -- one private tree per
+# *configuration profile* (compiler/Toolkit/backend/key-dependency variant):
+#     $R/.deps/level3/<app>/<profile>/{src,build,install,logs,cache}
+# exports L3_APP, L3_PROFILE, L3_DEPS, L3_SRC, L3_BUILD_DEPS, L3_INSTALL, L3_LOGS,
+# L3_CACHE and L3_BUILD (= $R/build/level3/<app>/<profile>, the application build
+# tree). Different profiles never share a mutable source tree or an install.
+l3_paths_profile() {
+    L3_APP="$1"; L3_PROFILE="$2"
+    case "$L3_PROFILE" in ""|*/*|.*) echo "l3_paths_profile: invalid profile name '$L3_PROFILE'" >&2; return 2;; esac
+    L3_DEPS="$L3_R/.deps/level3/$L3_APP/$L3_PROFILE"
+    L3_SRC="$L3_DEPS/src"; L3_BUILD_DEPS="$L3_DEPS/build"; L3_INSTALL="$L3_DEPS/install"; L3_LOGS="$L3_DEPS/logs"; L3_CACHE="$L3_DEPS/cache"
+    L3_BUILD="$L3_R/build/level3/$L3_APP/$L3_PROFILE"
+    mkdir -p "$L3_SRC" "$L3_BUILD_DEPS" "$L3_INSTALL" "$L3_LOGS" "$L3_CACHE"
+}
+
+# l3_version_mm <version string>: "13.2.78" -> "132", "13.3.0" -> "133" (profile-name component)
+l3_version_mm() { echo "$1" | awk -F. '{printf "%s%s", $1, $2}'; }
+
 # l3_isolate_build_env: remove the Level 2 dependency prefixes (everything under
 # $L3_R/.deps/install/, the validated Level 2 tree) from CMAKE_PREFIX_PATH and
 # LD_LIBRARY_PATH before a Level 3 configure, so a Level 3 build can never pick
@@ -187,14 +205,22 @@ l3_sha_file() { [ -f "$1" ] && sha256sum "$1" 2>/dev/null | cut -d' ' -f1 || ech
 
 # l3_binary_backend_check <exe> <expected: cuda|hip>
 #   Fails if the binary's GPU backend does not match what was requested (so a
-#   HIP request can never run a CUDA install and vice versa). Uses the linked
-#   runtime libraries (libcudart / libamdhip64) as the evidence.
+#   HIP request can never run a CUDA install and vice versa). Evidence: the
+#   linked runtime libraries (libcudart / libamdhip64); a binary that links the
+#   CUDA runtime statically (CMake's default CUDA_RUNTIME_LIBRARY=Static, e.g.
+#   AMReX-based apps) is accepted when cuobjdump finds embedded device code.
 l3_binary_backend_check() {
     local exe=$1 want=$2 libs
     [ -x "$exe" ] || { echo "l3: $exe not executable" >&2; return 1; }
     libs="$(ldd "$exe" 2>/dev/null || true)"
     case "$want" in
-        cuda) grep -q 'libcudart' <<<"$libs" || { echo "l3: $exe is not a CUDA binary (no libcudart linked) but CUDA was requested" >&2; return 1; }
+        cuda) if ! grep -q 'libcudart' <<<"$libs"; then
+                  if command -v cuobjdump >/dev/null 2>&1 && cuobjdump --list-elf "$exe" 2>/dev/null | grep -q 'sm_'; then
+                      : # static cudart with embedded CUDA device code
+                  else
+                      echo "l3: $exe is not a CUDA binary (no libcudart linked, no embedded CUDA ELF) but CUDA was requested" >&2; return 1
+                  fi
+              fi
               grep -q 'libamdhip64' <<<"$libs" && { echo "l3: $exe links libamdhip64 (HIP) but CUDA was requested" >&2; return 1; } ;;
         hip)  grep -q 'libamdhip64' <<<"$libs" || { echo "l3: $exe is not a HIP binary (no libamdhip64 linked) but HIP was requested" >&2; return 1; } ;;
         *) return 0 ;;
