@@ -1,0 +1,33 @@
+DFT-FE 1.2.0 (7147faa51f7c9f3075fffaa5e48ba989bcd329c1) -- qualify two isnan() calls as std::isnan
+
+Class: source compatibility fix (2 lines; no numerics: the calls only detect NaN
+in a diagnostic branch of AtomicCenteredNonLocalOperator::compute...).
+Problem: src/atom/AtomicCenteredNonLocalOperator.cc lines 785/791 call the
+unqualified `isnan(...)` inside a template; C++ provides std::isnan (<cmath>), and
+the unqualified spelling only compiles when some header drags in the C macro.
+With GCC 14.2.1 and deal.II 9.6.2's headers this fails ("there are no arguments to
+'isnan' that depend on a template parameter ... 'isnan' was not declared in this
+scope"). Upstream's publicGithubDevelop branch no longer contains these calls.
+Fix: `std::isnan`. Conditions: any compiler; applied for this profile. Impact:
+none on results. Verified: DFT-FE real builds; results validated in
+level3/dftfe/validate.sh. Applied by level3/dftfe/build.sh (git apply,
+idempotent); hash recorded in the profile fingerprint.
+
+--- a/src/atom/AtomicCenteredNonLocalOperator.cc
++++ b/src/atom/AtomicCenteredNonLocalOperator.cc
+@@ -782,13 +782,13 @@
+                         projectorMatricesReal[flattenedIndex];
+                       const double tempImag =
+                         projectorMatricesImag[flattenedIndex];
+-                      if (isnan(tempReal))
++                      if (std::isnan(tempReal))
+                         std::cout
+                           << "Real->Processor number and indices has nan: "
+                           << d_this_mpi_process << " " << iElemComp << " "
+                           << kPoint << " "
+                           << " " << beta << " " << iNode << std::endl;
+-                      if (isnan(tempImag))
++                      if (std::isnan(tempImag))
+                         std::cout
+                           << "Imag->Processor number and indices has nan: "
+                           << d_this_mpi_process << " " << iElemComp << " "
