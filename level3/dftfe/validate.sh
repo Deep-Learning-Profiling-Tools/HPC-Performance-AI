@@ -4,7 +4,8 @@
 #   ./validate.sh [CUDA]       HPCPERF_GPUS=N (default 1)
 #
 # [0] ELPA GPU kernels verified independently: <install>/elpa/ELPA_GPU_PROBE.txt must say RESULT PASS
-#     (elpa_probe.sh: ELPA's own residual/orthogonality tests of the sm_100 kernels on 1/2/4 GPUs).
+#     (elpa_probe.sh: ELPA's own analytic-matrix test programs with the sm_100 GPU kernels on 1/2/4 GPUs,
+#     ELPA's eigenvalue/eigenvector error limits, exit 0, GPU timers present, launcher audit 0 mismatch).
 # [1] al_md (upstream GPU regression deck Input_MD_0.prm, verbatim) on N GPUs, dftfe_check.py --check
 #     against upstream's own GPU reference accuracyBenchmarks/output_MD_0: SCF converged, MD completed
 #     (4 steps), ground-state energy within 1e-5 Ha, per-step MD total energies within 2e-5 Ha,

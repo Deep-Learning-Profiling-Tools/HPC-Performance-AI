@@ -36,7 +36,17 @@ ELPA eigensolver with NVIDIA GPU kernels.
   `LIBS=-lscalapack` but replace `LDFLAGS` by the CUDA path, so the
   ScaLAPACK/OpenBLAS `-L`/rpath entries are given in `LDFLAGS` as well.
 
-### deal.II version decision (no DFT-FE source change)
+### The one DFT-FE source patch (class D, `patches/0001-std-isnan.patch`)
+
+Two lines in `src/atom/AtomicCenteredNonLocalOperator.cc` (785/791) call an
+unqualified `isnan(` inside a template; GCC 14 (libstdc++ 14) no longer finds
+it through `<cmath>`'s global fallback and stops with "there are no arguments to
+'isnan' that depend on a template parameter". The patch qualifies both calls as
+`std::isnan(` -- the same function, no numerical or algorithmic change (upstream
+develop has the same spelling). Applied by build.sh with `git apply` (idempotent,
+sha256 recorded in the fingerprint as `DFTFE_PATCH_SHA`).
+
+### deal.II version decision (a dependency choice, not a DFT-FE change)
 
 Release 1.2.0 pins deal.II **9.5.2** in its own `setupUser*.sh`; the current
 `install_DFTFE` recipe (frontierDevelop/master) builds deal.II **9.7.1** -- but
@@ -53,11 +63,20 @@ those (deprecated) APIs, so 1.2.0 builds unpatched; recorded as attempt 2. The
 ## ELPA GPU kernels verified independently (`elpa_probe.sh`)
 
 ELPA's own test programs (`validate_real_double_eigenvectors_{1stage,2stage_default_kernel}_gpu_analytic`,
-which call `e%set("nvidia-gpu", 1)`) on 1, 2 and 4 GPUs (one rank per GPU through the
-common launcher) and their CPU counterparts on 1 rank: analytic test matrix, ELPA's own
-limits residual `max ||A z - lambda z|| <= 9e-10` and orthogonality `max |Z^T Z - I| <= 9e-10`
-re-parsed and re-applied; record `<install>/elpa/ELPA_GPU_PROBE.txt`, required PASS by
-`validate.sh`.
+which call `e%set("nvidia-gpu", 1)`; the real binaries in `build/elpa/.libs/`, the
+top-level names being libtool relink wrappers) on 1, 2 and 4 GPUs (one rank per GPU
+through the common launcher, na=2000 nev=1000 nblk=32) and their CPU counterparts on
+1 rank when built (they are not, with the GPU configuration: SKIPPED, recorded).
+The programs diagonalise the analytic test matrix of `test/shared/test_analytic_template.F90`
+(known eigenpairs) and apply ELPA's own limits `max |lambda - lambda_exact| <= 5e-14`,
+`max |z - z_exact| <= 6e-10` (real double; `stop 1` on violation); the probe re-parses the
+printed "Maximum error in eigenvalues/eigenvectors", re-applies the limits, requires exit 0,
+ELPA's GPU timers (`trans_ev_real_double_gpu`, `gpublas_*`) in the output and a launcher
+audit with 0 mismatch; record `<install>/elpa/ELPA_GPU_PROBE.txt`, required PASS by
+`validate.sh`. Two false starts, both recorded in the script header: the first pass
+looked for ELPA's `*_default` wrapper-script names (MISSING), the second parsed the
+`%Error Residual/Orthogonality` lines of the *random-matrix* programs, which the analytic
+programs never print, and aborted under `pipefail`.
 
 ## Cases and validation
 
@@ -75,4 +94,29 @@ reference `accuracyBenchmarks/output_MD_0` through `dftfe_check.py` (pre-fixed:
 ground-state energy 1e-5 Ha, per-step MD energies 2e-5 Ha, temperatures 0.1 K,
 forces 2e-5 Ha/Bohr; SCF converged, MD completed, finite), launcher audit "N
 verified, 0 mismatch"; N > 1 additionally vs the 1-GPU run under the same
-tolerances. Results: `SECOND_BATCH_STATUS.md`.
+tolerances.
+
+### Results (2026-09-06, profile `cuda132-gcc142-ompi5010`, 1 rank per GPU)
+
+| Run | GPUs | atoms / KS DOFs | wall (s) | check |
+|---|---|---|---|---|
+| `al_md` smoke (= strong, verbatim deck) | 1 | 32 / 50 653 | 216 | vs upstream GPU reference: e0, 4 MD energies, temperatures, forces all **identical at printed precision** (max diff 0.0; SCF iterations 8/9/9/9 as upstream) |
+| `al_md` | 2 | 32 / 50 653 | 117 | identical to upstream reference and to the 1-GPU run |
+| `al_md` | 4 | 32 / 50 653 | 70 | identical to upstream reference and to the 1-GPU run |
+| weak x1 (2x2x2 cells) | 1 | 32 / 50 653 | 213 | complete (same deck as smoke) |
+| weak x2 (4x2x2 cells, derived) | 2 | 64 / 108 151 | 284 | complete, 4 MD steps |
+| weak x4 (4x4x2 cells, derived) | 4 | 128 / 230 917 | 378 | complete, 4 MD steps |
+| `llzo` strong (192 atoms, 720 states, ELPA, verbatim deck) | 1 / 2 / 4 | 192 / 97 336 | 295 / 163 / 96 (1.81x, 3.07x) | ground state, 19 SCF iterations, E = -3579.26588980 Ha **identical on 1, 2 and 4 GPUs** |
+| ELPA GPU probe, 1-stage (`validate_real_double_eigenvectors_1stage_gpu_analytic`, na=2000 nev=1000) | 1 / 2 / 4 | -- | -- | PASS: max eigenvalue error 2.7e-15 / 2.4e-15 / 2.0e-15 (limit 5e-14), eigenvector error 1.5e-12 / 1.7e-12 / 1.5e-12 (limit 6e-10), exit 0, GPU timers, audit 0 mismatch |
+| ELPA GPU probe, 2-stage (`..._2stage_default_kernel_gpu_analytic`) | 1 / 2 / 4 | -- | -- | PASS: 5.8e-15 / 7.3e-15 / 6.9e-15; 1.0e-11 / 1.0e-11 / 8.1e-12; CPU counterparts SKIPPED (not built) |
+
+**VALIDATED_PASS at 1, 2 and 4 GPUs** (validate.sh 2026-09-06 05:04-05:12 UTC: [0] probe
+PASS, [1] al_md within the pre-fixed tolerances of upstream's reference and of the
+1-GPU run, launcher audit N verified / 0 mismatch; the 05:01-05:03 UTC pass FAILED on
+[0] only, with the aborted probe -- kept in `validate.*.stdout` history).
+Strong scaling: 32-atom deck 1.85x / 3.1x on 2 / 4 GPUs (small problem, 50 k DOFs);
+192-atom LLZO 1.81x / 3.07x. Dry-runs: 8/40/80 GPUs planned (HYPOTHETICAL) for the
+strong decks; the weak series is defined for 1/2/4/8 GPUs only (40/80 refused by run.sh). The weak series is synthetic (32 atoms per GPU; the electronic-structure
+cost grows faster than linearly with the cell, so constant wall time is not
+expected -- reported, not "ideal"). Probe record: `<install>/elpa/ELPA_GPU_PROBE.txt`,
+per-program logs `build/level3/dftfe/<profile>/elpa_probe/`.

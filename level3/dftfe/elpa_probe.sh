@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # Independent check of the ELPA NVIDIA-GPU kernels built for DFT-FE (before any DFT-FE run):
-# ELPA's own test programs (test/Fortran/test.F90 compiled as validate_*_gpu_* programs, which call
-# e%set("nvidia-gpu", 1)) diagonalise an analytic test matrix and verify
-#   residual      max || A z_i - lambda_i z_i ||  <= 9e-10   (ELPA's tol_res_real_double)
-#   orthogonality max | Z^T Z - I |               <= 9e-10   (ELPA's tol_orth_real_double)
-# themselves (nonzero exit on violation); this script re-parses the printed values and applies
-# the same limits, runs the 1-stage and 2-stage GPU solvers on 1, 2 and 4 GPUs (one MPI rank per
-# GPU through the common launcher, ELPA's process grid np_rows x np_cols) and the CPU versions
-# of the same programs on 1 rank as a cross-check. A GPU run whose residual is not smaller than
-# 9e-10, that does not exit 0, or whose launcher audit shows a GPU mismatch -> FAIL.
+# ELPA's own test programs (test/Fortran/test.F90 compiled as validate_*_gpu_analytic programs,
+# which call e%set("nvidia-gpu", 1)) diagonalise the analytic test matrix of
+# test/shared/test_analytic_template.F90 (known eigenpairs) and verify themselves
+#   max |lambda_i - lambda_i^exact|   <= 5e-14   (ELPA's tol_eigenvalues, real double)
+#   max |z_i - z_i^exact|             <= 6e-10   (ELPA's tol_eigenvectors, real double)
+# (nonzero exit -- `stop 1` -- on violation); this script re-parses the printed
+# "Maximum error in eigenvalues/eigenvectors" values and applies the same limits, runs the
+# 1-stage and 2-stage GPU solvers on 1, 2 and 4 GPUs (one MPI rank per GPU through the common
+# launcher, ELPA's process grid np_rows x np_cols) and the CPU versions of the same programs on
+# 1 rank as a cross-check when they exist. A GPU run whose errors are not within the limits,
+# that does not exit 0, or whose launcher audit shows a GPU mismatch -> FAIL; a run whose output
+# lacks the values -> FAIL (never an abort of this script).
 #
 #   ./elpa_probe.sh            HPCPERF_ELPA_NA=2000 HPCPERF_ELPA_NEV=1000 HPCPERF_ELPA_NBLK=32
 # Record: <install>/elpa/ELPA_GPU_PROBE.txt (PASS/FAIL + values); validate.sh requires PASS.
+# History: the first version looked for the "%Error Residual/Orthogonality" lines of ELPA's
+# *random-matrix* validate programs, which the analytic programs do not print (they print the
+# eigenvalue/eigenvector errors above) -- under `set -e -o pipefail` the empty grep aborted the
+# script after the first (successful) GPU run; fixed 2026-09-06, no run was ever mis-judged.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
@@ -25,42 +32,52 @@ l3_paths_profile dftfe "$PROFILE"
 EB="$L3_BUILD_DEPS/elpa"; INST="$L3_INSTALL"
 [ -f "$INST/elpa/.hpcperf-stage-done" ] || { echo "elpa_probe.sh: ELPA stage not built for profile $PROFILE" >&2; exit 1; }
 NA="${HPCPERF_ELPA_NA:-2000}"; NEV="${HPCPERF_ELPA_NEV:-1000}"; NBLK="${HPCPERF_ELPA_NBLK:-32}"
-TOL=9e-10
-export LD_LIBRARY_PATH="$INST/elpa/lib:$INST/scalapack/lib:$INST/openblas/lib:${LD_LIBRARY_PATH:-}"
+TOL_EV=5e-14; TOL_Z=6e-10     # test_analytic_template.F90: tol_eigenvalues / tol_eigenvectors (real double)
+export LD_LIBRARY_PATH="$EB/.libs:$INST/elpa/lib:$INST/scalapack/lib:$INST/openblas/lib:${LD_LIBRARY_PATH:-}"
 OUT="$L3_BUILD/elpa_probe"; mkdir -p "$OUT"
 REC="$INST/elpa/ELPA_GPU_PROBE.txt"; : > "$REC.tmp"
 ok=1
 note() { echo "$*" | tee -a "$REC.tmp"; }
 run_case() { # run_case <program> <ranks> <gpus:yes|no>
-    local prog=$1 n=$2 gpu=$3 exe="$EB/$prog" log="$OUT/$prog.np$n.log" rc=0 res orth audit
-    [ -x "$exe" ] || { note "MISSING $prog"; ok=0; return; }
+    # the top-level names in the build tree are libtool wrapper scripts (they would try to relink through mpicc);
+    # the real, already linked programs live in .libs/
+    local prog=$1 n=$2 gpu=$3 exe="$EB/.libs/$prog" log="$OUT/$prog.np$n.log" rc=0 res orth audit
+    if [ ! -x "$exe" ]; then
+        if [ "$gpu" = yes ]; then note "MISSING $prog (GPU test program not built)"; ok=0; else note "SKIPPED $prog (CPU variant not built with the GPU-enabled configuration; cross-check unavailable)"; fi
+        return
+    fi
     if [ "$gpu" = yes ]; then
         "$L3_LAUNCHER" --gpus "$n" --cpus-per-rank 4 --bind wrapper -- "$exe" "$NA" "$NEV" "$NBLK" > "$log" 2>&1 || rc=$?
-        audit="$(/usr/bin/grep -a 'audit summary' "$log" | tail -1 | sed 's/.*audit summary: //')"
+        audit="$( { /usr/bin/grep -a 'audit summary' "$log" || true; } | tail -1 | sed 's/.*audit summary: //')"
     else
         # CPU cross-check: one rank through the same launcher (no GPU binding; the CPU program ignores the device)
         "$L3_LAUNCHER" --gpus 1 --bind none -- "$exe" "$NA" "$NEV" "$NBLK" > "$log" 2>&1 || rc=$?
         audit="cpu"
     fi
-    res="$(/usr/bin/grep -a '%Error Residual' "$log" | tail -1 | awk -F: '{print $2}' | tr -d ' ')"
-    orth="$(/usr/bin/grep -a '%Error Orthogonality' "$log" | tail -1 | awk -F: '{print $2}' | tr -d ' ')"
+    # the analytic test programs print these two lines (test_analytic_template.F90); missing -> FAIL below
+    ev="$( { /usr/bin/grep -a 'Maximum error in eigenvalues' "$log" || true; } | tail -1 | awk -F: '{print $2}' | tr -d ' ')"
+    zv="$( { /usr/bin/grep -a 'Maximum error in eigenvectors' "$log" || true; } | tail -1 | awk -F: '{print $2}' | tr -d ' ')"
+    gpu_evidence="$( { /usr/bin/grep -ac '_gpu\|gpublas_\|gpu_copy' "$log" || true; } )"
     local verdict
-    verdict="$(python3 - "$rc" "$res" "$orth" "$TOL" "$gpu" "$audit" <<'PY'
+    verdict="$(python3 - "$rc" "$ev" "$zv" "$TOL_EV" "$TOL_Z" "$gpu" "$audit" "$gpu_evidence" <<'PY'
 import sys, math
-rc, res, orth, tol, gpu, audit = sys.argv[1:7]
+rc, ev, zv, tol_ev, tol_z, gpu, audit, gpu_evidence = sys.argv[1:9]
 try:
-    r, o = float(res), float(orth)
-    fin = math.isfinite(r) and math.isfinite(o)
+    e, z = float(ev), float(zv)
+    fin = math.isfinite(e) and math.isfinite(z)
 except ValueError:
-    fin = False; r = o = float("nan")
-good = rc == "0" and fin and 0 < r <= float(tol) and o <= float(tol) and (gpu == "no" or ("mismatch" in audit and audit.split(",")[1].strip().startswith("0")))
+    fin = False; e = z = float("nan")
+good = rc == "0" and fin and 0 <= e <= float(tol_ev) and 0 <= z <= float(tol_z)
+if gpu == "yes":
+    # launcher audit "N verified, 0 mismatch, ..." and ELPA's own GPU timers (trans_ev_*_gpu, gpublas_*) in the output
+    good = good and "mismatch" in audit and audit.split(",")[1].strip().startswith("0") and int(gpu_evidence or 0) > 0
 print("PASS" if good else "FAIL")
 PY
 )"
     [ "$verdict" = PASS ] || ok=0
-    note "$verdict $prog ranks=$n gpu=$gpu na=$NA nev=$NEV nblk=$NBLK exit=$rc residual=${res:-NA} orthogonality=${orth:-NA} tol=$TOL audit=[${audit:-none}] log=$log"
+    note "$verdict $prog ranks=$n gpu=$gpu na=$NA nev=$NEV nblk=$NBLK exit=$rc max_err_eigenvalues=${ev:-NA} (tol $TOL_EV) max_err_eigenvectors=${zv:-NA} (tol $TOL_Z) gpu_timer_lines=$gpu_evidence audit=[${audit:-none}] log=$log"
 }
-note "# ELPA 2026.02.001 GPU kernel probe, profile $PROFILE, $(date -u +%FT%TZ); limits: residual<=$TOL orthogonality<=$TOL (ELPA's own real-double tolerances)"
+note "# ELPA 2026.02.001 GPU kernel probe, profile $PROFILE, $(date -u +%FT%TZ); limits: max eigenvalue error <= $TOL_EV, max eigenvector error <= $TOL_Z (ELPA's own real-double analytic-test tolerances), exit 0, GPU timers present, launcher audit 0 mismatch"
 for prog in validate_real_double_eigenvectors_1stage_gpu_analytic validate_real_double_eigenvectors_2stage_default_kernel_gpu_analytic; do   # (the *_default names are ELPA's .sh wrappers; these are the programs)
     for n in 1 2 4; do run_case "$prog" "$n" yes; done
 done
