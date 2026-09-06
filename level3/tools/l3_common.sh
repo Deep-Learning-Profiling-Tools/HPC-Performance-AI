@@ -20,6 +20,11 @@
 # location is a single variable, HPCPERF_RUNTIME_DIR, defaulting to
 # level2/tools -- nothing is copied or moved, so Level 2 is not disturbed.
 
+# Some interactive environments export a `grep` shell FUNCTION (a ugrep wrapper with
+# -I/--ignore-files) into child processes; it changes grep's semantics (binary-file
+# handling, exit codes) inside these scripts. Level 3 scripts want the real grep.
+unset -f grep 2>/dev/null || true
+
 L3_R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 L3_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; export L3_TOOLS   # for the validators' python (l3_check.py)
 HPCPERF_RUNTIME_DIR="${HPCPERF_RUNTIME_DIR:-$L3_R/level2/tools}"
@@ -49,6 +54,23 @@ l3_paths_profile() {
     L3_SRC="$L3_DEPS/src"; L3_BUILD_DEPS="$L3_DEPS/build"; L3_INSTALL="$L3_DEPS/install"; L3_LOGS="$L3_DEPS/logs"; L3_CACHE="$L3_DEPS/cache"
     L3_BUILD="$L3_R/build/level3/$L3_APP/$L3_PROFILE"
     mkdir -p "$L3_SRC" "$L3_BUILD_DEPS" "$L3_INSTALL" "$L3_LOGS" "$L3_CACHE"
+}
+
+# l3_clean_conda_build_env: the project conda env exports its own compiler-driving
+# variables (CFLAGS/CXXFLAGS/LDFLAGS with -march=nocona -mtune=haswell and conda
+# -isystem/-rpath paths, AR/RANLIB/NM/LD = conda binutils, CMAKE_ARGS, ...). They are
+# right for the conda GCC, wrong for a build that deliberately uses the system GCC
+# 14 toolchain (they made OpenBLAS fail with "target specific option mismatch" on
+# its AVX512 kernels and would pin -march=nocona on everything). Call after
+# hpcperf_env.sh in build scripts that select the system compilers; PATH, CUDA and
+# the MPI wrappers are left alone.
+l3_clean_conda_build_env() {
+    unset CFLAGS CXXFLAGS FFLAGS FCFLAGS FORTRANFLAGS CPPFLAGS LDFLAGS \
+          DEBUG_CFLAGS DEBUG_CXXFLAGS DEBUG_CPPFLAGS DEBUG_FFLAGS DEBUG_FORTRANFLAGS \
+          AR RANLIB NM LD STRIP AS CPP OBJCOPY OBJDUMP READELF SIZE STRINGS ADDR2LINE ELFEDIT GPROF CXXFILT LD_GOLD \
+          HOST BUILD CMAKE_ARGS MESON_ARGS GCC_AR GCC_NM GCC_RANLIB GXX GCC GFORTRAN F77 F90 F95 \
+          CONDA_BUILD_SYSROOT CC_FOR_BUILD CXX_FOR_BUILD 2>/dev/null || true
+    echo "# l3: conda build variables (CFLAGS/LDFLAGS/AR/... ) cleared for a system-toolchain build"
 }
 
 # l3_version_mm <version string>: "13.2.78" -> "132", "13.3.0" -> "133" (profile-name component)
@@ -215,7 +237,10 @@ l3_binary_backend_check() {
     libs="$(ldd "$exe" 2>/dev/null || true)"
     case "$want" in
         cuda) if ! grep -q 'libcudart' <<<"$libs"; then
-                  if command -v cuobjdump >/dev/null 2>&1 && cuobjdump --list-elf "$exe" 2>/dev/null | grep -q 'sm_'; then
+                  # capture first, then grep: under the callers' `set -o pipefail` a `cuobjdump | grep -q`
+                  # pipe reports cuobjdump's SIGPIPE (grep -q exits early) as a failure on large binaries
+                  local elf=""; command -v cuobjdump >/dev/null 2>&1 && elf="$(cuobjdump --list-elf "$exe" 2>/dev/null || true)"
+                  if grep -q 'sm_' <<<"$elf"; then
                       : # static cudart with embedded CUDA device code
                   else
                       echo "l3: $exe is not a CUDA binary (no libcudart linked, no embedded CUDA ELF) but CUDA was requested" >&2; return 1
