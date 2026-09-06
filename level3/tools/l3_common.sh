@@ -69,7 +69,8 @@ l3_clean_conda_build_env() {
           DEBUG_CFLAGS DEBUG_CXXFLAGS DEBUG_CPPFLAGS DEBUG_FFLAGS DEBUG_FORTRANFLAGS \
           AR RANLIB NM LD STRIP AS CPP OBJCOPY OBJDUMP READELF SIZE STRINGS ADDR2LINE ELFEDIT GPROF CXXFILT LD_GOLD \
           HOST BUILD CMAKE_ARGS MESON_ARGS GCC_AR GCC_NM GCC_RANLIB GXX GCC GFORTRAN F77 F90 F95 \
-          CONDA_BUILD_SYSROOT CC_FOR_BUILD CXX_FOR_BUILD 2>/dev/null || true
+          CONDA_BUILD_SYSROOT CC_FOR_BUILD CXX_FOR_BUILD \
+          C_INCLUDE_PATH CPLUS_INCLUDE_PATH CPATH LIBRARY_PATH 2>/dev/null || true   # login-shell leftovers pointing at foreign conda envs
     echo "# l3: conda build variables (CFLAGS/LDFLAGS/AR/... ) cleared for a system-toolchain build"
 }
 
