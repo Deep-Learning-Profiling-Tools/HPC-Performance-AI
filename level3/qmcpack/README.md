@@ -63,8 +63,9 @@ executable: sm_100 only; `libomptarget.so` resolved from the private LLVM
 `run.sh`: `tests/solids/diamondC_2x1x1_pp/qmc_short_vmcbatch_dmcbatch.in.xml`
 (upstream's batched VMC+DMC test deck, 16 electrons, B-spline orbitals from
 `pwscf.pwscf.h5`, BFD pseudopotential, J1+J2) -- smoke verbatim (256 walkers),
-strong = `total_walkers 4096` fixed over N, weak = `walkers_per_rank 1024`; one
-rank per GPU, `OMP_NUM_THREADS` crowds, `OMP_TARGET_OFFLOAD=MANDATORY` (no silent
+strong = `total_walkers` fixed over N (default 256 = the verbatim population, see
+the population limit below), weak = `walkers_per_rank` (default 256); one rank per
+GPU, `OMP_NUM_THREADS` crowds, `OMP_TARGET_OFFLOAD=MANDATORY` (no silent
 host fallback). NiO performance decks are not used (orbital files only behind an
 anl.box.com link).
 
@@ -80,5 +81,42 @@ blocks finite, upstream's `check_scalars.py --ns 3 --series 1 -e 2 --le
 "-21.844975 0.02"` (DIAMOND2_DMC_SCALARS), and for N > 1 statistical consistency
 with the 1-GPU run (3 sqrt(sigma_1^2 + sigma_N^2)). First 1-GPU run: DMC
 LocalEnergy -21.84924 +- 0.01517 Ha vs -21.844975 +- 0.02 (deviation -0.21 sigma),
-534 s wall, launcher audit 1 verified. Full 1/2/4-GPU results and the
-strong/weak timings: `SECOND_BATCH_STATUS.md`.
+534 s wall, launcher audit 1 verified.
+
+### Results (2026-09-06, profile `clang231-cuda132-offload`, 8 crowds per rank)
+
+| Run | GPUs | Walkers (total / per GPU) | DMC LocalEnergy [Ha] (vs ref -21.844975 +- 0.02) | Wall [s] | Audit |
+|---|---|---|---|---|---|
+| validate / smoke = strong np1 | 1 | 256 / 256 | -21.8492 +- 0.0152 (-0.21 sigma) | 534 | 1 verified |
+| validate | 2 | 256 / 128 | -21.8566 +- 0.0126 (-0.58 sigma; 0.37 sigma vs 1 GPU) | 316 | 2 verified, 0 mismatch |
+| validate | 4 | 256 / 64 | -21.8313 +- 0.0105 (+0.68 sigma; 0.97 sigma vs 1 GPU) | 254 | 4 verified, 0 mismatch |
+| strong | 2 | 256 / 128 | -21.8365 +- 0.0088 | 332 | 2 verified |
+| strong | 4 | 256 / 64 | -21.8511 +- 0.0100 | 211 | 4 verified |
+| weak | 2 | 512 / 256 | -21.8466 +- 0.0077 | 632 | 2 verified |
+| weak | 4 | 1024 / 256 | -21.8433 +- 0.0034 | 656 | 4 verified |
+
+Unit ctests 64/64 and deterministic diamond ctests 526/526 (1 GPU) precede the
+science case. Strong scaling 1.61x / 2.53x on 2 / 4 GPUs (64 walkers per B200 is
+far below saturation), weak efficiency 84 % / 81 %; the error bars of the weak
+series shrink as 1/sqrt(walkers), as they should. Every run passes upstream's
+`check_scalars.py` window (`qmc_summary.txt` in each run directory). First
+attempts at 4096 total / 1024 per-rank walkers FAILED (next section).
+
+### Walker-population limit found on this build (open issue, documented, not worked around)
+
+Device memory grows by ~320 MB per walker although QMCPACK's own allocators report
+~27 MiB: `Free memory on the default device` drops from 181.8 GB to 99.5 GB with 256
+walkers and to 17.1 GB with 512 (VMC-only probes, 8 crowds); with 1024 walkers on
+one B200 (128 per crowd) every crowd aborts in `cuSolverInverter.hpp:55`
+(`CUSOLVER_STATUS_INTERNAL_ERROR`, i.e. cuSOLVER cannot get workspace), and so
+did the first strong/weak attempts (4096 total / 1024 per rank), recorded as
+FAILED in `SECOND_BATCH_STATUS.md`. Ruled out: allocation granularity (4096 x 1
+KiB `cudaMalloc`/`omp_target_alloc` cost 1.0/0.5 KiB each, microbenchmark), the
+libomptarget memory manager (`LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0` changes
+nothing). Not identified: which component of the LLVM 23.1 offload runtime + CUDA
+13.2 + QMCPACK 4.4.0 stack holds the memory (a `LIBOMPTARGET_INFO=-1` trace of the
+256-walker probe produced 3.5e8 lines and was abandoned). Consequences: run.sh
+refuses more than `HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU` (default 300) walkers per
+GPU unless forced; strong scaling = the verbatim 256-walker deck over 1/2/4 GPUs,
+weak scaling = 256 walkers per GPU. The 256-walker DMC runs use ~120 GB of the
+183 GB per GPU.

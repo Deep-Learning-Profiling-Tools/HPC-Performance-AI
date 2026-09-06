@@ -13,16 +13,24 @@
 #       identical <qmc> blocks) and checks the DMC total energy against -21.844975 +- 0.02 Ha
 #       (DIAMOND2_DMC_SCALARS, check_scalars.py --ns 3), which is exactly what validate.sh does here.
 #     smoke : the deck verbatim (total_walkers 256 -> split over the N ranks)
-#     strong: derived deck, VMC+DMC total_walkers = HPCPERF_QMCPACK_WALKERS (default 4096), fixed over N
-#     weak  : derived deck, VMC+DMC walkers_per_rank = HPCPERF_QMCPACK_WALKERS_PER_RANK (default 1024),
+#     strong: derived deck, VMC+DMC total_walkers = HPCPERF_QMCPACK_WALKERS (default 256 = the verbatim
+#             population, fixed over N)
+#     weak  : derived deck, VMC+DMC walkers_per_rank = HPCPERF_QMCPACK_WALKERS_PER_RANK (default 256),
 #             i.e. total = W x N (QMC weak scaling = more statistics at constant work per GPU)
+#   POPULATION LIMIT on this build (measured 2026-09-06, see README): device memory grows by ~320 MB per
+#   walker (82 GB at 256 walkers, 165 GB at 512; 1024 walkers on one B200 exhaust the 183 GB and cuSOLVER
+#   aborts with CUSOLVER_STATUS_INTERNAL_ERROR) although QMCPACK's own allocators report ~27 MiB -- so more
+#   than ~300 walkers per GPU are refused by the run, not silently reduced. Larger requests are honoured
+#   only when explicitly asked for and are expected to FAIL until the cause (LLVM 23.1 offload runtime on
+#   CUDA 13.2/B200) is understood.
 #   The derived decks change ONLY the walker-population parameter (recorded in the manifest with the diff);
 #   the DMC energy estimate does not depend on the population beyond the population-control bias (which
 #   shrinks with more walkers), so upstream's reference check applies in every mode.
 #   NiO (tests/performance/NiO, S1-S256) is NOT used: its orbital files exist only behind an anl.box.com link.
 #
 # Controls: HPCPERF_GPUS=N|all, HPCPERF_CPUS_PER_RANK=T (OpenMP threads per rank, default 8),
-#           HPCPERF_SCALE_MODE=smoke|strong|weak, HPCPERF_QMCPACK_PROFILE, HPCPERF_DRY_RUN=1
+#           HPCPERF_SCALE_MODE=smoke|strong|weak, HPCPERF_QMCPACK_PROFILE, HPCPERF_DRY_RUN=1,
+#           HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU (default 300), HPCPERF_QMCPACK_FORCE_POPULATION=1
 # OMP_TARGET_OFFLOAD=MANDATORY: a failed offload aborts the run instead of silently falling back to the host.
 # Output: <run_dir>/qmc.out (stdout+stderr incl. the launcher audit), <prefix>.s00N.scalar.dat, run_manifest.txt.
 set -euo pipefail
@@ -55,9 +63,15 @@ esac
 [ -f "$INP" ] || { echo "run.sh: $INP missing (run fetch.sh)" >&2; exit 1; }
 case "$MODE" in
     smoke)  LABEL="$CASE"; DERIV="verbatim" ;;
-    strong) W="${HPCPERF_QMCPACK_WALKERS:-4096}"; LABEL="$CASE.w$W"; DERIV="total_walkers=$W" ;;
-    weak)   W="${HPCPERF_QMCPACK_WALKERS_PER_RANK:-1024}"; LABEL="$CASE.wpr$W"; DERIV="walkers_per_rank=$W" ;;
+    strong) W="${HPCPERF_QMCPACK_WALKERS:-256}"; LABEL="$CASE.w$W"; DERIV="total_walkers=$W" ;;
+    weak)   W="${HPCPERF_QMCPACK_WALKERS_PER_RANK:-256}"; LABEL="$CASE.wpr$W"; DERIV="walkers_per_rank=$W" ;;
 esac
+# population guard (see the header): walkers per GPU above the measured device-memory limit are refused unless forced
+MAXW="${HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU:-300}"
+case "$MODE" in smoke) WPR=$(( (256 + N_RANKS - 1) / N_RANKS )) ;; strong) WPR=$(( (W + N_RANKS - 1) / N_RANKS )) ;; weak) WPR=$W ;; esac
+if [ "$WPR" -gt "$MAXW" ] && [ -z "${HPCPERF_QMCPACK_FORCE_POPULATION:-}" ]; then
+    echo "run.sh: $WPR walkers per GPU requested, above the measured limit of $MAXW for this build (device memory ~320 MB/walker; 1024 walkers on one B200 abort in cuSOLVER) -- refusing; set HPCPERF_QMCPACK_FORCE_POPULATION=1 to try anyway" >&2; exit 2
+fi
 RUN_DIR="$(l3_rundir "$L3_BUILD/run/$LABEL.$MODE.np$N_RANKS.t$THREADS")" || exit 2
 DECK="$RUN_DIR/$(basename "$INP")"
 if [ "$MODE" = smoke ]; then
@@ -86,7 +100,7 @@ rc=$?
 set +o pipefail; set -e
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
     l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=qmcpack" "backend=$BACKEND" "profile=$PROFILE" "case=$CASE" "label=$LABEL" "mode=$MODE" "deck_derivation=$DERIV" \
-        "ranks=$N_RANKS" "threads_per_rank=$THREADS" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
+        "ranks=$N_RANKS" "threads_per_rank=$THREADS" "walkers_per_gpu=$WPR" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
         "upstream_input=$INP" "upstream_input_sha256=$(l3_sha_file "$INP")" "deck_sha256=$(l3_sha_file "$DECK")" \
         "orbitals_h5_sha256=$(l3_sha_file "$CASE_DIR/pwscf.pwscf.h5")" "pseudo_sha256=$(l3_sha_file "$CASE_DIR/C.BFD.xml")" \
         "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" "prefix=$PREFIX" "omp_target_offload=MANDATORY" "utc=$(date -u +%FT%TZ)"
