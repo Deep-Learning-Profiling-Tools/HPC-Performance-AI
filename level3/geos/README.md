@@ -147,3 +147,22 @@ official small one. Dry-runs 8/40/80 (strong + weak): planned as HYPOTHETICAL
 (`stdout.log`, `displacement_history.hdf5`, restart files, `analytic_check.txt`,
 `cross_rank_check.txt`, `restart_baseline_check.txt`, `history_baseline_check.txt`,
 `run_manifest.txt`), `.deps/level3/geos/<profile>/install/BUILD_INFO.txt`.
+
+### Unit tests (dependency probe, not a validation criterion of the beam workflow)
+
+`ctest -j4` in `build/level3/geos/<profile>` on GPU 0 (upstream default `ENABLE_TESTS=ON`,
+`PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe` for the tests' own `mpirun -np 1`
+launches): **254 / 261 passed** in 351 s, log
+`.deps/level3/geos/<profile>/logs/geos-ctest.log`. Failed: `testMath` (LvArray
+`TestComplexMath/8.asinh`, `float` on the device: CUDA's `asinhf(5)` differs from the host
+value by >= 1 float ulp, the test allows `epsilon`; CUDA documents up to 3 ulp), `testErrorHandling`
+(`testYamlFileAssertOutput` aborts on purpose; prterun turns the abort into a non-zero test
+exit), and five fluid-flow/well physics tests -- `testCompMultiphaseFlow`
+(phase-mobility derivative check, analytical vs finite-difference error norm ~1.0),
+`testCompMultiphaseFlowHybrid` (flux Jacobian, error norms 0.008-0.15),
+`testThermalEstimatorProdWell`, `testThermalEstimatorInjWell`,
+`testReservoirThermalSinglePhaseMSWells_RateInj` (`ExternalError` in the well solvers).
+The last five are gross, not precision-level, and were not investigated: **the
+compositional multiphase flow and well modules of this build are UNVERIFIED**; the
+validated solid-mechanics workflow is not affected (its restart state matches upstream's
+baseline to 3.6e-12).
