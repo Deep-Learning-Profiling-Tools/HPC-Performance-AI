@@ -43,8 +43,12 @@ cache; see `level3/nekrs/COMPATIBILITY.md`):
 - Spack is used **only** where upstream documents it as a supported route and
   the recipe can express the target (`cuda_arch=100`, CUDA 13.2 external,
   conda Open MPI external). In this round that is nowhere; the two
-  `NATIVE+SPACK_DEPS` candidates (CP2K, QMCPACK) will use it for CPU-side
-  dependencies when they are brought up.
+  `NATIVE+SPACK_DEPS` candidates (CP2K, QMCPACK) were **brought up without
+  Spack in the second batch** (CP2K: upstream's own toolchain script is the
+  documented dependency route and already pins every version; QMCPACK: the
+  private LLVM/HDF5/Boost builds are 3 tarballs with recorded SHA-256s) -- so
+  every `spack_lock_sha256=` stays `none` and no `spack.yaml` exists. Their
+  matrix rows below are therefore realised as `NATIVE`.
 - When used, each application/backend gets its own environment
   `level3/envs/<app>/{cuda,rocm}/spack.yaml` with a committed `spack.lock`;
   the lock's SHA-256 is recorded in the application fingerprint
@@ -95,3 +99,29 @@ No class E change anywhere; no numerics, physics or algorithm touched. The
 nekRS list shows the general pattern for Fortran + CMake applications on this
 node (CP2K and DFT-FE will meet the same OMPI_FC / LTO / PIE issues) and that
 nekRS' vendored HYPRE 2.32.0 is not CUDA 13-ready as shipped.
+
+## Second batch (2026-09-05/06): what was actually built and how
+
+Per-profile isolation was added for this batch: `.deps/level3/<app>/<profile>/{src,build,install,logs,cache}`
+and `build/level3/<app>/<profile>/` (`l3_paths_profile`), the profile naming the
+compiler/Toolkit/backend/key-dependency combination (`cuda132-gcc142-ompi5010`,
+`clang231-cuda132-offload`, `cuda132-gcc133-adiabatic|heatcool`, ...). Two
+differently configured builds never share a source, build or install tree, and
+the fingerprint (schema `l3-2`; the profile and every dependency version/SHA are
+part of the `dependencies=` line) refuses a mismatching reuse. Source and
+build trees that suffer on NFS (LLVM 23, the CP2K toolchain -- 150k+ small files)
+live on local `/tmp/hpcperf-l3-b2-scratch/`; installs, logs and fingerprints stay
+under `.deps/`.
+
+| Application | Route actually used | Class | What |
+|---|---|---|---|
+| Nyx 26.09 | NATIVE; external **AMReX 26.09 built per profile** (the pinned submodule `6e875b7c` cannot emit sm_100), SUNDIALS 7.2.1 CUDA per profile for HEATCOOL; CPU-backend profile for cross-references | A | none in Nyx/AMReX/SUNDIALS; derived decks (step counts, fixed `amr.max_grid_size`/`refine_grid_layout=0`, checkpoint output, synthetic `RandomPerCell` sizes) written into the build tree, upstream decks otherwise verbatim |
+| CP2K v2026.2 | NATIVE + upstream `install_cp2k_toolchain.sh` (OpenBLAS/ScaLAPACK/FFTW/libint/libxc/LIBXSMM/spglib/DBCSR); **no Spack** (recipes cap `cuda_arch` at 90) | B + C | B: back-port of upstream commit `378b2fab` (B200 in the toolchain: `--gpu-ver=B200 -> ARCH_NUM 100`, DBCSR `GPU_ARCH_NUMBER_B200 100` + `parameters_H100.json -> parameters_B200.json`) -- `level3/cp2k/patches/0001`; C: toolchain copy on local scratch (DBCSR's `GetGitRevisionDescription.cmake` aborts inside a git worktree), `PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe` for DBCSR's own `mpiexec -n 4` ctest launches, `unset -f grep` (the login shell exports a `grep` function), conda build variables cleared, BLAS/LAPACK given explicitly as the toolchain `libopenblas.a` (`CP2K_BLAS_VENDOR=CUSTOM`) with the toolchain library directories first in the RPATH of libcp2k.so/cp2k.psmp (`CMAKE_INSTALL_RPATH` + `-Wl,-rpath` linker flags; attempt 1 had inherited conda's `LDFLAGS` -- `-Wl,--disable-new-dtags -rpath <conda lib>` -- so `libopenblas.so.0` resolved to the conda pthreads OpenBLAS at run time, attempt 2 with `CMAKE_INSTALL_RPATH` alone still lost to the MPI wrapper's rpath; run.sh refuses to run unless `ldd` resolves BLAS under the toolchain and records `blas_resolved=`), `setup` still sourced at run time |
+| QMCPACK v4.4.0 | NATIVE + **private toolchain** (LLVM 23.1.0 from source with the NVPTX offload runtime, HDF5 1.14.5 parallel, Boost 1.90 headers, OpenBLAS 0.3.30); no Spack (recipe inert for 4.x GPU options) | A (+ C) | none in QMCPACK; C: `-DCMAKE_IGNORE_PATH=/usr/lib64/cmake/ZLIB;/lib64/cmake/ZLIB` for HDF5 (the node's zlib-ng CMake package references an absent `libz.a`); derived decks change only the walker-population parameter (strong/weak) |
+| DFT-FE 1.2.0 | NATIVE; recipe transcribed from `install_DFTFE` (`frontierDevelop`) with **system GCC 14.2.1 for C/C++/Fortran**; all 9 dependencies per profile; **deal.II 9.6.2** (attempt 1 with 9.7.1 -- the version the current recipe pairs with dftfe *develop* -- fails: 9.7 removed `Utilities::MPI::create_group`, `Triangulation::load(name, autopartition)`, `VtkFlags::ZlibCompressionLevel` that release 1.2.0 uses; 9.6.2 keeps them deprecated, so no API back-port) | C + D | D: `level3/dftfe/patches/0001-std-isnan.patch` -- two unqualified `isnan(` calls in a template of `src/atom/AtomicCenteredNonLocalOperator.cc` qualified as `std::isnan(` (GCC 14 rejects the unqualified spelling; same function, no numerical change); C: dftfe's `p4est-setup.sh` given `CC=mpicc CXX=mpicxx FC=mpifort F77=mpifort LIBS=-lm` (Cray wrappers hardcoded, implicit libm) and its zlib check pointed at p4est 2.8.7's `config/p4est_config.h`; conda build variables cleared; `TARGET=SAPPHIRERAPIDS` for OpenBLAS; ELPA configured with `-march=native` (its AVX-512 probe needs the SIMD flags in CFLAGS) and the ScaLAPACK/OpenBLAS paths in `LDFLAGS` (its cublas link check drops `SCALAPACK_LDFLAGS`); no deal.II/ELPA/p4est source change |
+| GEOS develop `b7a0f133` + TPL `9b55672` | NATIVE: upstream `thirdPartyLibs` superbuild (`config-build.py -n`) + private host-config; TPLs per profile (not Level 2's RAJA/CHAI/Umpire installs: different compiler/CUDA flags); GEOS 1718 s at `-j32` | B + C + D | B (thirdPartyLibs, `level3/geos/patches/`): `0001` 65-character `SUPERLU_URL_HASH` typo, `0002` `RAJA_ENABLE_VECTORIZATION` overridable (built OFF: nvcc 13.2 + GCC 14/x86-64-v3 cannot compile RAJA's AVX2 tensor layer; upstream's own ROCm choice), `0003` hdf5 step gets `CMAKE_GENERATOR ${TPL_GENERATOR}` and `${TPL_BUILD_COMMAND}` like every other step (hardcoded `make` breaks under Ninja); D (BLT submodule, `geos-blt-0001-cuda13-memoryClockRate.patch`): back-port of LLNL/blt `38b46203` -- BLT's CUDA runtime smoke-test program reads `cudaDeviceProp::memoryClockRate`, removed in CUDA 13, now `cudaDeviceGetAttribute` for `CUDART_VERSION >= 13000`; test/benchmark switches left at upstream's default ON; C: configure-once guard (`config-build.py` deletes an existing build tree), stale-stamp cleanup; host-config `ENABLE_HYPREDRV=OFF` (GEOS-documented option; the TPL hypredrive step lacks Umpire's include path, and the beam workflow does not use hypredrive) and `-I<TPL metis/parmetis include>` ahead of the `-isystem` conda MPI include dir (which carries an unrelated 32-bit `metis.h` that broke GEOS' 64-bit ParMETIS assertion); no GEOS/LvArray/hypre source change |
+
+Still no class E change; no numerics, physics, precision, solver placement or
+input tolerance was touched. Every patch file carries its source, rationale,
+conditions, impact and verification in its header and its hash is in the
+profile fingerprint.
