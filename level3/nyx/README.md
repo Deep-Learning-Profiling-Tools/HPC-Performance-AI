@@ -168,6 +168,13 @@ verified. **VALIDATED_PASS at 1/2/4 GPUs** for the heating/cooling LyA deck.
 (Run dirs: `build/level3/nyx/cuda132-gcc133-heatcool/run/`.) The adiabatic results
 above and this section are separate claims; neither is presented as the other.
 
+Heat/cool strong scaling (`Exec/LyA/inputs` 64^3, `amr.max_grid_size=16` -> 64
+boxes, 10 steps) and the 8/40/80-GPU dry-runs: 8 ranks planned (2 hypothetical
+nodes, balanced); 40 ranks planned and flagged **IMBALANCED (64 boxes over 40
+ranks)**; 80 ranks **refused** ("80 ranks requested but ... only 64 boxes -- a rank
+without work is never launched silently"). Timings of the 1/2/4-GPU strong runs:
+`SECOND_BATCH_STATUS.md`.
+
 ## Files
 
 `fetch.sh` (pinned clones + SHA checks), `build.sh` (staged, profile-aware,
