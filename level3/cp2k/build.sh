@@ -37,6 +37,8 @@ source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
 l3_isolate_build_env
+l3_clean_conda_build_env   # conda's LDFLAGS carry -Wl,--disable-new-dtags/-rpath <conda lib>: they made cp2k.psmp/libcp2k.so
+                           # resolve libopenblas.so.0 to the conda OpenBLAS (pthreads build) instead of the toolchain's (found 2026-09-06)
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ "$BACKEND" = CUDA ] || { echo "build.sh: only CUDA is implemented for CP2K here (HIP: no ROCm on this node, UNTESTED)" >&2; exit 2; }
@@ -72,16 +74,28 @@ TC_OPTS=(--install-dir="$TC_INSTALL" --mpi-mode=openmpi --math-mode=openblas --w
          --with-elpa=no --with-cosma=no --with-sirius=no --with-tblite=no --with-libvori=no --with-hdf5=no --with-plumed=no
          --with-libtorch=no --with-gsl=no --with-dftd4=no --with-spla=no --with-spfft=no --with-gauxc=no --with-libsmeagol=no
          --with-deepmd=no --with-ace=no --with-greenx=no --with-trexio=no --with-libfci=no --with-mcl=no --with-libgint=no --with-cusolvermp=no)
+# Installed binaries carry an RPATH to the toolchain library directories (and libcp2k.so) so that the BLAS/LAPACK,
+# ScaLAPACK, FFTW, libxc, ... actually used at run time are the toolchain's, independent of LD_LIBRARY_PATH ordering;
+# run.sh verifies the resolution with ldd before every run.
+TC_RPATH="$( { ls -d "$TC_INSTALL"/*/lib "$TC_INSTALL"/*/lib64 2>/dev/null || true; } | paste -sd';')"   # (ls exits 2 when no lib64 exists: keep set -e/pipefail quiet)
+# BLAS/LAPACK: the toolchain's static OpenBLAS (its own convention, MATH_LIBS="-l:libopenblas.a") through CP2K's CUSTOM
+# vendor -- a dynamic -lopenblas resolved at run time to whichever libopenblas.so.0 the loader met first (the conda MPI
+# wrapper puts its rpath before ours), which was the conda pthreads OpenBLAS in attempts 1 and 2.
+TC_OPENBLAS_A="$(ls "$TC_INSTALL"/openblas-*/lib/libopenblas.a 2>/dev/null | head -1)"
+[ -f "$TC_OPENBLAS_A" ] || { echo "build.sh: toolchain libopenblas.a not found under $TC_INSTALL" >&2; exit 1; }
+TC_RPATH_COLON="${TC_RPATH//;/:}"
 CP2K_CMAKE=(-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON "-DCMAKE_INSTALL_PREFIX=$CP2K_PREFIX" "-DCP2K_DATA_DIR=$SRC/data"
+            "-DCMAKE_INSTALL_RPATH=$CP2K_PREFIX/lib;$TC_RPATH" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
+            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON" "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON"
             -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_Fortran_COMPILER=/usr/bin/gfortran
             -DCP2K_USE_MPI=ON -DCP2K_USE_MPI_F08=ON -DCP2K_USE_FFTW3=ON -DCP2K_USE_LIBXC=ON -DCP2K_USE_LIBINT2=ON
             -DCP2K_USE_LIBXS=ON -DCP2K_USE_LIBXSMM=ON -DCP2K_USE_SPGLIB=ON
             -DCP2K_USE_ELPA=OFF -DCP2K_USE_COSMA=OFF -DCP2K_USE_SIRIUS=OFF -DCP2K_USE_TBLITE=OFF -DCP2K_USE_VORI=OFF -DCP2K_USE_DFTD4=OFF
             -DCP2K_USE_HDF5=OFF -DCP2K_USE_PLUMED=OFF -DCP2K_USE_LIBTORCH=OFF -DCP2K_USE_GAUXC=OFF -DCP2K_USE_GREENX=OFF -DCP2K_USE_TREXIO=OFF
             -DCP2K_USE_ACE=OFF -DCP2K_USE_DEEPMD=OFF -DCP2K_USE_LIBFCI=OFF -DCP2K_USE_MIMIC=OFF -DCP2K_USE_LIBSMEAGOL=OFF -DCP2K_USE_SPLA=OFF
-            -DCP2K_BLAS_VENDOR=OpenBLAS -DCP2K_SCALAPACK_VENDOR=GENERIC
+            -DCP2K_BLAS_VENDOR=CUSTOM "-DCP2K_BLAS_LINK_LIBRARIES=$TC_OPENBLAS_A" "-DCP2K_LAPACK_LINK_LIBRARIES=$TC_OPENBLAS_A" -DCP2K_SCALAPACK_VENDOR=GENERIC
             -DCP2K_USE_ACCEL=CUDA "-DCMAKE_CUDA_ARCHITECTURES=$ARCH" -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++)
-CMAKE_OPTS="${CP2K_CMAKE[*]} | toolchain: ${TC_OPTS[*]}"
+CMAKE_OPTS="blas=CUSTOM:toolchain-libopenblas.a(static) install_rpath=toolchain-first ${CP2K_CMAKE[*]} | toolchain: ${TC_OPTS[*]}"
 DEPS="toolchain(install_cp2k_toolchain.sh v2026.2 + backport 378b2fab) dbcsr=2.10.0(sha256 3d897220fbb4498215331efad6905eb7744881b4cf04eb5c5fb4db7c48a56ef9; B200 entry=arch 100, libsmm_acc parameters=H100 reused) openblas/scalapack/fftw3/libint(lmax5)/libxc/libxsmm/libxs/spglib=toolchain pins gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V profile=$PROFILE dbcsr_tests=$( [ -n "${HPCPERF_CP2K_SKIP_DBCSR_TEST:-}" ] && echo SKIPPED || echo required)"
 FP="$(l3_fingerprint_text cp2k "$SHA" cuda "$DEPS" "$CMAKE_OPTS" "not-used(DBCSR/DBM communicate through host buffers)" "${PATCHES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1

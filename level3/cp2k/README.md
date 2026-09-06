@@ -42,6 +42,27 @@ H100 set reused, not B200-tuned** (upstream's own approach for GB10 and B200).
   (`PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe`), the same bookkeeping
   relaxation the common launcher applies (4 ranks on 4 GPUs, no GPU sharing).
 
+### BLAS/LAPACK actually linked: three attempts (recorded under `install/ATTEMPT-*`)
+
+1. First build: CP2K's CMake found the toolchain OpenBLAS (`-L.../openblas-0.3.33/lib
+   -lopenblas`), but the conda `LDFLAGS` leaked into the link (`-Wl,--disable-new-dtags`
+   + the MPI wrapper's `-Wl,-rpath <conda lib>`), so `libopenblas.so.0` resolved at
+   run time to the **conda pthreads OpenBLAS** ("OpenBLAS Warning : Detect OpenMP
+   Loop" in every run). All validations of that build passed (numerics are
+   BLAS-implementation independent within the tolerances), but the configuration
+   was not the recorded one and the OpenMP x pthreads oversubscription made its
+   timings meaningless -- found 2026-09-06 while preparing the strong-scaling runs.
+2. `l3_clean_conda_build_env` + `CMAKE_INSTALL_RPATH` with the toolchain dirs: the
+   wrapper's rpath still came first in the link line -> same resolution; `run.sh`'s
+   new guard (`ldd libcp2k.so` must resolve BLAS under the toolchain) refused every
+   run of this build.
+3. `CP2K_BLAS_VENDOR=CUSTOM` with the toolchain `libopenblas.a` and the toolchain
+   rpath in the linker flags: CMake still records a dynamic `libopenblas.so.0`
+   dependency, but the RPATH now lists the toolchain directories first and `ldd`
+   resolves it to `toolchain/openblas-0.3.33/lib/libopenblas.so.0` (OpenBLAS 0.3.33,
+   `USE_OPENMP=1`, the toolchain's own build). This is the validated configuration;
+   `run_manifest.txt` records `blas_resolved=`.
+
 ## DBCSR verified before CP2K (build.sh stage B)
 
 DBCSR 2.10.0 test build (`USE_ACCEL=cuda WITH_GPU=B200`, MPI + OpenMP,
@@ -64,11 +85,40 @@ rank (`HPCPERF_CPUS_PER_RANK`, default 8), input used verbatim, `CP2K_DATA_DIR`
 H2-big-1, H2-big-5) run on N GPUs and compared with the upstream reference
 values and tolerances from `TEST_FILES.toml` through the same matcher
 definitions (`tests/matchers.py`: `E_total` = last "Total energy:" col 3, `M011`
-= last "ENERGY| Total FORCE_EVAL" col 9); [2] H2O-64 MD: 10 steps reached, every
-SCF converged, finite energies, DBCSR reports >= 1 accelerator device and the
-GRID/DBM/PW GPU backends are active in CP2K's banner; for N > 1 the MD potential
-energy at steps 1 and 10 must agree with the 1-GPU run within **1e-8 Ha**
-(pre-fixed; upstream's `check-release-comparison.py` demands 1e-10 across CPU
-MPIxOMP layouts -- printed as well).
+= last "ENERGY| Total FORCE_EVAL" col 9); [2] H2O-64 MD checked by
+`cp2k_md_summary.py --check`: 10 steps reached, **every MD-step SCF cycle
+converged**, finite energies, GPU evidence from CP2K's own output (cp2kflags
+`offload_cuda dbcsr_acc`, `DBCSR| ACC: Number of devices/node >= 1`, GRID task
+statistics with tasks executed on the GPU, `pw_gpu_*` timers when they reach the
+timing report); for N > 1 the per-step `ENERGY| Total FORCE_EVAL` energies of MD
+steps 1..10 must agree with the 1-GPU run within **1e-8 Ha** (pre-fixed;
+upstream's `check-release-comparison.py` demands 1e-10 across CPU MPIxOMP
+layouts -- printed as well).
 
-Results are recorded in `SECOND_BATCH_STATUS.md`.
+**The initial SCF of upstream's H2O-64 deck does not converge -- by design.**
+`benchmarks/QS/H2O-*.inp` start from `SCF_GUESS ATOMIC` with the default
+`MAX_SCF 50`, no outer SCF, and declare `IGNORE_CONVERGENCE_FAILURE`; the first
+cycle stops after 50 OT/DIIS iterations ("Leaving inner SCF loop after reaching
+50 steps", gradient 4e-5) and MD starts from that state. The checker reports this
+explicitly (`initial_scf_converged=False initial_scf_iterations=50
+deck_ignore_convergence_failure=True`) and would FAIL if the deck did not declare
+`IGNORE_CONVERGENCE_FAILURE` or if any of the 10 MD-step SCF cycles were not
+converged (negative-tested in `level3/tools/tests/test_l3_validators.sh`).
+The deck is used verbatim; loosening/repairing it was not attempted.
+
+### Results (2026-09-06, profile `cuda132-gcc142-ompi5010`, 8 OpenMP threads per rank)
+
+| GPUs | regtests (5) vs upstream refs | H2O-64 MD | FORCE_EVAL energies vs 1 GPU (steps 1..10) | launcher audit |
+|---|---|---|---|---|
+| 1 | all within tolerance (max \|diff\| 6.0e-14, tol 8e-14..3e-13) | 10/10 MD SCFs converged, GRID GPU tasks 7.5e7, DBCSR ACC 1 device | -- | 1 verified |
+| 2 | all within tolerance | 10/10, GRID GPU 3.7e7, `pw_gpu_c1dr3d_3d_ps/pw_gpu_r3dc1d_3d_ps` in timing report | max 5.7e-12 Ha (1e-10 also met) | 2 verified, 0 mismatch |
+| 4 | all within tolerance | 10/10, GRID GPU 1.9e7, pw_gpu timers present | max 8.6e-12 Ha (1e-10 also met) | 4 verified, 0 mismatch |
+
+VALIDATED_PASS at 1/2/4 GPUs -- first with the attempt-1 binary (conda BLAS, see above) and
+again with the attempt-3 binary (toolchain OpenBLAS; 2026-09-06 04:09-04:12 UTC: regtests within
+upstream tolerances, H2O-64 10/10 MD-step SCFs converged, FORCE_EVAL energies vs 1 GPU: max 1.1e-11
+Ha on 2 GPUs, 8.6e-12 Ha on 4 GPUs, `blas_resolved=` recorded in every manifest). Runs:
+`build/level3/cp2k/cuda132-gcc142-ompi5010/run/` (`validate.*.stdout`, per-run `cp2k.out`,
+`md_summary.txt`, `run_manifest.txt`). Strong (H2O-128) / size-sweep timings:
+`SECOND_BATCH_STATUS.md` (H2O-128 on 1 GPU: 119.8 s with the toolchain OpenBLAS vs 204.9 s
+with the conda pthreads OpenBLAS of attempt 1 -- the BLAS mix-up was also a 1.7x slowdown).
