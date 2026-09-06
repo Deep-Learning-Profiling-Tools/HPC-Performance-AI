@@ -130,14 +130,43 @@ imbalanced, reported); **refused** for `minisb` (8 boxes) and for 80 ranks on
 the 64-box strong deck -- as designed. Multi-node remains BLOCKED/UNVERIFIED
 on this site (launcher note); HIP untested (no ROCm).
 
-## Status of the heating/cooling variant
+## Heating/cooling variant (profile `cuda132-gcc133-heatcool`)
 
-`build.sh` with `HPCPERF_NYX_HEATCOOL=YES` builds SUNDIALS 7.2.1 (ENABLE_CUDA,
-index 32, fused kernels -- Nyx's own `NyxSetupSUNDIALS.cmake` options) and AMReX
-with `AMReX_SUNDIALS=ON`, then Nyx with `Nyx_HEATCOOL=YES`; `lya_heatcool` runs
-`Exec/LyA/inputs` / `inputs.rt` as shipped. **Not executed in this round** (see
-SECOND_BATCH_STATUS.md for the current state); the adiabatic results above make
-no claim about heating/cooling.
+Staged build: SUNDIALS 7.2.1 (Nyx's pinned submodule commit; `ENABLE_CUDA`, index
+size 32, `SUNDIALS_BUILD_PACKAGE_FUSED_KERNELS=ON` as Nyx's own
+`NyxSetupSUNDIALS.cmake`; CVODE **and ARKODE** because AMReX 26.09's
+`find_package(SUNDIALS)` requires the `arkode` component) -> AMReX 26.09 with
+`AMReX_SUNDIALS=ON` -> Nyx `Nyx_HEATCOOL=YES` (CVODE vectorized, `heat_cool_type
+11`). 310 s at -j16 (SUNDIALS 14 s, AMReX 134 s, Nyx 157 s); `cuobjdump` sm_100;
+CPU reference profile `cpu-gcc133-heatcool` built the same way (CPU SUNDIALS).
+
+**SUNDIALS independent probe first** (`sundials_probe.sh`: SUNDIALS' own example
+regression tests, `SUNDIALS_TEST_ENABLE_DEV_TESTS`, CUDA sm_100, CUDA 13.2):
+6 CUDA examples/tests, **5 pass** (cvAdvDiff_kry_cuda, _managed,
+cvAdvDiff_diag_cuda x3); `cvRoberts_block_cusolversp_batchqr` **fails only in the
+integrator statistics** printed with a 10 % integer allowance (nni 805 vs 823,
+ncfn 5 vs 4, netf 33 vs 31; the solution values agree at the test's 4-digit
+precision). That example uses the cuSolverSp batched-QR linear solver; **Nyx's
+HEATCOOL path uses CVODE with `CVDiag`** (`Source/HeatCool/integrate_state_vec_3d.cpp`),
+not cuSolverSp, so the failing example is off Nyx's path. Recorded as-is
+(`.deps/level3/nyx/cuda132-gcc133-heatcool/logs/sundials-ctest.log`).
+
+**Workload `lya_heatcool`**: `Exec/LyA/inputs.rt` exactly as shipped
+(heat_cool_type 11, UVB table TREECOOL_middle, 32^3, 32.nyx IC), 10 steps; "Integrating
+heating/cooling method ... Vectorized CVODE" in the log; 1.3 s on 1 GPU.
+
+**Validation** (same script; tolerances fixed before the runs from upstream's own
+GPU nightly "LyA" heat/cool test, which compares with `fcompare --rel_tol 5e-05`
+and itself reaches 2.8e-5): same-config rerun (1 GPU), 1-GPU reference (2/4 GPU)
+and CPU-heatcool reference all at **5e-5**; the integrator-rate diagnostic field
+`I_R` (||I_R|| ~ 0.2, written by CVODE) is **excluded** and reported -- it differs at
+O(1) relative even between two identical 1-GPU runs, while **every state variable
+(density, momenta, rho_E, rho_e, Temp, Ne, phi_grav, grav_*, pressure,
+particle_*) agrees to <= 1.6e-13 relative** (rerun, 2-GPU, 4-GPU and vs CPU alike);
+DM particles agree to ~1e-15, baryon mass exact, counts exact, all ranks' GPUs
+verified. **VALIDATED_PASS at 1/2/4 GPUs** for the heating/cooling LyA deck.
+(Run dirs: `build/level3/nyx/cuda132-gcc133-heatcool/run/`.) The adiabatic results
+above and this section are separate claims; neither is presented as the other.
 
 ## Files
 

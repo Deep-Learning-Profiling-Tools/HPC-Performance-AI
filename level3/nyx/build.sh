@@ -26,7 +26,7 @@
 # AMReX options = exactly what Nyx's superbuild would set for the same Nyx options
 # (cmake/NyxSetupAMReX.cmake: 3D, DOUBLE, PARTICLES(PDOUBLE), MPI, no OMP, no
 # Fortran/PROBINIT, LINEAR_SOLVERS, SUNDIALS iff HEATCOOL, GPU backend); SUNDIALS
-# options = cmake/NyxSetupSUNDIALS.cmake (CVODE only, index 32, fused kernels).
+# options = cmake/NyxSetupSUNDIALS.cmake (CVODE + ARKODE -- AMReX 26.09 requires the arkode component -- index 32, fused kernels).
 # Nyx options mirror upstream's GPU CI (Nyx_HYDRO=YES Nyx_MPI=YES Nyx_OMP=NO,
 # CMAKE_CXX_STANDARD=17). Modification class: A (build options; out-of-source
 # builds; no file of any checkout is modified).
@@ -74,7 +74,7 @@ AMREX_PREFIX="$L3_INSTALL/amrex"; SUND_PREFIX="$L3_INSTALL/sundials"
 TOOLS=OFF; [ "$MODEL" = cpu ] && TOOLS=ON
 
 AMREX_OPTS="AMReX_SPACEDIM=3 AMReX_PRECISION=DOUBLE AMReX_PARTICLES=ON AMReX_PARTICLES_PRECISION=DOUBLE AMReX_MPI=ON AMReX_OMP=OFF AMReX_FORTRAN=OFF AMReX_PROBINIT=OFF AMReX_LINEAR_SOLVERS=ON AMReX_EB=OFF AMReX_FFT=OFF AMReX_SUNDIALS=$( [ "$HC" = YES ] && echo ON || echo OFF) AMReX_GPU_BACKEND=$AMREX_GPU arch=$ARCHNOTE AMReX_PLOTFILE_TOOLS=$TOOLS"
-CMAKE_OPTS="Nyx_GPU_BACKEND=$AMREX_GPU arch=$ARCHNOTE Nyx_HYDRO=YES Nyx_HEATCOOL=$HC Nyx_MPI=YES Nyx_OMP=NO Nyx_SINGLE_PRECISION_PARTICLES=NO CMAKE_CXX_STANDARD=17 CMAKE_BUILD_TYPE=Release amrex=external($AMREX_OPTS) sundials=$( [ "$HC" = YES ] && echo "external(ENABLE_CUDA=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) INDEX_SIZE=32 FUSED_KERNELS=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) CVODE only)" || echo off)"
+CMAKE_OPTS="Nyx_GPU_BACKEND=$AMREX_GPU arch=$ARCHNOTE Nyx_HYDRO=YES Nyx_HEATCOOL=$HC Nyx_MPI=YES Nyx_OMP=NO Nyx_SINGLE_PRECISION_PARTICLES=NO CMAKE_CXX_STANDARD=17 CMAKE_BUILD_TYPE=Release amrex=external($AMREX_OPTS) sundials=$( [ "$HC" = YES ] && echo "external(ENABLE_CUDA=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) INDEX_SIZE=32 FUSED_KERNELS=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) CVODE+ARKODE(AMReX 26.09 SUNDIALS component set))" || echo off)"
 DEPS="amrex=26.09($AMREX_SHA) [Nyx submodule pin $(git -C "$SRC/subprojects/amrex" rev-parse HEAD 2>/dev/null || echo unknown) not used: no sm_100 through CMake] sundials=$( [ "$HC" = YES ] && echo "7.2.1($SUNDIALS_SHA)" || echo off) profile=$PROFILE"
 FP="$(l3_fingerprint_text nyx "$SHA" "$MODEL" "$DEPS" "$CMAKE_OPTS" "runtime(amrex.use_gpu_aware_mpi default)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
@@ -102,7 +102,7 @@ if [ "$HC" = YES ] && [ ! -f "$SUND_PREFIX/.hpcperf-stage-done" ]; then
     stage SUNDIALS "$SRC/subprojects/sundials" "$L3_BUILD_DEPS/sundials" sundials \
         -DCMAKE_INSTALL_PREFIX="$SUND_PREFIX" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON \
         -DEXAMPLES_ENABLE_C=OFF -DEXAMPLES_ENABLE_CXX=OFF -DEXAMPLES_INSTALL=OFF -DENABLE_MPI=OFF -DENABLE_OPENMP=OFF \
-        -DBUILD_ARKODE=OFF -DBUILD_KINSOL=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_CVODES=OFF -DBUILD_TESTING=OFF \
+        -DBUILD_ARKODE=ON -DBUILD_KINSOL=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_CVODES=OFF -DBUILD_TESTING=OFF \
         "${SUND_GPU[@]}"
     cmake --install "$L3_BUILD_DEPS/sundials" > "$L3_LOGS/sundials-install.log" 2>&1 || { echo "build.sh: SUNDIALS install failed" >&2; exit 1; }
     touch "$SUND_PREFIX/.hpcperf-stage-done"
@@ -170,7 +170,8 @@ find_package(AMReX REQUIRED CONFIG)
 add_executable(particle_compare particle_compare.cpp)
 target_link_libraries(particle_compare PRIVATE AMReX::amrex_3d)
 EOF
-    stage particle_compare "$PC_SRC" "$L3_BUILD_DEPS/particle_compare" particle_compare "-DAMReX_ROOT=$AMREX_PREFIX"
+    PC_EXTRA=(); [ "$HC" = YES ] && PC_EXTRA=("-DSUNDIALS_ROOT=$SUND_PREFIX")   # AMReXConfig's find_dependency(SUNDIALS) for the heatcool AMReX
+    stage particle_compare "$PC_SRC" "$L3_BUILD_DEPS/particle_compare" particle_compare "-DAMReX_ROOT=$AMREX_PREFIX" "${PC_EXTRA[@]}"
     cp -f "$L3_BUILD_DEPS/particle_compare/particle_compare" "$L3_INSTALL/bin/"
 fi
 l3_fingerprint_write "$L3_INSTALL" "$FP"

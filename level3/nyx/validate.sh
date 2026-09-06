@@ -40,8 +40,21 @@ N="${HPCPERF_GPUS:-1}"
 CASES="${HPCPERF_NYX_CASES:-minisb lya_adiabatic}"
 STEPS="${HPCPERF_NYX_STEPS:-10}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-1800}"
-REL_TOL_SAME=2e-10     # upstream nightly GPU regression tolerance (fcompare --rel_tol)
-REL_TOL_XBACKEND=1e-8  # pre-fixed CPU-vs-GPU tolerance (see header)
+REL_TOL_SAME=2e-10     # upstream nightly GPU regression tolerance (fcompare --rel_tol) for the adiabatic decks
+REL_TOL_XBACKEND=1e-8  # pre-fixed CPU-vs-GPU tolerance (see header) for the adiabatic decks
+# Heating/cooling (CVODE, adaptive error-controlled per-cell ODE integration): upstream's nightly
+# GPU "LyA" test (inputs.rt, heat_cool_type 11) compares with `fcompare --rel_tol 5e-05` (their own
+# run reaches 2.8e-05 in Temp), so that tolerance is used for lya_heatcool, same-config and
+# cross-backend alike. The derived field I_R (instantaneous heating/cooling rate written by the
+# integrator, ||I_R|| ~ 0.2) is excluded from the per-variable check and reported: it differs at
+# O(1) relative even between two identical 1-GPU runs while every state variable agrees to 1e-13.
+HC_REL_TOL=5e-5; HC_EXCLUDE="I_R"
+case_tols() { # case_tols <case> -> sets TOL_SAME TOL_X EXCLUDE
+    case "$1" in
+        lya_heatcool) TOL_SAME=$HC_REL_TOL; TOL_X=$HC_REL_TOL; EXCLUDE="$HC_EXCLUDE" ;;
+        *)            TOL_SAME=$REL_TOL_SAME; TOL_X=$REL_TOL_XBACKEND; EXCLUDE="" ;;
+    esac
+}
 MASS_TOL=1e-9          # pre-fixed baryon mass conservation tolerance
 python3 -c 'import numpy' 2>/dev/null || { echo "validate.sh: python3 with numpy required" >&2; exit 1; }
 export HPCPERF_GPUS="$N" HPCPERF_SCALE_MODE=smoke HPCPERF_NYX_STEPS="$STEPS"
@@ -150,9 +163,20 @@ compare() { # compare <ref_dir> <dir> <rel_tol> <label>
     local ref=$1 d=$2 tol=$3 label=$4 out rc=0 plt; plt="$(final_plt)"
     out="$("$TOOLS/amrex_fcompare" -n 0 --rel_tol "$tol" --abort_if_not_all_found "$ref/$plt" "$d/$plt" 2>&1)" || rc=$?
     echo "$out" > "$d/fcompare.$label.txt"
-    if [ "$rc" -ne 0 ]; then fail "$label: fcompare (rel_tol $tol) disagrees or failed (rc=$rc): $(echo "$out" | tail -3 | tr '\n' ' ')"; return 1; fi
-    local worst; worst="$(echo "$out" | awk 'NF>=3 && $2 ~ /^[0-9.eE+-]+$/ && $3 ~ /^[0-9.eE+-]+$/ {if ($3+0 > m) {m=$3+0; v=$1}} END{printf "%s %.3e", v, m}')"
-    echo "    $label: fcompare -n 0 --rel_tol $tol: agree (max rel err $worst)"
+    # rc 0 = agree, 1 = a variable exceeds the tolerance (evaluated per variable below, with the
+    # documented exclusion list), anything else = structural failure (missing variable/level, grids)
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then fail "$label: fcompare failed (rc=$rc): $(echo "$out" | tail -3 | tr '\n' ' ')"; return 1; fi
+    local verdict; verdict="$(echo "$out" | awk -v tol="$tol" -v excl="${EXCLUDE:-}" '
+        BEGIN{n=split(excl,e," "); for(i=1;i<=n;i++) ex[e[i]]=1; nv=0; bad=""; m=0; v="-"}
+        NF>=3 && $2 ~ /^[0-9.eE+-]+$/ && $3 ~ /^[0-9.eE+-]+$/ {
+            nv++; if ($3=="nan"||$3=="inf") {bad=bad" "$1"(non-finite)"; next}
+            if (ex[$1]) {skip=skip" "$1"="$3; next}
+            if ($3+0 > m) {m=$3+0; v=$1}; if ($3+0 > tol) bad=bad" "$1"="$3 }
+        END{printf "nv=%d worst=%s %.3e bad=%s excluded=%s", nv, v, m, (bad==""?"none":bad), (skip==""?"none":skip)}')"
+    local nv; nv="$(sed -n 's/^nv=\([0-9]*\).*/\1/p' <<<"$verdict")"
+    [ "${nv:-0}" -ge 5 ] || { fail "$label: fcompare table incomplete ($verdict)"; return 1; }
+    case "$verdict" in *"bad=none"*) ;; *) fail "$label: fcompare (rel_tol $tol) variables over tolerance: ${verdict#*bad=}"; return 1;; esac
+    echo "    $label: fcompare -n 0 --rel_tol $tol: agree on all $nv non-excluded variables (${verdict#*worst=})"
     # DM particles: AMReX's particle_compare needs identical headers (incl. next_id and the per-file
     # layout), i.e. the same rank count -- and it exits 0 even when it prints "FAIL - Particle data
     # headers do not agree". Across rank counts the particles are matched through their exact t=0
@@ -176,7 +200,7 @@ ic_count() { # expected DM particle count from the deck's IC file
 
 for CASE in $CASES; do
     echo "validate.sh: === Nyx $BACKEND case=$CASE, $STEPS steps, $N GPU(s) [profile $GPU_PROFILE; CPU reference $CPU_PROFILE] ==="
-    WANT_NP="$(ic_count "$CASE")"
+    WANT_NP="$(ic_count "$CASE")"; case_tols "$CASE"; REL_TOL_SAME_CASE=$TOL_SAME; REL_TOL_X_CASE=$TOL_X
     D="$GPU_RUNS/$CASE.smoke.np$N"
     rc=0; run_gpu "$CASE" "$N" "$GPU_RUNS/validate.$CASE.np$N.stdout" || rc=$?
     /usr/bin/grep -aE '^# Nyx|hpcperf-launch: audit summary|Run time =|Total Time|ERROR|Error|abort' "$GPU_RUNS/validate.$CASE.np$N.stdout" | head -8 || true
@@ -210,7 +234,7 @@ for CASE in $CASES; do
         fi
         LABEL2="vs-1GPU"
     fi
-    compare "$REF" "$D" "$REL_TOL_SAME" "$CASE.np$N.$LABEL2" || true
+    compare "$REF" "$D" "$REL_TOL_SAME_CASE" "$CASE.np$N.$LABEL2" || true
 
     # [3] CPU reference (independent backend, same Nyx/AMReX sources and deck)
     C="$CPU_RUNS/$CASE.smoke.np1"
@@ -220,10 +244,10 @@ for CASE in $CASES; do
         [ "$rc" -eq 0 ] || { fail "$CASE CPU reference run exited $rc (see $CPU_RUNS/validate.$CASE.cpu.stdout)"; continue; }
     fi
     check_complete "$C" "$CASE cpu-ref" "$WANT_NP" || continue
-    compare "$C" "$D" "$REL_TOL_XBACKEND" "$CASE.np$N.vs-CPU" || true
+    compare "$C" "$D" "$REL_TOL_X_CASE" "$CASE.np$N.vs-CPU" || true
 done
 
 if [ "$ok" -eq 1 ]; then
-    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; fcompare/particle_compare rel_tol $REL_TOL_SAME vs $( [ "$N" -eq 1 ] && echo rerun || echo 1-GPU), CPU reference rel_tol $REL_TOL_XBACKEND, baryon mass |dM/M|<=$MASS_TOL, DM count exact, finite): PASS"; exit 0
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; fcompare/particle rel_tol adiabatic $REL_TOL_SAME / heatcool $HC_REL_TOL (I_R excluded) vs $( [ "$N" -eq 1 ] && echo rerun || echo 1-GPU), CPU reference rel_tol adiabatic $REL_TOL_XBACKEND / heatcool $HC_REL_TOL, baryon mass |dM/M|<=$MASS_TOL, DM count exact, finite): PASS"; exit 0
 fi
 echo "Nyx $BACKEND validation ($N GPU, cases: $CASES): FAIL"; exit 1
