@@ -102,6 +102,14 @@ level3/<app>/
   exist only as HYPOTHETICAL dry-runs (`HPCPERF_NODES=N/4`).
 - Do not move the common runtime, do not refactor the launcher for an app;
   extend it only with tests in `level2/tools/tests/run_all.sh`.
+- Regression campaigns never overwrite historical results: set
+  `HPCPERF_L3_RUN_SUBDIR=run.regress-<sha>` (every run.sh/validate.sh builds its
+  run directories under `build/level3/<app>/<profile>/$L3_RUN_SUBDIR`).
+- Any tool that records its process environment (CP2K's toolchain installer,
+  nsys/ncu, env-logging build systems) runs through `l3_clean_env_exec` /
+  `level3/tools/l3_clean_env.sh` (allow-listed `env -i`): the login shell carries
+  credentials that must never land in a `declare -x` dump or a profiler report.
+  Never print a full `env` into a log; report variable names only.
 
 ## Validation principles
 
