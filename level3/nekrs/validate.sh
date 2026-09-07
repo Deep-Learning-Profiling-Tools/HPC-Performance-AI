@@ -36,7 +36,7 @@ CIMODE="${HPCPERF_NEKRS_CIMODE:-2}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-2400}"
 VARIANT="${HPCPERF_NEKRS_VARIANT:-$([ "${HPCPERF_NEKRS_HYPRE_GPU:-ON}" = ON ] && echo hypregpu || echo cpucoarse)}"
 if [ "$VARIANT" = hypregpu ]; then VBD="$R/build/level3/nekrs/$MODEL"; else VBD="$R/build/level3/nekrs/$VARIANT.$MODEL"; fi
-OUT="$VBD/run/validate.cimode$CIMODE.np$N.log"
+OUT="$VBD/$L3_RUN_SUBDIR/validate.cimode$CIMODE.np$N.log"
 
 # complete CI-check counts and required coarse-solver location, per cimode
 case "$CIMODE" in

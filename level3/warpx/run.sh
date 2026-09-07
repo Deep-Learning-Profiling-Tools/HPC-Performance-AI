@@ -95,7 +95,7 @@ if [ "$CASE" = langmuir ]; then PARTS=$((2 * CELLS)); else PARTS=$((2 * CELLS));
 # l3_rundir: real runs get a fresh dir; a dry-run gets a throwaway .dryrun/ dir so it
 # can never delete or overwrite a real result directory (the old code rm -rf'd the real
 # dir before the launcher's dry-run check ever ran).
-RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$CASE.$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$BUILD_DIR/$L3_RUN_SUBDIR/$CASE.$MODE.np$N_RANKS")" || exit 2
 IN="$RUN_DIR/inputs"
 {
     echo "# derived from upstream $(realpath --relative-to="$R/_upstream/level3/WarpX" "$BASE") (HPC-Performance-AI level3/warpx/run.sh)"

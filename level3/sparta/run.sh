@@ -55,7 +55,7 @@ case "$MODE" in
             X=$((L * PX)); Y=$((L * PY)); Z=$((L * PZ)) ;;
 esac
 CELLS=$((X * Y * Z)); PARTS=$((10 * CELLS))
-RUN_DIR="$BUILD_DIR/run"
+RUN_DIR="$BUILD_DIR/$L3_RUN_SUBDIR"
 [ -n "${HPCPERF_DRY_RUN:-}" ] && RUN_DIR="$RUN_DIR/.dryrun"   # dry-run never overwrites real results
 mkdir -p "$RUN_DIR"
 LOG="$RUN_DIR/log.$MODE.np$N_RANKS.sparta"

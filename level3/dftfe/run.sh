@@ -52,7 +52,7 @@ esac
 [ -f "$PRM" ] || { echo "run.sh: $PRM missing (run fetch.sh)" >&2; exit 1; }
 LABEL="$CASE"; DERIV="verbatim"
 [ "$MODE" = weak ] && { LABEL="$CASE.x$N_RANKS"; DERIV="al-supercell x$N_RANKS (32 atoms/GPU)"; }
-RUN_DIR="$(l3_rundir "$L3_BUILD/run/$LABEL.$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$LABEL.$MODE.np$N_RANKS")" || exit 2
 for f in $(echo "$FILES" | tr ' ' '\n' | sort -u); do [ -f "$T/$f" ] || { echo "run.sh: input $T/$f missing" >&2; exit 1; }; ln -sfn "$T/$f" "$RUN_DIR/$f"; done
 if [ "$MODE" = weak ] && [ "$N_RANKS" -gt 1 ]; then
     case "$N_RANKS" in 2) REP="2 1 1" ;; 4) REP="2 2 1" ;; 8) REP="2 2 2" ;; *) echo "run.sh: weak series defined for 1/2/4/8 GPUs" >&2; exit 2 ;; esac

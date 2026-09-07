@@ -72,7 +72,7 @@ if [ "$H" -gt 0 ]; then ELEMS=$((32 * H * H * H)); else ELEMS=32; fi
 POINTS=$((ELEMS * (ORDER + 1) * (ORDER + 1) * (ORDER + 1)))
 
 # l3_rundir: dry-run gets a throwaway dir instead of rm -rf'ing the real run directory.
-RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$BUILD_DIR/$L3_RUN_SUBDIR/$MODE.np$N_RANKS")" || exit 2
 cp "$CASE_SRC"/* "$RUN_DIR"/     # complete upstream case directory (re2, usr, udf, CASEDATA include, ci.inc, par files)
 if [ "$MODE" = smoke ]; then
     sed -e "s/^numSteps *=.*/numSteps = $STEPS/" "$CASE_SRC/ethier.par" > "$RUN_DIR/ethier.par"

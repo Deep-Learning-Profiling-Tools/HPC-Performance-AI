@@ -11,5 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 rc=0
 run() { echo "=== $1"; shift; bash "$@" || { echo "=== FAILED: $*"; rc=1; }; echo; }
 run "l3 infra (correctness/reproducibility)" "$HERE/test_l3_infra.sh"
+run "second-batch checkers (negative/positive)" "$HERE/test_l3_validators.sh"
+run "Nyx strict comparator + validate.sh chain" "$HERE/test_nyx_validator.sh"
 [ $rc -eq 0 ] && echo "ALL LEVEL3 TEST GROUPS PASSED" || echo "SOME LEVEL3 TEST GROUPS FAILED"
 exit $rc

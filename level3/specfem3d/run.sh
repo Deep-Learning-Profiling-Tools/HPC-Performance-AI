@@ -63,7 +63,7 @@ MODE="$(l3_scale_mode specfem3d)" || exit 2
 BUILD_DIR="$R/build/level3/specfem3d/$MODEL"
 # l3_rundir: dry-run gets a throwaway dir (the old code rm -rf'd the real run dir before the
 # per-stage dry-run checks, deleting real seismograms/databases when only a plan was requested).
-RUN_DIR="$(l3_rundir "$BUILD_DIR/run/$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$BUILD_DIR/$L3_RUN_SUBDIR/$MODE.np$N_RANKS")" || exit 2
 mkdir -p "$RUN_DIR/OUTPUT_FILES/DATABASES_MPI"
 cp -r "$EX/DATA" "$RUN_DIR/DATA"
 PAR="$RUN_DIR/DATA/Par_file"

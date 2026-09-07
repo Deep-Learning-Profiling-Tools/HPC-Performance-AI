@@ -58,7 +58,7 @@ if [ "$MODE" != weak ]; then
     read -r PX PY PZ <<< "$TOPO"
 fi
 ELEMS=$((NX * NY * NZ))
-RUN_DIR="$(l3_rundir "$L3_BUILD/run/$LABEL.$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$LABEL.$MODE.np$N_RANKS")" || exit 2
 # Derived deck (class A): upstream smoke/benchmark deck with the mesh resolution and, for
 # the smoke+amg variant, the benchmark's LinearSolverParameters; base file copied alongside
 # so the <Included> relative reference resolves. Physics, BCs, material, time stepping and

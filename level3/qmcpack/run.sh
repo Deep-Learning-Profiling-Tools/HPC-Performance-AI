@@ -72,7 +72,7 @@ case "$MODE" in smoke) WPR=$(( (256 + N_RANKS - 1) / N_RANKS )) ;; strong) WPR=$
 if [ "$WPR" -gt "$MAXW" ] && [ -z "${HPCPERF_QMCPACK_FORCE_POPULATION:-}" ]; then
     echo "run.sh: $WPR walkers per GPU requested, above the measured limit of $MAXW for this build (device memory ~320 MB/walker; 1024 walkers on one B200 abort in cuSOLVER) -- refusing; set HPCPERF_QMCPACK_FORCE_POPULATION=1 to try anyway" >&2; exit 2
 fi
-RUN_DIR="$(l3_rundir "$L3_BUILD/run/$LABEL.$MODE.np$N_RANKS.t$THREADS")" || exit 2
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$LABEL.$MODE.np$N_RANKS.t$THREADS")" || exit 2
 DECK="$RUN_DIR/$(basename "$INP")"
 if [ "$MODE" = smoke ]; then
     cp "$INP" "$DECK"

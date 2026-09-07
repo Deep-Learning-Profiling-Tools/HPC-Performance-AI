@@ -112,7 +112,9 @@ if [ ! -f "$TC_INSTALL/.hpcperf-stage-done" ]; then
         sha256sum "${PATCHES[@]}" > "$TC_SRC/.hpcperf-patched"
     fi
     echo "# [A] toolchain: ${TC_OPTS[*]}"
-    ( cd "$TC_SRC" && unset CMAKE_GENERATOR && ./install_cp2k_toolchain.sh "${TC_OPTS[@]}" ) > "$L3_LOGS/toolchain.log" 2>&1 \
+    # the toolchain installer writes `declare -x` of its whole environment into <install>/toolchain.env:
+    # run it under the allow-listed environment so that no login-shell secret can end up in that file
+    ( cd "$TC_SRC" && unset CMAKE_GENERATOR && l3_clean_env_exec ./install_cp2k_toolchain.sh "${TC_OPTS[@]}" ) > "$L3_LOGS/toolchain.log" 2>&1 \
         || { tail -60 "$L3_LOGS/toolchain.log"; echo "build.sh: toolchain failed (log: $L3_LOGS/toolchain.log)" >&2; exit 1; }
     [ -f "$TC_INSTALL/setup" ] && [ -f "$TC_INSTALL/toolchain.conf" ] || { echo "build.sh: toolchain produced no setup/toolchain.conf under $TC_INSTALL" >&2; exit 1; }
     /usr/bin/grep -q 'GPU_ARCH_NUMBER_B200 100' "$TC_SRC/build/dbcsr-2.10.0/CMakeLists.txt" || { echo "build.sh: DBCSR CMakeLists did not receive the B200 (arch 100) entry" >&2; exit 1; }

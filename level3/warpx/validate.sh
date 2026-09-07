@@ -26,7 +26,7 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
-RUNS="$R/build/level3/warpx/$MODEL/run"
+RUNS="$R/build/level3/warpx/$MODEL/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-1800}"
 python3 -c 'import numpy' 2>/dev/null || { echo "validate.sh: python3 with numpy required for the plotfile analysis" >&2; exit 1; }
 export HPCPERF_GPUS="$N"

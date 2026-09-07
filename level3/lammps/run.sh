@@ -61,7 +61,7 @@ case "$MODE" in
             PROCS=(-var px "$PX" -var py "$PY" -var pz "$PZ") ;;
 esac
 ATOMS=$(( 4 * 20 * X * 20 * Y * 20 * Z ))
-RUN_DIR="$R/build/level3/lammps/$MODEL/run"
+RUN_DIR="$R/build/level3/lammps/$MODEL/$L3_RUN_SUBDIR"
 # A dry-run must never touch real results: it writes its derived deck and would-be
 # log into a throwaway .dryrun/ subdir instead of the real run directory.
 [ -n "${HPCPERF_DRY_RUN:-}" ] && RUN_DIR="$RUN_DIR/.dryrun"

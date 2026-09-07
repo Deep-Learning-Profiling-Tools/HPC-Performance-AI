@@ -87,7 +87,7 @@ case "$CASE" in
         LABEL="regtest.$(echo "$RT" | tr '/' '_' | sed 's/\.inp$//')" ;;
     *) echo "run.sh: HPCPERF_CP2K_CASE must be h2o or regtest" >&2; exit 2 ;;
 esac
-RUN_DIR="$(l3_rundir "$L3_BUILD/run/$LABEL.$MODE.np$N_RANKS.t$THREADS")" || exit 2
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$LABEL.$MODE.np$N_RANKS.t$THREADS")" || exit 2
 cp "$INP" "$RUN_DIR/input.inp"
 # regtest inputs may reference sibling files (basis sets, restart files) by relative name
 if [ "$CASE" = regtest ]; then for f in "$(dirname "$INP")"/*; do [ -f "$f" ] && [ "$(basename "$f")" != "$(basename "$INP")" ] && ln -sfn "$f" "$RUN_DIR/"; done; fi

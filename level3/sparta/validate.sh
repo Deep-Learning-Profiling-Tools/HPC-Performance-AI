@@ -27,7 +27,7 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
 REF="$R/_upstream/level3/sparta/bench/log.7Jul14.collide.icc.10K.1"
-RUN_DIR="$R/build/level3/sparta/$MODEL/run"
+RUN_DIR="$R/build/level3/sparta/$MODEL/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"
 [ -f "$REF" ] || { echo "validate.sh: reference log $REF missing (run fetch.sh)" >&2; exit 1; }
 

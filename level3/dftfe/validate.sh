@@ -29,7 +29,7 @@ TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-3600}"
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_DFTFE_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
 l3_paths_profile dftfe "$PROFILE"
-SRC="$R/_upstream/level3/dftfe"; RUNS="$L3_BUILD/run"; INST="$L3_INSTALL"
+SRC="$R/_upstream/level3/dftfe"; RUNS="$L3_BUILD/$L3_RUN_SUBDIR"; INST="$L3_INSTALL"
 REF="$SRC/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0"
 export HPCPERF_GPUS="$N" HPCPERF_SCALE_MODE=smoke HPCPERF_DFTFE_CASE=al_md
 mkdir -p "$RUNS"; ok=1

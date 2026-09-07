@@ -27,6 +27,15 @@ unset -f grep 2>/dev/null || true
 
 L3_R="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 L3_TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; export L3_TOOLS   # for the validators' python (l3_check.py)
+
+# L3_RUN_SUBDIR: name of the run-directory tree under each application build tree
+# ($R/build/level3/<app>/<profile>/<L3_RUN_SUBDIR>/<case>.<mode>.np<N>). Default "run".
+# HPCPERF_L3_RUN_SUBDIR=run.regress-<sha> sends a regression campaign into a fresh
+# sibling tree so that historical results are never overwritten (a plain name, no
+# path separators). run.sh and validate.sh of every application use $L3_RUN_SUBDIR.
+L3_RUN_SUBDIR="${HPCPERF_L3_RUN_SUBDIR:-run}"
+case "$L3_RUN_SUBDIR" in ""|*/*|.|..|.*) echo "l3_common: invalid HPCPERF_L3_RUN_SUBDIR '$L3_RUN_SUBDIR' (plain directory name expected)" >&2; return 2 2>/dev/null || exit 2;; esac
+export L3_RUN_SUBDIR
 HPCPERF_RUNTIME_DIR="${HPCPERF_RUNTIME_DIR:-$L3_R/level2/tools}"
 L3_LAUNCHER="$HPCPERF_RUNTIME_DIR/hpcperf_mpi_launch.sh"
 L3_TOPOLOGY="$HPCPERF_RUNTIME_DIR/hpcperf_topology.py"
@@ -76,6 +85,17 @@ l3_clean_conda_build_env() {
 
 # l3_version_mm <version string>: "13.2.78" -> "132", "13.3.0" -> "133" (profile-name component)
 l3_version_mm() { echo "$1" | awk -F. '{printf "%s%s", $1, $2}'; }
+
+# l3_clean_env_exec [--] <cmd...>
+#   Runs a command under an environment reduced to an explicit allow-list (scheduler,
+#   MPI, CUDA, compilers/build flags, conda/tool paths, HPCPERF_*, OpenMP/BLAS/UCX
+#   knobs, locale). Everything else from the login shell -- in particular API keys,
+#   tokens, agent/session variables -- is NOT passed on. Use it around every tool
+#   that dumps or records its process environment (upstream toolchain installers
+#   that write `declare -x` files, profilers such as nsys/ncu, `env`-recording
+#   build systems). The allow-list is printed by `l3_clean_env_exec --list`.
+#   Implementation: level3/tools/l3_clean_env.sh (also usable stand-alone).
+l3_clean_env_exec() { "$L3_TOOLS/l3_clean_env.sh" "$@"; }
 
 # l3_isolate_build_env: remove the Level 2 dependency prefixes (everything under
 # $L3_R/.deps/install/, the validated Level 2 tree) from CMAKE_PREFIX_PATH and

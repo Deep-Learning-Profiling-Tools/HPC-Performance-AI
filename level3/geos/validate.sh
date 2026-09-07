@@ -42,7 +42,7 @@ CURVE_TOL="${HPCPERF_GEOS_ANALYTIC_TOL:-2e-4}"  # geos-ats ||.||_2/N metric (scr
 XRANK_TOL=1e-4; XRANK_INFO=1e-5                 # relative L-inf between histories
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_GEOS_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-RUNS="$R/build/level3/geos/$PROFILE/run"; SRC="$R/_upstream/level3/GEOS"
+RUNS="$R/build/level3/geos/$PROFILE/$L3_RUN_SUBDIR"; SRC="$R/_upstream/level3/GEOS"
 PY="$R/.deps/level3/geos/$PROFILE/install/venv/bin/python"; [ -x "$PY" ] || { echo "validate.sh: FAIL -- venv python with h5py missing ($PY)"; exit 1; }
 CURVE="$SRC/inputFiles/solidMechanics/beamBending_curve.py"
 CHECK="$HERE/geos_beam_check.py"

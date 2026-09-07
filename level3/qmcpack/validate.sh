@@ -32,7 +32,7 @@ N="${HPCPERF_GPUS:-1}"; T="${HPCPERF_CPUS_PER_RANK:-8}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-3600}"
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
 l3_paths_profile qmcpack "$PROFILE"
-SRC="$R/_upstream/level3/qmcpack"; RUNS="$L3_BUILD/run"; BLD="$L3_BUILD/real"
+SRC="$R/_upstream/level3/qmcpack"; RUNS="$L3_BUILD/$L3_RUN_SUBDIR"; BLD="$L3_BUILD/real"
 REF_LE="-21.844975 0.02"   # upstream DIAMOND2_DMC_SCALARS totenergy (mean sigma) for qmc_short_vmcbatch_dmcbatch, series 1
 NSIGMA=3                    # upstream check_scalars default used by QMC_RUN_AND_CHECK
 EQUIL=2                     # upstream: -e 2 blocks of equilibration
