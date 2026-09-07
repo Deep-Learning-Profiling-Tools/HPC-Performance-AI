@@ -142,7 +142,7 @@ if [ "$N_RANKS" -gt "$BOXES" ]; then
 fi
 BALANCE=balanced; [ $((BOXES % N_RANKS)) -eq 0 ] || BALANCE="IMBALANCED ($BOXES boxes over $N_RANKS ranks)"
 
-RUN_DIR="$(l3_rundir "$L3_BUILD/run/$CASE.$MODE.np$N_RANKS")" || exit 2
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$CASE.$MODE.np$N_RANKS")" || exit 2
 IN="$RUN_DIR/inputs"
 {
     echo "# derived from upstream $(realpath --relative-to="$SRC" "$DECK") (HPC-Performance-AI level3/nyx/run.sh; profile $PROFILE)"
