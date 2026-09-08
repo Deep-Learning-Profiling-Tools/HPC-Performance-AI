@@ -15,7 +15,7 @@ redistribution, plotfile/checkpoint I/O.
 | SUNDIALS (heatcool variant only) | Nyx submodule pin `5c53be85c88f63c5201c130b8cb2c686615cfb03` = v7.2.1 |
 | Build strategy | NATIVE (CMake): private AMReX 26.09 install + Nyx via `find_package(AMReX CONFIG)`; upstream's GPU CI options (`Nyx_HYDRO=YES Nyx_MPI=YES Nyx_OMP=NO`, C++17); double-precision particles as upstream's nightly regression builds |
 | Compiler / Toolkit / MPI | conda GCC 13.3.0 (host), CUDA 13.2.78 sm_100, conda Open MPI 5.0.10 (site profile gmu-hopper: `pml ob1 / btl self,sm,smcuda`) |
-| Profiles | `cuda132-gcc133-adiabatic` (Nyx_HEATCOOL=NO), `cpu-gcc133-adiabatic` (Nyx_GPU_BACKEND=NONE reference + AMReX plotfile tools + particle_compare), `cuda132-gcc133-heatcool` (planned: SUNDIALS 7.2.1 CVODE, see status) |
+| Profiles | `cuda132-gcc133-adiabatic` (Nyx_HEATCOOL=NO), `cpu-gcc133-adiabatic` (Nyx_GPU_BACKEND=NONE reference + AMReX plotfile tools + particle_compare), `cuda132-gcc133-heatcool` + `cpu-gcc133-heatcool` (SUNDIALS 7.2.1 CVODE, see "Heating/cooling variant") |
 | Source changes | **none** (class A: build options; class A derived decks written at run time) |
 
 Layout: `.deps/level3/nyx/<profile>/{src,build,install,logs,cache}`, application
@@ -51,7 +51,7 @@ read-only source checkout tag.
 | `lya_adiabatic` smoke | `Exec/LyA/inputs.rt.garuda` | upstream's GPU regression deck **"LyA-adiabatic"** (heat_cool_type=0, strang_split=1), 32^3, shipped `32.nyx` IC, z=100, 10 steps | smoke |
 | `lya_adiabatic` strong | `Exec/LyA/inputs` with heating/cooling OFF | the flagship 64^3 Lyman-alpha science deck (shipped `64sssss_20mpc.nyx` IC, z=159) as a **named adiabatic derivative**: `nyx.heat_cool_type=0 sdc_split=0 strang_split=1`. Does **not** cover the heating/cooling LyA workload | strong |
 | `scaling_synthetic` | `Exec/Scaling/inputs` (RandomPerCell) | upstream's scaling deck; `RandomPerCell` is documented as a testing-only initialisation -> **synthetic scaling/communication test, not a science IC** | strong (fixed G^3, default 256^3) / weak (64^3 cells per rank, box and total DM mass scaled with the tiles) |
-| `lya_heatcool` | `Exec/LyA/inputs` as shipped (heat_cool_type=11, CVODE) | the heating/cooling LyA workload -- needs the `heatcool` profile (SUNDIALS) | smoke/strong -- **not built yet (status below)** |
+| `lya_heatcool` | `Exec/LyA/inputs.rt` as shipped (heat_cool_type=11, CVODE) | the heating/cooling LyA workload -- `heatcool` profile (SUNDIALS 7.2.1) | smoke (validation verdict STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING, see below) / strong (`Exec/LyA/inputs` 64^3, completeness record) |
 
 Decomposition: `amr.max_grid_size` is fixed per case (16 for 32^3/64^3 decks,
 64 for the synthetic decks) and `amr.refine_grid_layout=0` (as upstream's MiniSB
@@ -95,6 +95,18 @@ Per case, for the N-GPU run:
    strict wrapper (negative tests in `level3/tools/tests/test_nyx_validator.sh`);
    every earlier verdict was re-derived offline from the saved plotfiles with the
    strict wrapper (see "Results").
+   Box layouts (2026-09-08): the wrapper checks each plotfile's BoxArray geometrically
+   (physical extents -> cell boxes through `prob_lo`/`dx`: inside the level domain, no
+   overlap, level 0 covers the domain exactly). Identical box sets in any order are
+   compared normally; a *legal re-blocking* (the same cells partitioned differently,
+   e.g. another `amr.max_grid_size`) is reported as **UNSUPPORTED_LAYOUT** (comparator
+   exit 4, `validate.sh` exit 4: the comparison is not performed, the case is neither
+   PASS nor FAIL -- cross-BoxArray comparison would need `fcompare --allow_diff_grids`
+   and is not enabled here); a missing box, an overlap, a coverage deficit or different
+   covered cell sets at a level are STRUCTURAL failures (FAIL). All runs in this README
+   use the run.sh-fixed `max_grid_size`, so every real comparison so far had identical
+   box arrays (the 2026-09-08 offline re-check of the 2026-09-07 regression plotfiles
+   reports "identical box array" for every pair).
    Particles: AMReX's `particle_compare` needs identical headers (incl.
    `next_id` and per-file layout, i.e. the same rank count) and returns 0 even
    when it prints "FAIL - Particle data headers do not agree" -> across rank
@@ -128,6 +140,24 @@ accepts embedded CUDA ELF).
 
 (The `Temp` field carries the largest relative differences; MiniSB at 4 GPUs is
 the closest to the official tolerance, 1.4e-10 vs 2e-10.)
+
+**Joint-HEAD regression, 2026-09-07 (code state `fc4d2a1`; run trees
+`build/level3/nyx/<profile>/run.regress-fc4d2a1/`, logs
+`build/level3/nyx/regress-fc4d2a1/validate_full.hc{NO,YES}.np{1,2,4}.log` +
+`queue_nyx.log`)**: the same decks re-run from scratch with the strict wrapper,
+new run ids, the historical `run/` trees untouched. Six `validate.sh` calls:
+
+| GPUs | Cases | vs rerun / 1-GPU (tol) | vs CPU (tol) | DM particles | audit | validate.sh exit / class |
+|---|---|---|---|---|---|---|
+| 1 | minisb, lya_adiabatic | 1.6e-11, 6.1e-14 (2e-10) | 5.2e-11, 8.7e-14 (1e-8) | <= 9.8e-16, counts exact | 1 verified | 0 **PASS** |
+| 2 | minisb, lya_adiabatic | 2.2e-11, 6.5e-14 (2e-10) | 7.4e-11, 8.7e-14 (1e-8) | exact | 2 verified | 0 **PASS** |
+| 4 | minisb, lya_adiabatic | 1.2e-11, 6.0e-14 (2e-10) | 6.5e-11, 9.6e-14 (1e-8) | exact | 4 verified | 0 **PASS** |
+| 1 | lya_heatcool | state 1.4e-13 (5e-5); I_R rel 1.24 (reported) | state 1.9e-13; I_R rel 1.26 | 8.8e-16, exact | 1 verified | 3 **STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING** |
+| 2 | lya_heatcool | state 1.4e-13; I_R rel 1.40 | state 1.9e-13; I_R rel 1.26 | exact | 2 verified | 3 **STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING** |
+| 4 | lya_heatcool | state 1.2e-13; I_R rel 1.40 | state 1.9e-13; I_R rel 1.46 | exact | 4 verified | 3 **STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING** |
+
+The three heat/cool calls are counted as PENDING, not as passes (exit-code classes:
+`level3/tools/l3_verdict.py`).
 
 Scaling runs (COMPLETED, 10 steps, not correctness-validated; timing = Nyx
 "Run time", includes IC read and I/O; too short for a performance statement):
@@ -217,24 +247,45 @@ From the fixed source (Nyx `e06eabc1`, `Source/HeatCool/f_rhs_struct.H`,
   354-step comparison is in a regime where ||I_R|| ~ 6e18 (physical reaction term
   dominant) -- there a relative tolerance is meaningful; at step 10 it is not.
 - Reproducibility: between the 1-GPU run and its identical rerun, and vs the 2-GPU,
-  4-GPU and CPU runs, max|dI_R| = 0.27-0.33 (relative 0.97-1.17), spread over
-  78-100 % of the cells; the differences are uncorrelated with the (1e-13 relative)
-  state differences (corr(dI_R, d rho_e) = -0.006; dt a_half dI_R / a_end^2 would be
-  a 8e6 change of rho_E, nothing of the kind is present: rho_E agrees to 1e-15).
-  Whether the variability comes from the CVODE per-cell solution at its tolerance
-  (`sundials_reltol/abstol` 1e-4 defaults), from the batched host-device buffers
-  (`rho_init_vode`, `rhoe_src_vode`, `e_src_vode`) or from something else is
-  **not identified** from the plotfiles; a race or an uninitialised read is
-  neither shown nor excluded.
-- Consequence: an energy-consistent absolute criterion of the form
-  |dI_R| <= tol_state * max(a^2 rho e)/(dt a_half) (5e-5 * 3.7e2 = 1.9e-2) is
-  **violated** by the observed 0.29, so no criterion derived from the state
-  tolerance accepts the field, and "exclude it and PASS" is not a criterion. The
-  validator therefore reports `I_R` (parsed, finite, not gated) and downgrades the
-  case to I_R_CHECK_PENDING. Resolving it needs a run with per-step plotfiles (or
-  the SDC_IR/hydro-source intermediates) to attribute the variation to a term, and
-  a regime (more steps, lower z) where the reaction term is physical; neither was
-  run in the 2026-09-07 round. Historical run directories are untouched.
+  4-GPU and CPU runs, max|dI_R| = 0.27-0.33 (relative 0.97-1.46 over the two
+  campaigns), spread over 78-100 % of the cells; within the 10 steps the differences
+  are uncorrelated with the (1e-13 relative) state differences (corr(dI_R, d rho_e)
+  = -0.006; the observed dI_R would correspond, through the predictor coupling
+  dt a_half dI_R / a_end^2, to a change of rho_E of order 8e6 code units if it acted
+  fully, and nothing of the kind is present in the final state: rho_E agrees to
+  1e-15). This is an observation over 10 steps of a deck in which the net
+  heating/cooling is negligible. **It does not show that the I_R variation has no
+  effect on later steps**: I_R is consumed by the next step's hydro predictor and in
+  the SDC branch it is the increment applied to (rho e)/(rho E), so it is a
+  state-carried coupling term with an unresolved reproducibility question -- not a
+  diagnostic field that has been shown to be irrelevant. Whether the variability
+  comes from the CVODE per-cell solution at its tolerance (`sundials_reltol/abstol`
+  1e-4 defaults), from the batched host-device buffers (`rho_init_vode`,
+  `rhoe_src_vode`, `e_src_vode`) or from something else is **not identified** from
+  the plotfiles; a race or an uninitialised read is neither shown nor excluded.
+- Diagnostic estimate (not a verified error bound): if one asks how large a
+  per-cell change of I_R could be before the next step's energy update moves out of
+  the state tolerance, the linear one-step coupling gives
+  `|dI_R|_max ~ tol_state * max_cells|a^2 rho e| / (dt * a_half)`
+  with tol_state = 5e-5 (the heat/cool state tolerance), `max|a^2 rho e|/(dt a_half)`
+  = 3.7e2 read from the saved plt00010 of the 1-GPU run (Nyx code units: rho e in
+  comoving M_sun/Mpc^3 (km/s)^2, dt the runlog `dt` of step 10 = 2.99e5 code time
+  units, a = 0.01094 at z = 90.4, a_half the mid-step value), i.e. **~1.9e-2 in the
+  units of I_R (energy density per code time)**. Assumptions: linear one-step
+  coupling only, no amplification over later steps, the maximum-|a^2 rho e| cell
+  as the worst case, and a single tolerance for all cells. The observed
+  |dI_R| = 0.28-0.33 exceeds this estimate ~15x, so no criterion derived from the
+  state tolerance accepts the field; and "exclude it and PASS" is not a criterion.
+  The estimate is recorded to show why no tolerance is set, not as a proven bound.
+- Consequence: the validator reports `I_R` (parsed, finite, not gated) and
+  downgrades the case to I_R_CHECK_PENDING (exit 3). The heat/cool deck is
+  therefore **not** in the count of full correctness passes and its timings do not
+  enter a performance summary. Resolving it needs, at the original configuration,
+  CPU-vs-CPU and GPU-vs-GPU repeat runs of I_R, a run with per-step plotfiles (or
+  the SDC_IR/hydro-source intermediates) to attribute the variation to a term, an
+  independent tolerance comparison, and a regime (more steps, lower z) where the
+  reaction term is physical. None of this was run in the 2026-09-07/08 rounds;
+  historical run directories are untouched.
 
 Heat/cool strong scaling (`Exec/LyA/inputs` 64^3, `amr.max_grid_size=16` -> 64
 boxes, 10 steps) and the 8/40/80-GPU dry-runs: 8 ranks planned (2 hypothetical

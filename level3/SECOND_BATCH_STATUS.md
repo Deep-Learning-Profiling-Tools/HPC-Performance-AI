@@ -4,10 +4,14 @@ Branch `level3/second-batch-bringup` (worktree `HPC-Performance-AI-b2`, from the
 first-batch checkpoint `366b72f`). Node dgx003 (4x B200, CUDA 13.2.78, conda
 Open MPI 5.0.10, system GCC 14.2.1 / conda GCC 13.3.0), Slurm job 9552083.
 Everything below was produced on that allocation between 2026-09-05 and
-2026-09-06; nothing was pushed, no PR, no merge. Last update: **2026-09-06 05:25 UTC --
-batch complete: all five applications VALIDATED_PASS at 1/2/4 GPUs; open items are listed
-per application (QMCPACK walker-memory anomaly, GEOS flow/well unit tests, size of the
-official GEOS/Nyx decks).**
+2026-09-08. Last update: **2026-09-08 -- CP2K, QMCPACK, DFT-FE, GEOS VALIDATED_PASS at
+1/2/4 GPUs (results of 2026-09-05/06, commits listed at the end); Nyx MiniSB and
+LyA-adiabatic VALIDATED_PASS at 1/2/4 GPUs (re-run 2026-09-07 at the joint HEAD), Nyx
+LyA heat/cool STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (not a full pass, see
+`nyx/README.md`); open items per application (QMCPACK walker-memory anomaly, GEOS
+flow/well unit tests, Nyx I_R, size of the official GEOS/Nyx decks).** The branch is
+being submitted as a Draft PR; see "Joint-HEAD regression" below for what was and was
+not re-run.
 
 States: `PLANNED` (not started) / `NOT_RUN` (deliberately not run, reason given) /
 `BUILD_PASS` / `COMPLETED` (ran to completion, timings or plans recorded, no
@@ -18,7 +22,7 @@ correctness claim) / `VALIDATED_PASS` (validate.sh PASS) / `FAILED` / `BLOCKED` 
 
 | Application | Selected version / SHA | Build strategy | Compiler / Toolkit | Dependency probe | CUDA build | 1-GPU smoke | 2-GPU correctness | 4-GPU correctness | Strong | Weak / size sweep | 40/80 dry-run | Multi-node | HIP | Source changes | Blocker |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Nyx | 26.09 `e06eabc1` + external AMReX 26.09 `a52ca733` (+ SUNDIALS 7.2.1 for heat/cool) | NATIVE, per-profile AMReX/SUNDIALS | conda GCC 13.3.0 + nvcc 13.2.78, sm_100 | COMPLETED (AMReX archs = sm_100 verified; SUNDIALS CUDA examples 5/6, see README) | BUILD_PASS (2 profiles + CPU reference profiles) | VALIDATED_PASS (MiniSB, LyA-adiabatic, LyA heat/cool) | VALIDATED_PASS | VALIDATED_PASS | COMPLETED (LyA 64^3 adiabatic; synthetic 256^3; heat/cool LyA 64^3: 2.85/2.62/2.65 s on 1/2/4 GPUs -- too small to scale, fixed-cost dominated) | COMPLETED (synthetic 64^3/rank, labelled synthetic) | COMPLETED (8/40/80 planned or refused as designed) | BLOCKED (site) | NOT_RUN (no ROCm) | none (class A) | large ICs not public |
+| Nyx | 26.09 `e06eabc1` + external AMReX 26.09 `a52ca733` (+ SUNDIALS 7.2.1 for heat/cool) | NATIVE, per-profile AMReX/SUNDIALS | conda GCC 13.3.0 + nvcc 13.2.78, sm_100 | COMPLETED (AMReX archs = sm_100 verified; SUNDIALS CUDA examples 5/6, see README) | BUILD_PASS (2 profiles + CPU reference profiles) | VALIDATED_PASS (MiniSB, LyA-adiabatic); LyA heat/cool **STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING** (exit 3, not a pass) | VALIDATED_PASS (adiabatic decks); heat/cool PENDING | VALIDATED_PASS (adiabatic decks); heat/cool PENDING | COMPLETED (LyA 64^3 adiabatic; synthetic 256^3; heat/cool LyA 64^3: 2.85/2.62/2.65 s on 1/2/4 GPUs -- too small to scale, fixed-cost dominated; the heat/cool timings are completeness records of a PENDING case) | COMPLETED (synthetic 64^3/rank, labelled synthetic) | COMPLETED (8/40/80 planned or refused as designed) | BLOCKED (site) | NOT_RUN (no ROCm) | none (class A) | large ICs not public |
 | CP2K | v2026.2 `67b5da87`; DBCSR 2.10.0; toolchain OpenBLAS 0.3.33 | NATIVE + upstream toolchain (B200 back-port patch) | system GCC 14.2.1 + nvcc 13.2.78, sm_100 | COMPLETED (DBCSR ctest 19/19 on 4 GPUs) | BUILD_PASS (attempt 3: toolchain OpenBLAS via rpath order; attempts 1-2 resolved BLAS to the conda pthreads OpenBLAS -- archived under `install/ATTEMPT-*`) | VALIDATED_PASS (attempt-3 binary: regtests within upstream tol, H2O-64 MD 10/10 SCF converged) | VALIDATED_PASS (max FORCE_EVAL diff 1.1e-11 Ha vs 1 GPU) | VALIDATED_PASS (8.6e-12 Ha) | COMPLETED (H2O-128, 10 MD steps: 119.8 / 90.8 / 60.0 s on 1/2/4 GPUs = 1.32x / 2.0x; 8 OpenMP threads per rank) | COMPLETED (size sweep, 32 waters per GPU: H2O-32 on 1 GPU 17.3 s, H2O-64 on 2 GPUs 32.9 s, H2O-128 on 4 GPUs 62.8 s -- the GPW cost per molecule grows with system size, so this is a size sweep, not an iso-efficiency series) | COMPLETED (8/40/80 strong planned; weak 40/80 REFUSED: no upstream H2O-1280/2560 deck) | BLOCKED (site) | NOT_RUN | toolchain patch (class B) + node adaptations (C) | none |
 | QMCPACK | v4.4.0 `2601d62e`; LLVM 23.1.0, HDF5 1.14.5, Boost 1.90 | NATIVE + private LLVM offload toolchain | clang 23.1.0 (host) + nvcc 13.2.78, `QMC_GPU=openmp;cuda` sm_100 | COMPLETED (offload probe PASS 1/2/4 ranks; unit ctests 64/64; deterministic diamond ctests 526/526) | BUILD_PASS (982 s) | VALIDATED_PASS (DMC E = -21.8492 +- 0.0152 vs ref -21.844975 +- 0.02, -0.32 sigma) | VALIDATED_PASS (-21.8566 +- 0.0126; -0.58 sigma vs ref, 0.37 sigma vs 1-GPU) | VALIDATED_PASS (-21.8313 +- 0.0105; +0.68 sigma vs ref, 0.97 sigma vs 1-GPU) | FAILED at 4096 walkers (cuSOLVER INTERNAL_ERROR: device memory ~320 MB/walker exhausted, see README) -> COMPLETED with the verbatim 256-walker deck over 1/2/4 GPUs: 534 / 332 / 211 s (1.61x, 2.53x; the validation runs of the same deck: 316/254 s); DMC energies -21.8365 +- 0.0088 / -21.8511 +- 0.0100 Ha, upstream check_scalars pass | FAILED at 1024 walkers/GPU (same cause) -> COMPLETED with 256 walkers/GPU: 534 / 632 / 656 s on 1/2/4 GPUs (84 % / 81 % weak efficiency; 512 and 1024 walkers in total), DMC -21.8466 +- 0.0077 / -21.8433 +- 0.0034 Ha (error bars shrink as 1/sqrt(walkers) as they should), check_scalars pass | COMPLETED (8/40/80 planned, HYPOTHETICAL) | BLOCKED (site) | NOT_RUN | none (class A); HDF5 zlib discovery flag (C) | NiO datasets external |
 | DFT-FE | 1.2.0 `7147faa5`; deal.II **9.6.2** (9.7.1 attempt failed: API removals), ELPA 2026.02.001 (sm_100 kernels), p4est 2.8.7 | NATIVE (install_DFTFE recipe transcribed) | system GCC 14.2.1 + nvcc 13.2.78, sm_100 | COMPLETED (ELPA GPU probe PASS: ELPA's analytic 1-stage and 2-stage GPU eigensolver tests on 1/2/4 GPUs, max eigenvalue error <= 7.3e-15 (tol 5e-14), eigenvector error <= 1.0e-11 (tol 6e-10), GPU timers present, audit 0 mismatch; two earlier probe versions mis-parsed -- recorded) | BUILD_PASS (deal.II 9.6.2 rebuild + 2-line `std::isnan` patch) | VALIDATED_PASS (al_md 32-atom BOMD, 4 steps, vs upstream's GPU reference: e0, MD energies, temperatures, forces identical at printed precision, d = 0.0) | VALIDATED_PASS (identical to the reference and to the 1-GPU run) | VALIDATED_PASS (identical) | COMPLETED (LLZO 192 atoms / 720 states: 295 / 163 / 96 s on 1/2/4 GPUs = 1.81x / 3.07x; E = -3579.26588980 Ha identical on 1/2/4 GPUs) | COMPLETED (derived Al supercells, 32 atoms per GPU: 32 / 64 / 128 atoms on 1/2/4 GPUs: 213 / 284 / 378 s -- KS-DFT cost grows superlinearly with atoms, SYNTHETIC series labelled as such) | COMPLETED (8/40/80 planned, HYPOTHETICAL) | BLOCKED (site) | NOT_RUN | 2-line `std::isnan` patch (D); p4est-setup.sh + ELPA configure adaptations (C) | ELPA CPU cross-check programs not built with the GPU configuration (SKIPPED, recorded) |
@@ -26,19 +30,30 @@ correctness claim) / `VALIDATED_PASS` (validate.sh PASS) / `FAILED` / `BLOCKED` 
 
 ## Per application
 
-### Nyx -- `level3/nyx/` (commits 769482f, 1f7e14f)
+### Nyx -- `level3/nyx/` (commits 769482f, 1f7e14f, c7b90f9; validator rework f231217, fc4d2a1 and the 2026-09-08 layout/verdict commit)
 
 Official decks (MiniSB `inputs.32 nyx.ppm_type=0`, LyA `inputs.rt.garuda`, LyA
 heat/cool `inputs.rt`, 10 steps as in upstream's nightly GPU suite) on 1/2/4 GPUs;
-criteria: completeness/finiteness, `fcompare -n 0 --rel_tol` at upstream's
-tolerances (2e-10; 5e-5 for heat/cool with the integrator-rate diagnostic `I_R`
-excluded and reported), DM particle identity tracking across rank counts
-(`nyx_particle_compare.py` -- AMReX's own tool cannot compare different rank
-counts), CPU-backend cross-reference (1e-8 pre-fixed), baryon mass conservation
-1e-9. Strong/weak/dry-run numbers and the full derivation are in
-`level3/nyx/README.md` (heat/cool LyA 64^3 strong: 2.85 / 2.62 / 2.65 s on 1/2/4
-GPUs -- too small to scale; dry-runs 8 planned, 40 IMBALANCED, 80 refused as designed).
-Nothing remaining.
+criteria: completeness/finiteness, the strict `nyx_fcompare_check.py` wrapper around
+`fcompare -n 0 --rel_tol` (Header/box-layout structure, raw finiteness, one parsed row
+per variable, zero-reference rule, parser/tool consistency) at MiniSB's official
+tolerance 2e-10 (applied to LyA-adiabatic as well, a project choice stricter than
+upstream's 5e-9) and 5e-5 for heat/cool (upstream's plt00354 tolerance, adopted on
+2026-09-06 after a first heat/cool run at 2e-10 FAILED), DM particle identity tracking
+across rank counts (`nyx_particle_compare.py` -- AMReX's own tool cannot compare
+different rank counts), CPU-backend cross-reference (1e-8 pre-fixed), baryon mass
+conservation 1e-9. **Heat/cool**: the SDC reaction-integral field `I_R` -- consumed by
+the next step's hydro predictor -- varies O(1) relative between any two runs of the
+10-step deck while every state field agrees to 1e-13; no criterion derived from the
+state tolerance accepts it and its mechanism is not identified, so the case verdict is
+`STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING` (validate.sh exit 3), not a full pass, and
+it is excluded from the correctness-pass count and from any performance summary.
+Strong/weak/dry-run numbers and the full derivation are in `level3/nyx/README.md`
+(heat/cool LyA 64^3 strong: 2.85 / 2.62 / 2.65 s on 1/2/4 GPUs -- too small to scale, a
+completeness record of a PENDING case; dry-runs 8 planned, 40 IMBALANCED, 80 refused as
+designed). **Remaining**: the I_R question (CPU-vs-CPU and GPU-vs-GPU repeats at the
+original configuration, per-step attribution, an independent tolerance comparison) --
+not attempted in this round.
 
 ### CP2K -- `level3/cp2k/` (commit b04db93)
 
@@ -211,7 +226,44 @@ to 3.6e-12.
 - Shared infra changes (committed separately): `l3_paths_profile`, `l3_version_mm`,
   `l3_clean_conda_build_env`, real-grep guard, cuobjdump-based backend check for
   statically linked cudart (9327c26, 0b9daaf); validator negative tests
-  `level3/tools/tests/test_l3_validators.sh` (352cbb3).
+  `level3/tools/tests/test_l3_validators.sh` (352cbb3); 2026-09-07/08:
+  `HPCPERF_L3_RUN_SUBDIR` (regression run trees that never overwrite `run/`),
+  `l3_clean_env.sh`/`l3_clean_env_exec` (allow-listed `env -i` with a credential
+  deny-rule, used by CP2K's toolchain installer), `l3_run_recorded` + `l3_verdict.py`
+  (queue steps record their exit code and continue; classes PASS / PENDING /
+  UNSUPPORTED_LAYOUT / FAIL / MISSING, exit 3 and 4 never counted as PASS), all with
+  CPU tests in `level3/tools/tests/run_all.sh`.
+
+## Joint-HEAD regression (2026-09-07, code state `fc4d2a1`)
+
+After the shared-helper change (every `run.sh`/`validate.sh` builds its run directory
+under `$L3_RUN_SUBDIR`) and the Nyx validator rework, the following was re-run on
+dgx003 at the joint HEAD with `HPCPERF_L3_RUN_SUBDIR=run.regress-fc4d2a1` (new run
+ids, historical `run/` trees untouched; logs `build/level3/regress-firstbatch-fc4d2a1/`
+and `build/level3/nyx/regress-fc4d2a1/`, summary `SUMMARY_TABLE.md` produced by
+`l3_verdict.py`):
+
+| Scope | validate.sh calls | Result |
+|---|---|---|
+| First batch: LAMMPS, SPARTA, WarpX, SPECFEM3D smoke at 1/2/4 GPUs | 12 | 12 PASS |
+| nekRS ethier: hypregpu cimode 2 and 3, cpucoarse cimode 2, each at 1/2/4 GPUs | 9 | 9 PASS |
+| Nyx MiniSB + LyA-adiabatic at 1/2/4 GPUs | 3 | 3 PASS |
+| Nyx LyA heat/cool at 1/2/4 GPUs | 3 | 3 STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (exit 3) |
+| **Total** | **27** | **24 PASS, 3 PENDING, 0 FAIL** -- not "all PASS" |
+
+Launcher audits: 33 audit lines, 0 mismatch; four logs contain unverified ranks
+(SPARTA np1 0/0/1, SPARTA np2 0/0/2, WarpX np1 second run 0/0/1, WarpX np2 second run
+1/0/1 -- runs shorter than 0.3 s that the nvidia-smi sampling missed): a GPU-binding
+evidence gap for those runs, not a correctness signal; their correctness comes from the
+validator output, the binding evidence from the np4 and the other runs.
+**Not re-run on the GPU in this round**: CP2K, QMCPACK, DFT-FE, GEOS -- their change is
+the one-line run-directory variable; their validation status above is the historical
+result of 2026-09-05/06 (commits listed below), and their checkers are covered offline
+by `test_l3_validators.sh`. A GPU regression of these four under the new directory
+logic is a listed follow-up. CPU test suites at the same HEAD: `level3/tools/tests/run_all.sh`
+(four groups) and `level2/tools/tests/run_all.sh` (topology self-test, deps markers,
+env dep profiles, launcher dry-run, run.sh guards; test scripts last changed in 7f79d9c,
+2026-09-04) all pass -- this says nothing about the open items listed per application.
 - Private Toolkit/compiler exceptions: none for the CUDA Toolkit (13.2.78
   everywhere); private compilers: LLVM 23.1.0 for QMCPACK (required by upstream's
   GPU path), system GCC 14.2.1 (CP2K, DFT-FE, GEOS: one compiler for C/C++/Fortran)
@@ -228,7 +280,7 @@ to 3.6e-12.
   dry-runs under `.dryrun/`.
 - Patches: `level3/<app>/patches/*.patch` (header: source, rationale, conditions, impact, verification).
 
-## Local commits on `level3/second-batch-bringup` (no push)
+## Commits on `level3/second-batch-bringup`
 
 366b72f first-batch checkpoint; tools 9327c26 (per-profile paths, static-cudart
 backend check), 0b9daaf (conda build variables cleared, real grep), 32e25e9 (foreign
@@ -237,5 +289,9 @@ Nyx 769482f, 1f7e14f, c7b90f9; CP2K b04db93, 7408614 (toolchain OpenBLAS relink 
 BLAS guard); QMCPACK 166657e, 1e5d00d (population guard, 256-walker series); DFT-FE
 62f48e5, e91119c (ELPA probe fixed, validation 1/2/4 PASS); GEOS e354870 (build +
 beam validation), fbaa962 (unit-test probe findings); documentation commit (this
-file, `APPLICATION_AUDIT.md`, `BUILD_STRATEGY.md`) last. Nothing pushed, no PR, no
-merge; `main` untouched.
+file, `APPLICATION_AUDIT.md`, `BUILD_STRATEGY.md`); 2026-09-07: 6711980 (clean-env
+wrapper, `HPCPERF_L3_RUN_SUBDIR`), f231217 (Nyx strict comparator, PENDING verdict,
+tolerance provenance), fc4d2a1 (Nyx run.sh run-dir variable), 74c1d4d (CLAUDE.md);
+2026-09-08: box-layout classification, verdict classes, credential deny-rule, this
+status. The branch (first batch + second batch + shared helpers) is submitted as a
+Draft PR against `main` on 2026-09-08; no merge.

@@ -75,7 +75,8 @@ level3/<app>/
   fetch.sh      pinned upstream + dependency sources (tag/SHA, sha256 for tarballs) into _upstream/ and .deps downloads
   build.sh      idempotent, stage-marked (.hpcperf-stage-done), per-profile, writes BUILD_INFO.txt + .hpcperf-l3-fingerprint
   run.sh        [CUDA] [args]; cases via HPCPERF_<APP>_CASE; modes smoke|strong|weak; writes run_manifest.txt
-  validate.sh   [CUDA]; HPCPERF_GPUS=N; prints the criteria and PASS/FAIL, exit 0/1
+  validate.sh   [CUDA]; HPCPERF_GPUS=N; prints the criteria and the verdict; exit 0 PASS, 1 FAIL,
+                3 PENDING (Nyx heat/cool I_R_CHECK_PENDING), 4 UNSUPPORTED_LAYOUT (Nyx) -- only 0 is a pass
   <app>_check.py  the numeric checker (uses level3/tools/l3_check.py: require_finite, ValidationError)
   patches/      *.patch with header: source, rationale, conditions, impact, verification, class
   README.md     provenance, versions, node adaptations, cases, criteria, RESULTS with dates
@@ -107,9 +108,16 @@ level3/<app>/
   run directories under `build/level3/<app>/<profile>/$L3_RUN_SUBDIR`).
 - Any tool that records its process environment (CP2K's toolchain installer,
   nsys/ncu, env-logging build systems) runs through `l3_clean_env_exec` /
-  `level3/tools/l3_clean_env.sh` (allow-listed `env -i`): the login shell carries
-  credentials that must never land in a `declare -x` dump or a profiler report.
-  Never print a full `env` into a log; report variable names only.
+  `level3/tools/l3_clean_env.sh` (allow-listed `env -i` plus a credential
+  deny-rule that beats the allow-list): the login shell carries credentials that
+  must never land in a `declare -x` dump or a profiler report. Never print a full
+  `env` into a log; report variable names only. The common launcher/run.sh path
+  is NOT wrapped yet (follow-up): do not profile a science run with nsys/ncu
+  without the wrapper.
+- Queues: run every step through `l3_run_recorded <rc-file> <label> -- cmd`
+  (records the exit code, never aborts), classify with `level3/tools/l3_verdict.py`
+  (PASS / PENDING / UNSUPPORTED_LAYOUT / FAIL / MISSING). Exit 3 and 4 are never
+  PASS and never enter a performance summary; report their counts separately.
 
 ## Validation principles
 
@@ -201,23 +209,30 @@ Build systems
   FAIL; WarpX 26.09 uses CODATA 2022; single-node smcuda GPU-aware MPI is 3x
   slower for WarpX but 2.5x faster for LAMMPS -- record, don't generalise.
 
-## Current state (2026-09-06)
+## Current state (2026-09-08)
 
 - Level 1: 50/50 validated. Level 2: 19/20 (MiniEM/Trilinos pending the user);
   10 MPI apps verified at 4 ranks x 4 B200; scale-out launcher in place.
-- Level 3 first batch (`level3/full-apps-bringup`): LAMMPS, SPARTA, WarpX,
-  SPECFEM3D, nekRS validated at 1/2/4 GPUs. Second batch
-  (`level3/second-batch-bringup`, worktree `-b2`): Nyx, CP2K, QMCPACK, DFT-FE,
-  GEOS validated at 1/2/4 GPUs -- `level3/SECOND_BATCH_STATUS.md`.
+- Level 3 (`level3/second-batch-bringup`, worktree `-b2`, contains the first
+  batch): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx (adiabatic decks), CP2K,
+  QMCPACK, DFT-FE, GEOS validated at 1/2/4 GPUs; Nyx heat/cool is
+  STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (not a pass). Joint-HEAD regression
+  2026-09-07 at `fc4d2a1`: 27 validate calls = 24 PASS + 3 PENDING (first batch,
+  nekRS variants, Nyx); CP2K/QMCPACK/DFT-FE/GEOS not re-run on GPU since then
+  (historical 2026-09-05/06 results) -- never write "Level 3 fully accepted" or
+  "all tests PASS". Status: `level3/README.md`, `level3/SECOND_BATCH_STATUS.md`.
 - Remote (`origin`): `main` = PR #3 (`level3/apps`, Level 3 prep); branches
-  `level2/miniapps`, `level3/apps`, `infra/launcher-correctness` are pushed.
-  **Local only**: `level3/full-apps-bringup` (first batch, 2 commits on top of
-  `main`) and `level3/second-batch-bringup` (second batch, 16 more) -- the user
-  decides when they are pushed or turned into PRs.
-- Open items the user must decide on: QMCPACK per-walker device-memory anomaly;
-  GEOS compositional-flow/well unit tests failing on the GPU build (modules
-  UNVERIFIED); official Nyx/GEOS decks too small to show scaling; MiniEM/Trilinos
-  for Level 2; pushing/PRs for the two Level 3 branches.
+  `level2/miniapps`, `level3/apps`, `infra/launcher-correctness` pushed;
+  `level3/second-batch-bringup` pushed on 2026-09-08 as a Draft PR against
+  `main` (not merged). The main worktree checkout stays on
+  `level3/full-apps-bringup` @ 366b72f.
+- Open items (follow-ups, none resolved): Nyx I_R (CPU-vs-CPU and GPU-vs-GPU
+  repeats at the original configuration, independent tolerance comparison);
+  GEOS compositional-flow/well unit tests (modules UNVERIFIED); QMCPACK
+  per-walker device memory / cuSOLVER (<= 300 walkers/GPU); numerical acceptance
+  of strong/weak runs; multi-node and HIP; a GPU regression of CP2K/QMCPACK/
+  DFT-FE/GEOS under the run-directory logic; wrapping the run/profiler path in
+  the clean environment; MiniEM/Trilinos for Level 2.
 
 ## Reporting
 
