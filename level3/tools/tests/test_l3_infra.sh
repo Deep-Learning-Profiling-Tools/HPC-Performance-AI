@@ -85,6 +85,28 @@ show="$(HPCPERF_SELFTEST_TOKEN=secretvalue "$CE" --show -- true 2>&1)"
 echo "$show" | /usr/bin/grep -q secretvalue && bad "6e: --show printed a value" || ok "6e: --show prints names only"
 echo "$show" | /usr/bin/grep -q 'denied by the credential rule: .*HPCPERF_SELFTEST_TOKEN' && ok "6f: --show names the denied variable" || bad "6f: denied variable not reported"
 
+# 8. lock-file queries used by build.sh (source identity comes from provenance/source.lock*.yaml, never from git)
+mkdir -p "$TMP/bench/provenance"
+cat > "$TMP/bench/provenance/source.lock.yaml" <<'EOF'
+upstream: {url: u, tag: t, commit: aaaa1111}
+materialized_tree: {sha256: tree9999, layout: [src/, deps/]}
+patches:
+  - {path: patches/0001-a.patch, sha256: x}
+  - {path: patches/0002-b.patch, sha256: y}
+components:
+  - {dest: src, kind: git, commit: aaaa1111, submodules: [{path: sub/one, commit: cccc3333}]}
+  - {dest: deps/dep, kind: git, commit: bbbb2222}
+EOF
+[ "$(l3_source_commit "$TMP/bench")" = aaaa1111 ] && ok "8a: l3_source_commit reads upstream.commit" || bad "8a: $(l3_source_commit "$TMP/bench")"
+[ "$(l3_source_tree_sha "$TMP/bench")" = tree9999 ] && ok "8b: l3_source_tree_sha reads materialized_tree.sha256" || bad "8b"
+[ "$(l3_component_commit "$TMP/bench" deps/dep)" = bbbb2222 ] && ok "8c: l3_component_commit finds a deps component" || bad "8c"
+[ "$(l3_submodule_commit "$TMP/bench" src sub/one)" = cccc3333 ] && ok "8d: l3_submodule_commit finds a bundled submodule" || bad "8d"
+[ "$(l3_lock_patches "$TMP/bench")" = "0001-a.patch 0002-b.patch" ] && ok "8e: l3_lock_patches lists the series in order" || bad "8e: $(l3_lock_patches "$TMP/bench")"
+rc=0; l3_require_materialized "$TMP/bench" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 3 ] && ok "8f: l3_require_materialized fails (exit 3) without src/" || bad "8f: rc=$rc"
+printf 'variant: hypregpu\n' > "$TMP/bench/.hpcperf-materialized.yaml"
+[ "$(l3_materialized_variant "$TMP/bench")" = hypregpu ] && ok "8g: l3_materialized_variant reads the marker" || bad "8g"
+
 # 7. l3_run_recorded: records the real exit code of a queue step and never aborts the caller
 rcf="$TMP/rc.txt"; steps=0
 ( set -e; for r in 0 3 0; do l3_run_recorded "$rcf" "step$r" -- bash -c "exit $r"; echo step >> "$TMP/steps"; done )

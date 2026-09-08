@@ -5,7 +5,7 @@
 #     $R/.deps/level3/<app>/{src,build,install,logs}
 # (never a shared install root, so Kokkos/AMReX/MPI/hypre versions of
 # different applications cannot pollute each other), plus its upstream
-# checkout under $R/_upstream/level3/<Name> and its own build tree under
+# frozen source bundle materialized under level3/<app>/{src,deps} (freeze input: $R/_upstream/level3/<Name>) and its own build tree under
 # $R/build/level3/<app>/<backend>. Nothing here touches the Level 2 tree.
 #
 # Fingerprint: an install is stamped with .hpcperf-l3-fingerprint recording
@@ -96,6 +96,52 @@ l3_version_mm() { echo "$1" | awk -F. '{printf "%s%s", $1, $2}'; }
 #   build systems). The allow-list is printed by `l3_clean_env_exec --list`.
 #   Implementation: level3/tools/l3_clean_env.sh (also usable stand-alone).
 l3_clean_env_exec() { "$L3_TOOLS/l3_clean_env.sh" "$@"; }
+
+# l3_require_materialized <benchmark-dir>
+#   Level 3 application source lives INSIDE the benchmark directory (<dir>/src, <dir>/deps), materialized
+#   from the frozen source bundle by tools/prepare_benchmark.sh. build.sh/run.sh/validate.sh call this
+#   first and fail plainly when the source is absent -- they never fetch, clone or patch anything.
+l3_require_materialized() {
+    local d=$1
+    [ -d "$d/src" ] && [ ! -L "$d/src" ] || { echo "$(basename "$d"): source not materialized ($d/src missing) -- run tools/prepare_benchmark.sh level3 $(basename "$d")" >&2; return 3; }
+    [ -f "$d/benchmark.yaml" ] || { echo "$(basename "$d"): benchmark.yaml missing" >&2; return 3; }
+    return 0
+}
+# l3_lock_query <benchmark-dir> <variant|''> <query>: read provenance/source.lock[.variant].yaml
+#   queries: upstream | tree | patches | component:<dest> | submodule:<dest>:<path>
+l3_lock_query() {
+    local f="$1/provenance/source.lock${2:+.$2}.yaml"
+    [ -f "$f" ] || { echo "l3: $f missing -- the benchmark was not frozen/materialized" >&2; return 3; }
+    python3 - "$f" "$3" <<'PY'
+import os, sys, yaml
+lock = yaml.safe_load(open(sys.argv[1])); q = sys.argv[2]
+if q == "upstream": print(lock["upstream"]["commit"])
+elif q == "tree": print(lock["materialized_tree"]["sha256"])
+elif q == "patches": print(" ".join(os.path.basename(p["path"]) for p in lock.get("patches", [])))
+elif q.startswith("component:"):
+    dest = q.split(":", 1)[1]; print(next(c["commit"] for c in lock["components"] if c["dest"] == dest))
+elif q.startswith("submodule:"):
+    _, dest, path = q.split(":", 2); c = next(c for c in lock["components"] if c["dest"] == dest)
+    print(next(s["commit"] for s in c.get("submodules", []) if s["path"] == path))
+else: sys.exit(f"l3_lock_query: unknown query {q}")
+PY
+}
+# l3_source_commit <benchmark-dir> [variant]: the upstream commit of the application source
+l3_source_commit()   { l3_lock_query "$1" "${2:-}" upstream; }
+# l3_source_tree_sha <benchmark-dir> [variant]: the recorded source_tree_sha256 (identity of src/+deps/)
+l3_source_tree_sha() { l3_lock_query "$1" "${2:-}" tree; }
+# l3_component_commit <benchmark-dir> <dest> [variant]: commit of a git component of the bundle (e.g. deps/amrex)
+l3_component_commit() { l3_lock_query "$1" "${3:-}" "component:$2"; }
+# l3_submodule_commit <benchmark-dir> <dest> <path> [variant]: commit of a bundled submodule (e.g. src subprojects/sundials)
+l3_submodule_commit() { l3_lock_query "$1" "${4:-}" "submodule:$2:$3"; }
+# l3_lock_patches <benchmark-dir> [variant]: basenames of the patch series already applied in the frozen tree
+l3_lock_patches()    { l3_lock_query "$1" "${2:-}" patches; }
+# l3_materialized_variant <benchmark-dir>: variant recorded by the materialization marker ('' when none)
+l3_materialized_variant() {
+    [ -f "$1/.hpcperf-materialized.yaml" ] || { echo ""; return 0; }
+    sed -n 's/^variant: *//p' "$1/.hpcperf-materialized.yaml" | sed "s/^'\(.*\)'$/\1/; s/^null$//" | head -1
+}
+export PYTHONDONTWRITEBYTECODE=1   # scripts run from inside src/ must not leave __pycache__ in the frozen tree
 
 # l3_run_recorded <rc-file> <label> [--] <cmd...>
 #   Queue step: runs the command, appends "<label> <exit code>" to <rc-file> and returns 0, so a
