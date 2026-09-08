@@ -97,6 +97,19 @@ l3_version_mm() { echo "$1" | awk -F. '{printf "%s%s", $1, $2}'; }
 #   Implementation: level3/tools/l3_clean_env.sh (also usable stand-alone).
 l3_clean_env_exec() { "$L3_TOOLS/l3_clean_env.sh" "$@"; }
 
+# l3_run_recorded <rc-file> <label> [--] <cmd...>
+#   Queue step: runs the command, appends "<label> <exit code>" to <rc-file> and returns 0, so a
+#   validation queue (even under `set -e`) records every step's real exit code and continues.
+#   Exit code 3 (Nyx: STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING) and 4 (UNSUPPORTED_LAYOUT) are
+#   recorded like any other and classified later by level3/tools/l3_verdict.py -- never as PASS,
+#   never as a reason to stop the queue.
+l3_run_recorded() {
+    local f=$1 label=$2; shift 2; [ "${1:-}" = "--" ] && shift
+    local rc=0; "$@" || rc=$?
+    echo "$label $rc" >> "$f"
+    return 0
+}
+
 # l3_isolate_build_env: remove the Level 2 dependency prefixes (everything under
 # $L3_R/.deps/install/, the validated Level 2 tree) from CMAKE_PREFIX_PATH and
 # LD_LIBRARY_PATH before a Level 3 configure, so a Level 3 build can never pick

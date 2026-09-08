@@ -39,9 +39,20 @@
 #  I_R (heat/cool only): the SDC reaction-integral field is NOT accepted or rejected by a
 #      relative tolerance -- it is a small residual of cancelling O(a^2 rho e / dt) terms
 #      whose run-to-run variation is O(1) relative at this stage of the deck while every
-#      state field agrees to 1e-13 (README, section "I_R"). It is checked for presence and
+#      state field agrees to 1e-13 over the 10 steps (README, section "I_R"). I_R is a
+#      state-carried term that the NEXT step's hydro predictor consumes, so the agreement of
+#      the state fields over this short horizon does not establish that its variation has no
+#      effect later; it is a coupling field with an unresolved reproducibility question, not a
+#      diagnostic that has been shown to be irrelevant. It is checked for presence and
 #      finiteness, reported, and the case verdict is downgraded to I_R_CHECK_PENDING
 #      (exit 3): state and particle checks PASS, the full heat/cool acceptance does not.
+#  Box layouts: the comparator checks each plotfile's BoxArray geometrically (inside the
+#      domain, no overlap, level 0 covers the domain). A different but legal partition of the
+#      same cells (re-blocking) is reported as UNSUPPORTED_LAYOUT (comparator exit 4): the
+#      comparison is not performed, the case is neither PASS nor FAIL, validate.sh exits 4.
+# Exit codes: 0 PASS; 1 FAIL; 3 STATE_AND_PARTICLES_PASS with I_R_CHECK_PENDING; 4 UNSUPPORTED_LAYOUT
+# (precedence FAIL > UNSUPPORTED_LAYOUT > PENDING > PASS). Only 0 is a PASS; a queue must record
+# 3/4 and continue (level3/tools/l3_verdict.py classifies them, never as PASS).
 # Exit codes of run.sh/launcher/application and every tool are captured; a
 # missing tool, plotfile or reference is FAIL, never skipped silently.
 #
@@ -99,7 +110,7 @@ if [ -n "$OFFLINE" ]; then
     REPORT_DIR="${HPCPERF_NYX_REPORT_DIR:-$GPU_RUNS/offline_recheck.$(date -u +%Y%m%dT%H%M%SZ)}"; mkdir -p "$REPORT_DIR"
     echo "validate.sh: OFFLINE mode -- no run.sh execution; comparing existing run directories; reports under $REPORT_DIR"
 fi
-ok=1; pending=""
+ok=1; pending=""; unsupported=""
 fail() { echo "validate.sh: FAIL -- $*"; ok=0; }
 report_dir() { # report_dir <run_dir>: where this run's comparison outputs go (never a historical dir in offline mode)
     if [ -n "$OFFLINE" ]; then local d="$REPORT_DIR/$(basename "$1")"; mkdir -p "$d"; echo "$d"; else echo "$1"; fi
@@ -193,13 +204,19 @@ compare() { # compare <ref_dir> <dir> <rel_tol> <label>
     local ref=$1 d=$2 tol=$3 label=$4 out rc=0 plt rep; plt="$(final_plt)"; rep="$(report_dir "$d")"
     local diag_args=(); [ -n "${DIAG:-}" ] && diag_args=(--diagnostic $DIAG)
     # exit 0 = every gated variable within tolerance; 1 = a gated variable outside it; 2 = structural
-    # (header mismatch, non-finite raw values, missing/duplicate/message rows, tool errors, parser/tool
-    # inconsistency). The full report (headers, fextrema, fcompare output, decisions) is in fcompare.<label>.txt.
+    # (header mismatch, box overlap/missing box/coverage deficit, non-finite raw values, missing/duplicate/
+    # message rows, tool errors, parser/tool inconsistency); 4 = legal but different box layout
+    # (UNSUPPORTED_LAYOUT: not compared, neither PASS nor FAIL). The full report (headers, fextrema,
+    # fcompare output, decisions) is in fcompare.<label>.txt.
     out="$(python3 "$HERE/nyx_fcompare_check.py" "$ref/$plt" "$d/$plt" --rel_tol "$tol" --abs_tol_zero_ref "$ABS_TOL_ZERO_REF" "${diag_args[@]}" \
             --fcompare "$TOOLS/amrex_fcompare" --fextrema "$TOOLS/amrex_fextrema" --out "$rep/fcompare.$label.txt" --label "$label" 2>&1)" || rc=$?
     case "$rc" in
         0) echo "    $label: plotfile comparison rel_tol $tol: ${out#RESULT: }" ;;
         1) fail "$label: plotfile comparison (rel_tol $tol): ${out#RESULT: }"; return 1 ;;
+        4) unsupported="${unsupported:+$unsupported }$label"
+           echo "    $label: plotfile comparison NOT performed: ${out#RESULT: }"
+           echo "    $label: UNSUPPORTED_LAYOUT -- a different but legal box layout is outside this validator's scope; case verdict UNSUPPORTED_LAYOUT (not PASS, not FAIL)"
+           return 1 ;;
         *) fail "$label: plotfile comparison STRUCTURAL failure (rc=$rc): ${out#RESULT: }"; return 1 ;;
     esac
     if [ -n "${DIAG:-}" ]; then
@@ -283,9 +300,11 @@ for CASE in $CASES; do
 done
 
 CRIT="fcompare/particle rel_tol adiabatic $REL_TOL_SAME / heatcool $HC_REL_TOL vs $( [ "$N" -eq 1 ] && echo rerun || echo 1-GPU), CPU reference rel_tol adiabatic $REL_TOL_XBACKEND / heatcool $HC_REL_TOL, zero-reference fields exact, baryon mass |dM/M|<=$MASS_TOL, DM count exact, finite"
-if [ "$ok" -eq 1 ] && [ -z "$pending" ]; then
-    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): PASS"; exit 0
-elif [ "$ok" -eq 1 ]; then
+if [ "$ok" -ne 1 ]; then
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES): FAIL${unsupported:+ (and UNSUPPORTED_LAYOUT [$unsupported])}${pending:+ (and I_R_CHECK_PENDING [$pending])}"; exit 1
+elif [ -n "$unsupported" ]; then
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): UNSUPPORTED_LAYOUT [$unsupported] -- plotfile comparison not performed for these pairs (different but legal box layouts are not supported by this validator); not a PASS${pending:+; I_R_CHECK_PENDING [$pending]}"; exit 4
+elif [ -n "$pending" ]; then
     echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING [$pending] -- heat/cool acceptance incomplete, not a full regression PASS"; exit 3
 fi
-echo "Nyx $BACKEND validation ($N GPU, cases: $CASES): FAIL${pending:+ (and I_R_CHECK_PENDING [$pending])}"; exit 1
+echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): PASS"; exit 0

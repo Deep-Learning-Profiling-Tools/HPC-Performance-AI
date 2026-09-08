@@ -21,13 +21,16 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP" "$R/build/level3/nyx/__selftest__"*' EXI
 VARS="density xmom ymom zmom rho_E rho_e Temp Ne phi_grav grav_x grav_y grav_z I_R pressure particle_count particle_mass_density"
 
 # --- synthetic plotfile: an AMReX Header (single level, 8 grids) --------------------------------
-mk_header() { # mk_header <plotdir> [time] [vars...]
+mk_header() { # mk_header <plotdir> [time] [vars...]; MK_BOXES="xlo xhi ylo yhi zlo zhi" lines (physical) override the default 2x2x2 layout
     local d=$1 t=${2:-2.86455272510386e-06}; shift; [ $# -gt 0 ] && shift; local vars=("$@"); [ ${#vars[@]} -gt 0 ] || vars=($VARS)
+    local boxes=() l x0 x1 y0 y1 z0 z1
+    if [ -n "${MK_BOXES:-}" ]; then while IFS= read -r l; do [ -n "$l" ] && boxes+=("$l"); done <<< "$MK_BOXES"
+    else for b in "0 4" "4 8"; do for c in "0 4" "4 8"; do for e in "0 4" "4 8"; do boxes+=("$b $c $e"); done; done; done; fi
     mkdir -p "$d/Level_0" "$d/DM"
     { echo "HyperCLaw-V1.1"; echo "${#vars[@]}"; printf '%s\n' "${vars[@]}"; echo 3; echo "$t"; echo 0; echo "0 0 0 "; echo "8 8 8 "; echo ""
       echo "((0,0,0) (31,31,31) (0,0,0)) "; echo "10 "; echo "0.25 0.25 0.25 "; echo 0; echo 0
-      echo "0 8 $t"; echo 10
-      for b in "0 4" "4 8"; do for c in "0 4" "4 8"; do for e in "0 4" "4 8"; do echo "$b"; echo "$c"; echo "$e"; done; done; done
+      echo "0 ${#boxes[@]} $t"; echo 10
+      for l in "${boxes[@]}"; do read -r x0 x1 y0 y1 z0 z1 <<< "$l"; echo "$x0 $x1"; echo "$y0 $y1"; echo "$z0 $z1"; done
       echo "Level_0/Cell"; } > "$d/Header"
     # DM particle header: version, dim, nreal, names, nint, names, is_checkpoint, nparticles
     { echo "Version_Two_Dot_Zero_double"; echo 3; echo 4; printf 'mass\nxvel\nyvel\nzvel\n'; echo 0; echo 0; echo 32768; } > "$d/DM/Header"
@@ -101,6 +104,22 @@ run_chk "$TMP/t13" 1; rc=$?; [ $rc -eq 1 ] && ok "A14: I_R gated when not declar
 table "" "Ne=0:0" "Temp=1e-3:5e-9" > "$TMP/t15"; run_chk "$TMP/t15" 1; rc=$?; [ $rc -eq 1 ] && ok "A15: Temp rel 5e-9 > 2e-10 -> DISAGREE" || bad "A15: rc=$rc"
 # A16 parser/tool inconsistency: table says agree but fcompare rc=1 and no diagnostic -> STRUCTURAL
 run_chk "$TMP/t1" 1; rc=$?; [ $rc -eq 2 ] && ok "A16: AGREE table but fcompare rc=1 -> STRUCTURAL (inconsistency)" || bad "A16: rc=$rc"
+# --- box layouts: legal re-blocking is UNSUPPORTED_LAYOUT (exit 4, explicit), real defects are STRUCTURAL ----
+chk_layout() { # chk_layout <plotdir with another layout> -> rc, output in chk.out (control table, rc 0)
+    FCOMPARE_TABLE="$TMP/t1" FCOMPARE_RC=0 python3 "$CHK" "$REF" "$1" --rel_tol 2e-10 --fcompare "$T/amrex_fcompare" --fextrema "$T/amrex_fextrema" >"$TMP/chk.out" 2>&1
+}
+REBLOCK=$'0 8 0 4 0 4\n0 8 0 4 4 8\n0 8 4 8 0 4\n0 8 4 8 4 8'                       # 4 boxes, same 32^3 cells as the 8-box layout
+DEFAULT8="$(for b in "0 4" "4 8"; do for c in "0 4" "4 8"; do for e in "0 4" "4 8"; do echo "$b $c $e"; done; done; done)"
+MK_BOXES="$REBLOCK" mk_header "$TMP/lay1/plt00010"; chk_layout "$TMP/lay1/plt00010"; rc=$?
+[ $rc -eq 4 ] && /usr/bin/grep -q 'UNSUPPORTED_LAYOUT.*legal re-blocking' "$TMP/chk.out" && ok "A17: same cells, different partition (4 vs 8 boxes) -> UNSUPPORTED_LAYOUT (exit 4), reported explicitly" || bad "A17: rc=$rc: $(cat "$TMP/chk.out")"
+MK_BOXES="$(echo "$DEFAULT8" | head -n 7)" mk_header "$TMP/lay2/plt00010"; chk_layout "$TMP/lay2/plt00010"; rc=$?
+[ $rc -eq 2 ] && /usr/bin/grep -q 'coverage deficit' "$TMP/chk.out" && ok "A18: a missing box (7 of 8, level 0 not covered) -> STRUCTURAL" || bad "A18: rc=$rc: $(cat "$TMP/chk.out")"
+MK_BOXES="$(echo "$DEFAULT8" | head -n 7; echo "$DEFAULT8" | head -n 1)" mk_header "$TMP/lay3/plt00010"; chk_layout "$TMP/lay3/plt00010"; rc=$?
+[ $rc -eq 2 ] && /usr/bin/grep -q 'overlap' "$TMP/chk.out" && ok "A19: overlapping boxes -> STRUCTURAL" || bad "A19: rc=$rc: $(cat "$TMP/chk.out")"
+MK_BOXES="$(echo "$DEFAULT8" | head -n 7; echo "4 12 4 8 4 8")" mk_header "$TMP/lay4/plt00010"; chk_layout "$TMP/lay4/plt00010"; rc=$?
+[ $rc -eq 2 ] && /usr/bin/grep -q 'outside the level domain' "$TMP/chk.out" && ok "A20: a box outside the domain -> STRUCTURAL" || bad "A20: rc=$rc: $(cat "$TMP/chk.out")"
+MK_BOXES="$(echo "$DEFAULT8" | tac)" mk_header "$TMP/lay5/plt00010"; chk_layout "$TMP/lay5/plt00010"; rc=$?
+[ $rc -eq 0 ] && /usr/bin/grep -q 'RESULT: AGREE' "$TMP/chk.out" && ok "A21: the same boxes listed in another order -> identical layout, compared normally" || bad "A21: rc=$rc: $(cat "$TMP/chk.out")"
 
 # --- Part B: real validate.sh chain, offline, synthetic run dirs, stub tools -----------------------
 VAL="$R/level3/nyx/validate.sh"
@@ -136,6 +155,13 @@ if [ -f "$VAL" ]; then
     rc=$(chain "$TMP/t15hc" 1 2); [ "$rc" -eq 1 ] && ok "B9: chain, heat/cool with a state variable over tolerance -> FAIL (not PENDING)" || bad "B9: rc=$rc"
     # reports never land in the run directories in offline mode
     [ -z "$(ls "$GH/lya_heatcool.smoke.np2" | /usr/bin/grep -E 'fcompare|particle_compare')" ] && [ -n "$(ls "$TMP/reports" 2>/dev/null)" ] && ok "B10: offline reports written under HPCPERF_NYX_REPORT_DIR, run dirs untouched" || bad "B10: report placement"
+    # a legally re-blocked run directory: validate.sh exits 4 with UNSUPPORTED_LAYOUT -- not PASS, not FAIL, not PENDING-as-PASS
+    MK_BOXES="$REBLOCK" mk_run "$GH/lya_heatcool.smoke.np2"
+    rc=$(chain "$TMP/t13" 0 2); [ "$rc" -eq 4 ] && /usr/bin/grep -q '): UNSUPPORTED_LAYOUT \[' "$TMP/val.out" && ! /usr/bin/grep -q '): PASS$' "$TMP/val.out" && ok "B11: chain, re-blocked layout -> exit 4, UNSUPPORTED_LAYOUT verdict, no PASS" || bad "B11: rc=$rc: $(tail -2 "$TMP/val.out")"
+    # a defective layout (missing box) is a FAIL of the case, not UNSUPPORTED
+    MK_BOXES="$(echo "$DEFAULT8" | head -n 7)" mk_run "$GH/lya_heatcool.smoke.np2"
+    rc=$(chain "$TMP/t13" 0 2); [ "$rc" -eq 1 ] && /usr/bin/grep -q 'STRUCTURAL.*coverage deficit' "$TMP/val.out" && ok "B12: chain, missing box -> FAIL (STRUCTURAL: coverage deficit)" || bad "B12: rc=$rc: $(tail -2 "$TMP/val.out")"
+    mk_run "$GH/lya_heatcool.smoke.np2"
     unset HPCPERF_NYX_OFFLINE HPCPERF_NYX_TOOLS_DIR HPCPERF_NYX_SKIP_PARTICLES HPCPERF_NYX_CASES HPCPERF_NYX_REPORT_DIR HPCPERF_NYX_HEATCOOL HPCPERF_NYX_PROFILE HPCPERF_NYX_CPU_PROFILE HPCPERF_L3_RUN_SUBDIR
 else
     echo "# validate.sh not found -- Part B skipped"

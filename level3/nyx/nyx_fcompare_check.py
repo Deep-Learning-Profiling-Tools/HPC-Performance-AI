@@ -4,10 +4,18 @@
     nyx_fcompare_check.py <ref_plotfile> <plotfile> --rel_tol R [--abs_tol_zero_ref A] [--diagnostic VAR ...]
                           --fcompare PATH --fextrema PATH [--out FILE] [--label L]
 
-Steps (every one must succeed; a structural problem is exit 2, a tolerance violation exit 1, agreement exit 0):
+Steps (every one must succeed; a structural problem is exit 2, a tolerance violation exit 1, agreement exit 0,
+an unsupported-but-legal box layout exit 4):
  1. Header check (independent of fcompare): both plotfile Headers are parsed; the variable SET, the
-    dimension, the number of levels, the simulation time (relative difference <= 1e-12), the domain box,
-    the cell sizes and the box array of every level must be identical.
+    dimension, the number of levels, the simulation time (relative difference <= 1e-12), the domain box
+    and the cell sizes must be identical. The box array of every level is checked GEOMETRICALLY (physical
+    extents -> cell-index boxes via prob_lo/dx): in each plotfile the boxes must lie inside the level
+    domain, must not overlap, and at level 0 must cover the domain exactly (a missing box, an overlap or a
+    coverage deficit is STRUCTURAL, exit 2). Between the two plotfiles: identical box sets (any order)
+    proceed; different partitions of the SAME cell set (a legal re-blocking, e.g. another max_grid_size)
+    are reported as UNSUPPORTED_LAYOUT (exit 4) -- this validator does not compare across BoxArrays
+    (fcompare would need --allow_diff_grids), it never treats that as a science FAIL and never skips
+    it silently; different covered cell sets at a level (missing/extra refinement) are STRUCTURAL.
  2. Raw finiteness: `fextrema` on BOTH plotfiles; every variable of the header set must appear exactly once
     with finite min/max. A reference variable whose min == max == 0 is a ZERO-REFERENCE field.
  3. fcompare (`-n 0 --rel_tol R --abort_if_not_all_found`): stdout is parsed strictly -- one `level = L`
@@ -26,7 +34,7 @@ The full report (headers, extrema, fcompare output, per-variable decisions) is w
 """
 import argparse, math, os, re, subprocess, sys
 
-STRUCT, TOL, OK = 2, 1, 0
+STRUCT, TOL, OK, UNSUPPORTED = 2, 1, 0, 4
 
 
 class Fail(Exception):
@@ -72,8 +80,66 @@ def read_header(plt):
     except (IndexError, ValueError) as ex:
         raise Fail(STRUCT, f"{p}: cannot parse AMReX plotfile Header ({ex})")
     if len(set(names)) != nvars: raise Fail(STRUCT, f"{p}: duplicate variable names in Header")
+    if len(dom) != finest + 1: raise Fail(STRUCT, f"{p}: {len(dom)} domain boxes for {finest + 1} level(s)")
     return dict(version=version, nvars=nvars, names=names, dim=dim, time=time, finest=finest,
                 prob_lo=prob_lo, prob_hi=prob_hi, domain=dom, dx=dx, coord=coord, levels=levels)
+
+
+def index_boxes(h, lev, tag):
+    """Physical box extents of one level -> cell-index boxes [(lo, hi)] through prob_lo and dx (hi inclusive)."""
+    out = []
+    for ext in h["levels"][lev]["boxes"]:
+        lo, hi = [], []
+        for d, (plo, phi) in enumerate(ext):
+            x0 = (plo - h["prob_lo"][d]) / h["dx"][lev][d]; x1 = (phi - h["prob_lo"][d]) / h["dx"][lev][d]
+            i0, i1 = round(x0), round(x1)
+            if abs(x0 - i0) > 1e-6 or abs(x1 - i1) > 1e-6:
+                raise Fail(STRUCT, f"level {lev}: {tag} box {ext} is not aligned to the cell grid (dx={h['dx'][lev][d]!r})")
+            if i1 <= i0: raise Fail(STRUCT, f"level {lev}: {tag} box {ext} is empty")
+            lo.append(i0); hi.append(i1 - 1)
+        out.append((tuple(lo), tuple(hi)))
+    return out
+
+
+def box_volume(lo, hi):
+    v = 1
+    for l, h in zip(lo, hi): v *= (h - l + 1)
+    return v
+
+
+def box_intersection(a, b):
+    lo = tuple(max(x, y) for x, y in zip(a[0], b[0])); hi = tuple(min(x, y) for x, y in zip(a[1], b[1]))
+    return 0 if any(l > h for l, h in zip(lo, hi)) else box_volume(lo, hi)
+
+
+def check_layout(a, b, lev):
+    """Geometric BoxArray check of one level. Returns a report line for identical layouts; raises
+    Fail(STRUCT) for a missing box / overlap / coverage deficit / different covered cell sets, and
+    Fail(UNSUPPORTED) for a legal re-blocking (same cells, different partition)."""
+    dom = [tuple(int(x) for x in s.split(",")) for s in a["domain"][lev][:2]]
+    A, B = index_boxes(a, lev, "ref"), index_boxes(b, lev, "test")
+    totals = {}
+    for tag, X in (("ref", A), ("test", B)):
+        for (lo, hi) in X:
+            if any(l < dl or h > dh for l, h, dl, dh in zip(lo, hi, dom[0], dom[1])):
+                raise Fail(STRUCT, f"level {lev}: {tag} box {lo}-{hi} lies outside the level domain {dom[0]}-{dom[1]}")
+        for i in range(len(X)):
+            for j in range(i + 1, len(X)):
+                if box_intersection(X[i], X[j]) > 0:
+                    raise Fail(STRUCT, f"level {lev}: {tag} boxes {X[i][0]}-{X[i][1]} and {X[j][0]}-{X[j][1]} overlap")
+        totals[tag] = sum(box_volume(lo, hi) for lo, hi in X)
+        if lev == 0 and totals[tag] != box_volume(*dom):
+            raise Fail(STRUCT, f"level 0: {tag} boxes cover {totals[tag]} of {box_volume(*dom)} domain cells "
+                               f"({len(X)} boxes) -- missing box / coverage deficit")
+    if sorted(A) == sorted(B):
+        return f"    level {lev}: identical box array ({len(A)} boxes, {totals['ref']} cells)"
+    common = sum(box_intersection(x, y) for x in A for y in B)
+    if totals["ref"] == totals["test"] == common:
+        raise Fail(UNSUPPORTED, f"level {lev}: legal re-blocking (ref {len(A)} boxes, test {len(B)} boxes, the same "
+                                f"{common} cells covered) -- comparison across different BoxArrays is not supported by this "
+                                f"validator (fcompare would need --allow_diff_grids); comparison NOT performed")
+    raise Fail(STRUCT, f"level {lev}: box arrays cover different cell sets (ref {totals['ref']} cells, test {totals['test']}, "
+                       f"common {common}) -- missing/extra refinement, not a re-blocking")
 
 
 def check_headers(a, b):
@@ -86,9 +152,10 @@ def check_headers(a, b):
     if abs(a["time"] - b["time"]) > 1e-12 * max(abs(a["time"]), 1e-300):
         raise Fail(STRUCT, f"simulation time differs: ref={a['time']!r} test={b['time']!r}")
     for lev, (la, lb) in enumerate(zip(a["levels"], b["levels"])):
-        if la["ngrids"] != lb["ngrids"] or la["boxes"] != lb["boxes"]:
-            raise Fail(STRUCT, f"level {lev}: box array differs ({la['ngrids']} vs {lb['ngrids']} grids or different extents)")
         if la["step"] != lb["step"]: raise Fail(STRUCT, f"level {lev}: step differs {la['step']} vs {lb['step']}")
+        if la["ngrids"] != len(la["boxes"]) or lb["ngrids"] != len(lb["boxes"]):
+            raise Fail(STRUCT, f"level {lev}: declared grid count differs from the listed boxes")
+        out.append(check_layout(a, b, lev))
     out.append(f"    headers: {a['nvars']} variables, dim {a['dim']}, {a['finest']+1} level(s), time {a['time']!r}, "
                f"{sum(l['ngrids'] for l in a['levels'])} grids -- identical structure")
     return out
@@ -205,7 +272,7 @@ def main():
         summary = (f"RESULT: {'AGREE' if code == OK else 'DISAGREE'} nvars={len(names)} levels={nlev} rel_tol={a.rel_tol:g} "
                    f"worst={worst[0]} {worst[1]:.3e} zero_ref={sorted(zero_ref) or 'none'} bad={bad or 'none'} diagnostic={diag or 'none'}")
     except Fail as ex:
-        code, summary = ex.code, f"RESULT: STRUCTURAL_FAIL {ex}"
+        code, summary = ex.code, f"RESULT: {'UNSUPPORTED_LAYOUT' if ex.code == UNSUPPORTED else 'STRUCTURAL_FAIL'} {ex}"
     report.append(summary)
     text = "\n".join(report) + "\n"
     if a.out:

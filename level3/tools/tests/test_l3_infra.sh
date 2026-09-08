@@ -72,6 +72,25 @@ h2="$(l3_fingerprint_text app sha cuda deps opts gam "$TMP/p.patch" 2>/dev/null 
 hn="$(l3_fingerprint_text app sha cuda deps opts gam 2>/dev/null | sed -n 's/^patch_series_sha256=//p')"
 [ "$hn" = none ] && ok "5c: empty patch series -> 'none'" || bad "5c: empty series hash '$hn'"
 
+# 6. l3_clean_env.sh: allow-listed names pass, credential-looking names are dropped even under an
+#    allow-listed prefix, session/agent names are dropped, --show prints names only (never a value).
+CE="$TOOLS/l3_clean_env.sh"
+names="$(HPCPERF_SELFTEST_OK=keepme HPCPERF_SELFTEST_TOKEN=secretvalue CLAUDE_SELFTEST=secretvalue SELFTEST_API_KEY=secretvalue \
+         "$CE" -- env 2>/dev/null | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p')"
+echo "$names" | /usr/bin/grep -qx HPCPERF_SELFTEST_OK && ok "6a: clean env keeps an allow-listed project variable" || bad "6a: HPCPERF_SELFTEST_OK dropped"
+echo "$names" | /usr/bin/grep -qx HPCPERF_SELFTEST_TOKEN && bad "6b: credential-looking name survived through the HPCPERF_ prefix" || ok "6b: HPCPERF_*_TOKEN denied although its prefix is allow-listed"
+echo "$names" | /usr/bin/grep -qE '^(CLAUDE_SELFTEST|SELFTEST_API_KEY)$' && bad "6c: agent/credential names survived" || ok "6c: CLAUDE_* and *_API_KEY dropped"
+echo "$names" | /usr/bin/grep -qx PATH && ok "6d: PATH survives (the command can run)" || bad "6d: PATH dropped"
+show="$(HPCPERF_SELFTEST_TOKEN=secretvalue "$CE" --show -- true 2>&1)"
+echo "$show" | /usr/bin/grep -q secretvalue && bad "6e: --show printed a value" || ok "6e: --show prints names only"
+echo "$show" | /usr/bin/grep -q 'denied by the credential rule: .*HPCPERF_SELFTEST_TOKEN' && ok "6f: --show names the denied variable" || bad "6f: denied variable not reported"
+
+# 7. l3_run_recorded: records the real exit code of a queue step and never aborts the caller
+rcf="$TMP/rc.txt"; steps=0
+( set -e; for r in 0 3 0; do l3_run_recorded "$rcf" "step$r" -- bash -c "exit $r"; echo step >> "$TMP/steps"; done )
+[ "$(wc -l < "$TMP/steps")" -eq 3 ] && ok "7a: a queue under set -e continues past a step that exits 3" || bad "7a: queue stopped after $(wc -l < "$TMP/steps") step(s)"
+[ "$(tr '\n' ' ' < "$rcf")" = "step0 0 step3 3 step0 0 " ] && ok "7b: exit codes recorded verbatim (0 3 0)" || bad "7b: recorded '$(tr '\n' ' ' < "$rcf")'"
+
 echo
 echo "test_l3_infra: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]
