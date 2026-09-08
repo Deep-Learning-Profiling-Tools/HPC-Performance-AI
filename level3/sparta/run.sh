@@ -39,7 +39,8 @@ MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 BUILD_DIR="$R/build/level3/sparta/$MODEL"
 EXE="$(find "$BUILD_DIR" -maxdepth 2 -name "spa_kokkos_$MODEL" -type f 2>/dev/null | head -1)"
 [ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: spa_kokkos_$MODEL not found under $BUILD_DIR -- run ./build.sh $BACKEND first" >&2; exit 1; }
-SRC="$R/_upstream/level3/sparta"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle (the deck bench/in.collide and its species files live inside it)
 
 N_RANKS="$(hpcperf_ranks sparta yes)" || exit 2
 hpcperf_forbid_args sparta -in -i -var -v -k -kokkos -sf -suffix -pk -package -log -- "$@" || exit 2

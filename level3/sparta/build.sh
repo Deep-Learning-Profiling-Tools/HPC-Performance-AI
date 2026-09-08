@@ -6,9 +6,11 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): source _upstream/level3/sparta, build
+# Layout (Level 3 isolation): source level3/sparta/src (frozen source bundle
+# materialized by tools/prepare_benchmark.sh; identity in provenance/), build
 # build/level3/sparta/<cuda|hip>, install .deps/level3/sparta/install
-# (+ .hpcperf-l3-fingerprint), logs .deps/level3/sparta/logs.
+# (+ .hpcperf-l3-fingerprint), logs .deps/level3/sparta/logs. Application source
+# is read ONLY from $HERE/src; nothing is fetched, cloned or patched here.
 #
 # Recipe = upstream cmake/presets/kokkos_common.cmake (PKG_KOKKOS, BUILD_MPI,
 # -O3) loaded with -C, plus the settings of cmake/presets/kokkos_cuda.cmake
@@ -30,9 +32,10 @@ l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install pref
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-SRC="$R/_upstream/level3/sparta"
-[ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: SPARTA source missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"
+[ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a SPARTA source tree -- run tools/prepare_benchmark.sh level3 sparta" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$SRC/lib/kokkos/CMakeLists.txt" | paste -sd.)"
 l3_paths sparta
 BUILD_DIR="$R/build/level3/sparta/$MODEL"
@@ -61,7 +64,7 @@ CMAKE_OPTS="preset=kokkos_common BUILD_MPI=ON PKG_KOKKOS=ON CXX_STANDARD=20 Kokk
 FP="$(l3_fingerprint_text sparta "$SHA" "$MODEL" "kokkos(bundled)=$KOKKOS_VER" "$CMAKE_OPTS" "runtime(-pk kokkos gpu/aware)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# SPARTA $BACKEND: upstream $SHA, bundled Kokkos $KOKKOS_VER, arch $KARCH, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# SPARTA $BACKEND: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $KARCH, MPI $(mpirun --version 2>/dev/null | head -1)"
 mkdir -p "$BUILD_DIR"
 cmake -S "$SRC/cmake" -B "$BUILD_DIR" -G Ninja -C "$SRC/cmake/presets/kokkos_common.cmake" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$L3_INSTALL" -DCMAKE_CXX_STANDARD=20 \

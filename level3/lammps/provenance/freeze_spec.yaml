@@ -1,0 +1,42 @@
+schema: hpcperf-freeze-spec-1
+name: lammps
+level: 3
+application: LAMMPS
+benchmark_source_version: stable_22Jul2025_update6
+archive: archives/source_bundle.tar.zst
+components:
+  - dest: src
+    category: application
+    kind: git
+    checkout: _upstream/level3/lammps            # freeze-time input only (fetch.sh); never read by build.sh
+    url: https://github.com/lammps/lammps.git
+    ref: stable_22Jul2025_update6
+    commit: 9c5ab448c78a14fd534619622162ba418d6a1fb1
+    submodules: []
+    exclude: []                                  # exact upstream tree (documentation included; nothing pruned)
+    patches: []                                  # class A: no upstream file modified
+    license: {spdx: GPL-2.0-only, files: [LICENSE]}
+    bundled:
+      - {path: lib/kokkos, project: Kokkos, version: 4.6.2, license: Apache-2.0 WITH LLVM-exception, note: "the Kokkos LAMMPS bundles (upstream-supported KOKKOS package path)"}
+      - {path: lib, project: "LAMMPS bundled auxiliary libraries (colvars, gpu, ml-*, ...)", license: "per lib/<name>/README", note: "not built by this benchmark except lib/kokkos"}
+environment_provided:
+  - {name: CUDA Toolkit, version: 13.2.78, provided_by: node /usr/local/cuda (hpcperf_env.sh)}
+  - {name: GCC (nvcc_wrapper host compiler), version: 13.3.0, provided_by: .conda_env}
+  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env (site profile gmu-hopper)}
+  - {name: CMake / Ninja, provided_by: .conda_env}
+  - {name: Slurm, GPU driver, UCX, provided_by: site}
+equivalence:
+  - archive_path: src
+    validated_tree: _upstream/level3/lammps      # the validated builds (2026-09-04 .. 2026-09-07) read this checkout directly
+    ignore: ['.git/*']
+    generated: []
+    excluded: []
+    added: []
+licenses:
+  - {path: src, project: LAMMPS, license: GPL-2.0-only, url: https://github.com/lammps/lammps, commit: 9c5ab448c78a14fd534619622162ba418d6a1fb1}
+  - {path: src/lib/kokkos, project: Kokkos (bundled), license: Apache-2.0 WITH LLVM-exception, url: https://github.com/kokkos/kokkos, version: 4.6.2}
+  - {path: src/potentials + src/bench/POTENTIALS, project: LAMMPS potential files (upstream repository content), license: GPL-2.0-only (repository), url: https://github.com/lammps/lammps}
+license_notes:
+  - "LAMMPS is GPL-2.0-only: redistributing the (unmodified) source in a source bundle is permitted; the bundle carries the upstream LICENSE and the complete corresponding source."
+  - "lib/kokkos (Apache-2.0 with LLVM exception) and the other lib/ components keep their own license files inside the tree."
+  - "No dataset outside the upstream repository is bundled; the benchmark inputs (bench/in.lj, bench/POTENTIALS, potentials/) are upstream repository files."

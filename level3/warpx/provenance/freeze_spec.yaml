@@ -1,0 +1,51 @@
+schema: hpcperf-freeze-spec-1
+name: warpx
+level: 3
+application: WarpX
+benchmark_source_version: "26.09"
+archive: archives/source_bundle.tar.zst
+components:
+  - dest: src
+    category: application
+    kind: git
+    checkout: _upstream/level3/WarpX
+    url: https://github.com/BLAST-WarpX/warpx.git
+    ref: "26.09"
+    commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88
+    submodules: []
+    exclude: []
+    patches: []                                  # class A
+    license: {spdx: BSD-3-Clause-LBNL, files: [LICENSE.txt, NOTICE.txt]}
+    bundled: []
+  - dest: deps/amrex
+    category: benchmark_specific
+    kind: git
+    checkout: _upstream/level3/amrex
+    url: https://github.com/AMReX-Codes/amrex.git
+    ref: "26.09"
+    commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+    project: AMReX
+    version: "26.09"
+    submodules: []
+    exclude: []
+    patches: []
+    license: {spdx: BSD-3-Clause-LBNL, files: [LICENSE, NOTICE]}
+    note: "the AMReX release WarpX 26.09 pins; built by WarpX's superbuild from this tree (-DWarpX_amrex_src)"
+environment_provided:
+  - {name: CUDA Toolkit, version: 13.2.78}
+  - {name: GCC (host compiler), version: 13.3.0, provided_by: .conda_env}
+  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env}
+  - {name: CMake / Ninja, provided_by: .conda_env}
+equivalence:
+  - archive_path: src
+    validated_tree: _upstream/level3/WarpX
+    ignore: ['.git/*']
+  - archive_path: deps/amrex
+    validated_tree: _upstream/level3/amrex
+    ignore: ['.git/*']
+licenses:
+  - {path: src, project: WarpX, license: BSD-3-Clause-LBNL, url: https://github.com/BLAST-WarpX/warpx, commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88}
+  - {path: deps/amrex, project: AMReX, license: BSD-3-Clause-LBNL, url: https://github.com/AMReX-Codes/amrex, commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576}
+license_notes:
+  - "WarpX and AMReX carry the LBNL BSD-3-Clause license with NOTICE files; both files are kept in the bundle."
+  - "PICSAR-QED and openPMD are not part of this build (WarpX_QED=OFF, WarpX_OPENPMD=OFF) and are not bundled."

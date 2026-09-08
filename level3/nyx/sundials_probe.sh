@@ -15,11 +15,13 @@ source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
 l3_isolate_build_env
-SRC="$R/_upstream/level3/Nyx/subprojects/sundials"; [ -f "$SRC/CMakeLists.txt" ] || { echo "sundials_probe.sh: run fetch.sh" >&2; exit 1; }
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src/subprojects/sundials"; [ -f "$SRC/CMakeLists.txt" ] || { echo "sundials_probe.sh: src/subprojects/sundials missing (tools/prepare_benchmark.sh level3 nyx)" >&2; exit 1; }
+SUNDIALS_SHA="$(l3_submodule_commit "$HERE" src subprojects/sundials)"
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; GCC_MM="$(l3_version_mm "$("$CXX" -dumpfullversion)")"
 l3_paths_profile nyx "cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-heatcool"
 B="$L3_BUILD_DEPS/sundials-test"; JOBS="${HPCPERF_BUILD_JOBS:-16}"
-echo "# SUNDIALS $(git -C "$SRC" rev-parse HEAD) (v$(/usr/bin/grep -oE 'PACKAGE_VERSION_(MAJOR|MINOR|PATCH) "[0-9]+"' "$SRC/CMakeLists.txt" | /usr/bin/grep -oE '[0-9]+' | paste -sd.)) CUDA sm_$ARCH test build -> $B"
+echo "# SUNDIALS $SUNDIALS_SHA (v$(/usr/bin/grep -oE 'PACKAGE_VERSION_(MAJOR|MINOR|PATCH) "[0-9]+"' "$SRC/CMakeLists.txt" | /usr/bin/grep -oE '[0-9]+' | paste -sd.)) CUDA sm_$ARCH test build -> $B"
 mkdir -p "$B"
 cmake -S "$SRC" -B "$B" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_STANDARD=17 \
     -DENABLE_CUDA=ON "-DCMAKE_CUDA_ARCHITECTURES=$ARCH" "-DCMAKE_CUDA_HOST_COMPILER=$CXX" -DSUNDIALS_INDEX_SIZE=32 -DSUNDIALS_BUILD_PACKAGE_FUSED_KERNELS=ON \

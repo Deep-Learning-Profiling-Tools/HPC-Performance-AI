@@ -32,10 +32,11 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
-REF="$R/_upstream/level3/lammps/bench/log.15Jul25.lj.fixed.g++.1"
+l3_require_materialized "$HERE" || exit 3
+REF="$HERE/src/bench/log.15Jul25.lj.fixed.g++.1"     # upstream reference log, part of the frozen source bundle
 RUN_DIR="$R/build/level3/lammps/$MODEL/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"
-[ -f "$REF" ] || { echo "validate.sh: reference log $REF missing (run fetch.sh)" >&2; exit 1; }
+[ -f "$REF" ] || { echo "validate.sh: reference log $REF missing (run tools/prepare_benchmark.sh level3 lammps)" >&2; exit 1; }
 
 unset HPCPERF_SCALE_MODE
 export HPCPERF_GPUS="$N"

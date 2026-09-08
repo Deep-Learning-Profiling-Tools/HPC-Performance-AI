@@ -28,29 +28,30 @@ l3_clean_conda_build_env   # system GCC 14 build: drop conda's CFLAGS/LDFLAGS/AR
 export CC=/usr/bin/gcc CXX=/usr/bin/g++ FC=/usr/bin/gfortran OMPI_CC=/usr/bin/gcc OMPI_CXX=/usr/bin/g++ OMPI_FC=/usr/bin/gfortran CUDAHOSTCXX=/usr/bin/g++
 unset CMAKE_GENERATOR
 STAGE="${1:-all}"
-GEOS_SRC="$R/_upstream/level3/GEOS"; TPL_SRC="$R/_upstream/level3/thirdPartyLibs"
-[ -f "$GEOS_SRC/src/CMakeLists.txt" ] && [ -f "$TPL_SRC/CMakeLists.txt" ] || { echo "build.sh: run $HERE/fetch.sh first" >&2; exit 1; }
-GEOS_SHA="$(git -C "$GEOS_SRC" rev-parse HEAD)"; TPL_SHA="$(git -C "$TPL_SRC" rev-parse HEAD)"
+# Sources come ONLY from the frozen bundle materialized here (tools/prepare_benchmark.sh): src/ = GEOS
+# develop b7a0f133 with its submodules (BLT already carrying the CUDA-13 back-port), deps/thirdPartyLibs =
+# the superbuild (its three build-system patches already applied), deps/tpl-dist/<pkg>/<tarball> = the TPL
+# source tarballs, deps/openblas/<tarball>. Nothing is fetched, cloned or patched by this script.
+l3_require_materialized "$HERE" || exit 3
+GEOS_SRC="$HERE/src"; TPL_SRC="$HERE/deps/thirdPartyLibs"; TPL_DIST="$HERE/deps/tpl-dist"
+[ -f "$GEOS_SRC/src/CMakeLists.txt" ] && [ -f "$TPL_SRC/CMakeLists.txt" ] && [ -d "$TPL_DIST" ] || { echo "build.sh: src/, deps/thirdPartyLibs or deps/tpl-dist incomplete -- run tools/prepare_benchmark.sh level3 geos" >&2; exit 3; }
+GEOS_SHA="$(l3_source_commit "$HERE")"; TPL_SHA="$(l3_component_commit "$HERE" deps/thirdPartyLibs)"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 # TPL build-system patches (headers in patches/*.patch): 0001 fixes upstream's 65-character superlu_dist URL hash,
 # 0002 makes RAJA_ENABLE_VECTORIZATION overridable (nvcc 13.2 + GCC 14/x86-64-v3 cannot compile RAJA's AVX2 tensor layer),
 # 0003 gives the hdf5 step the superbuild's sub-project generator and build/install commands like every other step.
-# Applied to the TPL checkout idempotently; their hashes are recorded in the fingerprint.
-# GEOS-side patch: BLT submodule smoke test vs CUDA 13 (back-port of LLNL/blt 38b46203), same idempotent scheme
-BLT_SRC="$GEOS_SRC/src/cmake/blt"
+# GEOS-side patch: BLT submodule smoke test vs CUDA 13 (back-port of LLNL/blt 38b46203). All four are part of the frozen
+# baseline (provenance/patch_series.txt); their content hashes enter the fingerprint exactly as before.
+GEOS_PATCH_SHA=""
 for BLT_PATCH in "$HERE"/patches/geos-blt-*.patch; do
     [ -f "$BLT_PATCH" ] || continue
-    if git -C "$BLT_SRC" apply --check --reverse "$BLT_PATCH" >/dev/null 2>&1; then :
-    elif git -C "$BLT_SRC" apply --check "$BLT_PATCH" >/dev/null 2>&1; then git -C "$BLT_SRC" apply "$BLT_PATCH"; echo "# applied $(basename "$BLT_PATCH") to the GEOS BLT submodule"
-    else echo "build.sh: $BLT_PATCH is neither applied nor applicable to BLT $(git -C "$BLT_SRC" rev-parse --short HEAD)" >&2; exit 1; fi
     GEOS_PATCH_SHA="${GEOS_PATCH_SHA:-}${GEOS_PATCH_SHA:+,}$(basename "$BLT_PATCH" .patch)=$(sha256sum "$BLT_PATCH" | cut -c1-12)"
 done
 TPL_PATCH_SHA=""
 for TPL_PATCH in "$HERE"/patches/000*.patch; do
-    if git -C "$TPL_SRC" apply --check --reverse "$TPL_PATCH" >/dev/null 2>&1; then :
-    elif git -C "$TPL_SRC" apply --check "$TPL_PATCH" >/dev/null 2>&1; then git -C "$TPL_SRC" apply "$TPL_PATCH"; echo "# applied $(basename "$TPL_PATCH") to the thirdPartyLibs checkout"
-    else echo "build.sh: $TPL_PATCH is neither applied nor applicable to thirdPartyLibs $TPL_SHA" >&2; exit 1; fi
     TPL_PATCH_SHA="$TPL_PATCH_SHA${TPL_PATCH_SHA:+,}$(basename "$TPL_PATCH" | cut -d- -f1)=$(sha256sum "$TPL_PATCH" | cut -c1-12)"
 done
+LOCKED="$(l3_lock_patches "$HERE")"; EXPECTED="$(for P in "$HERE"/patches/geos-blt-*.patch "$HERE"/patches/000*.patch; do basename "$P"; done | paste -sd' ')"
+[ "$LOCKED" = "$EXPECTED" ] || { echo "build.sh: patch series in the lock ($LOCKED) differs from patches/ ($EXPECTED) -- the frozen tree is not the expected baseline" >&2; exit 3; }
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ "$ARCH" = 100 ] || { echo "build.sh: host-config is written for sm_100 (got sm_$ARCH)" >&2; exit 1; }
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_GEOS_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
@@ -64,15 +65,15 @@ DEPS="geos_patches[${GEOS_PATCH_SHA:-none}] tpl=361-1070($TPL_SHA)+patches[$TPL_
 OPTS="host-config=$(basename "$HC") RAJA_ENABLE_VECTORIZATION=OFF ENABLE_HYPREDRV=OFF(host-config+TPL) tpl_metis_include_first ENABLE_TESTS=ON(upstream default) ENABLE_CUDA=ON CUDA_ARCH=sm_$ARCH GEOS_LA_INTERFACE=Hypre ENABLE_HYPRE_DEVICE=CUDA ENABLE_TRILINOS=OFF ENABLE_PETSC=OFF ENABLE_OPENMP=OFF ENABLE_CALIPER=OFF ENABLE_MATHPRESSO=OFF ENABLE_VTK=ON ENABLE_SUPERLU_DIST=ON ENABLE_SUITESPARSE=ON ENABLE_SCOTCH=ON CMAKE_BUILD_TYPE=Release"
 FP="$(l3_fingerprint_text geos "$GEOS_SHA" cuda "$DEPS" "$OPTS" "ENABLE_HYPRE_GPU_AWARE_MPI=OFF (GEOS pinned host buffers)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
-echo "# GEOS profile=$PROFILE: GEOS $GEOS_SHA, TPL $TPL_SHA, gcc $(/usr/bin/gcc -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
+echo "# GEOS profile=$PROFILE: GEOS $GEOS_SHA, TPL $TPL_SHA, frozen source tree $TREE_SHA, gcc $(/usr/bin/gcc -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
 echo "# resources: TPL superbuild ~2-3 h (VTK, hypre-CUDA, RAJA suite; downloads ~500 MB), GEOS ~1.5-2.5 h; ~25 GB under $L3_DEPS"
 T0=$(date +%s)
 run() { local log=$1; shift; "$@" > "$L3_LOGS/$log" 2>&1 || { tail -50 "$L3_LOGS/$log"; echo "build.sh: FAILED: $* (log $L3_LOGS/$log)" >&2; exit 1; }; }
 
 # [0] OpenBLAS
 if [ ! -f "$L3_INSTALL/openblas/.hpcperf-stage-done" ]; then
-    TB="$R/.deps/level3/dftfe/downloads/OpenBLAS-0.3.30.tar.gz"
-    [ -f "$TB" ] || { mkdir -p "$L3_DEPS/downloads"; TB="$L3_DEPS/downloads/OpenBLAS-0.3.30.tar.gz"; curl -sSL -o "$TB" https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz; }
+    TB="$HERE/deps/openblas/OpenBLAS-0.3.30.tar.gz"
+    [ -f "$TB" ] || { echo "build.sh: deps/openblas/OpenBLAS-0.3.30.tar.gz missing from the materialized bundle" >&2; exit 3; }
     echo "$(sha256sum "$TB" | cut -d' ' -f1) OpenBLAS-0.3.30.tar.gz" > "$L3_LOGS/openblas.sha256"
     d="$L3_SRC/OpenBLAS-0.3.30"; [ -d "$d" ] || tar -xzf "$TB" -C "$L3_SRC"
     run openblas-make.log make -C "$d" -j "$JOBS" USE_THREAD=0 USE_OPENMP=0 DYNAMIC_ARCH=0 NO_AFFINITY=1 TARGET="${HPCPERF_OPENBLAS_TARGET:-SAPPHIRERAPIDS}" CC=/usr/bin/gcc FC=/usr/bin/gfortran
@@ -95,6 +96,14 @@ if [ "$STAGE" != geos ] && [ ! -f "$L3_INSTALL/tpl/.hpcperf-stage-done" ]; then
     else  # existing tree: re-assert the cache values without config-build.py (which would delete the tree)
         run tpl-reconfigure.log cmake "${TPLDEFS[@]}" "$L3_BUILD_DEPS/tpl"
     fi
+    # Pre-seed every ExternalProject download from the bundle (deps/tpl-dist/<pkg>/<file> -> <build>/tpl/<pkg>/src/<file>):
+    # CMake verifies the URL_HASH of an existing file and skips the download, so the superbuild never reaches the network.
+    # The metis step uses the parmetis tarball (as upstream's CMakeLists does).
+    for d in "$TPL_DIST"/*/; do
+        pkg="$(basename "$d")"
+        for f in "$d"*; do [ -f "$f" ] || continue; mkdir -p "$L3_BUILD_DEPS/tpl/$pkg/src"; cp -n "$f" "$L3_BUILD_DEPS/tpl/$pkg/src/"; done
+    done
+    mkdir -p "$L3_BUILD_DEPS/tpl/metis/src"; cp -n "$TPL_DIST"/parmetis/parmetis-4.0.3.tar.gz "$L3_BUILD_DEPS/tpl/metis/src/"
     run tpl-build.log ninja -C "$L3_BUILD_DEPS/tpl" -j "$JOBS"
     for d in raja chai hypre hdf5 conduit vtk pugixml suitesparse superlu_dist parmetis scotch; do [ -d "$L3_INSTALL/tpl/$d" ] || echo "build.sh: WARNING TPL install lacks $d" >&2; done
     [ -d "$L3_INSTALL/tpl/hypre" ] && [ -d "$L3_INSTALL/tpl/raja" ] || { echo "build.sh: TPL install incomplete (hypre/raja missing)" >&2; exit 1; }
@@ -103,10 +112,15 @@ if [ "$STAGE" != geos ] && [ ! -f "$L3_INSTALL/tpl/.hpcperf-stage-done" ]; then
 fi
 T2=$(date +%s)
 [ "$STAGE" = tpl ] && { echo "# TPL stage done ($((T2 - T0)) s)"; exit 0; }
-# [2] GEOS
+# [2] GEOS. LvArray's CMake configure writes docs/doxygen/LvArrayConfig.hpp INTO the source tree, so GEOS is
+#     configured from a build-side copy of the frozen tree (the frozen src/ stays pristine; stamp = tree hash).
+GEOS_BUILD_SRC="$L3_SRC/geos-src"
+if [ ! -f "$GEOS_BUILD_SRC/.hpcperf-src-stamp" ] || [ "$(cat "$GEOS_BUILD_SRC/.hpcperf-src-stamp")" != "$GEOS_SHA tree=$TREE_SHA" ]; then
+    rm -rf "$GEOS_BUILD_SRC"; mkdir -p "$GEOS_BUILD_SRC"; rsync -a "$GEOS_SRC/" "$GEOS_BUILD_SRC/"; echo "$GEOS_SHA tree=$TREE_SHA" > "$GEOS_BUILD_SRC/.hpcperf-src-stamp"
+fi
 mkdir -p "$L3_BUILD"
 if [ ! -f "$L3_BUILD/build.ninja" ]; then   # same reason as above: config-build.py deletes an existing build tree
-    ( cd "$GEOS_SRC" && python3 scripts/config-build.py -hc "$HC" -bt Release -bp "$L3_BUILD" -ip "$L3_INSTALL/geos" -n "${HCDEFS[@]}" -D "HPCPERF_GEOS_TPL_DIR=$L3_INSTALL/tpl" -D "GEOS_TPL_DIR=$L3_INSTALL/tpl" ) > "$L3_LOGS/geos-configure.log" 2>&1 \
+    ( cd "$GEOS_BUILD_SRC" && python3 scripts/config-build.py -hc "$HC" -bt Release -bp "$L3_BUILD" -ip "$L3_INSTALL/geos" -n "${HCDEFS[@]}" -D "HPCPERF_GEOS_TPL_DIR=$L3_INSTALL/tpl" -D "GEOS_TPL_DIR=$L3_INSTALL/tpl" ) > "$L3_LOGS/geos-configure.log" 2>&1 \
         || { tail -60 "$L3_LOGS/geos-configure.log"; echo "build.sh: GEOS configure failed" >&2; exit 1; }
 else  # existing tree: re-read the host-config (cache FORCE values) without config-build.py
     run geos-reconfigure.log cmake "${HCDEFS[@]}" -D "HPCPERF_GEOS_TPL_DIR=$L3_INSTALL/tpl" -D "GEOS_TPL_DIR=$L3_INSTALL/tpl" -C "$HC" "$L3_BUILD"   # -D before -C: the host-config reads HPCPERF_*

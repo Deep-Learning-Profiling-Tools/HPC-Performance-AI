@@ -1,0 +1,147 @@
+schema: hpcperf-source-lock-1
+name: nyx
+level: 3
+application: Nyx
+variant: null
+benchmark_source_version: '26.09'
+upstream:
+  url: https://github.com/AMReX-Astro/Nyx.git
+  tag: '26.09'
+  commit: e06eabc1b9dbcad5612db9529aced682402daede
+archive:
+  path: archives/source_bundle.tar.zst
+  sha256: 218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 79400559
+  uncompressed_size: 196747678
+  tar_entries: 6800
+  file_count: 5891
+  symlink_count: 42
+materialized_tree:
+  sha256: 71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120
+  algorithm: hpcperf-tree-1
+  entries: 5933
+  layout:
+  - src/
+  - deps/
+patches: []
+dependencies:
+  bundled:
+  - path: subprojects/sundials
+    project: SUNDIALS
+    version: 7.2.1
+    license: BSD-3-Clause
+    component: src
+  benchmark_specific:
+  - path: deps/amrex
+    project: AMReX
+    version: '26.09'
+    url: https://github.com/AMReX-Codes/amrex.git
+    commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+    sha256: null
+    license: &id001
+      spdx: BSD-3-Clause-LBNL
+      files:
+      - LICENSE
+      - NOTICE
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/AMReX-Astro/Nyx.git
+  ref: '26.09'
+  commit: e06eabc1b9dbcad5612db9529aced682402daede
+  sha256: null
+  checkout: _upstream/level3/Nyx
+  submodules:
+  - path: subprojects/sundials
+    url: https://github.com/LLNL/sundials.git
+    ref: v7.2.1
+    commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03
+    note: heat/cool variant (CVODE); nested submodules (.gitlab/*, external/sundials-addon-example, test/answers) are not
+      checked out and not bundled
+  excluded:
+  - path: subprojects/amrex
+    reason: 'Nyx''s pinned AMReX submodule (6e875b7c) is NOT used: its CMake cannot emit sm_100; the build uses AMReX 26.09
+      from deps/amrex (README)'
+  license:
+    spdx: BSD-3-Clause-LBNL
+    files:
+    - license.txt
+- dest: deps/amrex
+  kind: git
+  category: benchmark_specific
+  url: https://github.com/AMReX-Codes/amrex.git
+  ref: '26.09'
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+  sha256: null
+  checkout: _upstream/level3/amrex
+  submodules: []
+  excluded: []
+  license: *id001
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/Nyx
+  status: EQUIVALENT
+  summary:
+    identical: 3656
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 2268
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 3656
+    validated_entries_considered: 5924
+- archive_path: deps/amrex
+  validated_tree: _upstream/level3/amrex
+  status: EQUIVALENT
+  summary:
+    identical: 2277
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 2277
+    validated_entries_considered: 2277
+licenses:
+- path: src
+  project: Nyx
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/AMReX-Astro/Nyx
+  commit: e06eabc1b9dbcad5612db9529aced682402daede
+- path: src/subprojects/sundials
+  project: SUNDIALS
+  license: BSD-3-Clause
+  url: https://github.com/LLNL/sundials
+  commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03
+- path: deps/amrex
+  project: AMReX
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/AMReX-Codes/amrex
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T07:44:40Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256

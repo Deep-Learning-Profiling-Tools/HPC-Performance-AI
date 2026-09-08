@@ -1,0 +1,37 @@
+name: lammps
+level: 3
+application: LAMMPS
+description: LAMMPS KOKKOS/CUDA package, Lennard-Jones bench deck (in.lj) at 1/2/4 GPUs, one MPI rank per GPU
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (Kokkos CUDA), gpu-aware MPI on (-pk kokkos gpu/aware on)
+default_scale_mode: smoke
+scale_modes:
+  smoke: bench/in.lj 32^3 lattice x 4 = 131,072 atoms, 100 steps, validated 1/2/4 GPUs (2026-09-07 regression fc4d2a1)
+  strong: 16.4M atoms, completed 1/4 GPU runs (no numerical acceptance beyond smoke criteria)
+  weak: 2.05M atoms per rank, completed 4-GPU run
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only (HPCPERF_DRY_RUN=1), never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper)
+install_root: .deps/level3/lammps
+dependency_installs: []
+inputs:
+- src/bench/in.lj
+references:
+- src/bench/log.15Jul25.lj.fixed.g++.1
+source_version: stable_22Jul2025_update6
+source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
+source_bundle:
+  archive: archives/source_bundle.tar.zst
+  archive_sha256: 4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1
+  source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
+  compressed_size: 115344817
+  uncompressed_size: 457028170
+  file_count: 13893

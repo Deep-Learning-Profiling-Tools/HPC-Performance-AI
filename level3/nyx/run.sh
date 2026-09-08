@@ -67,7 +67,8 @@ case "$BACKEND" in
 esac
 PROFILE="${HPCPERF_NYX_PROFILE:-$PROFILE_DEFAULT}"
 l3_paths_profile nyx "$PROFILE"
-SRC="$R/_upstream/level3/Nyx"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle: the official decks and ICs (Exec/*) live inside it
 CASE="${HPCPERF_NYX_CASE:-minisb}"
 MODE="$(l3_scale_mode nyx)" || exit 2
 N_RANKS="$(hpcperf_ranks nyx yes)" || exit 2
@@ -131,7 +132,7 @@ case "$CASE" in
     *) echo "run.sh: HPCPERF_NYX_CASE must be minisb | lya_adiabatic | lya_heatcool | scaling_synthetic (got '$CASE')" >&2; exit 2 ;;
 esac
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND (profile $PROFILE) first" >&2; exit 1; }
-[ -f "$DECK" ] || { echo "run.sh: deck $DECK missing (run fetch.sh)" >&2; exit 1; }
+[ -f "$DECK" ] || { echo "run.sh: deck $DECK missing (run tools/prepare_benchmark.sh level3 nyx)" >&2; exit 1; }
 [ "$MODEL" = cpu ] || l3_binary_backend_check "$EXE" "$MODEL" || exit 1
 : "${NY:=$NX}"; : "${NZ:=$NX}"
 # boxes with the fixed layout (n_cell / max_grid_size per dimension)

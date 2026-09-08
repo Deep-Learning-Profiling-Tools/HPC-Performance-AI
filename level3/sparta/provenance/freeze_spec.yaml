@@ -1,0 +1,36 @@
+schema: hpcperf-freeze-spec-1
+name: sparta
+level: 3
+application: SPARTA
+benchmark_source_version: 27Aug2026
+archive: archives/source_bundle.tar.zst
+components:
+  - dest: src
+    category: application
+    kind: git
+    checkout: _upstream/level3/sparta
+    url: https://github.com/sparta/sparta.git
+    ref: 27Aug2026
+    commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+    submodules: []
+    exclude: []
+    patches: []                                  # class A
+    license: {spdx: GPL-2.0-only, files: [LICENSE]}
+    bundled:
+      - {path: lib/kokkos, project: Kokkos, version: 5.0.2, license: Apache-2.0 WITH LLVM-exception}
+      - {path: lib, project: "SPARTA bundled libraries", license: "per lib/<name>", note: "only lib/kokkos is built here"}
+environment_provided:
+  - {name: CUDA Toolkit, version: 13.2.78}
+  - {name: GCC (nvcc_wrapper host compiler), version: 13.3.0, provided_by: .conda_env}
+  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env}
+  - {name: CMake / Ninja, provided_by: .conda_env}
+equivalence:
+  - archive_path: src
+    validated_tree: _upstream/level3/sparta
+    ignore: ['.git/*']
+licenses:
+  - {path: src, project: SPARTA, license: GPL-2.0-only, url: https://github.com/sparta/sparta, commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74}
+  - {path: src/lib/kokkos, project: Kokkos (bundled), license: Apache-2.0 WITH LLVM-exception, version: 5.0.2}
+license_notes:
+  - "SPARTA is GPL-2.0-only; the unmodified source with its LICENSE is redistributed as a source bundle."
+  - "Benchmark inputs (bench/in.collide, bench/data.*, reference logs) are upstream repository files."

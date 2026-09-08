@@ -32,7 +32,8 @@ N="${HPCPERF_GPUS:-1}"; T="${HPCPERF_CPUS_PER_RANK:-8}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-3600}"
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
 l3_paths_profile qmcpack "$PROFILE"
-SRC="$R/_upstream/level3/qmcpack"; RUNS="$L3_BUILD/$L3_RUN_SUBDIR"; BLD="$L3_BUILD/real"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; RUNS="$L3_BUILD/$L3_RUN_SUBDIR"; BLD="$L3_BUILD/real"   # check_scalars.py comes from the frozen bundle
 REF_LE="-21.844975 0.02"   # upstream DIAMOND2_DMC_SCALARS totenergy (mean sigma) for qmc_short_vmcbatch_dmcbatch, series 1
 NSIGMA=3                    # upstream check_scalars default used by QMC_RUN_AND_CHECK
 EQUIL=2                     # upstream: -e 2 blocks of equilibration
@@ -41,7 +42,7 @@ export HPCPERF_GPUS="$N" HPCPERF_CPUS_PER_RANK="$T" HPCPERF_SCALE_MODE=smoke
 mkdir -p "$RUNS"; ok=1
 fail() { echo "validate.sh: FAIL -- $*"; ok=0; }
 manifest_val() { /usr/bin/grep -m1 "^$2=" "$1/run_manifest.txt" 2>/dev/null | cut -d= -f2- || true; }
-LLVM="$L3_INSTALL/llvm"
+LLVM="${HPCPERF_QMCPACK_LLVM:-$L3_INSTALL/llvm}"
 export LD_LIBRARY_PATH="$LLVM/lib:$LLVM/lib/x86_64-unknown-linux-gnu:$L3_INSTALL/hdf5/lib:$L3_INSTALL/openblas/lib:${LD_LIBRARY_PATH:-}"
 
 if [ "$N" -eq 1 ] && [ -z "${HPCPERF_QMCPACK_SKIP_CTEST:-}" ]; then

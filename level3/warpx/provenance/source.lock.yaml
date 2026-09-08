@@ -1,0 +1,129 @@
+schema: hpcperf-source-lock-1
+name: warpx
+level: 3
+application: WarpX
+variant: null
+benchmark_source_version: '26.09'
+upstream:
+  url: https://github.com/BLAST-WarpX/warpx.git
+  tag: '26.09'
+  commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88
+archive:
+  path: archives/source_bundle.tar.zst
+  sha256: d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 14235980
+  uncompressed_size: 41912234
+  tar_entries: 5170
+  file_count: 4493
+  symlink_count: 139
+materialized_tree:
+  sha256: e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2
+  algorithm: hpcperf-tree-1
+  entries: 4632
+  layout:
+  - src/
+  - deps/
+patches: []
+dependencies:
+  bundled: []
+  benchmark_specific:
+  - path: deps/amrex
+    project: AMReX
+    version: '26.09'
+    url: https://github.com/AMReX-Codes/amrex.git
+    commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+    sha256: null
+    license: &id001
+      spdx: BSD-3-Clause-LBNL
+      files:
+      - LICENSE
+      - NOTICE
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/BLAST-WarpX/warpx.git
+  ref: '26.09'
+  commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88
+  sha256: null
+  checkout: _upstream/level3/WarpX
+  submodules: []
+  excluded: []
+  license:
+    spdx: BSD-3-Clause-LBNL
+    files:
+    - LICENSE.txt
+    - NOTICE.txt
+- dest: deps/amrex
+  kind: git
+  category: benchmark_specific
+  url: https://github.com/AMReX-Codes/amrex.git
+  ref: '26.09'
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+  sha256: null
+  checkout: _upstream/level3/amrex
+  submodules: []
+  excluded: []
+  license: *id001
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/WarpX
+  status: EQUIVALENT
+  summary:
+    identical: 2355
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 2355
+    validated_entries_considered: 2355
+- archive_path: deps/amrex
+  validated_tree: _upstream/level3/amrex
+  status: EQUIVALENT
+  summary:
+    identical: 2277
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 2277
+    validated_entries_considered: 2277
+licenses:
+- path: src
+  project: WarpX
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/BLAST-WarpX/warpx
+  commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88
+- path: deps/amrex
+  project: AMReX
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/AMReX-Codes/amrex
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T07:58:27Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256

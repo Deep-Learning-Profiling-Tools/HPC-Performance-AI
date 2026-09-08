@@ -42,7 +42,8 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shi
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 EXE="$R/build/level3/lammps/$MODEL/lmp_kokkos_$MODEL"
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first" >&2; exit 1; }
-SRC="$R/_upstream/level3/lammps"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle (decks bench/in.lj live inside it; never _upstream)
 
 N_RANKS="$(hpcperf_ranks lammps yes)" || exit 2
 hpcperf_forbid_args lammps -in -i -var -v -k -kokkos -sf -suffix -pk -package -log -- "$@" || exit 2

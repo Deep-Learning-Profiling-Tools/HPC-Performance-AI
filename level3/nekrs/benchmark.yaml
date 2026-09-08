@@ -1,0 +1,49 @@
+name: nekrs
+level: 3
+application: nekRS
+description: nekRS v26.0 (OCCA/CUDA, vendored HYPRE), ethier case with --cimode CI checks at 1/2/4 GPUs; two frozen source
+  variants (hypregpu = v26.0 + 3 HYPRE CUDA-13 patches; cpucoarse = exact v26.0)
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (--device-id 0 under the launcher wrapper), GPU-aware MPI off (upstream default)
+default_scale_mode: smoke
+scale_modes:
+  smoke: examples/ethier (32 elements, N=9, 100 steps), 9/9 CI checks; validated 1/2/4 GPUs for hypregpu cimode 2 and 3 and
+    cpucoarse cimode 2 (2026-09-07 regression fc4d2a1)
+  strong: ethierRefine hrefine=10 (32,000 elements, N=7), completed 1/4 GPU runs
+  weak: ~8,000 elements per rank, completed 4-GPU run
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only, never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 C/C++ via the MPI wrappers, system gfortran 14.2.1 via OMPI_FC, CUDA
+  13.2.78, Open MPI 5.0.10, OMPI_MCA_osc=^ucx)
+install_root: .deps/level3/nekrs
+dependency_installs: []
+variant_env: HPCPERF_NEKRS_VARIANT
+default_variant: hypregpu
+variants:
+  hypregpu:
+    archive: archives/hypregpu.source.tar.zst
+    archive_sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
+    source_tree_sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
+    compressed_size: 48167250
+    uncompressed_size: 231107059
+    file_count: 14447
+    source_version: v26.0
+  cpucoarse:
+    archive: archives/cpucoarse.source.tar.zst
+    archive_sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
+    source_tree_sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
+    compressed_size: 48167029
+    uncompressed_size: 231106946
+    file_count: 14447
+    source_version: v26.0
+inputs:
+- src/examples/ethier
+references: []

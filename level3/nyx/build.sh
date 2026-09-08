@@ -43,11 +43,15 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 HC="$(echo "${HPCPERF_NYX_HEATCOOL:-NO}" | tr '[:lower:]' '[:upper:]')"
 case "$HC" in YES|NO) ;; *) echo "build.sh: HPCPERF_NYX_HEATCOOL must be YES or NO" >&2; exit 2;; esac
 VARIANT=adiabatic; [ "$HC" = YES ] && VARIANT=heatcool
-SRC="$R/_upstream/level3/Nyx"; AMREX_SRC="$R/_upstream/level3/amrex"
-[ -f "$SRC/CMakeLists.txt" ] && [ -f "$AMREX_SRC/CMakeLists.txt" ] || { echo "build.sh: sources missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-[ "$HC" = NO ] || [ -f "$SRC/subprojects/sundials/CMakeLists.txt" ] || { echo "build.sh: sundials submodule missing -- run $HERE/fetch.sh" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"; AMREX_SHA="$(git -C "$AMREX_SRC" rev-parse HEAD)"
-SUNDIALS_SHA="$(git -C "$SRC/subprojects/sundials" rev-parse HEAD 2>/dev/null || echo none)"
+# Sources come ONLY from the frozen bundle materialized in this directory (tools/prepare_benchmark.sh):
+# src/ = Nyx 26.09 incl. subprojects/sundials (the unused AMReX submodule pin is not bundled),
+# deps/amrex = AMReX 26.09. Nothing is fetched, cloned or patched here.
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; AMREX_SRC="$HERE/deps/amrex"
+[ -f "$SRC/CMakeLists.txt" ] && [ -f "$AMREX_SRC/CMakeLists.txt" ] || { echo "build.sh: src/ or deps/amrex incomplete -- run tools/prepare_benchmark.sh level3 nyx" >&2; exit 3; }
+[ "$HC" = NO ] || [ -f "$SRC/subprojects/sundials/CMakeLists.txt" ] || { echo "build.sh: src/subprojects/sundials missing from the materialized bundle" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; AMREX_SHA="$(l3_component_commit "$HERE" deps/amrex)"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
+SUNDIALS_SHA="$(l3_submodule_commit "$HERE" src subprojects/sundials)"
 GCC_MM="$(l3_version_mm "$("$CXX" -dumpfullversion 2>/dev/null || "$CXX" -dumpversion)")"
 
 case "$BACKEND" in
@@ -75,13 +79,13 @@ TOOLS=OFF; [ "$MODEL" = cpu ] && TOOLS=ON
 
 AMREX_OPTS="AMReX_SPACEDIM=3 AMReX_PRECISION=DOUBLE AMReX_PARTICLES=ON AMReX_PARTICLES_PRECISION=DOUBLE AMReX_MPI=ON AMReX_OMP=OFF AMReX_FORTRAN=OFF AMReX_PROBINIT=OFF AMReX_LINEAR_SOLVERS=ON AMReX_EB=OFF AMReX_FFT=OFF AMReX_SUNDIALS=$( [ "$HC" = YES ] && echo ON || echo OFF) AMReX_GPU_BACKEND=$AMREX_GPU arch=$ARCHNOTE AMReX_PLOTFILE_TOOLS=$TOOLS"
 CMAKE_OPTS="Nyx_GPU_BACKEND=$AMREX_GPU arch=$ARCHNOTE Nyx_HYDRO=YES Nyx_HEATCOOL=$HC Nyx_MPI=YES Nyx_OMP=NO Nyx_SINGLE_PRECISION_PARTICLES=NO CMAKE_CXX_STANDARD=17 CMAKE_BUILD_TYPE=Release amrex=external($AMREX_OPTS) sundials=$( [ "$HC" = YES ] && echo "external(ENABLE_CUDA=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) INDEX_SIZE=32 FUSED_KERNELS=$( [ "$MODEL" = cuda ] && echo ON || echo OFF) CVODE+ARKODE(AMReX 26.09 SUNDIALS component set))" || echo off)"
-DEPS="amrex=26.09($AMREX_SHA) [Nyx submodule pin $(git -C "$SRC/subprojects/amrex" rev-parse HEAD 2>/dev/null || echo unknown) not used: no sm_100 through CMake] sundials=$( [ "$HC" = YES ] && echo "7.2.1($SUNDIALS_SHA)" || echo off) profile=$PROFILE"
+DEPS="amrex=26.09($AMREX_SHA) [Nyx submodule pin 6e875b7cc1a4eec78e22ae4cdaa79f88acf5169e not used: no sm_100 through CMake] sundials=$( [ "$HC" = YES ] && echo "7.2.1($SUNDIALS_SHA)" || echo off) profile=$PROFILE"
 FP="$(l3_fingerprint_text nyx "$SHA" "$MODEL" "$DEPS" "$CMAKE_OPTS" "runtime(amrex.use_gpu_aware_mpi default)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
 COMMON=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX")
 [ "$MODEL" = hip ] && COMMON=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_C_COMPILER="$CC")
-echo "# Nyx $BACKEND profile=$PROFILE: Nyx $SHA (26.09), AMReX $AMREX_SHA (26.09, external), sundials $( [ "$HC" = YES ] && echo "$SUNDIALS_SHA (7.2.1)" || echo off), arch $ARCHNOTE, host $CXX, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# Nyx $BACKEND profile=$PROFILE: Nyx $SHA (26.09), AMReX $AMREX_SHA (26.09, deps/amrex), sundials $( [ "$HC" = YES ] && echo "$SUNDIALS_SHA (7.2.1)" || echo off), frozen source tree $TREE_SHA, arch $ARCHNOTE, host $CXX, MPI $(mpirun --version 2>/dev/null | head -1)"
 echo "# resources: -j$JOBS; expected AMReX 5-10 min + Nyx 2-5 min (+ SUNDIALS ~3 min); trees $L3_BUILD_DEPS, $BUILD_DIR"
 t0=$(date +%s)
 

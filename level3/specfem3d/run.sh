@@ -55,8 +55,9 @@ BIN="$L3_INSTALL/bin"
 for x in xdecompose_mesh xmeshfem3D xgenerate_databases xspecfem3D; do
     [ -x "$BIN/$x" ] || { echo "run.sh: $BIN/$x missing -- run ./build.sh $BACKEND first" >&2; exit 1; }
 done
-EX="$R/_upstream/level3/specfem3d/EXAMPLES/applications/homogeneous_halfspace"
-[ -f "$EX/DATA/Par_file" ] || { echo "run.sh: $EX missing (run fetch.sh)" >&2; exit 1; }
+l3_require_materialized "$HERE" || exit 3
+EX="$HERE/src/EXAMPLES/applications/homogeneous_halfspace"     # frozen source bundle: the upstream case (mesh, DATA, REF_SEIS)
+[ -f "$EX/DATA/Par_file" ] || { echo "run.sh: $EX missing (run tools/prepare_benchmark.sh level3 specfem3d)" >&2; exit 1; }
 
 N_RANKS="$(hpcperf_ranks specfem3d yes)" || exit 2
 MODE="$(l3_scale_mode specfem3d)" || exit 2

@@ -1,0 +1,33 @@
+schema: hpcperf-optimization-scope-1
+benchmark: cp2k
+modifiable:
+  - src/src/*                      # CP2K application source (Fortran + GPU offload code)
+readonly:
+  - build.sh
+  - run.sh
+  - validate.sh
+  - fetch.sh
+  - benchmark.yaml
+  - optimization_scope.yaml
+  - provenance/*
+  - archives/*
+  - patches/*
+  - cp2k_md_summary.py
+  - src/tools/*                    # toolchain installer + scripts (dependency build system; B200 back-port pre-applied)
+  - src/data/*                     # basis sets / potentials (run-time data)
+  - src/benchmarks/*               # decks (H2O-64/128 ...)
+  - src/tests/*                    # regtests + reference values used by validate.sh
+  - src/docs/*
+  - src/exts/*
+  - src/cmake/*
+  - src/CMakeLists.txt
+  - deps/*                         # toolchain package tarballs (OpenBLAS, DBCSR, libint, ...)
+excluded:
+  - deps/*
+  - src/exts/*
+loc_categories:
+  application_owned: [src/src/*]
+  bundled_dependency: [src/exts/*]
+  benchmark_specific_dependency: [deps/*]
+  test: [src/tests/*]
+  exclude: [src/data/*, src/benchmarks/*, src/docs/*, src/tools/*, src/.github/*, src/cmake/*]

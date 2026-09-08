@@ -1,0 +1,11 @@
+src	https://github.com/dftfeDevelopers/dftfe.git	release 1.2.0 commit (2025-08-17)	7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+deps/openblas/OpenBLAS-0.3.30.tar.gz	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz	0.3.30	sha256:27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+deps/scalapack/v2.2.2.tar.gz	https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v2.2.2.tar.gz	2.2.2	sha256:a2f0c9180a210bf7ffe126c9cb81099cf337da1a7120ddb4cbe4894eb7b7d022
+deps/libxc/libxc-7.0.0.tar.gz	https://gitlab.com/libxc/libxc/-/archive/7.0.0/libxc-7.0.0.tar.gz	7.0.0	sha256:8d4e343041c9cd869833822f57744872076ae709a613c118d70605539fb13a77
+deps/alglib/alglib-4.06.0.cpp.gpl.tgz	https://www.alglib.net/translator/re/alglib-4.06.0.cpp.gpl.tgz	4.06.0	sha256:27fa4b0b8160cbb2ace4f69d1a8ef0990cf894c87dff3f46dc86ec8ac2d30c68
+deps/p4est/p4est-2.8.7.tar.gz	https://p4est.github.io/release/p4est-2.8.7.tar.gz	2.8.7	sha256:0a1e912f3529999ca6d62fee335d51f24b5650b586e95a03ef39ebf73936d7f4
+deps/p4est/p4est-setup.sh	https://raw.githubusercontent.com/dftfeDevelopers/dftfe/manual/p4est-setup.sh	manual	sha256:86269c2ef751b33d06916299a3d15fa80f4c8c9de40eceedfb8b7f45bd90fb8b
+deps/kokkos/4.6.00.tar.gz	https://github.com/kokkos/kokkos/archive/refs/tags/4.6.00.tar.gz	4.6.00	sha256:348b2d860046fc3ddef5ca3a128317be1a6f3fa35196f268338a180fcae52264
+deps/dealii/dealii-9.6.2.tar.gz	https://github.com/dealii/dealii/releases/download/v9.6.2/dealii-9.6.2.tar.gz	9.6.2	sha256:1051e332de3822488e91c2b0460681052a3c4c5ac261cdd7a6af784869a25523
+deps/elpa/elpa-2026.02.001.tar.gz	https://elpa.mpcdf.mpg.de/software/tarball-archive/Releases/2026.02.001/elpa-2026.02.001.tar.gz	2026.02.001	sha256:a379f27f4dbd27b2ee45017afec656d064301e97150c874649bdfd64957b75ed
+deps/spglib	https://github.com/spglib/spglib.git	commit 02159eef (install_DFTFE pin)	02159eef6e7349535049a43fe2272bb634c77945

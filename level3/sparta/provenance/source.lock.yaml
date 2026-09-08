@@ -1,0 +1,98 @@
+schema: hpcperf-source-lock-1
+name: sparta
+level: 3
+application: SPARTA
+variant: null
+benchmark_source_version: 27Aug2026
+upstream:
+  url: https://github.com/sparta/sparta.git
+  tag: 27Aug2026
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+archive:
+  path: archives/source_bundle.tar.zst
+  sha256: ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 21330629
+  uncompressed_size: 76042143
+  tar_entries: 3284
+  file_count: 3083
+  symlink_count: 1
+materialized_tree:
+  sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
+  algorithm: hpcperf-tree-1
+  entries: 3084
+  layout:
+  - src/
+patches: []
+dependencies:
+  bundled:
+  - path: lib/kokkos
+    project: Kokkos
+    version: 5.0.2
+    license: Apache-2.0 WITH LLVM-exception
+    component: src
+  - path: lib
+    project: SPARTA bundled libraries
+    license: per lib/<name>
+    note: only lib/kokkos is built here
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (nvcc_wrapper host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/sparta/sparta.git
+  ref: 27Aug2026
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+  sha256: null
+  checkout: _upstream/level3/sparta
+  submodules: []
+  excluded: []
+  license:
+    spdx: GPL-2.0-only
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/sparta
+  status: EQUIVALENT
+  summary:
+    identical: 3084
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 3084
+    validated_entries_considered: 3084
+licenses:
+- path: src
+  project: SPARTA
+  license: GPL-2.0-only
+  url: https://github.com/sparta/sparta
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+- path: src/lib/kokkos
+  project: Kokkos (bundled)
+  license: Apache-2.0 WITH LLVM-exception
+  version: 5.0.2
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T07:58:05Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256

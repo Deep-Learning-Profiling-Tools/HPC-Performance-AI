@@ -33,7 +33,8 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shi
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_DFTFE_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
 l3_paths_profile dftfe "$PROFILE"
-SRC="$R/_upstream/level3/dftfe"; T="$SRC/testsGPU/pseudopotential/real"; INST="$L3_INSTALL"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; T="$SRC/testsGPU/pseudopotential/real"; INST="$L3_INSTALL"   # decks, pseudopotentials and references come from the frozen bundle
 EXE="$INST/bin/dftfe_real"
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh first (profile $PROFILE)" >&2; exit 1; }
 export LD_LIBRARY_PATH="$INST/dealii/lib:$INST/dealii/lib64:$INST/elpa/lib:$INST/scalapack/lib:$INST/openblas/lib:$INST/libxc/lib:$INST/libxc/lib64:$INST/spglib/lib:$INST/spglib/lib64:$INST/kokkos/lib:$INST/kokkos/lib64:$INST/p4est/FAST/lib:$INST/alglib:$L3_BUILD/real:${LD_LIBRARY_PATH:-}"
@@ -49,7 +50,7 @@ case "$CASE" in
            for f in $(awk '{print $2}' "$T/pseudo_LLZO.inp"); do FILES="$FILES $f"; done ;;
     *) echo "run.sh: HPCPERF_DFTFE_CASE must be al_md or llzo" >&2; exit 2 ;;
 esac
-[ -f "$PRM" ] || { echo "run.sh: $PRM missing (run fetch.sh)" >&2; exit 1; }
+[ -f "$PRM" ] || { echo "run.sh: $PRM missing (run tools/prepare_benchmark.sh level3 dftfe)" >&2; exit 1; }
 LABEL="$CASE"; DERIV="verbatim"
 [ "$MODE" = weak ] && { LABEL="$CASE.x$N_RANKS"; DERIV="al-supercell x$N_RANKS (32 atoms/GPU)"; }
 RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/$LABEL.$MODE.np$N_RANKS")" || exit 2

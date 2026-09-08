@@ -28,12 +28,17 @@ l3_isolate_build_env
 l3_clean_conda_build_env
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
 l3_paths_profile qmcpack "$PROFILE"
-SRC="$R/_upstream/level3/qmcpack"; DL="$R/.deps/level3/qmcpack/downloads"
-[ -f "$SRC/CMakeLists.txt" ] || { echo "build.sh: run $HERE/fetch.sh" >&2; exit 1; }
-LLVM="$L3_INSTALL/llvm"; CLANG="$LLVM/bin/clang"; CLANGXX="$LLVM/bin/clang++"
-[ -x "$CLANGXX" ] || { echo "build.sh: private LLVM missing ($LLVM) -- run toolchain/build_llvm.sh" >&2; exit 1; }
+# Sources come ONLY from the frozen bundle materialized here (tools/prepare_benchmark.sh): src/ = QMCPACK
+# v4.4.0, deps/{hdf5,boost,openblas}/<tarball> = the pinned dependency sources. The private LLVM offload
+# toolchain is an environment-provided COMPILER (toolchain/build_llvm.sh), not benchmark source.
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; DL="$HERE/deps"
+[ -f "$SRC/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a QMCPACK tree -- run tools/prepare_benchmark.sh level3 qmcpack" >&2; exit 3; }
+for tb in openblas/OpenBLAS-0.3.30.tar.gz hdf5/hdf5-1.14.5.tar.gz boost/boost-1.90.0-b2-nodocs.tar.xz; do [ -f "$DL/$tb" ] || { echo "build.sh: deps/$tb missing from the materialized bundle" >&2; exit 3; }; done
+LLVM="${HPCPERF_QMCPACK_LLVM:-$L3_INSTALL/llvm}"; CLANG="$LLVM/bin/clang"; CLANGXX="$LLVM/bin/clang++"
+[ -x "$CLANGXX" ] || { echo "build.sh: private LLVM missing ($LLVM) -- run toolchain/build_llvm.sh or point HPCPERF_QMCPACK_LLVM at an existing install (environment dependency)" >&2; exit 1; }
 [ -f "$LLVM/OFFLOAD_PROBE.txt" ] && /usr/bin/grep -q '^PASS' "$LLVM/OFFLOAD_PROBE.txt" || { echo "build.sh: offload probe has not PASSED (toolchain/probe_offload.sh) -- refusing to build QMCPACK on an unverified offload toolchain" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; CUDA_ROOT="${CUDA_HOME:-/usr/local/cuda}"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"; INST="$L3_INSTALL"; BLD="$L3_BUILD_DEPS"
 export OMPI_CC="$CLANG" OMPI_CXX="$CLANGXX" OMPI_FC=/usr/bin/gfortran
@@ -45,7 +50,7 @@ DEPS="llvm=$CLANG_V(offload sm_$ARCH, $(cat "$LLVM/OFFLOAD_PROBE.txt" | cut -c1-
 OPTS="QMC_GPU=openmp;cuda QMC_GPU_ARCHS=sm_$ARCH QMC_MPI=ON QMC_COMPLEX=OFF(+ON on request) QMC_MIXED_PRECISION=OFF ENABLE_PHDF5=ON BUILD_UNIT_TESTS=ON CMAKE_BUILD_TYPE=Release CXX=mpicxx(clang++)"
 FP="$(l3_fingerprint_text qmcpack "$SHA" cuda "$DEPS" "$OPTS" "not-used(walker-parallel; MPI on host buffers)")"
 l3_fingerprint_check "$INST" "$FP" || exit 1
-echo "# QMCPACK profile=$PROFILE: qmcpack $SHA (v4.4.0), clang $CLANG_V, $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS; expected 30-60 min + deps ~15 min"
+echo "# QMCPACK profile=$PROFILE: qmcpack $SHA (v4.4.0, frozen source tree $TREE_SHA), clang $CLANG_V, $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS; expected 30-60 min + deps ~15 min"
 T0=$(date +%s)
 run() { local log=$1; shift; "$@" > "$L3_LOGS/$log" 2>&1 || { tail -40 "$L3_LOGS/$log"; echo "build.sh: FAILED: $* (log $L3_LOGS/$log)" >&2; exit 1; }; }
 untar() { # untar <tarball> <dest-parent> -> prints the extracted top-level directory (tolerates a leading ./ entry)
@@ -55,14 +60,14 @@ untar() { # untar <tarball> <dest-parent> -> prints the extracted top-level dire
     [ -d "$dst/$top" ] || tar -xf "$tb" -C "$dst"; echo "$dst/$top"; }
 
 if [ ! -f "$INST/openblas/.hpcperf-stage-done" ]; then
-    d="$(untar "$DL/OpenBLAS-0.3.30.tar.gz" "$L3_SRC")"
+    d="$(untar "$DL/openblas/OpenBLAS-0.3.30.tar.gz" "$L3_SRC")"
     run openblas-make.log make -C "$d" -j "$JOBS" USE_THREAD=0 USE_OPENMP=0 DYNAMIC_ARCH=0 NO_AFFINITY=1 TARGET="${HPCPERF_OPENBLAS_TARGET:-SAPPHIRERAPIDS}" CC=/usr/bin/gcc FC=/usr/bin/gfortran
     run openblas-install.log make -C "$d" PREFIX="$INST/openblas" install
     touch "$INST/openblas/.hpcperf-stage-done"
 fi
 BLAS="$INST/openblas/lib/libopenblas.so"
 if [ ! -f "$INST/hdf5/.hpcperf-stage-done" ]; then
-    d="$(untar "$DL/hdf5-1.14.5.tar.gz" "$L3_SRC")"; mkdir -p "$BLD/hdf5"
+    d="$(untar "$DL/hdf5/hdf5-1.14.5.tar.gz" "$L3_SRC")"; mkdir -p "$BLD/hdf5"
     run hdf5-configure.log cmake -S "$d" -B "$BLD/hdf5" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$(command -v mpicc)" \
         -DHDF5_ENABLE_PARALLEL=ON -DHDF5_BUILD_CPP_LIB=OFF -DHDF5_BUILD_FORTRAN=OFF -DHDF5_BUILD_JAVA=OFF -DHDF5_BUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF \
         -DHDF5_BUILD_TOOLS=ON -DBUILD_SHARED_LIBS=ON -DHDF5_ENABLE_Z_LIB_SUPPORT=ON -DHDF5_ENABLE_SZIP_SUPPORT=OFF -DCMAKE_INSTALL_PREFIX="$INST/hdf5" \
@@ -71,7 +76,7 @@ if [ ! -f "$INST/hdf5/.hpcperf-stage-done" ]; then
     touch "$INST/hdf5/.hpcperf-stage-done"
 fi
 if [ ! -f "$INST/boost-1.90.0/.hpcperf-stage-done" ]; then
-    tar -xf "$DL/boost-1.90.0-b2-nodocs.tar.xz" -C "$INST" boost-1.90.0/boost boost-1.90.0/LICENSE_1_0.txt 2>/dev/null || tar -xf "$DL/boost-1.90.0-b2-nodocs.tar.xz" -C "$INST"
+    tar -xf "$DL/boost/boost-1.90.0-b2-nodocs.tar.xz" -C "$INST" boost-1.90.0/boost boost-1.90.0/LICENSE_1_0.txt 2>/dev/null || tar -xf "$DL/boost/boost-1.90.0-b2-nodocs.tar.xz" -C "$INST"
     [ -f "$INST/boost-1.90.0/boost/version.hpp" ] || { echo "build.sh: Boost headers not found after extraction" >&2; exit 1; }
     touch "$INST/boost-1.90.0/.hpcperf-stage-done"
 fi

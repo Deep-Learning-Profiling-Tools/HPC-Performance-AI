@@ -1,0 +1,3 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/0001-cuda13-deviceOverlap-guard.patch	553baab7a0fa8545f0462e97dff57432ddcc80f3836279dbbfabc48aef2321c5	D	SPECFEM/specfem3d devel cc2e9ffa	src/src/gpu/initialize_gpu.cu
+2	src	patches/0002-blackwell-device-block.patch	adaacdfc726f589852c4aefa7c2abd719bd6bcfcb738f18271863129e9ce59c1	D	SPECFEM/specfem3d devel cc2e9ffa	src/src/gpu/mesh_constants_cuda.h

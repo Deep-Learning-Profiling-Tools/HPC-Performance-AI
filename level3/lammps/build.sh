@@ -5,10 +5,12 @@
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
 # Layout (Level 3 dependency isolation, nothing shared with Level 2):
-#   source    _upstream/level3/lammps        (fetch.sh; the app owns its Kokkos)
+#   source    level3/lammps/src              (frozen source bundle materialized by tools/prepare_benchmark.sh;
+#                                            the app owns its Kokkos in src/lib/kokkos; identity in provenance/)
 #   build     build/level3/lammps/<cuda|hip>
 #   install   .deps/level3/lammps/install    (+ .hpcperf-l3-fingerprint)
 #   logs      .deps/level3/lammps/logs
+# This script reads application source ONLY from $HERE/src; it never fetches, clones or patches.
 #
 # Toolchain: conda GCC 13.3.0 as nvcc_wrapper host compiler (LAMMPS documents
 # GCC >= 8 and C++17), system CUDA, conda Open MPI 5.0.10 (CUDA-aware).
@@ -33,9 +35,10 @@ l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install pref
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-SRC="$R/_upstream/level3/lammps"
-[ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: LAMMPS source missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"
+[ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a LAMMPS source tree -- run tools/prepare_benchmark.sh level3 lammps" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$SRC/lib/kokkos/CMakeLists.txt" | paste -sd.)"
 l3_paths lammps
 BUILD_DIR="$R/build/level3/lammps/$MODEL"
@@ -67,7 +70,7 @@ CMAKE_OPTS="BUILD_MPI=yes BUILD_OMP=yes CXX_STANDARD=17 Kokkos_ENABLE_${BACKEND}
 FP="$(l3_fingerprint_text lammps "$SHA" "$MODEL" "kokkos(bundled)=$KOKKOS_VER" "$CMAKE_OPTS" "runtime(-pk kokkos gpu/aware)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# LAMMPS $BACKEND: upstream $SHA, bundled Kokkos $KOKKOS_VER, arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# LAMMPS $BACKEND: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
 mkdir -p "$BUILD_DIR"
 cmake -S "$SRC/cmake" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$L3_INSTALL" \

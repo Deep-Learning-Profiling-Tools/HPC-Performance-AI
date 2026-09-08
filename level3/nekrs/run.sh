@@ -56,8 +56,11 @@ fi
 export NEKRS_HOME="$L3_INSTALL"
 EXE="$NEKRS_HOME/bin/nekrs"
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found for variant '$VARIANT' -- run HPCPERF_NEKRS_VARIANT=$VARIANT ./build.sh $BACKEND first" >&2; exit 1; }
-CASE_SRC="$R/_upstream/level3/nekRS/examples/ethier"
-[ -f "$CASE_SRC/ethier.re2" ] || { echo "run.sh: $CASE_SRC missing (run fetch.sh)" >&2; exit 1; }
+l3_require_materialized "$HERE" || exit 3
+MATERIALIZED="$(l3_materialized_variant "$HERE")"
+[ "$MATERIALIZED" = "$VARIANT" ] || { echo "run.sh: materialized source is variant '${MATERIALIZED:-unknown}', requested '$VARIANT' (tools/prepare_benchmark.sh level3 nekrs --variant $VARIANT)" >&2; exit 3; }
+CASE_SRC="$HERE/src/examples/ethier"     # frozen source bundle: the upstream case directory
+[ -f "$CASE_SRC/ethier.re2" ] || { echo "run.sh: $CASE_SRC missing (run tools/prepare_benchmark.sh level3 nekrs --variant $VARIANT)" >&2; exit 1; }
 
 N_RANKS="$(hpcperf_ranks nekrs yes)" || exit 2
 hpcperf_forbid_args nekrs --setup --device-id --backend -- "$@" || exit 2

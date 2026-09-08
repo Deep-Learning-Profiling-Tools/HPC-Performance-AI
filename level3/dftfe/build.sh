@@ -33,22 +33,28 @@ export CC=/usr/bin/gcc CXX=/usr/bin/g++ FC=/usr/bin/gfortran F77=/usr/bin/gfortr
 export OMPI_CC=/usr/bin/gcc OMPI_CXX=/usr/bin/g++ OMPI_FC=/usr/bin/gfortran CUDAHOSTCXX=/usr/bin/g++
 unset CMAKE_GENERATOR   # autotools/ExternalProject-style stages below drive make/ninja explicitly
 for c in mpicc mpicxx mpifort mpirun cmake ninja nvcc python3; do command -v $c >/dev/null || { echo "build.sh: $c not in PATH" >&2; exit 1; }; done
-SRC="$R/_upstream/level3/dftfe"; DL="$R/.deps/level3/dftfe/downloads"
+# Sources come ONLY from the frozen bundle materialized here (tools/prepare_benchmark.sh): src/ = DFT-FE
+# 1.2.0 with the isnan patch already applied, deps/<pkg>/<tarball or checkout> = the pinned dependency
+# sources. Nothing is fetched, cloned or patched by this script.
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; DL="$HERE/deps"
 # deal.II 9.6.2: the newest deal.II whose API release 1.2.0 still compiles against (9.7 removed Utilities::MPI::create_group,
 # Triangulation::load(name, autopartition) and VtkFlags::ZlibCompressionLevel, all used by 1.2.0; 9.5.2 is the release's own pin;
-# 9.7.1 is what the current install_DFTFE recipe pairs with the *develop* branch) -- see README.
+# 9.7.1 is what the current install_DFTFE recipe pairs with the *develop* branch) -- see README. Only 9.6.2 is bundled.
 DEALII_VER="${HPCPERF_DFTFE_DEALII:-9.6.2}"
-[ -f "$SRC/CMakeLists.txt" ] && [ -f "$DL/dealii-$DEALII_VER.tar.gz" ] || { echo "build.sh: run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"
-# Source compatibility patches (headers in patches/*.patch): applied to the checkout idempotently; hashes in the fingerprint.
+[ -f "$SRC/CMakeLists.txt" ] && [ -f "$DL/dealii/dealii-$DEALII_VER.tar.gz" ] || { echo "build.sh: src/ or deps/dealii incomplete -- run tools/prepare_benchmark.sh level3 dftfe" >&2; exit 3; }
+for tb in openblas/OpenBLAS-0.3.30.tar.gz scalapack/v2.2.2.tar.gz libxc/libxc-7.0.0.tar.gz alglib/alglib-4.06.0.cpp.gpl.tgz p4est/p4est-2.8.7.tar.gz p4est/p4est-setup.sh kokkos/4.6.00.tar.gz elpa/elpa-2026.02.001.tar.gz spglib/CMakeLists.txt; do
+    [ -f "$DL/$tb" ] || { echo "build.sh: deps/$tb missing from the materialized bundle" >&2; exit 3; }
+done
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
+# The source compatibility patch (patches/0001-std-isnan.patch) is part of the frozen baseline
+# (provenance/patch_series.txt); its content hash stays in the fingerprint exactly as before.
 DFTFE_PATCH_SHA=""
 for P in "$HERE"/patches/000*.patch; do
     [ -f "$P" ] || continue
-    if git -C "$SRC" apply --check --reverse "$P" >/dev/null 2>&1; then :
-    elif git -C "$SRC" apply --check "$P" >/dev/null 2>&1; then git -C "$SRC" apply "$P"; echo "# applied $(basename "$P") to the dftfe checkout"
-    else echo "build.sh: $P is neither applied nor applicable to dftfe $SHA" >&2; exit 1; fi
     DFTFE_PATCH_SHA="$DFTFE_PATCH_SHA${DFTFE_PATCH_SHA:+,}$(basename "$P" | cut -d- -f1)=$(sha256sum "$P" | cut -c1-12)"
 done
+[ "$(l3_lock_patches "$HERE")" = "$(for P in "$HERE"/patches/000*.patch; do basename "$P"; done | paste -sd' ')" ] || { echo "build.sh: patch series in the lock file differs from patches/ -- the frozen tree is not the expected baseline" >&2; exit 3; }
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ -n "$ARCH" ] || { echo "build.sh: no GPU arch detected" >&2; exit 1; }
 ELPA_GPU="$(echo "${HPCPERF_DFTFE_ELPA_GPU:-ON}" | tr '[:lower:]' '[:upper:]')"
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
@@ -56,11 +62,11 @@ PROFILE="${HPCPERF_DFTFE_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc$
 l3_paths_profile dftfe "$PROFILE"
 JOBS="${HPCPERF_BUILD_JOBS:-16}"; INST="$L3_INSTALL"; BLD="$L3_BUILD_DEPS"; SRCD="$L3_SRC"
 CUDA_ROOT="${CUDA_HOME:-/usr/local/cuda}"
-DEPS_DESC="dftfe_patches[$DFTFE_PATCH_SHA] openblas=0.3.30 scalapack=2.2.2 libxc=7.0.0 spglib=02159eef alglib=4.06.0 p4est=2.8.7 kokkos=4.6.00(serial) dealii=$DEALII_VER elpa=2026.02.001(nvidia-gpu-kernels=$ELPA_GPU sm_$ARCH) gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V downloads_sha256=$(sha256sum "$DL/SHA256SUMS" | cut -c1-16) profile=$PROFILE"
+DEPS_DESC="dftfe_patches[$DFTFE_PATCH_SHA] openblas=0.3.30 scalapack=2.2.2 libxc=7.0.0 spglib=02159eef alglib=4.06.0 p4est=2.8.7 kokkos=4.6.00(serial) dealii=$DEALII_VER elpa=2026.02.001(nvidia-gpu-kernels=$ELPA_GPU sm_$ARCH) gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V bundle_tree=$(echo "$TREE_SHA" | cut -c1-16) profile=$PROFILE"
 DFTFE_OPTS="WITH_GPU=ON GPU_LANG=cuda GPU_VENDOR=nvidia CMAKE_CUDA_ARCHITECTURES=$ARCH WITH_DCCL=OFF WITH_GPU_AWARE_MPI=OFF WITH_COMPLEX=OFF(+ON if HPCPERF_DFTFE_COMPLEX) USE_64BIT_INT=ON HIGHERQUAD_PSP=OFF WITH_TESTING=OFF BUILD_SHARED_LIBS=ON CMAKE_BUILD_TYPE=Release"
 FP="$(l3_fingerprint_text dftfe "$SHA" cuda "$DEPS_DESC" "$DFTFE_OPTS" "WITH_GPU_AWARE_MPI=OFF")"
 l3_fingerprint_check "$INST" "$FP" || exit 1
-echo "# DFT-FE profile=$PROFILE: dftfe $SHA (1.2.0), gcc $(/usr/bin/gcc -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS; expected 2.5-4 h (deal.II dominates), ~10 GB under $L3_DEPS"
+echo "# DFT-FE profile=$PROFILE: dftfe $SHA (1.2.0, frozen source tree $TREE_SHA), gcc $(/usr/bin/gcc -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS; expected 2.5-4 h (deal.II dominates), ~10 GB under $L3_DEPS"
 T0=$(date +%s)
 done_marker() { [ -f "$INST/$1/.hpcperf-stage-done" ]; }
 finish() { touch "$INST/$1/.hpcperf-stage-done"; echo "# stage $1 done ($(( $(date +%s) - T0 )) s since start)"; }
@@ -74,7 +80,7 @@ run() { # run <log> <cmd...>
 
 # 1. OpenBLAS (BLAS+LAPACK for ScaLAPACK/deal.II/ELPA/DFT-FE), single-threaded, gfortran 14
 if ! done_marker openblas; then
-    d="$(untar "$DL/OpenBLAS-0.3.30.tar.gz" "$SRCD")"
+    d="$(untar "$DL/openblas/OpenBLAS-0.3.30.tar.gz" "$SRCD")"
     run openblas-make.log make -C "$d" -j "$JOBS" USE_THREAD=0 USE_OPENMP=0 DYNAMIC_ARCH=0 NO_AFFINITY=1 TARGET="${HPCPERF_OPENBLAS_TARGET:-SAPPHIRERAPIDS}" CC=/usr/bin/gcc FC=/usr/bin/gfortran
     run openblas-install.log make -C "$d" PREFIX="$INST/openblas" install
     finish openblas
@@ -82,7 +88,7 @@ fi
 BLAS="$INST/openblas/lib/libopenblas.so"
 # 2. ScaLAPACK 2.2.2 (reference), on OpenBLAS, MPI via the wrappers
 if ! done_marker scalapack; then
-    d="$(untar "$DL/v2.2.2.tar.gz" "$SRCD")"; mkdir -p "$BLD/scalapack"
+    d="$(untar "$DL/scalapack/v2.2.2.tar.gz" "$SRCD")"; mkdir -p "$BLD/scalapack"
     run scalapack-configure.log cmake -S "$d" -B "$BLD/scalapack" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DBUILD_TESTING=OFF \
         -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_Fortran_COMPILER=/usr/bin/gfortran -DMPI_C_COMPILER="$(command -v mpicc)" -DMPI_Fortran_COMPILER="$(command -v mpifort)" \
         -DCMAKE_C_FLAGS="-fPIC -Wno-error=implicit-function-declaration" -DCMAKE_Fortran_FLAGS="-fPIC -fallow-argument-mismatch" \
@@ -92,7 +98,7 @@ if ! done_marker scalapack; then
 fi
 # 3. libxc 7.0.0
 if ! done_marker libxc; then
-    d="$(untar "$DL/libxc-7.0.0.tar.gz" "$SRCD")"; mkdir -p "$BLD/libxc"
+    d="$(untar "$DL/libxc/libxc-7.0.0.tar.gz" "$SRCD")"; mkdir -p "$BLD/libxc"
     run libxc-configure.log cmake -S "$d" -B "$BLD/libxc" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
         -DCMAKE_C_FLAGS="-O2 -fPIC" -DCMAKE_CXX_FLAGS="-O2 -fPIC" -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF -DENABLE_FORTRAN=OFF -DCMAKE_INSTALL_PREFIX="$INST/libxc"
     run libxc-build.log cmake --build "$BLD/libxc" -j "$JOBS"; run libxc-install.log cmake --install "$BLD/libxc"
@@ -108,7 +114,7 @@ if ! done_marker spglib; then
 fi
 # 5. ALGLIB 4.06.0 (C++ sources -> shared library, as upstream's recipe)
 if ! done_marker alglib; then
-    d="$SRCD/alglib-cpp"; [ -d "$d" ] || { mkdir -p "$SRCD"; tar -xzf "$DL/alglib-4.06.0.cpp.gpl.tgz" -C "$SRCD"; }
+    d="$SRCD/alglib-cpp"; [ -d "$d" ] || { mkdir -p "$SRCD"; tar -xzf "$DL/alglib/alglib-4.06.0.cpp.gpl.tgz" -C "$SRCD"; }
     mkdir -p "$INST/alglib"
     ( cd "$d/src" && /usr/bin/g++ -o "$INST/alglib/libAlglib.so" -shared -fPIC -O2 ./*.cpp && cp ./*.h "$INST/alglib/" ) > "$L3_LOGS/alglib.log" 2>&1 || { tail -20 "$L3_LOGS/alglib.log"; echo "build.sh: ALGLIB failed" >&2; exit 1; }
     finish alglib
@@ -116,7 +122,7 @@ fi
 # 6. p4est 2.8.7 with dftfe's p4est-setup.sh (FAST + DEBUG trees, MPI, zlib required)
 if ! done_marker p4est; then
     [ -f /usr/include/zlib.h ] || { echo "build.sh: /usr/include/zlib.h missing (zlib-devel) -- p4est/deal.II need zlib" >&2; exit 1; }
-    mkdir -p "$SRCD/p4est"; cp "$DL/p4est-2.8.7.tar.gz" "$DL/p4est-setup.sh" "$SRCD/p4est/"; chmod +x "$SRCD/p4est/p4est-setup.sh"
+    mkdir -p "$SRCD/p4est"; cp "$DL/p4est/p4est-2.8.7.tar.gz" "$DL/p4est/p4est-setup.sh" "$SRCD/p4est/"; chmod +x "$SRCD/p4est/p4est-setup.sh"
     # p4est 2.8.7 writes its configured header to <build>/config/p4est_config.h; dftfe's p4est-setup.sh (written for
     # older p4est layouts) looks for <build>/src/p4est_config.h in its zlib check -> point the check at the 2.8.7 location
     sed -i 's|/src/p4est_config.h"|/config/p4est_config.h"|g' "$SRCD/p4est/p4est-setup.sh"
@@ -129,7 +135,7 @@ if ! done_marker p4est; then
 fi
 # 7. Kokkos 4.6.00 (Serial; deal.II's Kokkos dependency -- CPU only, as upstream)
 if ! done_marker kokkos; then
-    d="$(untar "$DL/4.6.00.tar.gz" "$SRCD")"; mkdir -p "$BLD/kokkos"
+    d="$(untar "$DL/kokkos/4.6.00.tar.gz" "$SRCD")"; mkdir -p "$BLD/kokkos"
     run kokkos-configure.log cmake -S "$d" -B "$BLD/kokkos" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_CXX_STANDARD=17 \
         -DCMAKE_CXX_FLAGS="-O2 -fPIC" -DKokkos_ENABLE_SERIAL=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX="$INST/kokkos"
     run kokkos-build.log cmake --build "$BLD/kokkos" -j "$JOBS"; run kokkos-install.log cmake --install "$BLD/kokkos"
@@ -137,7 +143,7 @@ if ! done_marker kokkos; then
 fi
 # 8. deal.II (version: DEALII_VER above)
 if ! done_marker dealii; then
-    d="$(untar "$DL/dealii-$DEALII_VER.tar.gz" "$SRCD")"; mkdir -p "$BLD/dealii"
+    d="$(untar "$DL/dealii/dealii-$DEALII_VER.tar.gz" "$SRCD")"; mkdir -p "$BLD/dealii"
     run dealii-configure.log cmake -S "$d" -B "$BLD/dealii" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER="$(command -v mpicc)" -DCMAKE_CXX_COMPILER="$(command -v mpicxx)" -DCMAKE_Fortran_COMPILER="$(command -v mpifort)" \
         -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_FLAGS="-std=c++17" -DDEAL_II_CXX_FLAGS_RELEASE=-O2 -DDEAL_II_ALLOW_PLATFORM_INTROSPECTION=OFF \
@@ -157,7 +163,7 @@ fi
 #    LDFLAGS carries the ScaLAPACK/OpenBLAS library paths as well: ELPA's later CUDA checks (cublas) link
 #    with LIBS=-lscalapack but replace LDFLAGS by the CUDA path, so without them "cannot find -lscalapack".
 if ! done_marker elpa; then
-    d="$(untar "$DL/elpa-2026.02.001.tar.gz" "$SRCD")"; mkdir -p "$BLD/elpa"
+    d="$(untar "$DL/elpa/elpa-2026.02.001.tar.gz" "$SRCD")"; mkdir -p "$BLD/elpa"
     GPUOPTS=(--disable-nvidia-gpu-kernels)
     [ "$ELPA_GPU" = ON ] && GPUOPTS=(--enable-nvidia-gpu-kernels "--with-NVIDIA-GPU-compute-capability=sm_$ARCH" "--with-cuda-path=$CUDA_ROOT")
     ( cd "$BLD/elpa" && "$d/configure" --prefix="$INST/elpa" CC="$(command -v mpicc)" CXX="$(command -v mpicxx)" FC="$(command -v mpifort)" \
@@ -173,11 +179,16 @@ if ! done_marker elpa; then
     ls "$BLD/elpa"/validate_* > "$INST/elpa/TEST_PROGRAMS.txt" 2>/dev/null || true
     finish elpa
 fi
-# 10. DFT-FE (real; complex on request)
+# 10. DFT-FE (real; complex on request). DFT-FE's CMake writes include/git_info.h INTO its source directory,
+#     so the application is configured from a build-side copy of the frozen tree (the frozen src/ stays pristine).
+SRC_BUILD="$SRCD/dftfe-src"
+if [ ! -f "$SRC_BUILD/.hpcperf-src-stamp" ] || [ "$(cat "$SRC_BUILD/.hpcperf-src-stamp")" != "$SHA tree=$TREE_SHA" ]; then
+    rm -rf "$SRC_BUILD"; mkdir -p "$SRC_BUILD"; rsync -a "$SRC/" "$SRC_BUILD/"; echo "$SHA tree=$TREE_SHA" > "$SRC_BUILD/.hpcperf-src-stamp"
+fi
 build_dftfe() { # build_dftfe <real|complex>
     local kind=$1 cplx=OFF; [ "$kind" = complex ] && cplx=ON
     mkdir -p "$L3_BUILD/$kind"
-    run "dftfe-$kind-configure.log" cmake -S "$SRC" -B "$L3_BUILD/$kind" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+    run "dftfe-$kind-configure.log" cmake -S "$SRC_BUILD" -B "$L3_BUILD/$kind" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
         -DCMAKE_CXX_COMPILER="$(command -v mpicxx)" -DCMAKE_CXX_FLAGS="-fPIC" -DCMAKE_CXX_FLAGS_RELEASE="-O2" \
         -DDEAL_II_DIR="$INST/dealii" -DALGLIB_DIR="$INST/alglib" -DLIBXC_DIR="$INST/libxc" -DSPGLIB_DIR="$INST/spglib" \
         -DXML_LIB_DIR=/usr/lib64 -DXML_INCLUDE_DIR=/usr/include/libxml2 -DCMAKE_PREFIX_PATH="$INST/elpa" \

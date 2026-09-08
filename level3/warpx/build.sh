@@ -4,11 +4,14 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): sources _upstream/level3/{WarpX,amrex}, build
+# Layout (Level 3 isolation): sources level3/warpx/src (WarpX) and
+# level3/warpx/deps/amrex (AMReX 26.09) -- the frozen source bundle materialized
+# by tools/prepare_benchmark.sh (identity in provenance/); build
 # build/level3/warpx/<cuda|hip>, install .deps/level3/warpx/install
 # (+ .hpcperf-l3-fingerprint), logs .deps/level3/warpx/logs. AMReX is built
-# by WarpX's superbuild from the local source (-DWarpX_amrex_src) -- it is
-# WarpX's private copy, nothing is shared with other Level 3 applications.
+# by WarpX's superbuild from deps/amrex (-DWarpX_amrex_src) -- it is WarpX's
+# private copy, nothing is shared with other Level 3 applications. No source
+# is read from outside the benchmark directory; nothing is fetched or patched.
 #
 # Configuration (bring-up subset of the documented options): WarpX_COMPUTE=CUDA,
 # CMAKE_CUDA_ARCHITECTURES=100 (sm_100), WarpX_DIMS=3, WarpX_MPI=ON,
@@ -28,9 +31,10 @@ l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install pref
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-SRC="$R/_upstream/level3/WarpX"; AMREX="$R/_upstream/level3/amrex"
-[ -f "$SRC/CMakeLists.txt" ] && [ -f "$AMREX/CMakeLists.txt" ] || { echo "build.sh: sources missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"; AMREX_SHA="$(git -C "$AMREX" rev-parse HEAD)"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; AMREX="$HERE/deps/amrex"
+[ -f "$SRC/CMakeLists.txt" ] && [ -f "$AMREX/CMakeLists.txt" ] || { echo "build.sh: src/ or deps/amrex incomplete -- run tools/prepare_benchmark.sh level3 warpx" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; AMREX_SHA="$(l3_component_commit "$HERE" deps/amrex)"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 l3_paths warpx
 BUILD_DIR="$R/build/level3/warpx/$MODEL"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
@@ -52,7 +56,7 @@ CMAKE_OPTS="WarpX_COMPUTE=$BACKEND arch=$ARCHNOTE WarpX_DIMS=3 WarpX_MPI=ON Warp
 FP="$(l3_fingerprint_text warpx "$SHA" "$MODEL" "amrex=26.09($AMREX_SHA) picsar-qed=off openpmd=off" "$CMAKE_OPTS" "runtime(amrex.use_gpu_aware_mpi auto)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# WarpX $BACKEND: upstream $SHA, AMReX $AMREX_SHA (26.09), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# WarpX $BACKEND: upstream $SHA, AMReX $AMREX_SHA (26.09), frozen source tree $TREE_SHA, arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
 mkdir -p "$BUILD_DIR"
 cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$L3_INSTALL" \

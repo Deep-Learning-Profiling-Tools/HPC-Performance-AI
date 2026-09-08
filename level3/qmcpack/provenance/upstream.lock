@@ -1,0 +1,4 @@
+src	https://github.com/QMCPACK/qmcpack.git	v4.4.0	2601d62e353934f1526cab1f67f30b6672b7c76f
+deps/hdf5/hdf5-1.14.5.tar.gz	https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.5/hdf5-1.14.5.tar.gz	1.14.5	sha256:ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
+deps/boost/boost-1.90.0-b2-nodocs.tar.xz	https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.xz	1.90.0	sha256:9e6bee9ab529fb2b0733049692d57d10a72202af085e553539a05b4204211a6f
+deps/openblas/OpenBLAS-0.3.30.tar.gz	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz	0.3.30	sha256:27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d

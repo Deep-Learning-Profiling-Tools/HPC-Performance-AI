@@ -1,0 +1,54 @@
+name: geos
+level: 3
+application: GEOS
+description: GEOS develop b7a0f13305 (CUDA sm_100, hypre AMG on device, thirdPartyLibs superbuild 361-1070 built from deps/);
+  beamBending solid-mechanics workflow at 1/2/4 GPUs
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU, explicit -x/-y/-z partition grid (requested == decomposed)
+default_scale_mode: smoke
+scale_modes:
+  smoke: beamBending 80x8x4 with GMRES+AMG on device (geos-ats curve metric 1.376e-4 <= 2e-4) + shipped direct-solver deck
+    vs the public restart baseline (0 disagree); validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07
+    regression)
+  strong: beamBending_benchmark 160x16x8 verbatim, completed 1/2/4 GPU runs (decks too small for a B200 -- completeness records)
+  weak: refinement weak 80x8x4 elements per GPU, completed 1/2/4 GPU runs (same caveat)
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only (HYPOTHETICAL; 3 ranks refused -- cannot partition 80x8x4), never executed
+known_limits: 'unit tests 254/261: 5 compositional-flow / well physics tests FAIL on this GPU build -- those modules are UNVERIFIED;
+  the beam workflow is unaffected'
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh with system GCC/gfortran 14.2.1 (OMPI_* redirection), CUDA 13.2.78, Open MPI 5.0.10, Python
+  3 (config-build.py; h5py venv under install/venv)
+install_root: .deps/level3/geos/cuda132-gcc142-ompi5010
+dependency_installs:
+- install/openblas
+- install/tpl
+- install/venv
+inputs:
+- src/inputFiles/solidMechanics/beamBending_base.xml
+- src/inputFiles/solidMechanics/beamBending_smoke.xml
+- src/inputFiles/solidMechanics/beamBending_benchmark.xml
+references:
+- src/inputFiles/solidMechanics/beamBending_curve.py
+datasets:
+- name: GEOS integrated-test baseline beamBending_smoke_01
+  file: .deps/level3/geos/downloads/baseline_integratedTests-pr3994-17525-4ae3593.tar.gz
+  size: 1572932914
+  sha256_recorded_in: level3/geos/README.md (de62cec7...)
+  license: LGPL-2.1 (GEOS project data)
+  used_by: validate.sh criterion [4] on 1 rank
+source_version: develop b7a0f13305 (2026-09-04) + thirdPartyLibs 9b55672 (TPL 361-1070)
+source_tree_sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
+source_bundle:
+  archive: archives/source_bundle.tar.zst
+  archive_sha256: cc5a6bfaf27504a200f46ca2f610dbca86a3a3e8a7753faa7bf7ca5dc8b309d1
+  source_tree_sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
+  compressed_size: 380218896
+  uncompressed_size: 787552164
+  file_count: 7026

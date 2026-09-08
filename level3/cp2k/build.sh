@@ -42,9 +42,13 @@ l3_clean_conda_build_env   # conda's LDFLAGS carry -Wl,--disable-new-dtags/-rpat
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ "$BACKEND" = CUDA ] || { echo "build.sh: only CUDA is implemented for CP2K here (HIP: no ROCm on this node, UNTESTED)" >&2; exit 2; }
-SRC="$R/_upstream/level3/cp2k"
-[ -f "$SRC/CMakeLists.txt" ] && [ -f "$SRC/tools/toolchain/install_cp2k_toolchain.sh" ] || { echo "build.sh: run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$SRC" rev-parse HEAD)"
+# Sources come ONLY from the frozen bundle materialized here (tools/prepare_benchmark.sh): src/ = CP2K
+# v2026.2 whose tools/toolchain already carries the B200 back-port; deps/cp2k-toolchain-dist/ = the package
+# tarballs the toolchain installer would download. Nothing is fetched, cloned or patched by this script.
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; TC_DIST="$HERE/deps/cp2k-toolchain-dist"
+[ -f "$SRC/CMakeLists.txt" ] && [ -f "$SRC/tools/toolchain/install_cp2k_toolchain.sh" ] && [ -d "$TC_DIST" ] || { echo "build.sh: src/ or deps/cp2k-toolchain-dist incomplete -- run tools/prepare_benchmark.sh level3 cp2k" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 # system GCC 14 toolchain for C/C++/Fortran; conda Open MPI wrappers redirected to it
 export CC=/usr/bin/gcc CXX=/usr/bin/g++ FC=/usr/bin/gfortran F90=/usr/bin/gfortran F77=/usr/bin/gfortran
 export OMPI_CC=/usr/bin/gcc OMPI_CXX=/usr/bin/g++ OMPI_FC=/usr/bin/gfortran CUDAHOSTCXX=/usr/bin/g++
@@ -66,7 +70,8 @@ JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 TC_SCRATCH="${HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/$PROFILE}"
 mkdir -p "$(dirname "$TC_SCRATCH")"; [ -L "$L3_SRC/toolchain" ] || { rm -rf "$L3_SRC/toolchain"; ln -sfn "$TC_SCRATCH" "$L3_SRC/toolchain"; }
 TC_SRC="$TC_SCRATCH"; TC_INSTALL="$L3_INSTALL/toolchain"; CP2K_PREFIX="$L3_INSTALL/cp2k"
-PATCHES=("$HERE/patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch")
+PATCHES=("$HERE/patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch")   # already applied in the frozen src/tools/toolchain; content hash kept in the fingerprint
+[ "$(l3_lock_patches "$HERE")" = "$(basename "${PATCHES[0]}")" ] || { echo "build.sh: the lock's patch series ($(l3_lock_patches "$HERE")) differs from the expected $(basename "${PATCHES[0]}")" >&2; exit 3; }
 TC_OPTS=(--install-dir="$TC_INSTALL" --mpi-mode=openmpi --math-mode=openblas --with-gcc=system --with-openmpi=system --with-cmake=system
          --enable-cuda=yes --gpu-ver=$GPUVER --libint-lmax=5
          --with-openblas=install --with-scalapack=install --with-fftw=install --with-libint=install --with-libxc=install
@@ -100,17 +105,19 @@ DEPS="toolchain(install_cp2k_toolchain.sh v2026.2 + backport 378b2fab) dbcsr=2.1
 FP="$(l3_fingerprint_text cp2k "$SHA" cuda "$DEPS" "$CMAKE_OPTS" "not-used(DBCSR/DBM communicate through host buffers)" "${PATCHES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# CP2K $BACKEND profile=$PROFILE: cp2k $SHA (v2026.2), gcc $(/usr/bin/gcc -dumpfullversion), gfortran $(/usr/bin/gfortran -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
+echo "# CP2K $BACKEND profile=$PROFILE: cp2k $SHA (v2026.2, frozen source tree $TREE_SHA), gcc $(/usr/bin/gcc -dumpfullversion), gfortran $(/usr/bin/gfortran -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
 echo "# resources: toolchain ~1.5-3 h (libint lmax 5 dominates), DBCSR tests ~10 min, CP2K ~40-90 min; disk ~10-15 GB under $L3_DEPS"
 t0=$(date +%s)
 
-# [A] toolchain (private, patched copy of tools/toolchain; the checkout is never written to)
+# [A] toolchain (build-side copy of the frozen src/tools/toolchain, which already carries the B200 back-port;
+#     the frozen tree is never written to). The package tarballs of the bundle are pre-seeded into the
+#     installer's build directory: retrieve_package() finds them, verifies the same sha256 and does not download.
 if [ ! -f "$TC_INSTALL/.hpcperf-stage-done" ]; then
-    if [ ! -f "$TC_SRC/.hpcperf-patched" ]; then
+    if [ ! -f "$TC_SRC/.hpcperf-src-stamp" ] || [ "$(cat "$TC_SRC/.hpcperf-src-stamp")" != "$SHA tree=$TREE_SHA" ]; then
         rm -rf "$TC_SRC"; mkdir -p "$TC_SRC"; cp -r "$SRC/tools/toolchain/." "$TC_SRC/"
-        for p in "${PATCHES[@]}"; do (cd "$TC_SRC" && patch -p1 < "$p") > "$L3_LOGS/patch-$(basename "$p").log" 2>&1 || { cat "$L3_LOGS/patch-$(basename "$p").log"; echo "build.sh: patch $p failed" >&2; exit 1; }; done
-        sha256sum "${PATCHES[@]}" > "$TC_SRC/.hpcperf-patched"
+        echo "$SHA tree=$TREE_SHA" > "$TC_SRC/.hpcperf-src-stamp"
     fi
+    mkdir -p "$TC_SRC/build"; cp -n "$TC_DIST"/* "$TC_SRC/build/"
     echo "# [A] toolchain: ${TC_OPTS[*]}"
     # the toolchain installer writes `declare -x` of its whole environment into <install>/toolchain.env:
     # run it under the allow-listed environment so that no login-shell secret can end up in that file

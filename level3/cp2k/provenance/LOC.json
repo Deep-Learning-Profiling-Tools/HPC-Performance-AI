@@ -1,0 +1,145 @@
+{
+ "benchmark": "cp2k",
+ "cloc": "2.06",
+ "test_code_loc": {
+  "code": 38960,
+  "files": 559,
+  "languages": {
+   "reStructuredText": 12885,
+   "JSON": 7249,
+   "Fortran 77": 6898,
+   "TOML": 5755,
+   "YAML": 3081,
+   "Fortran 90": 1800,
+   "Python": 888,
+   "Pawn": 166,
+   "Markdown": 155,
+   "Text": 40,
+   "C Shell": 34,
+   "XML": 9
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 1085842,
+  "files": 1508,
+  "languages": {
+   "Fortran 77": 1015193,
+   "C": 58310,
+   "C/C++ Header": 6482,
+   "CMake": 1962,
+   "CUDA": 1572,
+   "C++": 1341,
+   "Markdown": 373,
+   "OpenCL": 311,
+   "make": 256,
+   "Fortran 90": 42
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 20350978,
+  "files": 37068,
+  "languages": {
+   "C": 6410597,
+   "Assembly": 1089528,
+   "Fortran 77": 1115977,
+   "C/C++ Header": 1666177,
+   "make": 27427,
+   "CMake": 31671,
+   "Fortran 90": 11513,
+   "Bourne Shell": 45499,
+   "Perl": 6259,
+   "Markdown": 20531,
+   "Text": 8672,
+   "YAML": 35737,
+   "Python": 24297,
+   "TeX": 15400,
+   "SVG": 450,
+   "MATLAB": 401,
+   "C++": 9438523,
+   "XML": 34348,
+   "R": 113,
+   "Meson": 107,
+   "Prolog": 54,
+   "Groovy": 19,
+   "Bourne Again Shell": 1403,
+   "diff": 4,
+   "JSON": 231266,
+   "reStructuredText": 1890,
+   "Dockerfile": 194,
+   "INI": 37,
+   "TOML": 201,
+   "CUDA": 3595,
+   "Pascal": 3266,
+   "PHP": 358,
+   "Windows Module Definition": 262,
+   "CSS": 293,
+   "PowerShell": 147,
+   "HTML": 12429,
+   "XSLT": 116,
+   "DTD": 30,
+   "JavaScript": 2,
+   "m4": 11630,
+   "OCaml": 5442,
+   "Fortran 2003": 1086,
+   "CSV": 91854,
+   "Visual Studio Solution": 1259,
+   "DOS Batch": 95,
+   "Bazel": 24,
+   "Ruby": 795
+  },
+  "tarballs": {
+   "deps/cp2k-toolchain-dist/OpenBLAS-0.3.33.tar.gz": 3906127,
+   "deps/cp2k-toolchain-dist/dbcsr-2.10.0.tar.gz": 306372,
+   "deps/cp2k-toolchain-dist/eigen-5.0.1.tar.gz": 283060,
+   "deps/cp2k-toolchain-dist/fftw-3.3.11.tar.gz": 343127,
+   "deps/cp2k-toolchain-dist/libint-v2.13.1-cp2k-lmax-5.tar.xz": 10750379,
+   "deps/cp2k-toolchain-dist/libxc-7.0.0.tar.bz2": 3795605,
+   "deps/cp2k-toolchain-dist/libxs-1.0.0.tar.gz": 129537,
+   "deps/cp2k-toolchain-dist/libxsmm-2.0.0.tar.gz": 232113,
+   "deps/cp2k-toolchain-dist/scalapack-2.2.3.tar.gz": 421207,
+   "deps/cp2k-toolchain-dist/spglib-2.7.0.tar.gz": 183451
+  }
+ },
+ "unclassified": {
+  "code": 3319,
+  "files": 12,
+  "languages": {
+   "Bourne Shell": 1364,
+   "CMake": 1107,
+   "YAML": 631,
+   "Markdown": 145,
+   "Dockerfile": 72
+  }
+ },
+ "agent_modifiable_code_loc": {
+  "code": 1085842,
+  "files": 1508,
+  "languages": {
+   "Fortran 77": 1015193,
+   "C": 58310,
+   "C/C++ Header": 6482,
+   "CMake": 1962,
+   "CUDA": 1572,
+   "C++": 1341,
+   "Markdown": 373,
+   "OpenCL": 311,
+   "make": 256,
+   "Fortran 90": 42
+  }
+ },
+ "total_materialized_code_loc": 21479099,
+ "summary": {
+  "application_owned_code_loc": 1085842,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 20350978,
+  "test_code_loc": 38960,
+  "agent_modifiable_code_loc": 1085842,
+  "total_materialized_code_loc": 21479099,
+  "unclassified_code_loc": 3319
+ }
+}

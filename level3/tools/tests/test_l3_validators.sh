@@ -59,7 +59,9 @@ cp2k_check "$TMP/gridcpu.out" && bad "cp2k 8: GRID tasks all on CPU accepted" ||
 : > "$TMP/empty.out"; cp2k_check "$TMP/empty.out" && bad "cp2k 9: empty output accepted" || ok "cp2k 9: empty output rejected"
 
 # ---------------------------------------------------------------- QMCPACK: qmc_check.py
-QMC_CHK="$R/level3/qmcpack/qmc_check.py"; CS="$R/_upstream/level3/qmcpack/tests/scripts/check_scalars.py"
+QMC_CHK="$R/level3/qmcpack/qmc_check.py"
+# upstream's check_scalars.py from the materialized bundle (level3/qmcpack/src); before materialization the freeze-time checkout
+CS="$R/level3/qmcpack/src/tests/scripts/check_scalars.py"; [ -f "$CS" ] || CS="$R/_upstream/level3/qmcpack/tests/scripts/check_scalars.py"
 realq="$(ls -d "$R"/build/level3/qmcpack/*/run/diamond2.smoke.np1.t*/qmc.out 2>/dev/null | head -1)"
 if [ -n "$realq" ] && [ -f "$CS" ]; then
     RD="$(dirname "$realq")"; prefix="$(/usr/bin/grep -m1 '^prefix=' "$RD/run_manifest.txt" | cut -d= -f2)"
@@ -81,7 +83,8 @@ fi
 DFT_CHK="$R/level3/dftfe/dftfe_check.py"
 reald="$(ls -d "$R"/build/level3/dftfe/*/run/al_md.smoke.np1*/dftfe.out 2>/dev/null | head -1)"
 if [ -f "$DFT_CHK" ] && [ -n "$reald" ]; then
-    RD="$(dirname "$reald")"; REFD="$R/_upstream/level3/dftfe/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0"
+    RD="$(dirname "$reald")"; REFD="$R/level3/dftfe/src/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0"
+    [ -f "$REFD" ] || REFD="$R/_upstream/level3/dftfe/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0"   # before materialization
     dft_check() { python3 "$DFT_CHK" "$1/dftfe.out" "$REFD" --check >/dev/null 2>&1; }
     mk() { rm -rf "$TMP/d"; cp -r "$RD" "$TMP/d"; }
     mk; dft_check "$TMP/d" && ok "dftfe 1: genuine run accepted" || bad "dftfe 1: genuine run rejected"

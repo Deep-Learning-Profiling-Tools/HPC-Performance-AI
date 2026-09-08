@@ -44,8 +44,9 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shi
 [ "$BACKEND" = CUDA ] || { echo "run.sh: only CUDA (OpenMP offload + CUDA) is built for QMCPACK here" >&2; exit 2; }
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
 l3_paths_profile qmcpack "$PROFILE"
-SRC="$R/_upstream/level3/qmcpack"
-LLVM="$L3_INSTALL/llvm"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle: tests/solids/diamondC_2x1x1_pp (deck, pseudopotential, orbitals) lives inside it
+LLVM="${HPCPERF_QMCPACK_LLVM:-$L3_INSTALL/llvm}"
 EXE="$L3_INSTALL/qmcpack-real/bin/qmcpack"
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh first (profile $PROFILE)" >&2; exit 1; }
 export LD_LIBRARY_PATH="$LLVM/lib:$LLVM/lib/x86_64-unknown-linux-gnu:$L3_INSTALL/hdf5/lib:$L3_INSTALL/openblas/lib:${LD_LIBRARY_PATH:-}"
@@ -60,7 +61,7 @@ case "$CASE" in
     diamond2) CASE_DIR="$SRC/tests/solids/diamondC_2x1x1_pp"; INP="$CASE_DIR/qmc_short_vmcbatch_dmcbatch.in.xml"; AUX="C.BFD.xml pwscf.pwscf.h5"; PREFIX=qmc_short_vmcbatch_dmcbatch ;;
     *) echo "run.sh: HPCPERF_QMCPACK_CASE must be diamond2" >&2; exit 2 ;;
 esac
-[ -f "$INP" ] || { echo "run.sh: $INP missing (run fetch.sh)" >&2; exit 1; }
+[ -f "$INP" ] || { echo "run.sh: $INP missing (run tools/prepare_benchmark.sh level3 qmcpack)" >&2; exit 1; }
 case "$MODE" in
     smoke)  LABEL="$CASE"; DERIV="verbatim" ;;
     strong) W="${HPCPERF_QMCPACK_WALKERS:-256}"; LABEL="$CASE.w$W"; DERIV="total_walkers=$W" ;;

@@ -4,13 +4,16 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): read-only clone _upstream/level3/nekRS; patched
-# private source copy .deps/level3/nekrs/src (upstream's third-party libraries
-# -- OCCA, HYPRE 2.32, gslib, Nek5000, LAPACK -- are vendored in-tree and built
-# by nekRS' own superbuild, nothing is shared with other applications); build
-# build/level3/nekrs/<cuda|hip>; install .deps/level3/nekrs/install
-# (= NEKRS_HOME, with nekrs.conf recording the JIT toolchain); logs
-# .deps/level3/nekrs/logs.
+# Layout (Level 3 isolation): frozen source bundle level3/nekrs/src, materialized
+# by tools/prepare_benchmark.sh for ONE variant (hypregpu = v26.0 + the three
+# HYPRE CUDA-13 patches; cpucoarse = exact v26.0) -- the variant of the
+# materialized tree must match HPCPERF_NEKRS_VARIANT; no patch is applied here.
+# A build-side copy .deps/level3/nekrs[/<variant>]/src protects the frozen tree
+# (upstream's third-party libraries -- OCCA, HYPRE 2.32, gslib, Nek5000, LAPACK
+# -- are vendored in-tree and built by nekRS' own superbuild, nothing is shared
+# with other applications); build build/level3/nekrs/<cuda|hip>; install
+# .deps/level3/nekrs/install (= NEKRS_HOME, with nekrs.conf recording the JIT
+# toolchain); logs .deps/level3/nekrs/logs.
 #
 # Toolchain (upstream: GNU >= 9.1, MPI-3.1 with Fortran bindings, CMake >= 3.21,
 # CUDA >= 12): CC/CXX/FC = conda Open MPI wrappers (mpicc/mpicxx/mpif90 around
@@ -39,9 +42,9 @@ l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install pref
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-UP="$R/_upstream/level3/nekRS"
-[ -f "$UP/CMakeLists.txt" ] || { echo "build.sh: $UP missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$UP" rev-parse HEAD)"
+l3_require_materialized "$HERE" || exit 3
+UP="$HERE/src"
+[ -f "$UP/CMakeLists.txt" ] || { echo "build.sh: $UP is not a nekRS tree -- run tools/prepare_benchmark.sh level3 nekrs --variant <hypregpu|cpucoarse>" >&2; exit 3; }
 l3_paths nekrs
 
 # --- variant selection (multi-variant build/install/cache isolation) ----------
@@ -54,6 +57,9 @@ l3_paths nekrs
 HYPRE_GPU="${HPCPERF_NEKRS_HYPRE_GPU:-ON}"
 case "$HYPRE_GPU" in ON|OFF) : ;; *) echo "build.sh: HPCPERF_NEKRS_HYPRE_GPU must be ON or OFF" >&2; exit 2 ;; esac
 VARIANT="${HPCPERF_NEKRS_VARIANT:-$([ "$HYPRE_GPU" = ON ] && echo hypregpu || echo cpucoarse)}"
+MATERIALIZED="$(l3_materialized_variant "$HERE")"
+[ "$MATERIALIZED" = "$VARIANT" ] || { echo "build.sh: the materialized source is variant '${MATERIALIZED:-unknown}' but variant '$VARIANT' was requested -- each variant is its own frozen tree: tools/prepare_benchmark.sh level3 nekrs --variant $VARIANT (--force-rematerialize discards the other variant's tree)" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE" "$VARIANT")"; TREE_SHA="$(l3_source_tree_sha "$HERE" "$VARIANT")"
 if [ "$VARIANT" = hypregpu ]; then
     BUILD_DIR="$R/build/level3/nekrs/$MODEL"                 # legacy layout (unchanged)
 else
@@ -87,13 +93,13 @@ unset AR
 #   0003 (class D, 36 lines): explicit <thrust/iterator/reverse_iterator.h> + <thrust/pair.h> includes and
 #         thrust::not1 -> thrust::not_fn, all in HYPRE's *device* sources / device_utils headers.
 # All three touch code that is compiled by nvcc ONLY when ENABLE_HYPRE_GPU=ON. With ENABLE_HYPRE_GPU=OFF
-# HYPRE is host-only and that code is not compiled, so NO patch is applied (the candidate tests whether
-# the unused GPU component -- and therefore the patches -- can be dropped entirely).
-if [ "$HYPRE_GPU" = ON ]; then
-    PATCHES=("$HERE/patches/0001-hypre-cuda-sm100.patch" "$HERE/patches/0002-hypre-cuda13-thrust-pair.patch" "$HERE/patches/0003-hypre-cuda13-thrust3-compat.patch")
-else
-    PATCHES=()
-fi
+# HYPRE is host-only and that code is not compiled, so the cpucoarse variant carries NO patch (the candidate
+# tests whether the unused GPU component -- and therefore the patches -- can be dropped entirely).
+# The patch series is part of the frozen variant tree (provenance/patch_series.<variant>.txt); only its
+# names enter the fingerprint here (same identity as the validated installs).
+PATCHNAMES=($(l3_lock_patches "$HERE" "$VARIANT"))
+if [ "$HYPRE_GPU" = ON ]; then [ "${#PATCHNAMES[@]}" -eq 3 ] || { echo "build.sh: hypregpu tree must carry the 3 HYPRE patches, lock lists: ${PATCHNAMES[*]:-none}" >&2; exit 3; }
+else [ "${#PATCHNAMES[@]}" -eq 0 ] || { echo "build.sh: cpucoarse tree must be unpatched, lock lists: ${PATCHNAMES[*]}" >&2; exit 3; }; fi
 
 case "$BACKEND" in
     CUDA) command -v nvcc >/dev/null || { echo "build.sh: nvcc not on PATH" >&2; exit 1; }
@@ -103,27 +109,19 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="variant=$VARIANT ${OCCA_FLAGS[*]} ENABLE_HYPRE_GPU=$HYPRE_GPU ENABLE_ADIOS=OFF ENABLE_CVODE=OFF NEKRS_BUILD_FLOAT=OFF NEKRS_GPU_MPI=OFF(default; runtime NEKRS_GPU_MPI) CC=mpicc CXX=mpicxx FC=mpif90(OMPI_FC=$SYS_FC)"
-PATCHNAMES=(); for p in "${PATCHES[@]}"; do PATCHNAMES+=("$(basename "$p")"); done
 FP="$(l3_fingerprint_text nekrs "$SHA" "$MODEL" "vendored: occa=2.0.0-dev hypre=2.32.0 gslib nek5000 lapack (in-tree)" "$CMAKE_OPTS" "runtime(NEKRS_GPU_MPI, default 0)" "${PATCHNAMES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# nekRS $BACKEND: variant=$VARIANT ENABLE_HYPRE_GPU=$HYPRE_GPU patches=${#PATCHES[@]} upstream $SHA (v26.0), arch $ARCHNOTE, install=$L3_INSTALL"
-# private source copy (upstream clone stays pristine). The copy is ~280 MB in many small files (slow on
-# this filesystem), so it is reused only when it already holds this upstream commit AND this exact patch
-# series. The cache key is the upstream SHA plus the ORDERED patch-CONTENT hash, so editing a patch (even
-# without renaming it) invalidates the copy. A missing patch is a hard error.
-for p in "${PATCHES[@]}"; do [ -f "$p" ] || { echo "build.sh: patch $p missing" >&2; exit 1; }; done
-PATCH_SERIES_HASH="$(for p in "${PATCHES[@]}"; do sha256sum "$p" | cut -d' ' -f1; done | sha256sum | cut -d' ' -f1)"
-STAMP="$SHA $PATCH_SERIES_HASH"
+echo "# nekRS $BACKEND: variant=$VARIANT ENABLE_HYPRE_GPU=$HYPRE_GPU patches(pre-applied)=${#PATCHNAMES[@]} upstream $SHA (v26.0), frozen source tree $TREE_SHA, arch $ARCHNOTE, install=$L3_INSTALL"
+# build-side copy of the frozen tree (the frozen tree stays pristine; nekRS' superbuild is kept away from
+# it). The copy is ~220 MB in many small files (slow on this filesystem), so it is reused only when it holds
+# exactly this frozen tree (cache key = source_tree_sha256 of the materialized bundle).
+STAMP="$SHA tree=$TREE_SHA"
 if [ -f "$L3_SRC/.hpcperf-src-stamp" ] && [ "$(cat "$L3_SRC/.hpcperf-src-stamp")" = "$STAMP" ]; then
-    echo "# reusing patched source copy $L3_SRC ($STAMP)"
+    echo "# reusing build-side source copy $L3_SRC ($STAMP)"
 else
     rm -rf "$L3_SRC"; mkdir -p "$L3_SRC"
-    rsync -a --exclude .git "$UP/" "$L3_SRC/"    # examples/ and doc/ are installed by nekRS' CMake
-    for p in "${PATCHES[@]}"; do
-        (cd "$L3_SRC" && patch -p1 --forward --silent < "$p") || { echo "build.sh: patch $(basename "$p") failed to apply" >&2; exit 1; }
-        echo "# applied $(basename "$p")"
-    done
+    rsync -a "$UP/" "$L3_SRC/"    # examples/ and doc/ are installed by nekRS' CMake
     echo "$STAMP" > "$L3_SRC/.hpcperf-src-stamp"
 fi
 # fresh configure every time: CMake caches CMAKE_EXE_LINKER_FLAGS and the Fortran/C detection results

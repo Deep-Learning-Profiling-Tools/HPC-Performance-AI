@@ -1,0 +1,33 @@
+# What an optimization agent may change in this benchmark workspace. Paths are relative to the
+# benchmark directory (level3/lammps or its workspace copy). Globs: '*' matches across '/'.
+schema: hpcperf-optimization-scope-1
+benchmark: lammps
+modifiable:                        # application-owned source: LAMMPS core + the KOKKOS package (GPU kernels)
+  - src/src/*
+readonly:                          # harness, criteria, inputs, references, provenance -- never modified by the agent
+  - build.sh
+  - run.sh
+  - validate.sh
+  - fetch.sh
+  - benchmark.yaml
+  - optimization_scope.yaml
+  - provenance/*
+  - archives/*
+  - src/bench/*                    # benchmark decks + reference logs (upstream files used as inputs/references)
+  - src/potentials/*               # potential files referenced by the decks
+  - src/cmake/*                    # build system (flags stay the harness's business)
+  - src/lib/*                      # bundled third-party libraries (Kokkos and others) -- dependency source
+  - src/unittest/*
+  - src/tools/*
+  - src/examples/*
+  - src/doc/*
+  - src/python/*
+  - src/fortran/*
+excluded:                          # not part of the benchmark at all
+  - src/lib/kokkos/*               # explicit: the bundled Kokkos is dependency source (whole-stack work = separate experimental scope)
+loc_categories:
+  application_owned: [src/src/*]
+  bundled_dependency: [src/lib/*]
+  benchmark_specific_dependency: [deps/*]
+  test: [src/unittest/*]
+  exclude: [src/doc/*, src/examples/*, src/bench/*, src/potentials/*, src/tools/*, src/python/*, src/fortran/*, src/cmake/*, src/.github/*]

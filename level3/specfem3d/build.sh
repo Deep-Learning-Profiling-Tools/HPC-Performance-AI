@@ -5,11 +5,14 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): read-only clone _upstream/level3/specfem3d;
-# patched private source copy .deps/level3/specfem3d/src (autotools builds
-# in-tree: obj/ and bin/ live there); install .deps/level3/specfem3d/install/bin;
-# logs .deps/level3/specfem3d/logs. Only dependency besides MPI/CUDA is SCOTCH,
-# bundled (external_libs/scotch_5.1.12b) and built by the same make.
+# Layout (Level 3 isolation): frozen source bundle level3/specfem3d/src (v4.1.1
+# with the two devel back-ports ALREADY applied; materialized by
+# tools/prepare_benchmark.sh, identity in provenance/); the autotools build is
+# in-tree, so it runs in a private build-side copy .deps/level3/specfem3d/src
+# (obj/ and bin/ live there, the frozen tree stays pristine); install
+# .deps/level3/specfem3d/install/bin; logs .deps/level3/specfem3d/logs. Only
+# dependency besides MPI/CUDA is SCOTCH, bundled (external_libs/scotch_5.1.12b)
+# and built by the same make. Nothing is fetched or patched by this script.
 #
 # Toolchain: CC = conda GCC 13.3.0 (also nvcc's host compiler, first `gcc` on
 # PATH as upstream's Makefile expects), FC = system gfortran 14.2.1 (the conda
@@ -44,15 +47,18 @@ l3_isolate_build_env    # Level 3 builds must not see Level 2 .deps/install pref
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-UP="$R/_upstream/level3/specfem3d"
-[ -f "$UP/configure" ] || { echo "build.sh: $UP missing -- run $HERE/fetch.sh first" >&2; exit 1; }
-SHA="$(git -C "$UP" rev-parse HEAD)"
+l3_require_materialized "$HERE" || exit 3
+UP="$HERE/src"
+[ -f "$UP/configure" ] || { echo "build.sh: $UP is not a SPECFEM3D tree -- run tools/prepare_benchmark.sh level3 specfem3d" >&2; exit 3; }
+SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 l3_paths specfem3d
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 SYS_FC="${HPCPERF_SYSTEM_GFORTRAN:-/usr/bin/gfortran}"
 [ -x "$SYS_FC" ] || { echo "build.sh: no gfortran at $SYS_FC (set HPCPERF_SYSTEM_GFORTRAN); the conda env has none" >&2; exit 1; }
 export OMPI_FC="$SYS_FC"
-PATCHES=("$HERE/patches/0001-cuda13-deviceOverlap-guard.patch" "$HERE/patches/0002-blackwell-device-block.patch")
+# the two back-ports are part of the frozen baseline (provenance/patch_series.txt); their names stay in the
+# fingerprint so that the identity of the validated install (same upstream SHA + same series) is unchanged
+PATCHNAMES=($(l3_lock_patches "$HERE"))
 
 case "$BACKEND" in
     CUDA)
@@ -70,18 +76,14 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="configure: FC=$SYS_FC CC=$CC MPIFC=mpif90(OMPI_FC=$SYS_FC) --with-mpi ${CONF_GPU[*]} USE_BUNDLED_SCOTCH=1; make GENCODE=${GENCODE:-default}"
-PATCHNAMES=(); for p in "${PATCHES[@]}"; do PATCHNAMES+=("$(basename "$p")"); done
 FP="$(l3_fingerprint_text specfem3d "$SHA" "$MODEL" "scotch=5.1.12b (bundled)" "$CMAKE_OPTS" "no (host-staged halo exchange in v4.1.1)" "${PATCHNAMES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# SPECFEM3D $BACKEND: upstream $SHA (v4.1.1), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), FC $($SYS_FC --version | head -1), CC $($CC --version | head -1)"
+echo "# SPECFEM3D $BACKEND: upstream $SHA (v4.1.1, frozen source tree $TREE_SHA, patches pre-applied: ${PATCHNAMES[*]}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), FC $($SYS_FC --version | head -1), CC $($CC --version | head -1)"
 rm -rf "$L3_SRC"; mkdir -p "$L3_SRC"
-# private source copy (configure needs the top-level DATA/ defaults, which point into EXAMPLES/); doc/ stays in the clone
+# build-side copy of the frozen tree (autotools builds in-tree; configure needs the top-level DATA/ defaults,
+# which point into EXAMPLES/). No patch is applied here: the frozen tree already is the patched baseline.
 rsync -a --exclude .git --exclude doc "$UP/" "$L3_SRC/"
-for p in "${PATCHES[@]}"; do
-    (cd "$L3_SRC" && patch -p1 --forward --silent < "$p") || { echo "build.sh: patch $(basename "$p") failed to apply" >&2; exit 1; }
-    echo "# applied $(basename "$p")"
-done
 cd "$L3_SRC"
 CUDA_ROOT="${CUDA_HOME:-$(dirname "$(dirname "$(command -v nvcc)")")}"
 # mpi.h for the nvcc-compiled GPU sources (configure's auto-detection via `mpif90 -showme:incdirs` did not

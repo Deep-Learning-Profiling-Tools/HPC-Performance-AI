@@ -132,8 +132,9 @@ if [ -f "$VAL" ]; then
         printf '#  nstep time dt z a\n%s\n' "$(for s in $(seq 0 10); do echo "       $s 1.7e7 2.6e5 100 0.0099"; done)" > "$d/runlog"
         printf 'run_id=selftest\nexit_code=0\nbinary_sha256=deadbeef\ndeck_sha256=cafe\nsteps=10\n' > "$d/run_manifest.txt"
     }
-    # MiniSB's IC count (Exec/MiniSB/ic_sb_32.ascii) is 32686 when the upstream checkout is present; the count check is skipped otherwise
-    NP_SB="$(head -1 "$R/_upstream/level3/Nyx/Exec/MiniSB/ic_sb_32.ascii" 2>/dev/null | tr -d ' ')"; NP_SB="${NP_SB:-32768}"
+    # MiniSB's IC count (Exec/MiniSB/ic_sb_32.ascii) is 32686 when the frozen bundle is materialized (level3/nyx/src)
+    # or, before that, the freeze-time checkout is present; the count check uses 32768 otherwise
+    NP_SB="$( { head -1 "$R/level3/nyx/src/Exec/MiniSB/ic_sb_32.ascii" 2>/dev/null || head -1 "$R/_upstream/level3/Nyx/Exec/MiniSB/ic_sb_32.ascii" 2>/dev/null; } | tr -d ' ')"; NP_SB="${NP_SB:-32768}"
     for d in "$GR/minisb.smoke.np1" "$GR/minisb.smoke.np1.rerun" "$GR/minisb.smoke.np2" "$CR/minisb.smoke.np1"; do mk_run "$d" "$NP_SB"; done
     printf '#!/bin/bash\necho " density  1.0e+10"\n' > "$T/amrex_fvolumesum"; chmod +x "$T/amrex_fvolumesum"
     export HPCPERF_NYX_OFFLINE=1 HPCPERF_NYX_TOOLS_DIR="$T" HPCPERF_NYX_SKIP_PARTICLES=1 HPCPERF_NYX_CASES=minisb HPCPERF_NYX_REPORT_DIR="$TMP/reports"

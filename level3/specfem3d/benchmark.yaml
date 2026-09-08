@@ -1,0 +1,43 @@
+name: specfem3d
+level: 3
+application: SPECFEM3D Cartesian
+description: SPECFEM3D Cartesian v4.1.1 (CUDA solver, bundled SCOTCH), homogeneous_halfspace mesh->databases->solver workflow
+  at 1/2/4 GPUs
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU = one mesh slice (NPROC fixed at mesh time), host-staged halo exchange
+default_scale_mode: smoke
+scale_modes:
+  smoke: EXAMPLES/applications/homogeneous_halfspace as shipped (20,736 HEX8, NSTEP 5000), validated 1/2/4 GPUs (2026-09-07
+    regression fc4d2a1)
+  strong: xmeshfem3D refined domain, 165,888 elements, completed 1/4 GPU runs
+  weak: 165,888 elements per rank (domain extended), completed 4-GPU run
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only, never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 for C/nvcc host, system gfortran 14.2.1 via OMPI_FC, CUDA 13.2.78, Open
+  MPI 5.0.10)
+install_root: .deps/level3/specfem3d
+dependency_installs: []
+inputs:
+- src/EXAMPLES/applications/homogeneous_halfspace/DATA/Par_file
+- src/EXAMPLES/applications/homogeneous_halfspace/MESH-default
+- src/EXAMPLES/applications/homogeneous_halfspace/meshfem3D_files/Mesh_Par_file
+references:
+- src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS
+- src/utils/scripts/compare_seismogram_correlations.py
+source_version: v4.1.1
+source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+source_bundle:
+  archive: archives/source_bundle.tar.zst
+  archive_sha256: 62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316
+  source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+  compressed_size: 248289500
+  uncompressed_size: 665155680
+  file_count: 6205

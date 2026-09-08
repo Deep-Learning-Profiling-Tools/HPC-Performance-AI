@@ -1,0 +1,97 @@
+{
+ "benchmark_dir": "level3/sparta",
+ "variant": null,
+ "verdict": "PASS",
+ "results": [
+  {
+   "check": 1,
+   "name": "benchmark.yaml schema",
+   "status": "PASS",
+   "detail": "sparta level 3"
+  },
+  {
+   "check": 2,
+   "name": "optimization_scope.yaml",
+   "status": "PASS",
+   "detail": "1 modifiable / 16 readonly patterns"
+  },
+  {
+   "check": 3,
+   "name": "src/ materialized",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 4,
+   "name": "deps/ present as required by the lock",
+   "status": "PASS",
+   "detail": "not required for this benchmark"
+  },
+  {
+   "check": 5,
+   "name": "source tree hash == canonical baseline",
+   "status": "PASS",
+   "detail": "63519f0e3e9ac974... vs 63519f0e3e9ac974..."
+  },
+  {
+   "check": 6,
+   "name": "build/run/validate entries exist and are executable",
+   "status": "PASS",
+   "detail": "./build.sh, ./run.sh, ./validate.sh"
+  },
+  {
+   "check": 7,
+   "name": "scripts read no application source outside the benchmark directory",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 8,
+   "name": "no symlink escaping the benchmark directory",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 9,
+   "name": "provenance/source.lock.yaml complete",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 10,
+   "name": "archive/tree hashes consistent between benchmark.yaml and the lock",
+   "status": "PASS",
+   "detail": "archive sha256 ok"
+  },
+  {
+   "check": 11,
+   "name": "required inputs/references exist",
+   "status": "PASS",
+   "detail": "4 listed"
+  },
+  {
+   "check": 12,
+   "name": "optimization-scope patterns lie inside the benchmark directory",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 13,
+   "name": "no credential/env-dump/session/profiler files in src+deps",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 14,
+   "name": "no build output / binary artifacts in src+deps",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 15,
+   "name": "no _upstream dependency in the benchmark scripts (fetch.sh = freeze-time only)",
+   "status": "PASS",
+   "detail": ""
+  }
+ ]
+}

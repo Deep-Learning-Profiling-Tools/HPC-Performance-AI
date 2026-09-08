@@ -38,7 +38,8 @@ E_TOL=1e-8       # pre-fixed cross-rank-count tolerance on MD potential energies
 REGTESTS="${HPCPERF_CP2K_REGTESTS:-QS/regtest-gpw-1/Ar.inp QS/regtest-gpw-1/H2O-geoopt.inp QS/regtest-gpw-1/pyridine.inp QS/regtest-dm-ls-scf-1/H2-big-1.inp QS/regtest-dm-ls-scf-1/H2-big-5.inp}"
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_CP2K_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-SRC="$R/_upstream/level3/cp2k"; RUNS="$R/build/level3/cp2k/$PROFILE/$L3_RUN_SUBDIR"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"; RUNS="$R/build/level3/cp2k/$PROFILE/$L3_RUN_SUBDIR"   # regtest references (TEST_FILES.toml) come from the frozen bundle
 export HPCPERF_GPUS="$N" HPCPERF_CPUS_PER_RANK="$T" HPCPERF_SCALE_MODE=smoke
 mkdir -p "$RUNS"; ok=1
 fail() { echo "validate.sh: FAIL -- $*"; ok=0; }

@@ -55,13 +55,15 @@ MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 BUILD_DIR="$R/build/level3/warpx/$MODEL"
 EXE="$(find "$BUILD_DIR/bin" -maxdepth 1 -name 'warpx.3d*' -type f 2>/dev/null | head -1)"
 [ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: warpx.3d* not found under $BUILD_DIR/bin -- run ./build.sh $BACKEND first" >&2; exit 1; }
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle: the upstream example decks live inside it
 CASE="${HPCPERF_WARPX_CASE:-uniform_plasma}"
 case "$CASE" in
-    uniform_plasma) BASE="$R/_upstream/level3/WarpX/Examples/Physics_applications/uniform_plasma/inputs_base_3d" ;;
-    langmuir)       BASE="$R/_upstream/level3/WarpX/Examples/Tests/langmuir/inputs_base_3d" ;;
+    uniform_plasma) BASE="$SRC/Examples/Physics_applications/uniform_plasma/inputs_base_3d" ;;
+    langmuir)       BASE="$SRC/Examples/Tests/langmuir/inputs_base_3d" ;;
     *) echo "run.sh: HPCPERF_WARPX_CASE must be uniform_plasma or langmuir" >&2; exit 2 ;;
 esac
-[ -f "$BASE" ] || { echo "run.sh: $BASE missing (run fetch.sh)" >&2; exit 1; }
+[ -f "$BASE" ] || { echo "run.sh: $BASE missing (run tools/prepare_benchmark.sh level3 warpx)" >&2; exit 1; }
 
 N_RANKS="$(hpcperf_ranks warpx yes)" || exit 2
 hpcperf_forbid_args warpx amr.n_cell amr.max_grid_size amr.blocking_factor warpx.numprocs max_step warpx.random_seed -- "$@" || exit 2
@@ -98,7 +100,7 @@ if [ "$CASE" = langmuir ]; then PARTS=$((2 * CELLS)); else PARTS=$((2 * CELLS));
 RUN_DIR="$(l3_rundir "$BUILD_DIR/$L3_RUN_SUBDIR/$CASE.$MODE.np$N_RANKS")" || exit 2
 IN="$RUN_DIR/inputs"
 {
-    echo "# derived from upstream $(realpath --relative-to="$R/_upstream/level3/WarpX" "$BASE") (HPC-Performance-AI level3/warpx/run.sh)"
+    echo "# derived from upstream $(realpath --relative-to="$SRC" "$BASE") (HPC-Performance-AI level3/warpx/run.sh)"
     if [ "$CASE" = langmuir ]; then
         grep -vE '^\s*(amr\.max_grid_size|diagnostics\.diags_names|openpmd\.)' "$BASE"
         echo "diagnostics.diags_names = diag1"

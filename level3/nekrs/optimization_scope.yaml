@@ -1,0 +1,29 @@
+schema: hpcperf-optimization-scope-1
+benchmark: nekrs
+modifiable:
+  - src/src/*                      # nekRS core (C++ host code and OKL device kernels)
+readonly:
+  - build.sh
+  - run.sh
+  - validate.sh
+  - fetch.sh
+  - benchmark.yaml
+  - optimization_scope.yaml
+  - provenance/*
+  - archives/*
+  - patches/*
+  - COMPATIBILITY.md
+  - src/3rd_party/*                # vendored OCCA, HYPRE, gslib, Nek5000, LAPACK, ... (dependency source)
+  - src/examples/*                 # ethier case (.par/.udf/.oudf/.re2) = benchmark input
+  - src/cmake/*
+  - src/CMakeLists.txt
+  - src/scripts/*
+  - src/build.sh
+excluded:
+  - src/3rd_party/*
+loc_categories:
+  application_owned: [src/src/*]
+  bundled_dependency: [src/3rd_party/*]
+  benchmark_specific_dependency: [deps/*]
+  test: []
+  exclude: [src/examples/*, src/doc/*, src/scripts/*, src/cmake/*, src/.github/*]

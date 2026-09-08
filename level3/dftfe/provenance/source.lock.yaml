@@ -1,0 +1,330 @@
+schema: hpcperf-source-lock-1
+name: dftfe
+level: 3
+application: DFT-FE
+variant: null
+benchmark_source_version: 1.2.0 (7147faa5)
+upstream:
+  url: https://github.com/dftfeDevelopers/dftfe.git
+  tag: release 1.2.0 commit (2025-08-17)
+  commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+archive:
+  path: archives/source_bundle.tar.zst
+  sha256: 0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 182954572
+  uncompressed_size: 274995831
+  tar_entries: 3883
+  file_count: 3525
+  symlink_count: 0
+materialized_tree:
+  sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
+  algorithm: hpcperf-tree-1
+  entries: 3525
+  layout:
+  - src/
+  - deps/
+patches:
+- path: patches/0001-std-isnan.patch
+  sha256: a5a96e7daab783321ad4c57a6fca23513998cf6ef9b637f56fe9eafa60d4ce3d
+  upstream_source: 'local 2-line fix: unqualified isnan in a template (GCC 14)'
+  category: D
+  component: src
+  files:
+  - src/src/atom/AtomicCenteredNonLocalOperator.cc
+dependencies:
+  bundled: []
+  benchmark_specific:
+  - path: deps/openblas/OpenBLAS-0.3.30.tar.gz
+    project: OpenBLAS
+    version: 0.3.30
+    url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+    commit: null
+    sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+    license: BSD-3-Clause
+  - path: deps/scalapack/v2.2.2.tar.gz
+    project: ScaLAPACK
+    version: 2.2.2
+    url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v2.2.2.tar.gz
+    commit: null
+    sha256: a2f0c9180a210bf7ffe126c9cb81099cf337da1a7120ddb4cbe4894eb7b7d022
+    license: BSD-3-Clause (modified)
+  - path: deps/libxc/libxc-7.0.0.tar.gz
+    project: libxc
+    version: 7.0.0
+    url: https://gitlab.com/libxc/libxc/-/archive/7.0.0/libxc-7.0.0.tar.gz
+    commit: null
+    sha256: 8d4e343041c9cd869833822f57744872076ae709a613c118d70605539fb13a77
+    license: MPL-2.0
+  - path: deps/alglib/alglib-4.06.0.cpp.gpl.tgz
+    project: ALGLIB (free edition)
+    version: 4.06.0
+    url: https://www.alglib.net/translator/re/alglib-4.06.0.cpp.gpl.tgz
+    commit: null
+    sha256: 27fa4b0b8160cbb2ace4f69d1a8ef0990cf894c87dff3f46dc86ec8ac2d30c68
+    license: GPL-2.0-or-later
+  - path: deps/p4est/p4est-2.8.7.tar.gz
+    project: p4est
+    version: 2.8.7
+    url: https://p4est.github.io/release/p4est-2.8.7.tar.gz
+    commit: null
+    sha256: 0a1e912f3529999ca6d62fee335d51f24b5650b586e95a03ef39ebf73936d7f4
+    license: GPL-2.0-or-later
+  - path: deps/p4est/p4est-setup.sh
+    project: dftfe p4est-setup.sh (manual branch)
+    version: manual
+    url: https://raw.githubusercontent.com/dftfeDevelopers/dftfe/manual/p4est-setup.sh
+    commit: null
+    sha256: 86269c2ef751b33d06916299a3d15fa80f4c8c9de40eceedfb8b7f45bd90fb8b
+    license: LGPL-2.1-or-later
+  - path: deps/kokkos/4.6.00.tar.gz
+    project: Kokkos (Serial
+    version: 4.6.00
+    url: https://github.com/kokkos/kokkos/archive/refs/tags/4.6.00.tar.gz
+    commit: null
+    sha256: 348b2d860046fc3ddef5ca3a128317be1a6f3fa35196f268338a180fcae52264
+    license: Apache-2.0 WITH LLVM-exception
+  - path: deps/dealii/dealii-9.6.2.tar.gz
+    project: deal.II
+    version: 9.6.2
+    url: https://github.com/dealii/dealii/releases/download/v9.6.2/dealii-9.6.2.tar.gz
+    commit: null
+    sha256: 1051e332de3822488e91c2b0460681052a3c4c5ac261cdd7a6af784869a25523
+    license: LGPL-2.1-or-later
+  - path: deps/elpa/elpa-2026.02.001.tar.gz
+    project: ELPA
+    version: 2026.02.001
+    url: https://elpa.mpcdf.mpg.de/software/tarball-archive/Releases/2026.02.001/elpa-2026.02.001.tar.gz
+    commit: null
+    sha256: a379f27f4dbd27b2ee45017afec656d064301e97150c874649bdfd64957b75ed
+    license: LGPL-3.0-only
+  - path: deps/spglib
+    project: spglib
+    version: 02159eef
+    url: https://github.com/spglib/spglib.git
+    commit: 02159eef6e7349535049a43fe2272bb634c77945
+    sha256: null
+    license: &id001
+      spdx: BSD-3-Clause
+      files:
+      - COPYING
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: system GCC / gfortran
+    version: 14.2.1
+    provided_by: node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: zlib
+    libxml2 (system headers/libraries): null
+    provided_by: node
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/dftfeDevelopers/dftfe.git
+  ref: release 1.2.0 commit (2025-08-17)
+  commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+  sha256: null
+  checkout: _upstream/level3/dftfe
+  submodules: []
+  excluded: []
+  license:
+    spdx: LGPL-2.1-or-later
+    files:
+    - LICENSE
+- dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+  ref: null
+  commit: null
+  sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+- dest: deps/scalapack/v2.2.2.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v2.2.2.tar.gz
+  ref: null
+  commit: null
+  sha256: a2f0c9180a210bf7ffe126c9cb81099cf337da1a7120ddb4cbe4894eb7b7d022
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause (modified)
+- dest: deps/libxc/libxc-7.0.0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://gitlab.com/libxc/libxc/-/archive/7.0.0/libxc-7.0.0.tar.gz
+  ref: null
+  commit: null
+  sha256: 8d4e343041c9cd869833822f57744872076ae709a613c118d70605539fb13a77
+  checkout: null
+  submodules: []
+  excluded: []
+  license: MPL-2.0
+- dest: deps/alglib/alglib-4.06.0.cpp.gpl.tgz
+  kind: file
+  category: benchmark_specific
+  url: https://www.alglib.net/translator/re/alglib-4.06.0.cpp.gpl.tgz
+  ref: null
+  commit: null
+  sha256: 27fa4b0b8160cbb2ace4f69d1a8ef0990cf894c87dff3f46dc86ec8ac2d30c68
+  checkout: null
+  submodules: []
+  excluded: []
+  license: GPL-2.0-or-later
+- dest: deps/p4est/p4est-2.8.7.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://p4est.github.io/release/p4est-2.8.7.tar.gz
+  ref: null
+  commit: null
+  sha256: 0a1e912f3529999ca6d62fee335d51f24b5650b586e95a03ef39ebf73936d7f4
+  checkout: null
+  submodules: []
+  excluded: []
+  license: GPL-2.0-or-later
+- dest: deps/p4est/p4est-setup.sh
+  kind: file
+  category: benchmark_specific
+  url: https://raw.githubusercontent.com/dftfeDevelopers/dftfe/manual/p4est-setup.sh
+  ref: null
+  commit: null
+  sha256: 86269c2ef751b33d06916299a3d15fa80f4c8c9de40eceedfb8b7f45bd90fb8b
+  checkout: null
+  submodules: []
+  excluded: []
+  license: LGPL-2.1-or-later
+- dest: deps/kokkos/4.6.00.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/kokkos/kokkos/archive/refs/tags/4.6.00.tar.gz
+  ref: null
+  commit: null
+  sha256: 348b2d860046fc3ddef5ca3a128317be1a6f3fa35196f268338a180fcae52264
+  checkout: null
+  submodules: []
+  excluded: []
+  license: Apache-2.0 WITH LLVM-exception
+- dest: deps/dealii/dealii-9.6.2.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/dealii/dealii/releases/download/v9.6.2/dealii-9.6.2.tar.gz
+  ref: null
+  commit: null
+  sha256: 1051e332de3822488e91c2b0460681052a3c4c5ac261cdd7a6af784869a25523
+  checkout: null
+  submodules: []
+  excluded: []
+  license: LGPL-2.1-or-later
+- dest: deps/elpa/elpa-2026.02.001.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://elpa.mpcdf.mpg.de/software/tarball-archive/Releases/2026.02.001/elpa-2026.02.001.tar.gz
+  ref: null
+  commit: null
+  sha256: a379f27f4dbd27b2ee45017afec656d064301e97150c874649bdfd64957b75ed
+  checkout: null
+  submodules: []
+  excluded: []
+  license: LGPL-3.0-only
+- dest: deps/spglib
+  kind: git
+  category: benchmark_specific
+  url: https://github.com/spglib/spglib.git
+  ref: commit 02159eef (install_DFTFE pin)
+  commit: 02159eef6e7349535049a43fe2272bb634c77945
+  sha256: null
+  checkout: .deps/level3/dftfe/downloads/spglib
+  submodules: []
+  excluded: []
+  license: *id001
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/dftfe
+  status: EQUIVALENT
+  summary:
+    identical: 1771
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 1771
+    validated_entries_considered: 1771
+- archive_path: deps/spglib
+  validated_tree: .deps/level3/dftfe/downloads/spglib
+  status: EQUIVALENT
+  summary:
+    identical: 1745
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 1745
+    validated_entries_considered: 1745
+licenses:
+- path: src
+  project: DFT-FE
+  license: LGPL-2.1-or-later
+  url: https://github.com/dftfeDevelopers/dftfe
+  commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+- path: deps/openblas
+  project: OpenBLAS
+  license: BSD-3-Clause
+  version: 0.3.30
+- path: deps/scalapack
+  project: ScaLAPACK
+  license: BSD-3-Clause (modified)
+  version: 2.2.2
+- path: deps/libxc
+  project: libxc
+  license: MPL-2.0
+  version: 7.0.0
+- path: deps/alglib
+  project: ALGLIB free edition
+  license: GPL-2.0-or-later
+  version: 4.06.0
+- path: deps/p4est
+  project: p4est
+  license: GPL-2.0-or-later
+  version: 2.8.7
+- path: deps/kokkos
+  project: Kokkos
+  license: Apache-2.0 WITH LLVM-exception
+  version: 4.6.00
+- path: deps/dealii
+  project: deal.II
+  license: LGPL-2.1-or-later
+  version: 9.6.2
+- path: deps/elpa
+  project: ELPA
+  license: LGPL-3.0-only
+  version: 2026.02.001
+- path: deps/spglib
+  project: spglib
+  license: BSD-3-Clause
+  commit: 02159eef6e7349535049a43fe2272bb634c77945
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T08:04:41Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256

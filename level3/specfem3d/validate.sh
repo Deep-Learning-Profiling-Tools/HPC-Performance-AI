@@ -23,12 +23,13 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
-UP="$R/_upstream/level3/specfem3d"
+l3_require_materialized "$HERE" || exit 3
+UP="$HERE/src"      # frozen source bundle: reference seismograms and upstream's comparison script
 REF="$UP/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS"
 CMP="$UP/utils/scripts/compare_seismogram_correlations.py"
 RUN_DIR="$R/build/level3/specfem3d/$MODEL/$L3_RUN_SUBDIR/smoke.np$N"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-1800}"
-[ -d "$REF" ] && [ -f "$CMP" ] || { echo "validate.sh: $REF or $CMP missing (run fetch.sh)" >&2; exit 1; }
+[ -d "$REF" ] && [ -f "$CMP" ] || { echo "validate.sh: $REF or $CMP missing (run tools/prepare_benchmark.sh level3 specfem3d)" >&2; exit 1; }
 NREF="$(ls "$REF"/*.semd 2>/dev/null | wc -l)"
 [ "$NREF" -ge 1 ] || { echo "validate.sh: no reference traces in $REF" >&2; exit 1; }
 

@@ -1,0 +1,112 @@
+schema: hpcperf-source-lock-1
+name: specfem3d
+level: 3
+application: SPECFEM3D Cartesian
+variant: null
+benchmark_source_version: v4.1.1
+upstream:
+  url: https://github.com/SPECFEM/specfem3d.git
+  tag: v4.1.1
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+archive:
+  path: archives/source_bundle.tar.zst
+  sha256: 62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 248289500
+  uncompressed_size: 665155680
+  tar_entries: 6808
+  file_count: 6147
+  symlink_count: 58
+materialized_tree:
+  sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+  algorithm: hpcperf-tree-1
+  entries: 6205
+  layout:
+  - src/
+patches:
+- path: patches/0001-cuda13-deviceOverlap-guard.patch
+  sha256: 553baab7a0fa8545f0462e97dff57432ddcc80f3836279dbbfabc48aef2321c5
+  upstream_source: SPECFEM/specfem3d devel cc2e9ffa
+  category: D
+  component: src
+  files:
+  - src/src/gpu/initialize_gpu.cu
+- path: patches/0002-blackwell-device-block.patch
+  sha256: adaacdfc726f589852c4aefa7c2abd719bd6bcfcb738f18271863129e9ce59c1
+  upstream_source: SPECFEM/specfem3d devel cc2e9ffa
+  category: D
+  component: src
+  files:
+  - src/src/gpu/mesh_constants_cuda.h
+dependencies:
+  bundled:
+  - path: external_libs/scotch_5.1.12b
+    project: SCOTCH
+    version: 5.1.12b
+    license: CeCILL-C
+    component: src
+  - path: external_libs
+    project: other bundled libraries (ADIOS glue, ...)
+    license: per directory
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC 13.3.0 (conda
+    C + nvcc host) and system gfortran 14.2.1: null
+    provided_by: .conda_env / node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/SPECFEM/specfem3d.git
+  ref: v4.1.1
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+  sha256: null
+  checkout: _upstream/level3/specfem3d
+  submodules: []
+  excluded:
+  - path: doc
+    reason: documentation (PDF manuals, figures); the validated private build copy was made without doc/ as well
+  license:
+    spdx: GPL-3.0-or-later
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/specfem3d/src
+  status: EQUIVALENT
+  summary:
+    identical: 6196
+    expected_patch_difference: 0
+    expected_generated_difference: 3
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 6
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 6205
+    validated_entries_considered: 6199
+licenses:
+- path: src
+  project: SPECFEM3D Cartesian
+  license: GPL-3.0-or-later
+  url: https://github.com/SPECFEM/specfem3d
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+- path: src/external_libs/scotch_5.1.12b
+  project: SCOTCH (bundled)
+  license: CeCILL-C
+  url: https://gitlab.inria.fr/scotch/scotch
+  version: 5.1.12b
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T08:03:30Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256

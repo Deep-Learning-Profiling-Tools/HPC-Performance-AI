@@ -93,6 +93,7 @@ OFFLINE="${HPCPERF_NYX_OFFLINE:-}"; SKIP_PARTICLES="${HPCPERF_NYX_SKIP_PARTICLES
 
 HC="$(echo "${HPCPERF_NYX_HEATCOOL:-NO}" | tr '[:lower:]' '[:upper:]')"; VARIANT=adiabatic; [ "$HC" = YES ] && VARIANT=heatcool
 GCC_MM="$(l3_version_mm "$("$CXX" -dumpfullversion 2>/dev/null || "$CXX" -dumpversion)")"
+[ -n "$OFFLINE" ] || l3_require_materialized "$HERE" || exit 3   # decks/ICs come from the frozen bundle (offline re-checks only read existing run dirs)
 case "$BACKEND" in
     CUDA) GPU_PROFILE="${HPCPERF_NYX_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-${VARIANT}}" ;;
     HIP)  GPU_PROFILE="${HPCPERF_NYX_PROFILE:-hip-${HPCPERF_HIP_ARCH:-gfx950}-${VARIANT}}" ;;
@@ -238,19 +239,24 @@ compare() { # compare <ref_dir> <dir> <rel_tol> <label>
     return 0
 }
 
-ic_count() { # expected DM particle count from the deck's IC file
+ic_count() { # ic_count <case> <run_dir>: expected DM particle count from the IC file THIS run used (run.sh links the
+             # deck's IC file into the run directory; the frozen bundle is its origin). Empty = no IC file in the run
+             # directory (synthetic harness runs only) -> the count check is skipped and says so.
+    local f
     case "$1" in
-        minisb) head -1 "$R/_upstream/level3/Nyx/Exec/MiniSB/ic_sb_32.ascii" | tr -d ' ' ;;
-        lya_adiabatic|lya_heatcool) python3 -c "import struct; f=open('$R/_upstream/level3/Nyx/Exec/LyA/32.nyx','rb'); print(struct.unpack('<q', f.read(8))[0])" ;;
-        *) echo "" ;;
+        minisb) f="$2/ic_sb_32.ascii"; [ -f "$f" ] && { head -1 "$f" | tr -d ' '; return 0; } ;;
+        lya_adiabatic|lya_heatcool) f="$2/32.nyx"; [ -f "$f" ] && { python3 -c "import struct; f=open('$f','rb'); print(struct.unpack('<q', f.read(8))[0])"; return 0; } ;;
     esac
+    echo ""
 }
 
 for CASE in $CASES; do
     echo "validate.sh: === Nyx $BACKEND case=$CASE, $STEPS steps, $N GPU(s) [profile $GPU_PROFILE; CPU reference $CPU_PROFILE] ==="
-    WANT_NP="$(ic_count "$CASE")"; case_tols "$CASE"; REL_TOL_SAME_CASE=$TOL_SAME; REL_TOL_X_CASE=$TOL_X
+    case_tols "$CASE"; REL_TOL_SAME_CASE=$TOL_SAME; REL_TOL_X_CASE=$TOL_X
     D="$GPU_RUNS/$CASE.smoke.np$N"
     rc=0; run_gpu "$CASE" "$N" "$GPU_RUNS/validate.$CASE.np$N.stdout" || rc=$?
+    WANT_NP="$(ic_count "$CASE" "$D")"
+    [ -n "$WANT_NP" ] || echo "    $CASE np$N: NOTE -- no IC file in the run directory, DM count check against the IC skipped (harness/offline run)"
     /usr/bin/grep -aE '^# Nyx|hpcperf-launch: audit summary|Run time =|Total Time|ERROR|Error|abort' "$GPU_RUNS/validate.$CASE.np$N.stdout" | head -8 || true
     if [ "$rc" -eq 124 ]; then fail "$CASE np$N timed out after ${TIMEOUT}s"; continue; fi
     if [ "$rc" -ne 0 ]; then fail "$CASE np$N run.sh exited $rc (see $GPU_RUNS/validate.$CASE.np$N.stdout)"; continue; fi

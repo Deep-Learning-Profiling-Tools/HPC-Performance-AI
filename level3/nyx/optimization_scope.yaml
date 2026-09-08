@@ -1,0 +1,32 @@
+schema: hpcperf-optimization-scope-1
+benchmark: nyx
+modifiable:
+  - src/Source/*                   # Nyx application source (hydro, gravity, particles, heat/cool)
+readonly:
+  - build.sh
+  - run.sh
+  - validate.sh
+  - fetch.sh
+  - benchmark.yaml
+  - optimization_scope.yaml
+  - provenance/*
+  - archives/*
+  - nyx_fcompare_check.py
+  - nyx_particle_compare.py
+  - sundials_probe.sh
+  - src/Exec/*                     # official decks, initial conditions and problem set-up (inputs)
+  - src/Util/*
+  - src/Docs/*
+  - src/cmake/*
+  - src/CMakeLists.txt
+  - src/subprojects/*              # bundled SUNDIALS (dependency source)
+  - deps/*                         # AMReX 26.09 (benchmark-specific dependency source)
+excluded:
+  - src/subprojects/sundials/*
+  - deps/amrex/*
+loc_categories:
+  application_owned: [src/Source/*, src/Exec/*]
+  bundled_dependency: [src/subprojects/*]
+  benchmark_specific_dependency: [deps/*]
+  test: []
+  exclude: [src/Docs/*, src/Util/*, src/.github/*, src/cmake/*]

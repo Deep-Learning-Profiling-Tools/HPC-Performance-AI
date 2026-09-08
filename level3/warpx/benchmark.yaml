@@ -1,0 +1,39 @@
+name: warpx
+level: 3
+application: WarpX
+description: WarpX 3D electromagnetic PIC (CUDA, AMReX 26.09 superbuild); uniform_plasma performance case + langmuir_multi
+  analytic correctness case at 1/2/4 GPUs
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU, one AMReX box per rank (warpx.numprocs); GPU-aware MPI auto-detected
+default_scale_mode: smoke
+scale_modes:
+  smoke: uniform_plasma 64x32x32 cells (131,072 particles), 10 steps + langmuir_multi 64^3, 40 steps; validated 1/2/4 GPUs
+    (2026-09-07 regression fc4d2a1)
+  strong: uniform_plasma 256^3 cells (33.6M particles), completed 1/4 GPU runs
+  weak: uniform_plasma 128^3 cells per rank (4.2M particles/rank), completed 4-GPU run
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only, never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper)
+install_root: .deps/level3/warpx
+dependency_installs: []
+inputs:
+- src/Examples/Physics_applications/uniform_plasma/inputs_base_3d
+- src/Examples/Tests/langmuir/inputs_base_3d
+references: []
+source_version: '26.09'
+source_tree_sha256: e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2
+source_bundle:
+  archive: archives/source_bundle.tar.zst
+  archive_sha256: d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0
+  source_tree_sha256: e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2
+  compressed_size: 14235980
+  uncompressed_size: 41912234
+  file_count: 4632

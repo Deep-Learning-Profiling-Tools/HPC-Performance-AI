@@ -35,7 +35,8 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shi
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_GEOS_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
 l3_paths_profile geos "$PROFILE"
-SRC="$R/_upstream/level3/GEOS"
+l3_require_materialized "$HERE" || exit 3
+SRC="$HERE/src"      # frozen source bundle: the upstream decks (inputFiles/solidMechanics) live inside it
 EXE="$L3_INSTALL/geos/bin/geosx"; [ -x "$EXE" ] || EXE="$(find "$L3_INSTALL/geos/bin" -maxdepth 1 -type f -name 'geos*' 2>/dev/null | head -1)"
 [ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: GEOS executable not found under $L3_INSTALL/geos/bin -- run ./build.sh" >&2; exit 1; }
 l3_binary_backend_check "$EXE" cuda || exit 1

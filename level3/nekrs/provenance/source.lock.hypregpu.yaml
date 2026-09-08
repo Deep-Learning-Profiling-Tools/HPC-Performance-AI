@@ -1,0 +1,183 @@
+schema: hpcperf-source-lock-1
+name: nekrs
+level: 3
+application: nekRS
+variant: hypregpu
+benchmark_source_version: v26.0
+upstream:
+  url: https://github.com/Nek5000/nekRS.git
+  tag: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+archive:
+  path: archives/hypregpu.source.tar.zst
+  sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
+  compression: zstd
+  zstd_level: 19
+  zstd_version: 1.5.6
+  tar_format: hpcperf-tar-1
+  compressed_size: 48167250
+  uncompressed_size: 231107059
+  tar_entries: 15617
+  file_count: 14444
+  symlink_count: 3
+materialized_tree:
+  sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
+  algorithm: hpcperf-tree-1
+  entries: 14447
+  layout:
+  - src/
+patches:
+- path: patches/0001-hypre-cuda-sm100.patch
+  sha256: b2b977ff7ab7bcd6ee318ae0effa96e252604c556b0004f0671a91689e135cfd
+  upstream_source: cmake/hypre.cmake HYPRE_CUDA_SM list
+  category: B
+  component: src
+  files:
+  - src/cmake/hypre.cmake
+- path: patches/0002-hypre-cuda13-thrust-pair.patch
+  sha256: a46c189f6c981969d11cfd176519249f403ce7f6974d47228acf450a8aa6d6b7
+  upstream_source: hypre 2.32 device_utils/csr_matop_device thrust::reduce_by_key result type
+  category: D
+  component: src
+  files:
+  - src/3rd_party/hypre/src/seq_mv/csr_matop_device.c
+  - src/3rd_party/hypre/src/utilities/device_utils.c
+- path: patches/0003-hypre-cuda13-thrust3-compat.patch
+  sha256: c31e077569a9d2934211f1657e9e501514503603b38b77e4d310ca409b644058
+  upstream_source: 'hypre device sources: thrust 3 includes, thrust::not1 -> not_fn'
+  category: D
+  component: src
+  files:
+  - src/3rd_party/hypre/src/IJ_mv/IJMatrix_parcsr_device.c
+  - src/3rd_party/hypre/src/IJ_mv/IJVector_parcsr_device.c
+  - src/3rd_party/hypre/src/parcsr_ls/ams.c
+  - src/3rd_party/hypre/src/parcsr_ls/par_mod_multi_interp_device.c
+  - src/3rd_party/hypre/src/parcsr_mv/par_csr_triplemat_device.c
+  - src/3rd_party/hypre/src/seq_mv/csr_matop_device.c
+  - src/3rd_party/hypre/src/utilities/_hypre_utilities.hpp
+  - src/3rd_party/hypre/src/utilities/device_utils.h
+dependencies:
+  bundled:
+  - path: 3rd_party/occa
+    project: OCCA
+    license: MIT
+    component: src
+  - path: 3rd_party/hypre
+    project: hypre
+    version: 2.32.0
+    license: Apache-2.0 OR MIT
+    component: src
+  - path: 3rd_party/gslib
+    project: gslib
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/nek5000
+    project: Nek5000
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/nek5000_parRSB
+    project: parRSB
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/lapack
+    project: LAPACK (vendored subset)
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/cpptrace
+    project: cpptrace
+    license: MIT
+    component: src
+  - path: 3rd_party/adios
+    project: ADIOS2 (vendored, not built -- ENABLE_ADIOS=OFF)
+    license: Apache-2.0
+    component: src
+  - path: 3rd_party/cvode
+    project: CVODE glue (not built -- ENABLE_CVODE=OFF)
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/plugins
+    project: nekRS plugins
+    license: BSD-3-Clause
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC 13.3.0 (conda
+    C/C++) + system gfortran 14.2.1: null
+    provided_by: .conda_env / node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/Nek5000/nekRS.git
+  ref: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+  sha256: null
+  checkout: _upstream/level3/nekRS
+  submodules: []
+  excluded: []
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/nekrs/src
+  status: EQUIVALENT
+  summary:
+    identical: 14083
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 364
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 14447
+    validated_entries_considered: 14083
+licenses:
+- path: src
+  project: nekRS
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/nekRS
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+- path: src/3rd_party/occa
+  project: OCCA
+  license: MIT
+  url: https://github.com/libocca/occa
+- path: src/3rd_party/hypre
+  project: hypre
+  license: Apache-2.0 OR MIT
+  url: https://github.com/hypre-space/hypre
+  version: 2.32.0
+- path: src/3rd_party/gslib
+  project: gslib
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/gslib
+- path: src/3rd_party/nek5000
+  project: Nek5000
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/Nek5000
+- path: src/3rd_party/lapack
+  project: LAPACK
+  license: BSD-3-Clause
+  url: https://github.com/Reference-LAPACK/lapack
+- path: src/3rd_party/cpptrace
+  project: cpptrace
+  license: MIT
+  url: https://github.com/jeremy-rifkin/cpptrace
+- path: src/3rd_party/adios
+  project: ADIOS2
+  license: Apache-2.0
+  url: https://github.com/ornladios/ADIOS2
+freeze_tool_version: freeze-1.0
+freeze_timestamp: '2026-09-08T08:00:13Z'
+note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
