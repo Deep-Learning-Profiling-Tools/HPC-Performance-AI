@@ -124,3 +124,15 @@ UNVALIDATED**, nothing executed:
   have no wrappers yet.
 - Weak-mode `processors` grid comes from the generic balanced factorization;
   LAMMPS' own auto grid is used in smoke/strong.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 lammps` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 110.0 MB / 435.9 MB | 13893 | `d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48` | `4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1` | stable_22Jul2025_update6 `9c5ab448c78a` | none | src: EQUIVALENT | 852527 / 852527 / 494133 / 0 / 124684 / 1471402 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

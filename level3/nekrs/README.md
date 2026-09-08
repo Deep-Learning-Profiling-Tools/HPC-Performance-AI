@@ -186,3 +186,16 @@ UNVALIDATED**, nothing executed:
 - Only the ethier family is wrapped (CI case + h-refined strong/weak); turbPipe,
   kershaw (needs `genbox`, not shipped), tgv, pb146 build with this install
   but have no wrappers yet. ADIOS2 checkpointing and CVODE are not built.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 nekrs` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| hypregpu | `archives/hypregpu.source.tar.zst` | 45.9 MB / 220.4 MB | 14447 | `76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01` | `83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2` | v26.0 `96b3cf9e5bac` | 0001-hypre-cuda-sm100.patch, 0002-hypre-cuda13-thrust-pair.patch, 0003-hypre-cuda13-thrust3-compat.patch | src: EQUIVALENT | 53131 / 53131 / 2312092 / 0 / 0 / 2366122 |
+| cpucoarse | `archives/cpucoarse.source.tar.zst` | 45.9 MB / 220.4 MB | 14447 | `6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e` | `a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169` | v26.0 `96b3cf9e5bac` | none | src: EQUIVALENT | 53131 / 53131 / 2312088 / 0 / 0 / 2366118 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

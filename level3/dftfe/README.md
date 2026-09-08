@@ -120,3 +120,15 @@ strong decks; the weak series is defined for 1/2/4/8 GPUs only (40/80 refused by
 cost grows faster than linearly with the cell, so constant wall time is not
 expected -- reported, not "ideal"). Probe record: `<install>/elpa/ELPA_GPU_PROBE.txt`,
 per-program logs `build/level3/dftfe/<profile>/elpa_probe/`.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 dftfe` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 174.5 MB / 262.3 MB | 3525 | `54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30` | `0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670` | release 1.2.0 commit (2025-08-17) `7147faa51f7c` | 0001-std-isnan.patch | src: EQUIVALENT, deps/spglib: EQUIVALENT | 107718 / 107718 / 0 / 12784642 / 314 / 12896192 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

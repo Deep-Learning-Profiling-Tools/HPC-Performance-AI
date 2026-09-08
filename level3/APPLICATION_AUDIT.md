@@ -442,3 +442,23 @@ candidates have an officially supported native CUDA path.
    node; nekRS additionally needs `--device-id 0` under the wrapper.
 6. **Multi-node MPI is BLOCKED/UNVERIFIED on this site**; every application
    above is multi-node capable per upstream, none is verified beyond one node.
+
+<!-- hpcperf:loc-table:begin -->
+## Materialized source LOC per application (frozen bundles, 2026-09-08)
+
+cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, build output excluded) of the frozen source bundles (`level3/<app>/provenance/LOC*.json`, categories from `optimization_scope.yaml`). This replaces the whole-checkout `wc -l` figures: the +9,972 lines of the integration PR are the harness, not application code.
+
+| Application | variant | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_loc | total_materialized_code_loc | agent_modifiable_code_loc |
+|---|---|---|---|---|---|---|---|
+| LAMMPS | - | 852527 | 494133 | 0 | 124684 | 1471402 | 852527 |
+| SPARTA | - | 131181 | 223529 | 0 | 0 | 354863 | 131181 |
+| WarpX | - | 112459 | 0 | 366200 | 11058 | 492389 | 112459 |
+| SPECFEM3D Cartesian | - | 142516 | 147593 | 0 | 1027 | 307549 | 142516 |
+| nekRS | hypregpu | 53131 | 2312092 | 0 | 0 | 2366122 | 53131 |
+| nekRS | cpucoarse | 53131 | 2312088 | 0 | 0 | 2366118 | 53131 |
+| Nyx | - | 32330 | 595317 | 366200 | 0 | 994298 | 21644 |
+| CP2K | - | 1085842 | 0 | 20350978 | 38960 | 21479099 | 1085842 |
+| QMCPACK | - | 337840 | 294128 | 10949914 | 538165 | 12122677 | 337840 |
+| DFT-FE | - | 107718 | 0 | 12784642 | 314 | 12896192 | 107718 |
+| GEOS | - | 406925 | 330939 | 14602640 | 46778 | 15395169 | 406859 |
+<!-- hpcperf:loc-table:end -->

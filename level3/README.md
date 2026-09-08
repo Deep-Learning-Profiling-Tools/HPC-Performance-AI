@@ -119,13 +119,67 @@ tolerance 5e-5 (upstream's value for that deck) was adopted after a first run at
 the adiabatic 2e-10 had FAILED, and the `I_R` field of that deck is not accepted
 by any tolerance (PENDING), see `nyx/README.md`.
 
+## Source distribution: frozen source bundles (2026-09-08)
+
+Level 1 and Level 2 keep their kernel / mini-app sources in git. Level 3 keeps
+the harness in git and distributes the application source as **frozen source
+bundles**: one `archives/*.tar.zst` per application (two for nekRS' variants),
+managed with Git LFS, that materializes into `level3/<app>/src` (+ `deps/`).
+After `git clone` + `git lfs pull` + `tools/prepare_benchmark.sh level3 <app>`
+the benchmark directory contains every application and benchmark-specific
+source the build needs; `build.sh`/`run.sh`/`validate.sh` read source ONLY from
+`$HERE/src` and `$HERE/deps` (never `_upstream/`, another checkout or an
+absolute path). Environment/system software (CUDA, compilers, MPI, Slurm, the
+site UCX profile, `.conda_env`) stays environment-provided.
+
+```
+level3/<app>/
+├── README.md, benchmark.yaml, optimization_scope.yaml
+├── archives/source_bundle.tar.zst        Git LFS object (nekRS: hypregpu.source.tar.zst, cpucoarse.source.tar.zst)
+├── src/, deps/                           materialized by tools/prepare_benchmark.sh (never committed)
+├── build.sh, run.sh, validate.sh         read $HERE/src and $HERE/deps only; no fetch, no patching
+├── fetch.sh                              FREEZE-TIME ONLY (input of the freeze), not used by build.sh
+├── patches/, <app>_check.py, host-configs/ ...
+└── provenance/
+    ├── freeze_spec[.variant].yaml        what the bundle is made of (pinned checkouts, submodules, tarballs, patches, exclusions)
+    ├── source.lock[.variant].yaml        upstream url/tag/commit, archive sha256, source_tree_sha256, patch series, dependencies, licenses
+    ├── upstream[.variant].lock, patch_series[.variant].txt, original_vs_baseline[.variant].diff
+    ├── SOURCE_MANIFEST[.variant].json    every file of the bundle (path, sha256, size, exec bit) + the tree-hash algorithm
+    ├── LICENSES[.variant].md, equivalence[.variant].{json,md}, LOC[.variant].{json,md}
+    └── check_workspace[.variant].json
+```
+
+Tools (`tools/`): `freeze_benchmark_source.py` (exact upstream HEAD blobs + declared
+submodules + pinned tarballs -> approved patch series applied -> credential/artifact
+scan -> `source_tree_sha256` -> equivalence check against the tree the recorded
+results were validated from -> deterministic archive), `compare_source_trees.py`,
+`prepare_benchmark.sh` / `hpcperf_materialize.py` (LFS-pointer detection, archive
+sha256, tree sha256, layout/symlink/secret/artifact checks, atomic rename,
+idempotent, refuses to overwrite a modified tree unless `--force-rematerialize`),
+`check_workspace.py` (15 static checks, iteration 0 must PASS),
+`create_agent_workspace.sh` (per-run writable copy under `workspaces/<run-id>/`,
+readonly ranges from `optimization_scope.yaml`, never symlinks back to the
+canonical tree), `loc_report.py` (cloc code LOC by ownership),
+`source_archives_report.py` (-> [SOURCE_ARCHIVES.md](SOURCE_ARCHIVES.md)); tests in
+`tools/tests/test_source_tools.sh` (run by `level3/tools/tests/run_all.sh`).
+
+Identity: `source_tree_sha256` (algorithm hpcperf-tree-1: sorted paths, file
+content / symlink target, no mtime/uid/mode) is the identity of a bundle; the
+archive sha256 is recorded separately. Iteration 0 of an optimization run = the
+materialized frozen baseline; the agent works in `workspaces/<run-id>/level3/<app>/`
+and may modify only the `modifiable` ranges of `optimization_scope.yaml`
+(application-owned source; bundled/benchmark-specific dependency source, inputs,
+references, validators and provenance are read-only). Migration status,
+sizes, LOC, license review and the Git LFS blocker: [SOURCE_ARCHIVES.md](SOURCE_ARCHIVES.md).
+
 ## Dependency isolation
 
 Every application owns a private tree -- no shared Level 3 install root:
 
 ```
-.deps/level3/<app>/{src,build,install,logs}     patched source copy (where needed), deps, install, logs
-_upstream/level3/<Name>                        shallow upstream checkout at the selected tag (read-only)
+level3/<app>/{src,deps}                        materialized frozen source bundle (the ONLY application source input)
+.deps/level3/<app>/{src,build,install,logs}     build-side copies (in-tree-writing builds), dependency builds, install, logs
+_upstream/level3/<Name>                        freeze-time checkout (fetch.sh; input of the freeze only)
 build/level3/<app>/<cuda|hip>                  application build tree (+ run/ directories of run.sh)
 ```
 

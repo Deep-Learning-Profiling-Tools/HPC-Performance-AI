@@ -166,3 +166,15 @@ The last five are gross, not precision-level, and were not investigated: **the
 compositional multiphase flow and well modules of this build are UNVERIFIED**; the
 validated solid-mechanics workflow is not affected (its restart state matches upstream's
 baseline to 3.6e-12).
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 geos` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 362.6 MB / 751.1 MB | 7026 | `208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741` | `cc5a6bfaf27504a200f46ca2f610dbca86a3a3e8a7753faa7bf7ca5dc8b309d1` | develop @ 2026-09-04 `b7a0f1330527` | geos-blt-0001-cuda13-memoryClockRate.patch, 0001-tpl-superlu_dist-url-hash-typo.patch, 0002-tpl-raja-vectorization-overridable.patch, 0003-tpl-hdf5-step-generator-and-build-command.patch | src: EQUIVALENT, deps/thirdPartyLibs: EQUIVALENT | 406925 / 406859 / 330939 / 14602640 / 46778 / 15395169 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

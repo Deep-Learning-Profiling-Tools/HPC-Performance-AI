@@ -57,9 +57,18 @@ Facts that differ from any "reference" you may read elsewhere:
   user asks in that turn. Never push `main`, never force-push, no `gh` on the
   node, never print tokens.
 - Never `git add .`/`-A`. Add files by name. Never commit `.conda_env`, `.tools`,
-  `_upstream/`, `.deps/`, `build/`, binaries, tarballs or large data (`.gitignore`
-  covers them, but symlinked `.conda_env`/`.tools` in worktrees are untracked --
-  leave them).
+  `_upstream/`, `.deps/`, `build/`, `level3/*/src`, `level3/*/deps`, `workspaces/`,
+  binaries, tarballs or large data (`.gitignore` covers them, but symlinked
+  `.conda_env`/`.tools` in worktrees are untracked -- leave them). The source
+  bundles `level3/*/archives/*.tar.zst` are Git LFS objects: never `git add` them
+  without a working `git lfs` filter (the `.gitignore` guard line stays until then),
+  never push LFS objects without the user's confirmation of the quota.
+- Source freezing: `tools/freeze_benchmark_source.py level3/<app>` from the
+  spec in `provenance/freeze_spec*.yaml`; inputs are committed blobs of pinned
+  checkouts and sha256-pinned tarballs only -- never tar `.deps/` or a worktree;
+  the scan fails on any credential-looking file/content; an UNEXPECTED difference
+  against the validated tree stops the migration (declare artifacts in the spec,
+  never edit source to make hashes match).
 - One commit per application or infrastructure change, message = what/why with
   the measured facts. Branch names follow `CONTRIBUTING.md` (`level3/<app>`,
   `env/...`, `docs/...`).
@@ -72,8 +81,16 @@ Facts that differ from any "reference" you may read elsewhere:
 
 ```
 level3/<app>/
-  fetch.sh      pinned upstream + dependency sources (tag/SHA, sha256 for tarballs) into _upstream/ and .deps downloads
-  build.sh      idempotent, stage-marked (.hpcperf-stage-done), per-profile, writes BUILD_INFO.txt + .hpcperf-l3-fingerprint
+  archives/*.tar.zst   frozen source bundle (Git LFS); materialized into src/ (+ deps/) by tools/prepare_benchmark.sh
+  src/, deps/   the ONLY application/benchmark-specific source input of build.sh (never committed; identity =
+                source_tree_sha256 in benchmark.yaml / provenance/source.lock*.yaml)
+  provenance/   freeze_spec, source.lock, upstream.lock, patch_series, original_vs_baseline.diff, SOURCE_MANIFEST.json,
+                LICENSES.md, equivalence.*, LOC.*, check_workspace.json
+  benchmark.yaml, optimization_scope.yaml   contract for optimization agents (what may be modified; inputs/references)
+  fetch.sh      FREEZE-TIME ONLY: pinned upstream checkout into _upstream/ -- never called by build.sh
+  build.sh      idempotent, stage-marked (.hpcperf-stage-done), per-profile, writes BUILD_INFO.txt + .hpcperf-l3-fingerprint;
+                reads $HERE/src, $HERE/deps only; applies NO patch (the bundle is the patched baseline); builds that
+                write into their source tree (SPECFEM3D, nekRS, DFT-FE, GEOS, CP2K toolchain) use a build-side copy
   run.sh        [CUDA] [args]; cases via HPCPERF_<APP>_CASE; modes smoke|strong|weak; writes run_manifest.txt
   validate.sh   [CUDA]; HPCPERF_GPUS=N; prints the criteria and the verdict; exit 0 PASS, 1 FAIL,
                 3 PENDING (Nyx heat/cool I_R_CHECK_PENDING), 4 UNSUPPORTED_LAYOUT (Nyx) -- only 0 is a pass
@@ -106,6 +123,12 @@ level3/<app>/
 - Regression campaigns never overwrite historical results: set
   `HPCPERF_L3_RUN_SUBDIR=run.regress-<sha>` (every run.sh/validate.sh builds its
   run directories under `build/level3/<app>/<profile>/$L3_RUN_SUBDIR`).
+- Agent runs: `tools/create_agent_workspace.sh level3 <app> <run-id>
+  [--link-prebuilt-deps]` -> `workspaces/<run-id>/level3/<app>/` (real copy of
+  src/deps, readonly ranges chmod'ed, harness copied to the workspace root,
+  environment symlinked); `tools/check_workspace.py` must PASS before iteration 0;
+  never point an agent at the canonical `level3/<app>`; never symlink src/deps
+  back to it. Build outputs of a workspace stay under `workspaces/<run-id>/`.
 - Any tool that records its process environment (CP2K's toolchain installer,
   nsys/ncu, env-logging build systems) runs through `l3_clean_env_exec` /
   `level3/tools/l3_clean_env.sh` (allow-listed `env -i` plus a credential

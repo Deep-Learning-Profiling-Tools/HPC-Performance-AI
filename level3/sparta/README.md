@@ -141,3 +141,15 @@ UNVALIDATED**, nothing executed:
   wrappers yet.
 - Reference logs are from 2014 (Intel CPU) and only for 1 and 8 ranks; the
   comparison is statistical by design (upstream policy), not bitwise.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 sparta` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 20.3 MB / 72.5 MB | 3084 | `63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c` | `ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09` | 27Aug2026 `95b9abaa8bd5` | none | src: EQUIVALENT | 131181 / 131181 / 223529 / 0 / 0 / 354863 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

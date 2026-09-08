@@ -154,3 +154,15 @@ UNVALIDATED**, nothing executed:
 - Upstream's checksum baselines are not used (platform-dependent by
   upstream's own statement); validation is the analytic Langmuir test plus
   charge and particle conservation.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 warpx` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 13.6 MB / 40.0 MB | 4632 | `e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2` | `d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0` | 26.09 `0c62c75e53a9` | none | src: EQUIVALENT, deps/amrex: EQUIVALENT | 112459 / 112459 / 0 / 366200 / 11058 / 492389 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

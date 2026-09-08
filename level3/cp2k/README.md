@@ -122,3 +122,15 @@ Ha on 2 GPUs, 8.6e-12 Ha on 4 GPUs, `blas_resolved=` recorded in every manifest)
 `md_summary.txt`, `run_manifest.txt`). Strong (H2O-128) / size-sweep timings:
 `SECOND_BATCH_STATUS.md` (H2O-128 on 1 GPU: 119.8 s with the toolchain OpenBLAS vs 204.9 s
 with the conda pthreads OpenBLAS of attempt 1 -- the BLAS mix-up was also a 1.7x slowdown).
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 cp2k` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 201.2 MB / 495.3 MB | 9009 | `d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2` | `d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2` | v2026.2 `67b5da876dd6` | 0001-toolchain-b200-backport-cp2k-378b2fab.patch | src: EQUIVALENT, src/tools/toolchain: EQUIVALENT | 1085842 / 1085842 / 0 / 20350978 / 38960 / 21479099 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

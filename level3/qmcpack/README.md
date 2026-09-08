@@ -120,3 +120,15 @@ refuses more than `HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU` (default 300) walkers pe
 GPU unless forced; strong scaling = the verbatim 256-walker deck over 1/2/4 GPUs,
 weak scaling = 256 walkers per GPU. The 256-walker DMC runs use ~120 GB of the
 183 GB per GPU.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 qmcpack` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 215.0 MB / 533.3 MB | 8344 | `f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e` | `6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3` | v4.4.0 `2601d62e3539` | none | src: EQUIVALENT | 337840 / 337840 / 294128 / 10949914 / 538165 / 12122677 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->

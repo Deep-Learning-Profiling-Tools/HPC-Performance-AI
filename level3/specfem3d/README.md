@@ -128,3 +128,15 @@ UNVALIDATED**, nothing executed (each of the three stages prints its plan):
 - Only the homogeneous half-space family is wrapped; layered_halfspace,
   Mount_StHelens, CPML and fault examples build with this configuration but
   have no wrappers yet.
+
+<!-- hpcperf:source-section:begin -->
+## Source distribution (frozen bundle, 2026-09-08)
+
+The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 specfem3d` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+
+| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|
+| - | `archives/source_bundle.tar.zst` | 236.8 MB / 634.3 MB | 6205 | `9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f` | `62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316` | v4.1.1 `c67d3ae7d4bf` | 0001-cuda13-deviceOverlap-guard.patch, 0002-blackwell-device-block.patch | src: EQUIVALENT | 142516 / 142516 / 147593 / 0 / 1027 / 307549 |
+
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+<!-- hpcperf:source-section:end -->
