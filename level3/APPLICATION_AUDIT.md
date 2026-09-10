@@ -27,8 +27,9 @@ candidates have an officially supported native CUDA path.
 | CP2K | v2026.2 | native CUDA/HIP + DBCSR | very high (~40 pkgs) | medium-high | high | official but `cuda_arch=100` rejected | official, no B200 image | SECOND_BATCH |
 | Nyx | 26.09 | AMReX | low-medium | medium (SUNDIALS) | medium-high | none | none | SECOND_BATCH |
 | QMCPACK | v4.4.0 | OpenMP offload + cuBLAS | medium (needs Clang offload) | medium-high | medium | pkg `+cuda` broken for 4.x | CI only | SECOND_BATCH |
-| GEOS | 1.2.0 (develop differs) | RAJA/CHAI/Umpire + hypre | very high (~20 TPLs) | high (tag) / medium (develop) | high | uberenv only (LC systems) | CI images | SECOND_BATCH |
+| GEOS | 1.2.0 (develop differs) | RAJA/CHAI/Umpire + hypre | very high (~20 TPLs) | high (tag) / medium (develop) | high | uberenv only (LC systems) | CI images | SECOND_BATCH -> **RETIRED_FROM_DEFAULT_SUITE (2026-09-10)**: ParMETIS 4.0.3 redistribution constraint + replacement decision |
 | DFT-FE | 1.2.0 | native CUDA/HIP/SYCL + deal.II (CPU) | high | medium | medium-high | pkg stale (0.6) | CPU only | SECOND_BATCH |
+| ExaCA | 2.1.0 (+ Kokkos 4.7.04, nlohmann_json 3.12.0 in `deps/`) | Kokkos (external) | low | low-medium (Kokkos 4.7.04 documents CUDA 13; Kokkos 4.6.02's nvcc_wrapper still defaults to sm_70 = unusable with CUDA 13.2) | medium (Kokkos HIP path documented by ExaCA; untested here) | `exaca` package exists (`+cuda cuda_arch=`) | none | **REPLACEMENT_CANDIDATE (2026-09-10)**, admission pending (see the ExaCA section) |
 
 ---
 
@@ -338,6 +339,8 @@ candidates have an officially supported native CUDA path.
 
 ## GEOS
 
+**RETIRED_FROM_DEFAULT_SUITE (2026-09-10)** -- dependency redistribution/licensing constraints (ParMETIS 4.0.3, University of Minnesota research license, inside the third-party dependency set the benchmark needs) and the project decision to replace the application. The audit, the bring-up record (`geos/`, `SECOND_BATCH_STATUS.md`) and the provenance stay as history; no source artifact is staged or published for GEOS, and it is not counted in the default-suite statistics. The section below is unchanged from 2026-09-04/06.
+
 - official_repository: https://github.com/GEOS-DEV/GEOS (formerly GEOSX; TPLs https://github.com/GEOS-DEV/thirdPartyLibs; submodules LvArray, BLT, PVTPackage, hdf5_interface, uberenv)
 - official_documentation: https://geosx-geosx.readthedocs-hosted.com/en/latest/ (QuickStart, buildGuide/{Prerequisites,Dependencies,BuildProcess,SpackUberenv,ContinuousIntegration}, advancedExamples/performanceBenchmarks)
 - latest_stable_release: 1.2.0 (2024-10-02, "Latest"); `develop` (`b7a0f133...`, 2026) is ~2 years ahead and is what docs/CI describe (TPL tag 361-1070, CUDA 12.9.1 images, RAJA 2026.07.0)
@@ -414,6 +417,44 @@ candidates have an officially supported native CUDA path.
 
 ---
 
+## ExaCA (replacement candidate, audited 2026-09-10)
+
+- official_repository: https://github.com/LLNL/ExaCA (LLNL / ExaAM; README `README.md`, examples `examples/README.md`, analysis `analysis/README.md`)
+- official_documentation: the repository READMEs (build, inputs, problem types, analysis); Spack package `exaca`; Zenodo DOI 10.5281/zenodo.6908176 for releases
+- latest_stable_release: `2.1.0` (tag, the latest release) -- selected
+- selected_commit_sha: `d26e59cd51e241a327c5267d43fd70537e5425f7`
+- license: MIT (+ NOTICE)
+- application_owned_loc: 6,512 cloc code lines (29 files: `src/*.hpp` 5,976 header lines, `src/*.cpp` 473, CMake 63); tests 2,760 (`unit_test/`, `analysis/unit_test/`); Kokkos 4.7.04 as a benchmark-specific dependency 278,336 -- a complete but compact application (header-only templated CA kernels)
+- main_languages: C++17 (Kokkos), JSON inputs, CMake
+- build_system: CMake >= 3.12 (`find_package(Kokkos 4.0)`, `find_package(MPI)`, `nlohmann_json 3.10` found or FetchContent-downloaded -- the benchmark bundles the tarball and sets `ExaCA_REQUIRE_EXTERNAL_JSON=ON`)
+- cxx_standard: C++17 (Kokkos 4.x)
+- supported_compilers: whatever Kokkos supports (nvcc_wrapper + GCC, hipcc, Clang); verified conda GCC 13.3.0 + nvcc 13.2.78
+- cuda_support: yes (Kokkos CUDA backend; documented CUDA 9+); **verified on B200 with Kokkos 4.7.04** (Kokkos 4.6.02's nvcc_wrapper defaults to sm_70, rejected by CUDA 13.2)
+- hip_rocm_support: yes (Kokkos HIP backend, documented HIP 3.5+); untested here (no ROCm)
+- mpi_support: yes (required; 1-D decomposition in Y, halo exchange every step through host buffers)
+- official_gpu_programming_model: Kokkos (external; not bundled by upstream -> `deps/kokkos` in the artifact)
+- multi_gpu_support: one MPI rank per GPU (Kokkos default device under the per-rank `CUDA_VISIBLE_DEVICES` wrapper); verified 1/2/4 GPUs, launcher audit "N verified, 0 mismatch"
+- multi_node_support: documented (MPI); UNVERIFIED here (site transport)
+- gpu_aware_mpi_requirement: none (halos staged through host buffers; the README lists "GPU aware if enabled" as optional)
+- rank_to_gpu_binding: launcher wrapper (per-rank visible device); ExaCA uses Kokkos' default device
+- topology_decomposition_controls: none beyond the rank count (1-D Y split, ny/np with the remainder spread); each rank needs >= 2 cells in Y
+- major_dependencies: Kokkos >= 4.0, MPI, nlohmann_json >= 3.10; optional Finch (coupled heat transport), GoogleTest
+- dependency_complexity: low
+- official_inputs_datasets: `examples/Inp_*.json` (Directional, Spot, SingleGrain analytic problems; `FromFile` problems need the external ExaCA-Data temperature histories), material files `examples/Materials/*.json`, orientation files `examples/Substrate/*.csv` (10,000 orientations) -- all repository content; benchmark deck = the flagship `Inp_DirSolidification.json` physics with a decomposition-independent substrate (`level3/exaca/inputs/`)
+- correctness_mechanism: upstream ships GoogleTest unit tests (not built here) and no reference output for the example problems; the benchmark uses statistical invariants of the final GrainID field (grain counts, nucleated fraction, top-layer grain count, <001>-to-z misorientation) vs a frozen 1-GPU reference and vs the same build's 1-GPU run, with tolerances from the measured atomic-capture spread (`exaca/README.md`)
+- strong_scaling_input_availability: yes (`Domain.Nx/Ny/Nz`); a single rank cannot hold 512^3 cells (ExaCA indexes the 26-neighbour arrays with `int`), strong box 512x256x512
+- weak_scaling_input_availability: yes (Ny scaled with the rank count)
+- expected_build_time: **verified 109 s** at -j32 (Kokkos 4.7.04 CUDA + json + ExaCA)
+- expected_disk_usage: artifact 2.7 MB compressed / 15 MB source; build + installs ~0.3 GB
+- expected_input_data_size: 1.5 MB (orientation csv files), no downloads
+- b200_cuda132_risk: low-medium -- **verified** (build + 1/2/4-GPU validation); the only adaptation was the Kokkos version (4.7.04)
+- mi355x_hip_risk: medium (Kokkos HIP backend; gfx950 support in Kokkos 4.7 untested here)
+- container_availability: none official (Nix expression for the Serial backend only)
+- spack_availability: `exaca` package (`+cuda cuda_arch=...`, `+finch`); not used (native CMake build from the artifact)
+- recommended_integration_priority: REPLACEMENT_CANDIDATE for the tenth default-suite slot (GEOS retired); all twenty admission criteria met on this node, maintainer confirmation pending
+- blocker: none found. Watch: small per-step GPU work (strong scaling 1.55x on 4 GPUs at 67 M cells), int-indexed arrays limit the cells per rank to ~82 M, no bitwise-reproducible output (atomic captures)
+- build_strategy_notes: **NATIVE** (CMake, out-of-source, no patch; Kokkos and json built from `deps/` inside the benchmark's private `.deps/level3/exaca/`)
+
 ## Cross-cutting findings
 
 1. **Spack is not a shortcut to Blackwell for any candidate on this node.** The
@@ -444,21 +485,22 @@ candidates have an officially supported native CUDA path.
    above is multi-node capable per upstream, none is verified beyond one node.
 
 <!-- hpcperf:loc-table:begin -->
-## Materialized source LOC per application (frozen bundles, 2026-09-08)
+## Materialized source LOC per application (frozen source artifacts, 2026-09-10)
 
-cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, build output excluded) of the frozen source bundles (`level3/<app>/provenance/LOC*.json`, categories from `optimization_scope.yaml`). This replaces the whole-checkout `wc -l` figures: the +9,972 lines of the integration PR are the harness, not application code.
+cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, build output excluded) of the frozen source artifacts (`level3/<app>/provenance/LOC*.json`, categories from `optimization_scope.yaml`). This replaces the whole-checkout `wc -l` figures: the +9,972 lines of the integration PR are the harness, not application code. Suite status: retained = default suite; retired = GEOS (not counted in the suite totals); candidate = ExaCA (admission pending).
 
-| Application | variant | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_loc | total_materialized_code_loc | agent_modifiable_code_loc |
-|---|---|---|---|---|---|---|---|
-| LAMMPS | - | 852527 | 494133 | 0 | 124684 | 1471402 | 852527 |
-| SPARTA | - | 131181 | 223529 | 0 | 0 | 354863 | 131181 |
-| WarpX | - | 112459 | 0 | 366200 | 11058 | 492389 | 112459 |
-| SPECFEM3D Cartesian | - | 142516 | 147593 | 0 | 1027 | 307549 | 142516 |
-| nekRS | hypregpu | 53131 | 2312092 | 0 | 0 | 2366122 | 53131 |
-| nekRS | cpucoarse | 53131 | 2312088 | 0 | 0 | 2366118 | 53131 |
-| Nyx | - | 32330 | 595317 | 366200 | 0 | 994298 | 21644 |
-| CP2K | - | 1085842 | 0 | 20350978 | 38960 | 21479099 | 1085842 |
-| QMCPACK | - | 337840 | 294128 | 10949914 | 538165 | 12122677 | 337840 |
-| DFT-FE | - | 107718 | 0 | 12784642 | 314 | 12896192 | 107718 |
-| GEOS | - | 406925 | 330939 | 14602640 | 46778 | 15395169 | 406859 |
+| Application | variant | suite | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_loc | total_materialized_code_loc | agent_modifiable_code_loc |
+|---|---|---|---|---|---|---|---|---|
+| LAMMPS | - | retained | 852527 | 494133 | 0 | 124684 | 1471402 | 852527 |
+| SPARTA | - | retained | 131181 | 223529 | 0 | 0 | 354863 | 131181 |
+| WarpX | - | retained | 112459 | 0 | 366200 | 11058 | 492389 | 112459 |
+| SPECFEM3D Cartesian | - | retained | 142516 | 147593 | 0 | 1027 | 307549 | 142516 |
+| nekRS | hypregpu | retained | 53131 | 2312092 | 0 | 0 | 2366122 | 53131 |
+| nekRS | cpucoarse | retained | 53131 | 2312088 | 0 | 0 | 2366118 | 53131 |
+| Nyx | - | retained | 32330 | 595317 | 366200 | 0 | 994298 | 21644 |
+| CP2K | - | retained | 1085842 | 0 | 20350978 | 38960 | 21479099 | 1085842 |
+| QMCPACK | - | retained | 337840 | 294128 | 10949914 | 538165 | 12122677 | 337840 |
+| DFT-FE | - | retained | 107718 | 0 | 12784642 | 314 | 12896192 | 107718 |
+| GEOS | - | retired | 406925 | 330939 | 14602640 | 46778 | 15395169 | 406859 |
+| ExaCA | - | candidate | 6512 | 0 | 278336 | 2760 | 287697 | 6368 |
 <!-- hpcperf:loc-table:end -->

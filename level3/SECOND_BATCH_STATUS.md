@@ -4,7 +4,14 @@ Branch `level3/second-batch-bringup` (worktree `HPC-Performance-AI-b2`, from the
 first-batch checkpoint `366b72f`). Node dgx003 (4x B200, CUDA 13.2.78, conda
 Open MPI 5.0.10, system GCC 14.2.1 / conda GCC 13.3.0), Slurm job 9552083.
 Everything below was produced on that allocation between 2026-09-05 and
-2026-09-08. Last update: **2026-09-08 -- CP2K, QMCPACK, DFT-FE, GEOS VALIDATED_PASS at
+2026-09-08. **2026-09-10: GEOS is RETIRED_FROM_DEFAULT_SUITE** (dependency
+redistribution/licensing constraints -- ParMETIS 4.0.3 in its third-party set --
+and the project decision to replace the application; ExaCA is the replacement
+candidate, see `exaca/README.md`). The GEOS results below stay as a historical
+record; no source artifact is staged or published for GEOS and it is excluded
+from prepare-all / publish-all / suite statistics
+([SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md)). Last update of the results:
+**2026-09-08 -- CP2K, QMCPACK, DFT-FE, GEOS VALIDATED_PASS at
 1/2/4 GPUs (results of 2026-09-05/06, commits listed at the end); Nyx MiniSB and
 LyA-adiabatic VALIDATED_PASS at 1/2/4 GPUs (re-run 2026-09-07 at the joint HEAD), Nyx
 LyA heat/cool STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (not a full pass, see

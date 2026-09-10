@@ -1,0 +1,599 @@
+{
+ "schema": "hpcperf-release-manifest-1",
+ "generated": "2026-09-10T22:11:30Z",
+ "suite": "level3-default",
+ "source_version": "hpcperf-l3-v1",
+ "release": {
+  "proposed_release_name": "level3-source-hpcperf-l3-v1",
+  "provider": null,
+  "status": "REMOTE_ARTIFACT_UNPUBLISHED"
+ },
+ "naming": "<app>[-<variant>]-<source_version>.tar.zst  (top-level entries: src/, deps/)",
+ "default_suite_order": [
+  "lammps",
+  "sparta",
+  "warpx",
+  "specfem3d",
+  "nekrs",
+  "nyx",
+  "cp2k",
+  "qmcpack",
+  "dftfe"
+ ],
+ "totals": {
+  "retained_applications": 9,
+  "retained_artifacts": 10,
+  "retained_compressed_bytes": 1194243164,
+  "retained_uncompressed_bytes": 3252649837
+ },
+ "artifacts": [
+  {
+   "app": "lammps",
+   "application": "LAMMPS",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "AGENT_WORKSPACE_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "lammps-hpcperf-l3-v1.tar.zst",
+   "size": 115344817,
+   "uncompressed_size": 457028170,
+   "sha256": "4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1",
+   "source_tree_sha256": "d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48",
+   "entries": 13893,
+   "upstream": {
+    "repository": "https://github.com/lammps/lammps.git",
+    "tag": "stable_22Jul2025_update6",
+    "commit": "9c5ab448c78a14fd534619622162ba418d6a1fb1"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 852527,
+    "bundled_dependency_code_loc": 494133,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 124684,
+    "agent_modifiable_code_loc": 852527,
+    "total_materialized_code_loc": 1471402,
+    "unclassified_code_loc": 58
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "sparta",
+   "application": "SPARTA",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "sparta-hpcperf-l3-v1.tar.zst",
+   "size": 21330629,
+   "uncompressed_size": 76042143,
+   "sha256": "ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09",
+   "source_tree_sha256": "63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c",
+   "entries": 3084,
+   "upstream": {
+    "repository": "https://github.com/sparta/sparta.git",
+    "tag": "27Aug2026",
+    "commit": "95b9abaa8bd548991cc3c3f1c58b34722f7ade74"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 131181,
+    "bundled_dependency_code_loc": 223529,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 0,
+    "agent_modifiable_code_loc": 131181,
+    "total_materialized_code_loc": 354863,
+    "unclassified_code_loc": 153
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "warpx",
+   "application": "WarpX",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "warpx-hpcperf-l3-v1.tar.zst",
+   "size": 14235980,
+   "uncompressed_size": 41912234,
+   "sha256": "d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0",
+   "source_tree_sha256": "e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2",
+   "entries": 4632,
+   "upstream": {
+    "repository": "https://github.com/BLAST-WarpX/warpx.git",
+    "tag": "26.09",
+    "commit": "0c62c75e53a9ad08241535444bd7e53fd1deba88"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 112459,
+    "bundled_dependency_code_loc": 0,
+    "benchmark_specific_dependency_code_loc": 366200,
+    "test_code_loc": 11058,
+    "agent_modifiable_code_loc": 112459,
+    "total_materialized_code_loc": 492389,
+    "unclassified_code_loc": 2672
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "specfem3d",
+   "application": "SPECFEM3D",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "specfem3d-hpcperf-l3-v1.tar.zst",
+   "size": 248289500,
+   "uncompressed_size": 665155680,
+   "sha256": "62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316",
+   "source_tree_sha256": "9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f",
+   "entries": 6205,
+   "upstream": {
+    "repository": "https://github.com/SPECFEM/specfem3d.git",
+    "tag": "v4.1.1",
+    "commit": "c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d"
+   },
+   "patches": 2,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 142516,
+    "bundled_dependency_code_loc": 147593,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 1027,
+    "agent_modifiable_code_loc": 142516,
+    "total_materialized_code_loc": 307549,
+    "unclassified_code_loc": 16413
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "nekrs",
+   "application": "nekRS",
+   "variant": "hypregpu",
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "nekrs-hypregpu-hpcperf-l3-v1.tar.zst",
+   "size": 48167250,
+   "uncompressed_size": 231107059,
+   "sha256": "83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2",
+   "source_tree_sha256": "76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01",
+   "entries": 14447,
+   "upstream": {
+    "repository": "https://github.com/Nek5000/nekRS.git",
+    "tag": "v26.0",
+    "commit": "96b3cf9e5bacede16568826c04a21bc0fe50dc7d"
+   },
+   "patches": 3,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 53131,
+    "bundled_dependency_code_loc": 2312092,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 0,
+    "agent_modifiable_code_loc": 53131,
+    "total_materialized_code_loc": 2366122,
+    "unclassified_code_loc": 899
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "nekrs",
+   "application": "nekRS",
+   "variant": "cpucoarse",
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "nekrs-cpucoarse-hpcperf-l3-v1.tar.zst",
+   "size": 48167029,
+   "uncompressed_size": 231106946,
+   "sha256": "a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169",
+   "source_tree_sha256": "6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e",
+   "entries": 14447,
+   "upstream": {
+    "repository": "https://github.com/Nek5000/nekRS.git",
+    "tag": "v26.0",
+    "commit": "96b3cf9e5bacede16568826c04a21bc0fe50dc7d"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 53131,
+    "bundled_dependency_code_loc": 2312088,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 0,
+    "agent_modifiable_code_loc": 53131,
+    "total_materialized_code_loc": 2366118,
+    "unclassified_code_loc": 899
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": false,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "nyx",
+   "application": "Nyx",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "nyx-hpcperf-l3-v1.tar.zst",
+   "size": 79400559,
+   "uncompressed_size": 196747678,
+   "sha256": "218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36",
+   "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
+   "entries": 5933,
+   "upstream": {
+    "repository": "https://github.com/AMReX-Astro/Nyx.git",
+    "tag": "26.09",
+    "commit": "e06eabc1b9dbcad5612db9529aced682402daede"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 32330,
+    "bundled_dependency_code_loc": 595317,
+    "benchmark_specific_dependency_code_loc": 366200,
+    "test_code_loc": 0,
+    "agent_modifiable_code_loc": 21644,
+    "total_materialized_code_loc": 994298,
+    "unclassified_code_loc": 451
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "cp2k",
+   "application": "CP2K",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "cp2k-hpcperf-l3-v1.tar.zst",
+   "size": 210932689,
+   "uncompressed_size": 519383421,
+   "sha256": "d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2",
+   "source_tree_sha256": "d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2",
+   "entries": 9009,
+   "upstream": {
+    "repository": "https://github.com/cp2k/cp2k.git",
+    "tag": "v2026.2",
+    "commit": "67b5da876dd6a76b8b021d5a04d1c81ba79a4c50"
+   },
+   "patches": 1,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 1085842,
+    "bundled_dependency_code_loc": 0,
+    "benchmark_specific_dependency_code_loc": 20350978,
+    "test_code_loc": 38960,
+    "agent_modifiable_code_loc": 1085842,
+    "total_materialized_code_loc": 21479099,
+    "unclassified_code_loc": 3319
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "qmcpack",
+   "application": "QMCPACK",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "qmcpack-hpcperf-l3-v1.tar.zst",
+   "size": 225420139,
+   "uncompressed_size": 559170675,
+   "sha256": "6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3",
+   "source_tree_sha256": "f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e",
+   "entries": 8344,
+   "upstream": {
+    "repository": "https://github.com/QMCPACK/qmcpack.git",
+    "tag": "v4.4.0",
+    "commit": "2601d62e353934f1526cab1f67f30b6672b7c76f"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 337840,
+    "bundled_dependency_code_loc": 294128,
+    "benchmark_specific_dependency_code_loc": 10949914,
+    "test_code_loc": 538165,
+    "agent_modifiable_code_loc": 337840,
+    "total_materialized_code_loc": 12122677,
+    "unclassified_code_loc": 2630
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "dftfe",
+   "application": "DFT-FE",
+   "variant": null,
+   "suite_status": "retained",
+   "statuses": [
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "dftfe-hpcperf-l3-v1.tar.zst",
+   "size": 182954572,
+   "uncompressed_size": 274995831,
+   "sha256": "0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670",
+   "source_tree_sha256": "54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30",
+   "entries": 3525,
+   "upstream": {
+    "repository": "https://github.com/dftfeDevelopers/dftfe.git",
+    "tag": "release 1.2.0 commit (2025-08-17)",
+    "commit": "7147faa51f7c9f3075fffaa5e48ba989bcd329c1"
+   },
+   "patches": 1,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 107718,
+    "bundled_dependency_code_loc": 0,
+    "benchmark_specific_dependency_code_loc": 12784642,
+    "test_code_loc": 314,
+    "agent_modifiable_code_loc": 107718,
+    "total_materialized_code_loc": 12896192,
+    "unclassified_code_loc": 3518
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "geos",
+   "application": "GEOS",
+   "variant": null,
+   "suite_status": "retired",
+   "statuses": [
+    "RETIRED",
+    "FROZEN",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [
+    "dependency redistribution/licensing constraints (ParMETIS 4.0.3, University of Minnesota research license) + project decision to replace the application"
+   ],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "geos-hpcperf-l3-v1.tar.zst",
+   "size": 380218896,
+   "uncompressed_size": 787552164,
+   "sha256": "cc5a6bfaf27504a200f46ca2f610dbca86a3a3e8a7753faa7bf7ca5dc8b309d1",
+   "source_tree_sha256": "208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741",
+   "entries": 7026,
+   "upstream": {
+    "repository": "https://github.com/GEOS-DEV/GEOS.git",
+    "tag": "develop @ 2026-09-04",
+    "commit": "b7a0f13305277c3d825ee93f34946ac4e8c94fee"
+   },
+   "patches": 4,
+   "redistribution_status": "blocked",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 406925,
+    "bundled_dependency_code_loc": 330939,
+    "benchmark_specific_dependency_code_loc": 14602640,
+    "test_code_loc": 46778,
+    "agent_modifiable_code_loc": 406859,
+    "total_materialized_code_loc": 15395169,
+    "unclassified_code_loc": 7887
+   },
+   "local_staging": "not staged",
+   "cache_hit": false,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  },
+  {
+   "app": "exaca",
+   "application": "ExaCA",
+   "variant": null,
+   "suite_status": "candidate",
+   "statuses": [
+    "CANDIDATE(pending)",
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "LOCAL_MATERIALIZATION_VERIFIED",
+    "REMOTE_ARTIFACT_UNPUBLISHED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "exaca-hpcperf-l3-v1.tar.zst",
+   "size": 2758430,
+   "uncompressed_size": 16024831,
+   "sha256": "3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316",
+   "source_tree_sha256": "b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44",
+   "entries": 1579,
+   "upstream": {
+    "repository": "https://github.com/LLNL/ExaCA.git",
+    "tag": "2.1.0",
+    "commit": "d26e59cd51e241a327c5267d43fd70537e5425f7"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": null,
+    "status": "unpublished"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 6512,
+    "bundled_dependency_code_loc": 0,
+    "benchmark_specific_dependency_code_loc": 278336,
+    "test_code_loc": 2760,
+    "agent_modifiable_code_loc": 6368,
+    "total_materialized_code_loc": 287697,
+    "unclassified_code_loc": 89
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "PASS"
+  }
+ ]
+}

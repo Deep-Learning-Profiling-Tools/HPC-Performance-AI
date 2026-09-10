@@ -119,68 +119,104 @@ tolerance 5e-5 (upstream's value for that deck) was adopted after a first run at
 the adiabatic 2e-10 had FAILED, and the `I_R` field of that deck is not accepted
 by any tolerance (PENDING), see `nyx/README.md`.
 
-## Source distribution: frozen source bundles (2026-09-08)
+## Source distribution: external source artifacts + automatic materialization (scheme 3, 2026-09-10)
 
 Level 1 and Level 2 keep their kernel / mini-app sources in git. Level 3 keeps
-the harness in git and distributes the application source as **frozen source
-bundles**: one `archives/*.tar.zst` per application (two for nekRS' variants),
-managed with Git LFS, that materializes into `level3/<app>/src` (+ `deps/`).
-After `git clone` + `git lfs pull` + `tools/prepare_benchmark.sh level3 <app>`
-the benchmark directory contains every application and benchmark-specific
-source the build needs; `build.sh`/`run.sh`/`validate.sh` read source ONLY from
-`$HERE/src` and `$HERE/deps` (never `_upstream/`, another checkout or an
-absolute path). Environment/system software (CUDA, compilers, MPI, Slurm, the
-site UCX profile, `.conda_env`) stays environment-provided.
+only the harness, the contract and the provenance in git and distributes the
+application source as **frozen source artifacts** stored in project-controlled
+external artifact storage (never in git, never in Git LFS):
+`<app>[-<variant>]-<source_version>.tar.zst`, top-level `src/` (application +
+upstream-bundled dependency source, approved patches pre-applied) and `deps/`
+(benchmark-specific source dependencies). Design: [EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md);
+per-artifact status, sizes and hashes: [SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md);
+the abandoned Git LFS design and its migration: [LFS_TO_ARTIFACT_MIGRATION.md](LFS_TO_ARTIFACT_MIGRATION.md).
 
 ```
-level3/<app>/
+git clone <repo> && cd HPC-Performance-AI
+tools/prepare_benchmark.sh level3 lammps            # source.lock -> cache / immutable URL -> verify -> level3/lammps/{src,deps}
+tools/prepare_benchmark.sh level3 lammps --artifact /path/to/lammps-hpcperf-l3-v1.tar.zst   # local copy (air-gapped, unpublished)
+tools/create_agent_workspace.sh level3 lammps <run-id>       # workspaces/<run-id>/level3/lammps/ = the agent's cwd
+tools/check_workspace.py workspaces/<run-id>/level3/lammps   # iteration 0 must PASS (17 checks)
+tools/validate_workspace.sh level3 lammps workspaces/<run-id>/level3/lammps --iteration N   # trusted harness
+```
+
+`prepare_benchmark.sh` reads `provenance/source.lock[.variant].yaml`, finds the
+artifact (`--artifact FILE` > content-addressed cache `.artifacts/sha256/<sha256>.tar.zst`
+> the immutable https URL recorded in the lock > mirrors; `--offline` forbids
+fetches), verifies size + sha256, extracts with a restricted extractor outside
+the benchmark directory, verifies `source_tree_sha256`, scans for
+credentials/build output/escaping symlinks and only then places `src/` (+ `deps/`)
+atomically. It is idempotent (`READY`), refuses a modified tree (`DIRTY`, exit 3)
+unless `--force-rematerialize`, and is never called by a build. After it,
+`build.sh`/`run.sh`/`validate.sh` read source ONLY from `$HERE/src` and
+`$HERE/deps` (never `_upstream/`, another checkout, `.deps/.../src`, a home
+directory or `/tmp`); environment/system software (CUDA, compilers, MPI, Slurm,
+the site UCX profile, `.conda_env`) stays environment-provided. **Remote status
+of every artifact in this round: REMOTE_ARTIFACT_UNPUBLISHED** -- the artifacts
+exist in the maintainer's local staging (`LOCAL_ARTIFACT_VERIFIED`), provider and
+release naming are still to be decided; until then `--artifact FILE` is the way
+to materialize.
+
+```
+level3/<app>/                                  (git)
 ├── README.md, benchmark.yaml, optimization_scope.yaml
-├── archives/source_bundle.tar.zst        Git LFS object (nekRS: hypregpu.source.tar.zst, cpucoarse.source.tar.zst)
-├── src/, deps/                           materialized by tools/prepare_benchmark.sh (never committed)
 ├── build.sh, run.sh, validate.sh         read $HERE/src and $HERE/deps only; no fetch, no patching
+├── inputs/, references/, configs/, patches/, <app>_check.py ...
 ├── fetch.sh                              FREEZE-TIME ONLY (input of the freeze), not used by build.sh
-├── patches/, <app>_check.py, host-configs/ ...
-└── provenance/
-    ├── freeze_spec[.variant].yaml        what the bundle is made of (pinned checkouts, submodules, tarballs, patches, exclusions)
-    ├── source.lock[.variant].yaml        upstream url/tag/commit, archive sha256, source_tree_sha256, patch series, dependencies, licenses
-    ├── upstream[.variant].lock, patch_series[.variant].txt, original_vs_baseline[.variant].diff
-    ├── SOURCE_MANIFEST[.variant].json    every file of the bundle (path, sha256, size, exec bit) + the tree-hash algorithm
-    ├── LICENSES[.variant].md, equivalence[.variant].{json,md}, LOC[.variant].{json,md}
-    └── check_workspace[.variant].json
+├── provenance/
+│   ├── freeze_spec[.variant].yaml        what the artifact is made of (pinned checkouts, submodules, tarballs, patches, exclusions)
+│   ├── source.lock[.variant].yaml        schema hpcperf-source-lock-2: upstream, artifact {filename,size,sha256,source_tree_sha256,primary url/status}, patches, dependencies, licenses, redistribution_status
+│   ├── upstream[.variant].lock, patch_series[.variant].txt, original_vs_baseline[.variant].diff
+│   ├── SOURCE_MANIFEST[.variant].json    every file of the artifact (path, sha256, size, exec bit) + the tree-hash algorithm
+│   ├── LICENSES[.variant].md, equivalence[.variant].{json,md}, LOC[.variant].{json,md}, check_workspace[.variant].json
+│   └── agent_workspace_verification.yaml (LAMMPS: the real closed-loop record)
+├── src/, deps/                           (local only) materialized by tools/prepare_benchmark.sh
+└── .hpcperf-materialized.yaml            (local only) variant, source version, tree hash, artifact sha256, origin
 ```
 
 Tools (`tools/`): `freeze_benchmark_source.py` (exact upstream HEAD blobs + declared
 submodules + pinned tarballs -> approved patch series applied -> credential/artifact
 scan -> `source_tree_sha256` -> equivalence check against the tree the recorded
-results were validated from -> deterministic archive), `compare_source_trees.py`,
-`prepare_benchmark.sh` / `hpcperf_materialize.py` (LFS-pointer detection, archive
-sha256, tree sha256, layout/symlink/secret/artifact checks, atomic rename,
-idempotent, refuses to overwrite a modified tree unless `--force-rematerialize`),
-`check_workspace.py` (15 static checks, iteration 0 must PASS),
-`create_agent_workspace.sh` (per-run writable copy under `workspaces/<run-id>/`,
-readonly ranges from `optimization_scope.yaml`, never symlinks back to the
-canonical tree), `loc_report.py` (cloc code LOC by ownership),
-`source_archives_report.py` (-> [SOURCE_ARCHIVES.md](SOURCE_ARCHIVES.md)); tests in
-`tools/tests/test_source_tools.sh` (run by `level3/tools/tests/run_all.sh`).
+results were validated from -> deterministic archive into the local artifact
+staging `$HPCPERF_ARTIFACT_STAGING/level3/<app>/<source_version>/`),
+`compare_source_trees.py`, `prepare_benchmark.sh` / `hpcperf_materialize.py`,
+`hpcperf_lock.py` (lock schema), `artifacts/{verify_artifact.py,
+generate_release_manifest.py, publish_artifacts.sh, artifact_catalog.yaml,
+migrate_from_lfs_bundle.py}`, `check_workspace.py` (17 checks; `--agent-mode`
+for iterations > 0), `create_agent_workspace.sh`, `validate_workspace.sh`
+(trusted harness: refuses readonly tampering, builds and validates inside the
+workspace), `loc_report.py`; tests in `tools/tests/test_source_tools.sh` (62
+checks, run by `level3/tools/tests/run_all.sh`).
 
 Identity: `source_tree_sha256` (algorithm hpcperf-tree-1: sorted paths, file
-content / symlink target, no mtime/uid/mode) is the identity of a bundle; the
-archive sha256 is recorded separately. Iteration 0 of an optimization run = the
-materialized frozen baseline; the agent works in `workspaces/<run-id>/level3/<app>/`
-and may modify only the `modifiable` ranges of `optimization_scope.yaml`
-(application-owned source; bundled/benchmark-specific dependency source, inputs,
-references, validators and provenance are read-only). Migration status,
-sizes, LOC, license review and the Git LFS blocker: [SOURCE_ARCHIVES.md](SOURCE_ARCHIVES.md).
+content / symlink target, no mtime/uid/mode) is the identity of an artifact; the
+archive sha256 is recorded separately. Any source change produces a new
+`source_version` and a new artifact (published artifacts are immutable).
+Iteration 0 of an optimization run = the materialized frozen baseline; the agent
+works in `workspaces/<run-id>/level3/<app>/` and may modify only the `modifiable`
+ranges of `optimization_scope.yaml` (application-owned source; bundled /
+benchmark-specific dependency source, inputs, references, validators and
+provenance are read-only and checked against a trusted baseline at every
+iteration).
+
+Default suite (2026-09-10): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx, CP2K,
+QMCPACK, DFT-FE (9 retained) + ExaCA as the replacement candidate for the tenth
+slot (see `exaca/README.md` for its admission status). GEOS is
+RETIRED_FROM_DEFAULT_SUITE (ParMETIS redistribution constraint + replacement
+decision); its directory, provenance and historical results stay as a record, no
+artifact is staged or published for it.
 
 ## Dependency isolation
 
 Every application owns a private tree -- no shared Level 3 install root:
 
 ```
-level3/<app>/{src,deps}                        materialized frozen source bundle (the ONLY application source input)
+level3/<app>/{src,deps}                        materialized frozen source artifact (the ONLY application source input)
 .deps/level3/<app>/{src,build,install,logs}     build-side copies (in-tree-writing builds), dependency builds, install, logs
 _upstream/level3/<Name>                        freeze-time checkout (fetch.sh; input of the freeze only)
+.artifacts/sha256/<archive_sha256>.tar.zst     content-addressed local artifact cache (prepare_benchmark.sh)
 build/level3/<app>/<cuda|hip>                  application build tree (+ run/ directories of run.sh)
+workspaces/<run-id>/                           per-run agent workspace (real copy; own build/ and .deps/)
 ```
 
 Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream

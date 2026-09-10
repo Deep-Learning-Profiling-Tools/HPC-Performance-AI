@@ -59,21 +59,31 @@ Facts that differ from any "reference" you may read elsewhere:
 - Never `git add .`/`-A`. Add files by name. Never commit `.conda_env`, `.tools`,
   `_upstream/`, `.deps/`, `build/`, `level3/*/src`, `level3/*/deps`, `workspaces/`,
   binaries, tarballs or large data (`.gitignore` covers them, but symlinked
-  `.conda_env`/`.tools` in worktrees are untracked -- leave them). The source
-  bundles `level3/*/archives/*.tar.zst` are Git LFS objects: never `git add` them
-  without a working `git lfs` filter (the `.gitignore` guard line stays until then),
-  never push LFS objects without the user's confirmation of the quota.
-- Source freezing: `tools/freeze_benchmark_source.py level3/<app>` from the
-  spec in `provenance/freeze_spec*.yaml`; inputs are committed blobs of pinned
-  checkouts and sha256-pinned tarballs only -- never tar `.deps/` or a worktree;
-  the scan fails on any credential-looking file/content; an UNEXPECTED difference
-  against the validated tree stops the migration (declare artifacts in the spec,
-  never edit source to make hashes match).
+  `.conda_env`/`.tools` in worktrees are untracked -- leave them). Level 3 source
+  artifacts (`*.tar.zst`) never enter git (no Git LFS either): they live in the
+  maintainer's local staging (`$HPCPERF_ARTIFACT_STAGING`, outside the worktree)
+  until the user publishes them; never upload/publish an artifact yourself.
+- Source freezing (scheme 3, `level3/EXTERNAL_ARTIFACT_DESIGN.md`):
+  `tools/freeze_benchmark_source.py level3/<app>` from the spec in
+  `provenance/freeze_spec*.yaml` writes the artifact into the local staging and
+  `provenance/source.lock*.yaml` (schema hpcperf-source-lock-2, `primary:
+  {url: null, status: unpublished}` until published -- never invent a URL);
+  inputs are committed blobs of pinned checkouts and sha256-pinned tarballs only
+  -- never tar `.deps/` or a worktree; the scan fails on any credential-looking
+  file/content; an UNEXPECTED difference against the validated tree stops the
+  migration (declare artifacts in the spec, never edit source to make hashes
+  match). Any source change = new `source_version` + new artifact.
+- Materialize with `tools/prepare_benchmark.sh level3 <app> [--artifact FILE]`
+  (cache `.artifacts/`); never let a build call it; a DIRTY tree is never
+  overwritten without `--force-rematerialize`. Agents work in
+  `workspaces/<run-id>/` (`tools/create_agent_workspace.sh`); validate agent
+  iterations only through `tools/validate_workspace.sh` (refuses readonly
+  tampering).
 - One commit per application or infrastructure change, message = what/why with
   the measured facts. Branch names follow `CONTRIBUTING.md` (`level3/<app>`,
   `env/...`, `docs/...`).
 - Worktrees: the main checkout and `../HPC-Performance-AI-b2` (branch
-  `level3/second-batch-bringup`) share one repository; `git worktree list`
+  `level3/source-freeze`, scheme-3 work) share one repository; `git worktree list`
   before assuming which branch a path is on. `.deps/`, `build/`, `_upstream/`
   are per-worktree.
 
@@ -81,11 +91,11 @@ Facts that differ from any "reference" you may read elsewhere:
 
 ```
 level3/<app>/
-  archives/*.tar.zst   frozen source bundle (Git LFS); materialized into src/ (+ deps/) by tools/prepare_benchmark.sh
-  src/, deps/   the ONLY application/benchmark-specific source input of build.sh (never committed; identity =
-                source_tree_sha256 in benchmark.yaml / provenance/source.lock*.yaml)
-  provenance/   freeze_spec, source.lock, upstream.lock, patch_series, original_vs_baseline.diff, SOURCE_MANIFEST.json,
-                LICENSES.md, equivalence.*, LOC.*, check_workspace.json
+  src/, deps/   the ONLY application/benchmark-specific source input of build.sh (never committed; materialized from
+                the external source artifact by tools/prepare_benchmark.sh; identity = source_tree_sha256 in
+                benchmark.yaml / provenance/source.lock*.yaml)
+  provenance/   freeze_spec, source.lock (schema 2), upstream.lock, patch_series, original_vs_baseline.diff,
+                SOURCE_MANIFEST.json, LICENSES.md, equivalence.*, LOC.*, check_workspace.json
   benchmark.yaml, optimization_scope.yaml   contract for optimization agents (what may be modified; inputs/references)
   fetch.sh      FREEZE-TIME ONLY: pinned upstream checkout into _upstream/ -- never called by build.sh
   build.sh      idempotent, stage-marked (.hpcperf-stage-done), per-profile, writes BUILD_INFO.txt + .hpcperf-l3-fingerprint;

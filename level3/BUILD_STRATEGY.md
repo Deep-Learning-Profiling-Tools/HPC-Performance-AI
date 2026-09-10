@@ -125,3 +125,36 @@ Still no class E change; no numerics, physics, precision, solver placement or
 input tolerance was touched. Every patch file carries its source, rationale,
 conditions, impact and verification in its header and its hash is in the
 profile fingerprint.
+
+## Source input rules (scheme 3: external source artifacts, 2026-09-10)
+
+Every Level 3 `build.sh` builds from the materialized frozen source artifact and nothing else
+(see [EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md)):
+
+- application source = `$HERE/src`, benchmark-specific source dependencies = `$HERE/deps`; both are
+  placed by `tools/prepare_benchmark.sh level3 <app>` after size/sha256/tree-hash/safety verification of
+  `<app>[-<variant>]-<source_version>.tar.zst`. A build never calls prepare (a DIRTY tree is never
+  overwritten), never fetches, clones, downloads or patches source (patches are pre-applied at freeze
+  time; their series and hashes are still recorded in `provenance/patch_series*.txt` / `source.lock*.yaml`
+  and go into the install fingerprint). When `src/` is absent the build fails plainly with
+  `source not materialized ... run tools/prepare_benchmark.sh level3 <app>` (`l3_require_materialized`).
+- forbidden as source inputs: `_upstream/` (freeze-time checkout only, used by `fetch.sh` and the freeze),
+  `.deps/<...>/src` of another benchmark, another repository or worktree, a maintainer's `/tmp` or home
+  directory, a floating upstream branch. `tools/check_workspace.py` (checks 7 and 15) greps the scripts
+  for such references.
+- allowed environment-provided inputs (declared in `source.lock*.yaml: dependencies.environment_provided`):
+  CUDA/ROCm toolkit and driver, compilers (conda GCC, system GCC/gfortran, the private LLVM offload
+  toolchain for QMCPACK), MPI, Slurm, site UCX/libfabric, system runtime libraries, `.conda_env`, and --
+  for a workspace created with `--link-prebuilt-deps` -- a stage-complete dependency install prefix of the
+  canonical tree (never the application itself, which is always rebuilt in the workspace).
+- builds that write into their source tree (SPECFEM3D autotools, nekRS, DFT-FE `git_info.h`, GEOS LvArray
+  docs, the CP2K toolchain) copy `src/` to a build-side tree under `.deps/level3/<app>/` first; the
+  materialized `src/` stays byte-identical to the artifact (its hash is re-checked by `check_workspace.py`).
+- dependency tarballs that upstream build systems would download (GEOS TPL superbuild, CP2K toolchain,
+  ExaCA's nlohmann_json) are pre-seeded from `$HERE/deps` into the build tree; the upstream sha256 check
+  then passes without a download.
+- an agent workspace (`tools/create_agent_workspace.sh`) is a real copy of `level3/<app>` under its own root
+  with its own `build/` and `.deps/level3/<app>/`; `build.sh` there compiles the workspace's current
+  `src/` (Ninja incremental: only changed files are recompiled; the install fingerprint carries the
+  configuration, not the source hash, so an edited file is always rebuilt, never served from a stale
+  binary of another run).
