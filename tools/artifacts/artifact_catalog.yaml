@@ -1,0 +1,49 @@
+# Level 3 source-artifact catalog (scheme 3: project-controlled external source artifacts).
+# The formal default suite, what may be published, and where the artifacts are expected to live.
+# Nothing here is a download location for users: tools/prepare_benchmark.sh reads the immutable URL(s)
+# recorded in each level3/<app>/provenance/source.lock*.yaml once the artifacts are published.
+schema: hpcperf-artifact-catalog-1
+suite: level3-default
+source_version: hpcperf-l3-v1                 # benchmark source version of this release round
+release:
+  proposed_release_name: level3-source-hpcperf-l3-v1   # to be confirmed by the maintainer with the provider choice
+  provider: null                              # github-release | s3 | http | zenodo -- NOT decided (no upload this round)
+  status: REMOTE_ARTIFACT_UNPUBLISHED
+naming: "<app>[-<variant>]-<source_version>.tar.zst  (top-level entries: src/, deps/)"
+staging:
+  env: HPCPERF_ARTIFACT_STAGING               # maintainer-side local staging (outside the git worktree); layout below
+  layout: "level3/<app>/<source_version>/{<artifact>.tar.zst, artifact.json, SHA256SUMS}"
+cache:
+  env: HPCPERF_ARTIFACT_CACHE
+  default: "$HPC_PERFORMANCE_AI_ROOT/.artifacts"
+  layout: "sha256/<archive_sha256>.tar.zst"
+publish_requirements:              # every one must hold, or publish_artifacts.sh REFUSES the artifact
+  - redistribution_status == cleared
+  - artifact sha256 and size == source.lock
+  - source_tree_sha256 of the extracted artifact == source.lock
+  - secret / build-output scan clean
+  - benchmark.yaml identity == source.lock
+  - artifact present in local staging
+applications:
+  lammps:    {application: LAMMPS,    suite_status: retained,  variants: [null]}
+  sparta:    {application: SPARTA,    suite_status: retained,  variants: [null]}
+  warpx:     {application: WarpX,     suite_status: retained,  variants: [null]}
+  specfem3d: {application: SPECFEM3D, suite_status: retained,  variants: [null]}
+  nekrs:     {application: nekRS,     suite_status: retained,  variants: [hypregpu, cpucoarse]}
+  nyx:       {application: Nyx,       suite_status: retained,  variants: [null]}
+  cp2k:      {application: CP2K,      suite_status: retained,  variants: [null]}
+  qmcpack:   {application: QMCPACK,   suite_status: retained,  variants: [null]}
+  dftfe:     {application: DFT-FE,    suite_status: retained,  variants: [null]}
+  geos:
+    application: GEOS
+    suite_status: retired                     # RETIRED_FROM_DEFAULT_SUITE (2026-09-10)
+    reason: "dependency redistribution/licensing constraints (ParMETIS 4.0.3, University of Minnesota research license) + project decision to replace the application"
+    publish: never                            # no scheme-3 artifact, not in prepare-all / publish-all / suite statistics
+    history_kept: true                        # level3/geos/ code, provenance and test records stay in git
+    variants: [null]
+  exaca:
+    application: ExaCA
+    suite_status: candidate                   # replacement candidate for the 10th slot; admission pending the bring-up criteria
+    admission: pending
+    variants: [null]
+default_suite_order: [lammps, sparta, warpx, specfem3d, nekrs, nyx, cp2k, qmcpack, dftfe]

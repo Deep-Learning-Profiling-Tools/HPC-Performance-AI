@@ -1,2 +1,0 @@
-# Level 3 frozen source bundles are Git LFS objects (see level3/SOURCE_ARCHIVES.md)
-level3/*/archives/*.tar.zst filter=lfs diff=lfs merge=lfs -text

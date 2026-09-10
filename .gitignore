@@ -24,14 +24,17 @@ __pycache__/
 rocprof*.csv
 rocprof*.json
 
-# Level 3 source distribution (Git LFS source bundles + materialization, 2026-09-08)
-# materialized source trees and per-run agent workspaces are never committed
+# Level 3 source distribution (scheme 3: external source artifacts + automatic materialization, 2026-09-10)
+# materialized source trees, the content-addressed artifact cache, materialization staging, per-run agent
+# workspaces and trusted workspace baselines are local state, never committed; source artifacts live in
+# the maintainer's staging / the external artifact storage (never in git, never in Git LFS)
 level3/*/src/
 level3/*/deps/
 level3/*/.hpcperf-materialized.yaml
 level3/*/.materialize.tmp.*
 level3/*/.discarded-*
+level3/.materialize-staging/
+.artifacts/
+.hpcperf/
 workspaces/
-# GUARD (remove when git-lfs is configured on the clone, see level3/SOURCE_ARCHIVES.md): without the
-# LFS filter a `git add` would commit the archives as plain blobs
-level3/*/archives/*.tar.zst
+*.tar.zst

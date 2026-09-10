@@ -15,11 +15,16 @@ patch). The staging tree is scanned for credential-looking files/contents and bu
 fails the freeze; only paths and rule names are printed), checked for symlinks escaping the tree, hashed
 (source_tree_sha256, algorithm hpcperf-tree-1), compared with the tree the recorded results were validated
 from (compare_source_trees; an UNEXPECTED difference stops the freeze), and only then archived
-deterministically (hpcperf-tar-1 + zstd -19 single-thread) into archives/<name>.tar.zst.
+deterministically (hpcperf-tar-1 + zstd -19 single-thread) into the maintainer's LOCAL ARTIFACT STAGING
+(--staging DIR or $HPCPERF_ARTIFACT_STAGING, outside the git worktree):
+    <staging>/level3/<app>/<source_version>/<app>[-<variant>]-<source_version>.tar.zst  (+ artifact.json, SHA256SUMS)
+The artifact never enters git; it is published later to project-controlled external storage
+(tools/artifacts/publish_artifacts.sh) and materialized by users with tools/prepare_benchmark.sh.
 
-Outputs (under level3/<app>/): archives/<archive>, provenance/source.lock[.variant].yaml, upstream.lock,
-patch_series.txt, original_vs_baseline.diff, SOURCE_MANIFEST[.variant].json, LICENSES.md,
-equivalence[.variant].{json,md}; benchmark.yaml gets its source identity fields filled in.
+Outputs (under level3/<app>/): provenance/source.lock[.variant].yaml (schema hpcperf-source-lock-2: identity,
+verification data, publish status `unpublished`), upstream.lock, patch_series.txt, original_vs_baseline.diff,
+SOURCE_MANIFEST[.variant].json, LICENSES.md, equivalence[.variant].{json,md}; benchmark.yaml gets its
+source identity fields (source_version, source_tree_sha256, source_artifact / variants.<v>).
 """
 import argparse
 import datetime
@@ -35,9 +40,10 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import hpcperf_source as hs  # noqa: E402
+import hpcperf_lock as hl  # noqa: E402
 import compare_source_trees as cst  # noqa: E402
 
-TOOL_VERSION = "freeze-1.0"
+TOOL_VERSION = "freeze-2.0"
 
 
 def die(msg):
@@ -139,6 +145,9 @@ def main():
     ap.add_argument("--keep-stage", action="store_true"); ap.add_argument("--skip-equivalence", action="store_true")
     ap.add_argument("--no-archive", action="store_true"); ap.add_argument("--verify-determinism", action="store_true")
     ap.add_argument("--allow-unexpected", action="store_true", help="record UNEXPECTED equivalence differences but continue (never silent: they stay in the report)")
+    ap.add_argument("--staging", default=os.environ.get(hs.STAGING_ENV), help="local artifact staging root (outside the worktree); default $HPCPERF_ARTIFACT_STAGING")
+    ap.add_argument("--redistribution-status", choices=hl.REDISTRIBUTION_STATUSES, help="default: the spec's redistribution_status, else 'review'")
+    ap.add_argument("--suite-status", choices=hl.SUITE_STATUSES, help="default: the benchmark.yaml value, else 'candidate'")
     a = ap.parse_args()
 
     app_dir = os.path.abspath(a.app_dir)
@@ -152,7 +161,14 @@ def main():
     variant = variant or spec.get("variant")
     suffix = f".{variant}" if variant else ""
     prov = os.path.join(app_dir, "provenance"); os.makedirs(prov, exist_ok=True)
-    arch_rel = spec.get("archive", f"archives/source_bundle{suffix}.tar.zst")
+    source_version = spec["benchmark_source_version"]
+    arch_name = hs.artifact_filename(app, variant, source_version)
+    if not a.no_archive and not a.staging:
+        die("no artifact staging: pass --staging DIR or set HPCPERF_ARTIFACT_STAGING (never inside the worktree)")
+    if a.staging and (os.path.abspath(a.staging) == R or os.path.abspath(a.staging).startswith(R + os.sep)):
+        die("the artifact staging must be outside the git worktree")
+    staging_dir = hl.staging_entry(a.staging, app, source_version) if a.staging else None
+    redistribution = a.redistribution_status or spec.get("redistribution_status") or "review"
     stage_dir = os.path.join(a.stage_root, f"{app}{suffix}")
     if os.path.isdir(stage_dir):
         shutil.rmtree(stage_dir)
@@ -249,55 +265,71 @@ def main():
         if unexpected and not a.allow_unexpected:
             die(f"{unexpected} UNEXPECTED difference(s) between the frozen tree and the validated tree -- migration of {app}{suffix} stopped (see provenance/equivalence{suffix}.md)")
 
-    # 5. archive
+    # 5. deterministic artifact -> local staging (never into the worktree)
     archive_info = {}
+    arch = None
     if not a.no_archive:
-        arch = os.path.join(app_dir, arch_rel); os.makedirs(os.path.dirname(arch), exist_ok=True)
-        tar_tmp = os.path.join(stage_dir, "bundle.tar")
+        os.makedirs(staging_dir, exist_ok=True)
+        arch = os.path.join(staging_dir, arch_name)
+        tar_tmp = os.path.join(stage_dir, "artifact.tar")
         n = hs.write_deterministic_tar(stage, tar_tmp)
-        hs.zstd_compress(tar_tmp, arch)
-        arch_sha = hs.sha256_file(arch)
+        arch_tmp = arch + f".tmp.{os.getpid()}"
+        hs.zstd_compress(tar_tmp, arch_tmp)
+        arch_sha = hs.sha256_file(arch_tmp)
         if a.verify_determinism:
-            tar2 = os.path.join(stage_dir, "bundle2.tar"); arch2 = os.path.join(stage_dir, "bundle2.tar.zst")
+            tar2 = os.path.join(stage_dir, "artifact2.tar"); arch2 = os.path.join(stage_dir, "artifact2.tar.zst")
             hs.write_deterministic_tar(stage, tar2); hs.zstd_compress(tar2, arch2)
             same = hs.sha256_file(arch2) == arch_sha
             log(f"determinism check: second archive {'IDENTICAL' if same else 'DIFFERS'} (sha256 {hs.sha256_file(arch2)[:16]} vs {arch_sha[:16]})")
             if not same:
-                die("archive is not reproducible")
+                os.remove(arch_tmp); die("archive is not reproducible")
             os.remove(tar2); os.remove(arch2)
-        archive_info = {"path": arch_rel, "sha256": arch_sha, "compression": "zstd", "zstd_level": 19, "zstd_version": hs.zstd_version(),
+        if os.path.isfile(arch) and hs.sha256_file(arch) != arch_sha:
+            os.remove(arch_tmp)
+            die(f"{os.path.relpath(arch, a.staging)} already exists in the staging with a DIFFERENT sha256 -- artifacts are immutable; bump benchmark_source_version")
+        os.chmod(arch_tmp, 0o640); os.replace(arch_tmp, arch)
+        archive_info = {"sha256": arch_sha, "compression": "zstd", "zstd_level": 19, "zstd_version": hs.zstd_version(),
                         "tar_format": hs.TAR_ALGO, "compressed_size": os.path.getsize(arch), "uncompressed_size": total,
                         "tar_entries": n, "file_count": sum(1 for e in entries if e["type"] == "F"), "symlink_count": sum(1 for e in entries if e["type"] == "L")}
         os.remove(tar_tmp)
-        log(f"archive {arch_rel}: {hs.human(archive_info['compressed_size'])} compressed / {hs.human(total)} uncompressed, sha256={arch_sha}")
+        log(f"artifact {os.path.relpath(arch, a.staging)}: {hs.human(archive_info['compressed_size'])} compressed / {hs.human(total)} uncompressed, sha256={arch_sha}")
 
     # 6. provenance files
     now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     comps = spec["components"]
     app_comp = next(c for c in comps if c["dest"] == "src")
-    lock = {
-        "schema": "hpcperf-source-lock-1",
-        "name": spec["name"], "level": 3, "application": spec["application"], "variant": variant,
-        "benchmark_source_version": spec["benchmark_source_version"],
-        "upstream": {"url": app_comp.get("url"), "tag": app_comp.get("ref"), "commit": app_comp["commit"]},
-        "archive": {**archive_info} if archive_info else {"path": arch_rel, "sha256": None, "compression": "zstd"},
-        "materialized_tree": {"sha256": tree_sha, "algorithm": hs.TREE_ALGO, "entries": len(entries), "layout": ["src/", "deps/"] if os.path.isdir(os.path.join(stage, "deps")) else ["src/"]},
-        "patches": [{"path": s["path"], "sha256": s["sha256"], "upstream_source": s["upstream_source"], "category": s["category"], "component": s["component"], "files": s["touched"]} for s in series],
-        "dependencies": {
-            "bundled": [{**b, "component": c["dest"]} for c in comps for b in c.get("bundled", [])],
-            "benchmark_specific": [{"path": c["dest"], "project": c.get("project"), "version": c.get("version"), "url": c.get("url"), "commit": c.get("commit"),
-                                    "sha256": comp_info[c["dest"]].get("sha256"), "license": c.get("license")} for c in comps if c.get("category") == "benchmark_specific"],
-            "environment_provided": spec.get("environment_provided", []),
-        },
-        "components": [{"dest": c["dest"], "kind": c["kind"], "category": c["category"], "url": c.get("url"), "ref": c.get("ref"), "commit": c.get("commit"),
-                        "sha256": c.get("sha256"), "checkout": c.get("checkout"), "submodules": c.get("submodules", []),
-                        "excluded": c.get("exclude", []), "license": c.get("license")} for c in comps],
-        "equivalence": [{"archive_path": r["archive_path"], "validated_tree": r["validated_tree"], "status": r["status"], **({"summary": r["summary"]} if "summary" in r else {})} for r in eq_results] if not a.skip_equivalence else "SKIPPED",
-        "licenses": spec.get("licenses", []),
-        "freeze_tool_version": TOOL_VERSION, "freeze_timestamp": now,
-        "note": "freeze_timestamp and the archive metadata are not part of source_tree_sha256",
-    }
-    hs.dump_yaml(lock, os.path.join(prov, f"source.lock{suffix}.yaml"))
+    layout = ["src/", "deps/"] if os.path.isdir(os.path.join(stage, "deps")) else ["src/"]
+    eq_records = [{"archive_path": r["archive_path"], "validated_tree": hl.portable_location(r["validated_tree"]), "status": r["status"], **({"summary": r["summary"]} if "summary" in r else {})} for r in eq_results] if not a.skip_equivalence else "SKIPPED"
+    lock = None
+    if archive_info:
+        lock = hl.make_lock(
+            name=spec["name"], application=spec["application"], variant=variant, source_version=source_version,
+            upstream={"url": app_comp.get("url"), "tag": app_comp.get("ref"), "commit": app_comp["commit"]},
+            archive_info=archive_info, tree_sha=tree_sha, entries=len(entries), layout=layout,
+            patches=[{"path": s_["path"], "sha256": s_["sha256"], "category": s_["category"], "upstream_reference": s_["upstream_source"], "component": s_["component"], "files": s_["touched"]} for s_ in series],
+            dependencies={
+                "bundled": [{**b, "component": c["dest"]} for c in comps for b in c.get("bundled", [])],
+                "benchmark_specific": [{"path": c["dest"], "project": c.get("project"), "version": c.get("version"), "url": c.get("url"), "commit": c.get("commit"),
+                                        "sha256": comp_info[c["dest"]].get("sha256"), "license": c.get("license")} for c in comps if c.get("category") == "benchmark_specific"],
+                "environment_provided": spec.get("environment_provided", []),
+            },
+            components=[{"dest": c["dest"], "kind": c["kind"], "category": c["category"], "url": c.get("url"), "ref": c.get("ref"), "commit": c.get("commit"),
+                         "sha256": c.get("sha256"), "checkout": c.get("checkout"), "submodules": c.get("submodules", []),
+                         "excluded": c.get("exclude", []), "license": c.get("license")} for c in comps],
+            equivalence=eq_records, licenses=spec.get("licenses", []), license_notes=spec.get("license_notes", []),
+            redistribution_status=redistribution, source_scope=hl.source_scope_from_optimization_scope(app_dir),
+            scan_allow=spec.get("scan_allow", []), freeze_tool_version=TOOL_VERSION, freeze_timestamp=now,
+            primary=spec.get("primary"), mirrors=spec.get("mirrors"))
+        tmp_lock = os.path.join(prov, f"source.lock{suffix}.yaml.freezing")
+        hs.dump_yaml(lock, tmp_lock)
+        problems = hl.validate_lock(lock, open(tmp_lock).read())
+        if problems:
+            os.remove(tmp_lock); die("lock invalid: " + "; ".join(problems))
+        os.replace(tmp_lock, os.path.join(prov, f"source.lock{suffix}.yaml"))
+        hl.update_staging_metadata(staging_dir, {"filename": arch_name, "benchmark": app, "variant": variant, "source_version": source_version,
+                                           "size": archive_info["compressed_size"], "sha256": archive_info["sha256"], "source_tree_sha256": tree_sha,
+                                           "format": hs.ARTIFACT_FORMAT, "status": "LOCAL_ARTIFACT_VERIFIED", "remote_status": "REMOTE_ARTIFACT_UNPUBLISHED",
+                                           "verified": now, "origin": {"kind": "freeze", "tool": TOOL_VERSION}, "redistribution_status": redistribution})
     with open(os.path.join(prov, f"upstream{suffix}.lock"), "w") as f:
         for c in comps:
             if c["kind"] == "git":
@@ -334,23 +366,24 @@ def main():
         f.write(f"\nLicense/notice files present in the bundle ({len(lic_files)}):\n\n")
         for p in lic_files:
             f.write(f"- `{p}`\n")
-    # benchmark.yaml identity fields
+    # benchmark.yaml identity fields (from the lock; nothing archive-path related is recorded in git)
     by_path = os.path.join(app_dir, "benchmark.yaml")
     by = hs.load_yaml(by_path) if os.path.isfile(by_path) else {"name": spec["name"], "level": 3, "application": spec["application"]}
-    ident = {"archive": arch_rel, "archive_sha256": archive_info.get("sha256"), "source_tree_sha256": tree_sha,
-             "compressed_size": archive_info.get("compressed_size"), "uncompressed_size": total, "file_count": len(entries)}
-    if variant:
-        by.setdefault("variants", {})[variant] = {**by.get("variants", {}).get(variant, {}), **ident, "source_version": spec["benchmark_source_version"]}
+    if lock:
+        hl.apply_identity(by, lock)
+        if a.suite_status:
+            by["suite_status"] = a.suite_status
+        elif "suite_status" not in by:
+            by["suite_status"] = "candidate"
+        hs.dump_yaml(by, by_path)
     else:
-        by["source_version"] = spec["benchmark_source_version"]; by["source_tree_sha256"] = tree_sha
-        by["source_bundle"] = ident
-    hs.dump_yaml(by, by_path)
+        log("--no-archive: tree hashed and reported only; lock / benchmark.yaml identity NOT written (an artifact is the identity carrier)")
     log(f"provenance written under {os.path.relpath(prov, R)}; benchmark.yaml identity updated")
     if not a.keep_stage:
         shutil.rmtree(stage_dir)
     else:
         log(f"staging tree kept: {stage}")
-    print(f"FREEZE OK {app}{suffix} source_tree_sha256={tree_sha}" + (f" archive_sha256={archive_info['sha256']} compressed={archive_info['compressed_size']}" if archive_info else ""))
+    print(f"FREEZE OK {app}{suffix} source_tree_sha256={tree_sha}" + (f" archive_sha256={archive_info['sha256']} compressed={archive_info['compressed_size']} artifact={arch_name} status=LOCAL_ARTIFACT_VERIFIED,REMOTE_ARTIFACT_UNPUBLISHED" if archive_info else ""))
     return 0
 
 

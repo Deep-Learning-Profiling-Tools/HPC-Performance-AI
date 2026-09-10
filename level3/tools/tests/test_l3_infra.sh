@@ -88,7 +88,11 @@ echo "$show" | /usr/bin/grep -q 'denied by the credential rule: .*HPCPERF_SELFTE
 # 8. lock-file queries used by build.sh (source identity comes from provenance/source.lock*.yaml, never from git)
 mkdir -p "$TMP/bench/provenance"
 cat > "$TMP/bench/provenance/source.lock.yaml" <<'EOF'
-upstream: {url: u, tag: t, commit: aaaa1111}
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark: {name: bench, level: 3, application: Bench, variant: null, source_version: hpcperf-l3-v1}
+upstream: {repository: u, tag: t, commit: aaaa1111}
+artifact: {filename: bench-hpcperf-l3-v1.tar.zst, format: tar.zst, layout: [src/, deps/], size: 1, sha256: s, source_tree_sha256: tree9999, primary: {url: null, status: unpublished}, mirrors: []}
 materialized_tree: {sha256: tree9999, layout: [src/, deps/]}
 patches:
   - {path: patches/0001-a.patch, sha256: x}
@@ -98,7 +102,11 @@ components:
   - {dest: deps/dep, kind: git, commit: bbbb2222}
 EOF
 [ "$(l3_source_commit "$TMP/bench")" = aaaa1111 ] && ok "8a: l3_source_commit reads upstream.commit" || bad "8a: $(l3_source_commit "$TMP/bench")"
-[ "$(l3_source_tree_sha "$TMP/bench")" = tree9999 ] && ok "8b: l3_source_tree_sha reads materialized_tree.sha256" || bad "8b"
+[ "$(l3_source_tree_sha "$TMP/bench")" = tree9999 ] && ok "8b: l3_source_tree_sha reads artifact.source_tree_sha256" || bad "8b"
+[ "$(l3_source_version "$TMP/bench")" = hpcperf-l3-v1 ] && ok "8b2: l3_source_version reads benchmark.source_version" || bad "8b2"
+printf 'schema: hpcperf-source-lock-1\nupstream: {commit: zzzz}\n' > "$TMP/bench/provenance/source.lock.old.yaml"
+rc=0; l3_source_commit "$TMP/bench" old >/dev/null 2>&1 || rc=$?
+[ "$rc" -ne 0 ] && ok "8b3: a scheme-2 (schema 1) lock is refused by the lock queries" || bad "8b3"
 [ "$(l3_component_commit "$TMP/bench" deps/dep)" = bbbb2222 ] && ok "8c: l3_component_commit finds a deps component" || bad "8c"
 [ "$(l3_submodule_commit "$TMP/bench" src sub/one)" = cccc3333 ] && ok "8d: l3_submodule_commit finds a bundled submodule" || bad "8d"
 [ "$(l3_lock_patches "$TMP/bench")" = "0001-a.patch 0002-b.patch" ] && ok "8e: l3_lock_patches lists the series in order" || bad "8e: $(l3_lock_patches "$TMP/bench")"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""hpcperf_source -- shared library for Level 3 source freezing / materialization / workspace checks.
+"""hpcperf_source -- shared library for Level 3 source freezing / artifact verification / materialization /
+workspace checks (scheme 3: project-controlled external source artifacts + automatic materialization).
 
 Everything here is deterministic and side-effect free unless a function says otherwise.
 
@@ -32,7 +33,7 @@ TREE_ALGO = "hpcperf-tree-1"
 TAR_ALGO = "hpcperf-tar-1"
 ARCHIVE_MTIME = 1704067200  # 2024-01-01T00:00:00Z: fixed timestamp of every archive entry
 MARKERS = {".hpcperf-materialized", ".hpcperf-materialized.yaml"}
-LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"   # zstd frame magic (little endian 0xFD2FB528)
 
 
 class SourceError(Exception):
@@ -233,7 +234,7 @@ def zstd_decompress_to_tar(src, dst):
     subprocess.run(["zstd", "-q", "-f", "-d", "--no-progress", "-o", dst, src], check=True)
 
 
-def safe_extract_tar(tar_path, dest, allowed_tops=("src", "deps")):
+def safe_extract_tar(tar_path, dest, allowed_tops=("src", "deps", "ARTIFACT_MANIFEST.json")):
     """Extract a source bundle: only regular files, directories and symlinks under the allowed top-level
     directories; no absolute paths, no '..', no hard links, no devices. Symlinks are extracted as-is and
     validated afterwards by the caller (escaping_symlinks)."""
@@ -317,17 +318,113 @@ def git_export_tree(checkout, dest, exclude=None):
     return nfiles, nlinks, gitlinks
 
 
-# ----------------------------------------------------------------------------- LFS pointer
-def is_lfs_pointer(path):
+# ----------------------------------------------------------------------------- source artifacts (scheme 3)
+# A frozen benchmark source is distributed as ONE deterministic archive per application (per variant),
+#     <app>[-<variant>]-<source_version>.tar.zst        (top-level entries: src/, deps/)
+# stored OUTSIDE git in project-controlled artifact storage and verified locally against
+# provenance/source.lock*.yaml (archive size + sha256, then source_tree_sha256 of the extracted tree).
+ARTIFACT_FORMAT = "tar.zst"
+CACHE_ENV = "HPCPERF_ARTIFACT_CACHE"
+STAGING_ENV = "HPCPERF_ARTIFACT_STAGING"
+DOWNLOAD_CHUNK = 1 << 20
+
+
+def artifact_filename(name, variant, source_version):
+    """lammps-hpcperf-l3-v1.tar.zst / nekrs-cpucoarse-hpcperf-l3-v1.tar.zst"""
+    for part in (name, variant or "", source_version):
+        if part and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", part):
+            raise SourceError(f"invalid artifact name component {part!r}")
+    return f"{name}{'-' + variant if variant else ''}-{source_version}.{ARTIFACT_FORMAT}"
+
+
+def repo_root():
+    return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+
+def cache_dir(explicit=None):
+    """Content-addressed local artifact cache: --cache-dir > $HPCPERF_ARTIFACT_CACHE > <repo>/.artifacts"""
+    return os.path.abspath(explicit or os.environ.get(CACHE_ENV) or os.path.join(repo_root(), ".artifacts"))
+
+
+def cache_path(cdir, sha256):
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256 or ""):
+        raise SourceError(f"invalid sha256 {sha256!r}")
+    return os.path.join(cdir, "sha256", f"{sha256}.{ARTIFACT_FORMAT}")
+
+
+def is_zstd(path):
     try:
         with open(path, "rb") as f:
-            return f.read(len(LFS_POINTER_PREFIX)) == LFS_POINTER_PREFIX
+            return f.read(4) == ZSTD_MAGIC
     except OSError:
         return False
 
 
-def lfs_pointer_text(sha256, size):
-    return f"version https://git-lfs.github.com/spec/v1\noid sha256:{sha256}\nsize {size}\n"
+def verify_archive_file(path, sha256, size=None):
+    """Existence, (size,) zstd magic and sha256 of an artifact file. Returns the sha256; raises SourceError."""
+    if not os.path.isfile(path):
+        raise SourceError(f"artifact missing: {path}")
+    got_size = os.path.getsize(path)
+    if size is not None and got_size != int(size):
+        raise SourceError(f"artifact size {got_size} != recorded {size} ({os.path.basename(path)})")
+    if not is_zstd(path):
+        raise SourceError(f"artifact is not a zstd stream ({os.path.basename(path)}): wrong file, LFS pointer or HTML error page?")
+    got = sha256_file(path)
+    if got != sha256:
+        raise SourceError(f"artifact sha256 {got} != recorded {sha256} ({os.path.basename(path)})")
+    return got
+
+
+def download_to_cache(url, cdir, sha256, size, log=None):
+    """Stream url into <cache>/.partial/, verify size + zstd magic + sha256, then atomically place it at
+    cache_path(). A failed or oversized transfer never becomes a cache entry. Returns the final path."""
+    import urllib.request
+    if not re.match(r"^https?://", url or ""):
+        raise SourceError(f"artifact url must be http(s): {url!r}")
+    final = cache_path(cdir, sha256)
+    part_dir = os.path.join(cdir, ".partial"); os.makedirs(part_dir, exist_ok=True)
+    part = os.path.join(part_dir, f"{sha256}.{ARTIFACT_FORMAT}.{os.getpid()}")
+    limit = int(size) if size else None
+    n = 0
+    try:
+        if log: log(f"downloading {url} ({human(limit) if limit else 'unknown size'})")
+        req = urllib.request.Request(url, headers={"User-Agent": "hpcperf-prepare/1.0"})
+        with urllib.request.urlopen(req, timeout=120) as r, open(part, "wb") as f:
+            for b in iter(lambda: r.read(DOWNLOAD_CHUNK), b""):
+                n += len(b)
+                if limit is not None and n > limit:
+                    raise SourceError(f"download exceeds the recorded size {limit} -- aborted")
+                f.write(b)
+        verify_archive_file(part, sha256, limit)
+        os.makedirs(os.path.dirname(final), exist_ok=True)
+        os.chmod(part, 0o444)     # cache entries are immutable (content-addressed)
+        os.replace(part, final)
+    except Exception:
+        if os.path.exists(part):
+            os.remove(part)
+        raise
+    return final
+
+
+def place_in_cache(src, cdir, sha256, size=None):
+    """Copy a verified local artifact into the cache (content-addressed); returns the cache path."""
+    verify_archive_file(src, sha256, size)
+    final = cache_path(cdir, sha256)
+    if os.path.isfile(final) and sha256_file(final) == sha256:
+        return final
+    os.makedirs(os.path.dirname(final), exist_ok=True)
+    tmp = final + f".tmp.{os.getpid()}"
+    import shutil
+    shutil.copyfile(src, tmp)      # a real copy, never a hard link: the cache and the staging must not share an inode
+    if sha256_file(tmp) != sha256:
+        os.remove(tmp); raise SourceError("copy into the cache did not reproduce the sha256")
+    os.chmod(tmp, 0o444)
+    os.replace(tmp, final)
+    return final
+
+
+def sha256sums_line(sha256, filename):
+    return f"{sha256}  {filename}\n"
 
 
 # ----------------------------------------------------------------------------- misc

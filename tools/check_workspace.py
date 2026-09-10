@@ -1,36 +1,50 @@
 #!/usr/bin/env python3
 """check_workspace -- static contract checks of a Level 3 benchmark directory (canonical level3/<app> or an
-agent workspace copy). Iteration 0 of any optimization run must PASS this check. No build is run.
+agent workspace copy). No build is run.
 
     check_workspace.py <benchmark-dir> [--variant NAME] [--json OUT] [--quick]
+                       [--agent-mode [--baseline FILE] [--iteration N] [--report OUT.json] [--diff OUT.diff]]
 
-Checks (each reported PASS/FAIL, all must pass):
-  1  benchmark.yaml exists and carries the required keys
-  2  optimization_scope.yaml exists with modifiable/readonly lists
-  3  src/ exists (materialized)
-  4  deps/ present when the lock file's layout requires it
-  5  source tree hash of src/(+deps/) equals the canonical baseline (benchmark.yaml / source lock)
+Baseline mode (default; canonical directory and iteration 0 of every run): the source tree must equal the
+frozen baseline. Agent mode (iteration > 0): files inside the `modifiable` ranges of optimization_scope.yaml may
+differ from the baseline recorded at workspace creation (workspace_baseline.json, kept outside the agent's cwd);
+every readonly/excluded/unclassified file -- build.sh, run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml,
+provenance/**, inputs/**, references/**, dependency source -- must still be identical, otherwise check 5 FAILS
+("readonly tampering"). Modified/added/deleted files, initial and current source hashes are recorded in --report.
+
+Checks (each PASS/FAIL, all must pass):
+  1  benchmark.yaml exists with the required keys (and hip is not claimed validated)
+  2  optimization_scope.yaml with modifiable/readonly lists
+  3  src/ materialized (a real directory)
+  4  deps/ present when the lock's layout requires it
+  5  source identity: == canonical source_tree_sha256 (baseline mode) / readonly ranges unchanged (agent mode)
   6  build.sh, run.sh, validate.sh exist and are executable
-  7  build.sh/run.sh/validate.sh reference no application source outside the benchmark directory
+  7  the scripts reference no application source outside the benchmark directory
   8  no symlink under src/ or deps/ escapes the benchmark directory
-  9  provenance/source.lock[.variant].yaml complete
- 10  archive sha256 (when the archive is present and not an LFS pointer) and tree sha256 match the lock
+  9  provenance/source.lock[.variant].yaml: schema hpcperf-source-lock-2, complete, no node-private location
+ 10  benchmark.yaml identity == lock (artifact filename, archive sha256, tree sha256, size); no scheme-2 fields
  11  required inputs/references listed in benchmark.yaml exist
  12  every optimization-scope pattern points inside the benchmark directory
  13  no credential-looking file / env dump / session record in src+deps (name rules; content rules unless --quick)
  14  no build output / binary artifacts inside src+deps
  15  the scripts do not depend on _upstream paths
+ 16  artifact publish status consistent (unpublished => no URL; published => immutable https) and the
+     materialization marker agrees with the lock (variant, tree hash); no Git LFS metadata
+ 17  redistribution_status and suite_status declared
 """
 import argparse
+import fnmatch
 import json
 import os
 import re
 import stat
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import hpcperf_source as hs  # noqa: E402
+import hpcperf_lock as hl  # noqa: E402
 
 REQUIRED_BY = ("name", "level", "application", "supported_backends", "validated_backends", "build_entry", "run_entry", "validate_entry", "optimization_scope")
 FORBIDDEN_SRC_REFS = [
@@ -38,11 +52,44 @@ FORBIDDEN_SRC_REFS = [
     ("other-repository-path", re.compile(r"/projects/|/home/[A-Za-z0-9]|\$HOME/|~/")),
     ("parent-directory-source", re.compile(r"\.\./\.\./(level3|_upstream|\.deps)/[^ ]*/src")),
 ]
+HARNESS_FILES = ("build.sh", "run.sh", "validate.sh", "benchmark.yaml", "optimization_scope.yaml", "workspace.yaml", hl.MARKER)
+
+
+def match_any(path, globs):
+    return any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*") for g in globs)
+
+
+def classify(path, scope):
+    """excluded > readonly > modifiable > unclassified (treated as readonly)"""
+    if match_any(path, scope.get("excluded") or []):
+        return "excluded"
+    if path in HARNESS_FILES or path.startswith("provenance/") or match_any(path, scope.get("readonly") or []):
+        return "readonly"
+    if match_any(path, scope.get("modifiable") or []):
+        return "modifiable"
+    return "unclassified"
+
+
+def find_baseline(D, explicit):
+    """trusted baseline: explicit > <repo>/.hpcperf/workspace_baselines/<run-id>.json > <workspace-root>/workspace_baseline.json"""
+    if explicit:
+        return explicit
+    ws = hs.load_yaml(os.path.join(D, "workspace.yaml")) if os.path.isfile(os.path.join(D, "workspace.yaml")) else {}
+    run_id = ws.get("run_id")
+    root = os.path.abspath(os.path.join(HERE, ".."))
+    if run_id:
+        p = os.path.join(root, ".hpcperf", "workspace_baselines", f"{run_id}.json")
+        if os.path.isfile(p):
+            return p
+    p = os.path.abspath(os.path.join(D, "..", "..", "workspace_baseline.json"))
+    return p if os.path.isfile(p) else None
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("bench_dir"); ap.add_argument("--variant"); ap.add_argument("--json"); ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--agent-mode", action="store_true"); ap.add_argument("--baseline"); ap.add_argument("--iteration", type=int)
+    ap.add_argument("--report"); ap.add_argument("--diff")
     a = ap.parse_args()
     D = os.path.abspath(a.bench_dir)
     results = []
@@ -62,7 +109,7 @@ def main():
             rec(1, "benchmark.yaml schema", False, f"unreadable: {ex}")
     else:
         rec(1, "benchmark.yaml schema", False, "file missing")
-    if by.get("validated_backends") and "hip" in [b.lower() for b in by.get("validated_backends", [])]:
+    if by.get("validated_backends") and "hip" in [str(b).lower() for b in by.get("validated_backends", [])]:
         rec(1, "benchmark.yaml: hip must not be listed as validated on this node", False, "hip in validated_backends")
 
     scope = {}
@@ -74,40 +121,89 @@ def main():
     else:
         rec(2, "optimization_scope.yaml", False, "file missing")
 
-    variant = a.variant
-    bundle, expected = None, None
-    marker_path = os.path.join(D, ".hpcperf-materialized.yaml")
-    marker = hs.load_yaml(marker_path) if os.path.isfile(marker_path) else {}
-    if by.get("variants"):
-        env = by.get("variant_env")
-        # the materialization marker says which variant IS in src/; an explicit --variant must agree with it
-        variant = variant or marker.get("variant") or (os.environ.get(env) if env else None) or by.get("default_variant")
-        if marker.get("variant") and variant != marker.get("variant"):
-            rec(0, "requested variant matches the materialized one", False, f"requested {variant}, materialized {marker.get('variant')}")
-        v = by["variants"].get(variant) if variant else None
-        if v:
-            bundle, expected = v, v.get("source_tree_sha256")
-    else:
-        bundle, expected = by.get("source_bundle"), by.get("source_tree_sha256")
-    suffix = f".{variant}" if variant else ""
-    lock_path = os.path.join(D, "provenance", f"source.lock{suffix}.yaml")
-    lock = hs.load_yaml(lock_path) if os.path.isfile(lock_path) else {}
+    marker = hl.read_marker(D)
+    try:
+        variant = hl.select_variant(by, a.variant, marker)
+    except hs.SourceError as ex:
+        variant = a.variant or marker.get("variant"); rec(0, "variant selection", False, str(ex))
+    if marker.get("variant") and variant != marker.get("variant"):
+        rec(0, "requested variant matches the materialized one", False, f"requested {variant}, materialized {marker.get('variant')}")
+    ident = hl.identity_from_benchmark(by, variant)
+    expected = ident.get("source_tree_sha256") or (by.get("source_tree_sha256") if not variant else None)
+    lock_p = hl.lock_path(D, variant)
+    lock = (hs.load_yaml(lock_p) or {}) if os.path.isfile(lock_p) else {}
+    lock_v2 = lock.get("schema") == hl.LOCK_SCHEMA
 
     src_ok = os.path.isdir(os.path.join(D, "src")) and not os.path.islink(os.path.join(D, "src"))
     rec(3, "src/ materialized", src_ok, "" if src_ok else "run tools/prepare_benchmark.sh level3 <app>")
-    layout = lock.get("materialized_tree", {}).get("layout", ["src/"])
+    layout = (lock.get("materialized_tree") or {}).get("layout", ["src/"])
     need_deps = "deps/" in layout
     deps_ok = (not need_deps) or (os.path.isdir(os.path.join(D, "deps")) and not os.path.islink(os.path.join(D, "deps")))
     rec(4, "deps/ present as required by the lock", deps_ok, "required by the lock layout" if need_deps else "not required for this benchmark")
 
     entries = []
     present = [d for d in ("src", "deps") if os.path.isdir(os.path.join(D, d))]
+    tree = None
     if present:
-        entries = hs.manifest(D, present)
-        tree = hs.tree_hash_from_manifest(entries)
+        try:
+            entries = hs.manifest(D, present); tree = hs.tree_hash_from_manifest(entries)
+        except hs.SourceError as ex:
+            rec(5, "source identity", False, str(ex))
+    report = None
+    if tree is None and not a.agent_mode:
+        if not results or results[-1]["check"] != 5:
+            rec(5, "source tree hash == canonical baseline", False, "no src/deps to hash")
+    elif not a.agent_mode:
         rec(5, "source tree hash == canonical baseline", bool(expected) and tree == expected, f"{tree[:16]}... vs {str(expected)[:16]}...")
     else:
-        rec(5, "source tree hash == canonical baseline", False, "no src/deps to hash")
+        bp = find_baseline(D, a.baseline)
+        if not bp:
+            rec(5, "agent mode: readonly ranges unchanged vs the trusted baseline", False, "no workspace_baseline.json found (create the workspace with tools/create_agent_workspace.sh)")
+        else:
+            base = json.load(open(bp))
+            bfiles = base.get("files", {})
+            try:
+                cur = {e["path"]: e for e in hs.manifest(D)}
+            except hs.SourceError as ex:
+                cur = {}; rec(5, "agent mode: readonly ranges unchanged vs the trusted baseline", False, str(ex))
+            if cur:
+                classes = {"modified": [], "added": [], "deleted": [], "violations": []}
+                for pth, b in bfiles.items():
+                    c = cur.get(pth)
+                    kind = classify(pth, scope)
+                    if c is None:
+                        (classes["deleted"] if kind == "modifiable" else classes["violations"]).append({"path": pth, "change": "deleted", "class": kind})
+                    elif c["sha256"] != b["sha256"] or c["type"] != b["type"]:
+                        (classes["modified"] if kind == "modifiable" else classes["violations"]).append({"path": pth, "change": "modified", "class": kind})
+                for pth in cur:
+                    if pth not in bfiles:
+                        kind = classify(pth, scope)
+                        (classes["added"] if kind == "modifiable" else classes["violations"]).append({"path": pth, "change": "added", "class": kind})
+                v = classes["violations"]
+                rec(5, "agent mode: readonly/excluded/harness files unchanged vs the trusted baseline",
+                    not v, (f"READONLY TAMPERING: " + "; ".join(f"{x['path']} ({x['change']}, {x['class']})" for x in v[:5])) if v else
+                    f"{len(classes['modified'])} modified, {len(classes['added'])} added, {len(classes['deleted'])} deleted file(s) inside the modifiable scope; baseline {os.path.relpath(bp)}")
+                src_paths = [p for p in cur if p.startswith(("src/", "deps/"))]
+                cur_tree = hs.tree_hash_from_manifest([cur[p] for p in sorted(src_paths, key=lambda s: s.encode())])
+                report = {"schema": "hpcperf-workspace-check-1", "mode": "agent", "iteration": a.iteration, "baseline": os.path.relpath(bp),
+                          "run_id": base.get("run_id"), "benchmark": base.get("benchmark"), "variant": variant,
+                          "initial_source_hash": base.get("canonical_source_tree_sha256"), "current_source_hash": cur_tree,
+                          "modified_files": [x["path"] for x in classes["modified"]], "added_files": [x["path"] for x in classes["added"]],
+                          "deleted_files": [x["path"] for x in classes["deleted"]], "readonly_violations": v}
+                if a.diff:
+                    ws = hs.load_yaml(os.path.join(D, "workspace.yaml")) if os.path.isfile(os.path.join(D, "workspace.yaml")) else {}
+                    can = ws.get("canonical_dir")
+                    with open(a.diff, "w") as f:
+                        if can and os.path.isdir(can):
+                            for x in classes["modified"] + classes["added"] + classes["deleted"]:
+                                old = os.path.join(can, x["path"]); new = os.path.join(D, x["path"])
+                                r = subprocess.run(["diff", "-u", "--label", f"baseline/{x['path']}", "--label", f"workspace/{x['path']}",
+                                                    old if os.path.isfile(old) else "/dev/null", new if os.path.isfile(new) else "/dev/null"], capture_output=True, text=True)
+                                f.write(r.stdout)
+                            report["diff"] = a.diff
+                        else:
+                            f.write(f"# diff unavailable: canonical directory {can!r} not reachable from this workspace (hashes recorded in the report)\n")
+                            report["diff"] = "unavailable (canonical directory not reachable)"
 
     scripts = [by.get("build_entry", "./build.sh"), by.get("run_entry", "./run.sh"), by.get("validate_entry", "./validate.sh")]
     exist = [s for s in scripts if os.path.isfile(os.path.join(D, s)) and os.stat(os.path.join(D, s)).st_mode & stat.S_IXUSR]
@@ -129,23 +225,28 @@ def main():
     esc = hs.escaping_symlinks(D, entries) if entries else []
     rec(8, "no symlink escaping the benchmark directory", not esc, "; ".join(f"{e['path']} -> {e['target']}" for e in esc[:4]))
 
-    need = ("upstream", "archive", "materialized_tree", "patches", "dependencies", "freeze_timestamp")
-    lock_ok = bool(lock) and all(k in lock for k in need)
-    rec(9, f"provenance/source.lock{suffix}.yaml complete", lock_ok, "" if lock_ok else f"missing: {[k for k in need if k not in lock]}" if lock else "file missing")
+    if not lock:
+        rec(9, f"provenance/source.lock{hl.suffix(variant)}.yaml valid", False, "file missing")
+    elif not lock_v2:
+        rec(9, f"provenance/source.lock{hl.suffix(variant)}.yaml valid", False, f"schema {lock.get('schema')!r} (scheme-2 lock; migrate it)")
+    else:
+        problems = hl.validate_lock(lock, open(lock_p).read())
+        rec(9, f"provenance/source.lock{hl.suffix(variant)}.yaml valid (schema 2, complete, no node-private location)", not problems, "; ".join(problems[:4]))
 
-    detail = []
-    ok10 = bool(lock) and bool(expected) and lock.get("materialized_tree", {}).get("sha256") == expected
-    if bundle and bundle.get("archive"):
-        arch = os.path.join(D, bundle["archive"])
-        if os.path.isfile(arch) and not hs.is_lfs_pointer(arch):
-            got = hs.sha256_file(arch)
-            ok10 = ok10 and got == bundle.get("archive_sha256") == lock.get("archive", {}).get("sha256")
-            detail.append(f"archive sha256 {'ok' if got == bundle.get('archive_sha256') else 'MISMATCH'}")
-        elif os.path.isfile(arch):
-            detail.append("archive is an LFS pointer (not verified here)")
-        else:
-            detail.append("archive absent in this directory (workspace copies omit it)")
-    rec(10, "archive/tree hashes consistent between benchmark.yaml and the lock", ok10, "; ".join(detail))
+    ok10, detail = False, []
+    if lock_v2:
+        art = lock["artifact"]
+        ok10 = (ident.get("filename") == art["filename"] and ident.get("archive_sha256") == art["sha256"] and ident.get("source_tree_sha256") == art["source_tree_sha256"]
+                and int(ident.get("size") or -1) == art["size"] and ident.get("source_version") == lock["benchmark"]["source_version"])
+        detail.append("identity fields agree" if ok10 else "benchmark.yaml identity differs from the lock")
+        for k in ("source_bundle",):
+            if k in by:
+                ok10 = False; detail.append(f"scheme-2 key {k} present")
+        if variant and any(k in ident for k in ("archive", "compressed_size")):
+            ok10 = False; detail.append("scheme-2 variant keys present")
+        if os.path.isdir(os.path.join(D, "archives")):
+            ok10 = False; detail.append("archives/ directory present (scheme 2)")
+    rec(10, "benchmark.yaml identity == source lock; no scheme-2 fields", ok10, "; ".join(detail))
 
     req = [p for p in (by.get("inputs", []) + by.get("references", []))]
     missing = [p for p in req if not os.path.exists(os.path.join(D, p))]
@@ -154,7 +255,7 @@ def main():
     bad_scope = []
     for key in ("modifiable", "readonly", "excluded"):
         for pat in scope.get(key, []) or []:
-            base = re.split(r"[*?\[]", pat, 1)[0]
+            base = re.split(r"[*?\[]", pat, maxsplit=1)[0]
             if os.path.isabs(pat) or ".." in pat.split("/"):
                 bad_scope.append(pat); continue
             base_dir = os.path.join(D, base.rstrip("/") if base else ".")
@@ -178,7 +279,7 @@ def main():
 
     ups = []
     for root_dir, dirs, files in os.walk(D):
-        dirs[:] = [d for d in dirs if d not in ("src", "deps", "archives", "provenance", "__pycache__")]
+        dirs[:] = [d for d in dirs if d not in ("src", "deps", "provenance", "__pycache__")]
         for fn in files:
             if fn.endswith((".sh", ".py")):
                 p = os.path.join(root_dir, fn)
@@ -187,14 +288,35 @@ def main():
                         ups.append(f"{os.path.relpath(p, D)}:{i}")
     rec(15, "no _upstream dependency in the benchmark scripts (fetch.sh = freeze-time only)", not ups, "; ".join(ups[:5]))
 
+    ok16, d16 = False, []
+    if lock_v2:
+        prim = lock["artifact"].get("primary") or {}
+        ok16 = prim.get("status") in hl.PUBLISH_STATUSES and ((prim.get("status") == "unpublished") == (not prim.get("url")))
+        d16.append(f"publish status {prim.get('status')}{' (' + prim['url'] + ')' if prim.get('url') else ''}")
+        if marker:
+            m_ok = marker.get("source_tree_sha256") == lock["artifact"]["source_tree_sha256"] and (marker.get("variant") or None) == (variant or None)
+            ok16 = ok16 and m_ok; d16.append("marker agrees with the lock" if m_ok else "materialization marker disagrees with the lock")
+        if any(k in lock for k in ("lfs", "git_lfs")) or any(k in lock["artifact"] for k in ("lfs", "lfs_pointer")):
+            ok16 = False; d16.append("Git LFS metadata present")
+    rec(16, "artifact publish status consistent, marker agrees with the lock, no LFS metadata", ok16, "; ".join(d16))
+
+    ok17 = by.get("redistribution_status") in hl.REDISTRIBUTION_STATUSES and by.get("suite_status") in hl.SUITE_STATUSES and (not lock_v2 or lock.get("redistribution_status") == by.get("redistribution_status"))
+    rec(17, "redistribution_status and suite_status declared (benchmark.yaml == lock)", ok17, f"redistribution {by.get('redistribution_status')}, suite {by.get('suite_status')}")
+
     fails = [r for r in results if r["status"] == "FAIL"]
     verdict = "PASS" if not fails else "FAIL"
-    print(f"check_workspace: {verdict} ({len(results) - len(fails)}/{len(results)} checks) {os.path.relpath(D)}{' variant=' + variant if variant else ''}")
+    mode = "agent" if a.agent_mode else "baseline"
+    print(f"check_workspace: {verdict} ({len(results) - len(fails)}/{len(results)} checks, {mode} mode) {os.path.relpath(D)}{' variant=' + variant if variant else ''}")
+    root = os.path.abspath(os.path.join(HERE, ".."))
+    rel = os.path.relpath(D, root) if D.startswith(root + os.sep) else os.path.basename(D)
+    if report is not None:
+        report["verdict"] = verdict
+        if a.report:
+            with open(a.report, "w") as f:
+                json.dump(report, f, indent=1)
     if a.json:
-        root = os.path.abspath(os.path.join(HERE, ".."))
-        rel = os.path.relpath(D, root) if D.startswith(root + os.sep) else D
         with open(a.json, "w") as f:
-            json.dump({"benchmark_dir": rel, "variant": variant, "verdict": verdict, "results": results}, f, indent=1)
+            json.dump({"benchmark_dir": rel, "variant": variant, "mode": mode, "verdict": verdict, "results": results, **({"agent_report": report} if report else {})}, f, indent=1)
     return 0 if not fails else 1
 
 

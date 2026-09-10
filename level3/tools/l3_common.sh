@@ -4,8 +4,9 @@
 # Dependency isolation: every Level 3 application owns a private tree
 #     $R/.deps/level3/<app>/{src,build,install,logs}
 # (never a shared install root, so Kokkos/AMReX/MPI/hypre versions of
-# different applications cannot pollute each other), plus its upstream
-# frozen source bundle materialized under level3/<app>/{src,deps} (freeze input: $R/_upstream/level3/<Name>) and its own build tree under
+# different applications cannot pollute each other), plus its frozen source
+# artifact materialized under level3/<app>/{src,deps} by tools/prepare_benchmark.sh
+# (freeze-time input only: $R/_upstream/level3/<Name>) and its own build tree under
 # $R/build/level3/<app>/<backend>. Nothing here touches the Level 2 tree.
 #
 # Fingerprint: an install is stamped with .hpcperf-l3-fingerprint recording
@@ -99,7 +100,7 @@ l3_clean_env_exec() { "$L3_TOOLS/l3_clean_env.sh" "$@"; }
 
 # l3_require_materialized <benchmark-dir>
 #   Level 3 application source lives INSIDE the benchmark directory (<dir>/src, <dir>/deps), materialized
-#   from the frozen source bundle by tools/prepare_benchmark.sh. build.sh/run.sh/validate.sh call this
+#   from the frozen source artifact by tools/prepare_benchmark.sh (which is never called from a build). build.sh/run.sh/validate.sh call this
 #   first and fail plainly when the source is absent -- they never fetch, clone or patch anything.
 l3_require_materialized() {
     local d=$1
@@ -107,16 +108,29 @@ l3_require_materialized() {
     [ -f "$d/benchmark.yaml" ] || { echo "$(basename "$d"): benchmark.yaml missing" >&2; return 3; }
     return 0
 }
-# l3_lock_query <benchmark-dir> <variant|''> <query>: read provenance/source.lock[.variant].yaml
-#   queries: upstream | tree | patches | component:<dest> | submodule:<dest>:<path>
+# l3_python_yaml: a python3 with PyYAML. The project conda env activated by hpcperf_env.sh ships no PyYAML,
+#   so inside build/run/validate scripts the first interpreter on PATH may lack it; the system interpreter
+#   (or HPCPERF_PYTHON_YAML) is used then. Only for reading the small provenance/lock YAML files.
+l3_python_yaml() {
+    local p
+    for p in "${HPCPERF_PYTHON_YAML:-}" python3 /usr/bin/python3 /usr/local/bin/python3; do
+        [ -n "$p" ] && command -v "$p" >/dev/null 2>&1 && "$p" -c 'import yaml' >/dev/null 2>&1 && { command -v "$p"; return 0; }
+    done
+    echo "l3: no python3 with PyYAML found (set HPCPERF_PYTHON_YAML)" >&2; return 3
+}
+# l3_lock_query <benchmark-dir> <variant|''> <query>: read provenance/source.lock[.variant].yaml (schema hpcperf-source-lock-2)
+#   queries: upstream | tree | version | artifact | patches | component:<dest> | submodule:<dest>:<path>
 l3_lock_query() {
     local f="$1/provenance/source.lock${2:+.$2}.yaml"
     [ -f "$f" ] || { echo "l3: $f missing -- the benchmark was not frozen/materialized" >&2; return 3; }
-    python3 - "$f" "$3" <<'PY'
+    "$(l3_python_yaml)" - "$f" "$3" <<'PY'
 import os, sys, yaml
 lock = yaml.safe_load(open(sys.argv[1])); q = sys.argv[2]
+if lock.get("schema") != "hpcperf-source-lock-2": sys.exit(f"l3_lock_query: {sys.argv[1]}: schema {lock.get('schema')!r} is not hpcperf-source-lock-2 (migrate the lock)")
 if q == "upstream": print(lock["upstream"]["commit"])
-elif q == "tree": print(lock["materialized_tree"]["sha256"])
+elif q == "tree": print(lock["artifact"]["source_tree_sha256"])
+elif q == "version": print(lock["benchmark"]["source_version"])
+elif q == "artifact": print(lock["artifact"]["filename"])
 elif q == "patches": print(" ".join(os.path.basename(p["path"]) for p in lock.get("patches", [])))
 elif q.startswith("component:"):
     dest = q.split(":", 1)[1]; print(next(c["commit"] for c in lock["components"] if c["dest"] == dest))
@@ -130,6 +144,8 @@ PY
 l3_source_commit()   { l3_lock_query "$1" "${2:-}" upstream; }
 # l3_source_tree_sha <benchmark-dir> [variant]: the recorded source_tree_sha256 (identity of src/+deps/)
 l3_source_tree_sha() { l3_lock_query "$1" "${2:-}" tree; }
+# l3_source_version <benchmark-dir> [variant]: the benchmark source version (artifact version, e.g. hpcperf-l3-v1)
+l3_source_version()  { l3_lock_query "$1" "${2:-}" version; }
 # l3_component_commit <benchmark-dir> <dest> [variant]: commit of a git component of the bundle (e.g. deps/amrex)
 l3_component_commit() { l3_lock_query "$1" "${3:-}" "component:$2"; }
 # l3_submodule_commit <benchmark-dir> <dest> <path> [variant]: commit of a bundled submodule (e.g. src subprojects/sundials)
