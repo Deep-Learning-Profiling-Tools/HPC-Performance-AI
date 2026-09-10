@@ -1,25 +1,45 @@
-schema: hpcperf-source-lock-1
-name: warpx
-level: 3
-application: WarpX
-variant: null
-benchmark_source_version: '26.09'
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: warpx
+  level: 3
+  application: WarpX
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/BLAST-WarpX/warpx.git
+  repository: https://github.com/BLAST-WarpX/warpx.git
   tag: '26.09'
   commit: 0c62c75e53a9ad08241535444bd7e53fd1deba88
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: warpx-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 14235980
   sha256: d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 14235980
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 41912234
   tar_entries: 5170
   file_count: 4493
   symlink_count: 139
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2
   algorithm: hpcperf-tree-1
@@ -124,6 +144,37 @@ licenses:
   license: BSD-3-Clause-LBNL
   url: https://github.com/AMReX-Codes/amrex
   commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T07:58:27Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- WarpX and AMReX carry the LBNL BSD-3-Clause license with NOTICE files; both files are kept in the bundle.
+- PICSAR-QED and openPMD are not part of this build (WarpX_QED=OFF, WarpX_OPENPMD=OFF) and are not bundled.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/Source/*
+  bundled: []
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/Regression/*
+  exclude:
+  - src/Docs/*
+  - src/Examples/*
+  - src/Tools/*
+  - src/Python/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:58:27Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: '26.09'
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:53:03Z'
+  tool: migrate_from_lfs_bundle-1.0

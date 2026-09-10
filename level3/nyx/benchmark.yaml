@@ -1,13 +1,18 @@
 name: nyx
 level: 3
 application: Nyx
-description: Nyx cosmological N-body + hydro (AMReX 26.09, CUDA); official MiniSB / LyA-adiabatic decks at 1/2/4 GPUs; LyA heat/cool deck (SUNDIALS CVODE) at 1/2/4 GPUs with the I_R_CHECK_PENDING verdict
-supported_backends: [cuda, hip]
-validated_backends: [cuda]            # HIP: recipe present, untested (no ROCm on this node)
+description: Nyx cosmological N-body + hydro (AMReX 26.09, CUDA); official MiniSB / LyA-adiabatic decks at 1/2/4 GPUs; LyA
+  heat/cool deck (SUNDIALS CVODE) at 1/2/4 GPUs with the I_R_CHECK_PENDING verdict
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
 distributed_model: MPI, one rank per GPU, fixed BoxArray (amr.max_grid_size) so only the distribution changes with N
 default_scale_mode: smoke
 scale_modes:
-  smoke: MiniSB (32^3, 10 steps) and LyA-adiabatic (32^3, 10 steps) PASS at 1/2/4 GPUs (2026-09-07 regression fc4d2a1); LyA heat/cool 1/2/4 GPUs STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (exit 3, not a pass)
+  smoke: MiniSB (32^3, 10 steps) and LyA-adiabatic (32^3, 10 steps) PASS at 1/2/4 GPUs (2026-09-07 regression fc4d2a1); LyA
+    heat/cool 1/2/4 GPUs STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (exit 3, not a pass)
   strong: LyA 64^3 adiabatic derivative + synthetic 256^3, completed 1/2/4 GPU runs (too small to scale, completeness records)
   weak: synthetic 64^3 cells per rank (RandomPerCell), completed runs, labelled synthetic
 multi_node: BLOCKED/UNVERIFIED on this site
@@ -15,34 +20,45 @@ gpu_40_80: DRY-RUN only (8 planned, 40 IMBALANCED, 80 refused as designed), neve
 build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
-validate_exit_codes: {0: PASS, 1: FAIL, 3: "STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (heat/cool)", 4: UNSUPPORTED_LAYOUT}
+validate_exit_codes:
+  0: PASS
+  1: FAIL
+  3: STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (heat/cool)
+  4: UNSUPPORTED_LAYOUT
 optimization_scope: ./optimization_scope.yaml
-environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper); profiles cuda132-gcc133-{adiabatic,heatcool}, cpu-gcc133-{adiabatic,heatcool}
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper);
+  profiles cuda132-gcc133-{adiabatic,heatcool}, cpu-gcc133-{adiabatic,heatcool}
 install_root: .deps/level3/nyx
-dependency_installs:                 # per-profile AMReX / SUNDIALS installs built from deps/amrex and src/subprojects/sundials (reusable as environment-provided prebuilt prefixes)
-  - cuda132-gcc133-adiabatic/install/amrex
-  - cuda132-gcc133-heatcool/install/amrex
-  - cuda132-gcc133-heatcool/install/sundials
-  - cpu-gcc133-adiabatic/install/amrex
-  - cpu-gcc133-heatcool/install/amrex
-  - cpu-gcc133-heatcool/install/sundials
+dependency_installs:
+- cuda132-gcc133-adiabatic/install/amrex
+- cuda132-gcc133-heatcool/install/amrex
+- cuda132-gcc133-heatcool/install/sundials
+- cpu-gcc133-adiabatic/install/amrex
+- cpu-gcc133-heatcool/install/amrex
+- cpu-gcc133-heatcool/install/sundials
 inputs:
-  - src/Exec/MiniSB/inputs.32
-  - src/Exec/MiniSB/ic_sb_32.ascii
-  - src/Exec/LyA/inputs.rt.garuda
-  - src/Exec/LyA/inputs.rt
-  - src/Exec/LyA/inputs
-  - src/Exec/LyA/32.nyx
-  - src/Exec/LyA/64sssss_20mpc.nyx
-  - src/Exec/LyA/TREECOOL_middle
-  - src/Exec/Scaling/inputs
-references: []                       # references are produced by the CPU-profile binary of the same source (validate.sh criterion [3]) and same-configuration reruns
-source_version: '26.09'
+- src/Exec/MiniSB/inputs.32
+- src/Exec/MiniSB/ic_sb_32.ascii
+- src/Exec/LyA/inputs.rt.garuda
+- src/Exec/LyA/inputs.rt
+- src/Exec/LyA/inputs
+- src/Exec/LyA/32.nyx
+- src/Exec/LyA/64sssss_20mpc.nyx
+- src/Exec/LyA/TREECOOL_middle
+- src/Exec/Scaling/inputs
+references: []
+source_version: hpcperf-l3-v1
 source_tree_sha256: 71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: nyx-hpcperf-l3-v1.tar.zst
   archive_sha256: 218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36
   source_tree_sha256: 71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120
-  compressed_size: 79400559
+  size: 79400559
   uncompressed_size: 196747678
   file_count: 5933
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: '26.09'
+redistribution_status: cleared
+suite_status: retained

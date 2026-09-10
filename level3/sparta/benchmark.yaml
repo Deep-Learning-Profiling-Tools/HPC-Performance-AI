@@ -28,12 +28,18 @@ inputs:
 - src/bench/ar.vss
 references:
 - src/bench/log.7Jul14.collide.icc.10K.1
-source_version: 27Aug2026
+source_version: hpcperf-l3-v1
 source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: sparta-hpcperf-l3-v1.tar.zst
   archive_sha256: ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09
   source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
-  compressed_size: 21330629
+  size: 21330629
   uncompressed_size: 76042143
   file_count: 3084
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: 27Aug2026
+redistribution_status: cleared
+suite_status: retained

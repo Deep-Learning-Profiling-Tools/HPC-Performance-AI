@@ -1,25 +1,45 @@
-schema: hpcperf-source-lock-1
-name: dftfe
-level: 3
-application: DFT-FE
-variant: null
-benchmark_source_version: 1.2.0 (7147faa5)
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: dftfe
+  level: 3
+  application: DFT-FE
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/dftfeDevelopers/dftfe.git
+  repository: https://github.com/dftfeDevelopers/dftfe.git
   tag: release 1.2.0 commit (2025-08-17)
   commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: dftfe-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 182954572
   sha256: 0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 182954572
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 274995831
   tar_entries: 3883
   file_count: 3525
   symlink_count: 0
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
   algorithm: hpcperf-tree-1
@@ -30,8 +50,8 @@ materialized_tree:
 patches:
 - path: patches/0001-std-isnan.patch
   sha256: a5a96e7daab783321ad4c57a6fca23513998cf6ef9b637f56fe9eafa60d4ce3d
-  upstream_source: 'local 2-line fix: unqualified isnan in a template (GCC 14)'
   category: D
+  upstream_reference: 'local 2-line fix: unqualified isnan in a template (GCC 14)'
   component: src
   files:
   - src/src/atom/AtomicCenteredNonLocalOperator.cc
@@ -325,6 +345,43 @@ licenses:
   project: spglib
   license: BSD-3-Clause
   commit: 02159eef6e7349535049a43fe2272bb634c77945
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T08:04:41Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- All dependency sources are redistributable source tarballs/checkouts with their license files inside (LGPL/GPL/MPL/BSD/Apache);
+  the bundle redistributes them unmodified.
+- 'ALGLIB free edition and p4est are GPL: the bundle ships their complete source, which satisfies the source-distribution
+  requirement; the resulting dftfe binary is not distributed.'
+- deal.II 9.7.1 (attempt 1, incompatible API) is NOT bundled; only the 9.6.2 tarball used by the validated build is.
+- Pseudopotentials and the upstream GPU reference outputs (testsGPU/, accuracyBenchmarks) are upstream repository content.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  - src/include/*
+  bundled: []
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  - src/testsGPU/*
+  exclude:
+  - src/data/*
+  - src/demo/*
+  - src/doc/*
+  - src/utils/*
+  - src/.github/*
+  - src/cmake/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:04:41Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: 1.2.0 (7147faa5)
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:54:21Z'
+  tool: migrate_from_lfs_bundle-1.0

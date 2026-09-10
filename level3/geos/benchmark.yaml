@@ -43,12 +43,18 @@ datasets:
   sha256_recorded_in: level3/geos/README.md (de62cec7...)
   license: LGPL-2.1 (GEOS project data)
   used_by: validate.sh criterion [4] on 1 rank
-source_version: develop b7a0f13305 (2026-09-04) + thirdPartyLibs 9b55672 (TPL 361-1070)
+source_version: hpcperf-l3-v1
 source_tree_sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: geos-hpcperf-l3-v1.tar.zst
   archive_sha256: cc5a6bfaf27504a200f46ca2f610dbca86a3a3e8a7753faa7bf7ca5dc8b309d1
   source_tree_sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
-  compressed_size: 380218896
+  size: 380218896
   uncompressed_size: 787552164
   file_count: 7026
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: develop @ 2026-09-04
+redistribution_status: blocked
+suite_status: retired

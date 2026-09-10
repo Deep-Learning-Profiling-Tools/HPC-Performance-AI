@@ -2,7 +2,7 @@
 # FREEZE-TIME ONLY. Fetch the LAMMPS upstream source at the recorded stable
 # release into the read-only reference checkout _upstream/level3/lammps
 # (gitignored) -- the input of tools/freeze_benchmark_source.py, which produces
-# archives/source_bundle.tar.zst. build.sh/run.sh/validate.sh never read this
+# the source artifact (in the maintainer's staging, never in git). build.sh/run.sh/validate.sh never read this
 # checkout: they use level3/lammps/src, materialized by tools/prepare_benchmark.sh.
 # Nothing is built here. Re-running is idempotent; a checkout at a different
 # commit is an error (delete it to re-fetch), never silently reused.

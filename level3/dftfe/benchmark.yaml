@@ -44,12 +44,18 @@ inputs:
 references:
 - src/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0
 - src/testsGPU/pseudopotential/real/accuracyBenchmarks/outputLLZO
-source_version: 1.2.0 (7147faa5)
+source_version: hpcperf-l3-v1
 source_tree_sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: dftfe-hpcperf-l3-v1.tar.zst
   archive_sha256: 0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670
   source_tree_sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
-  compressed_size: 182954572
+  size: 182954572
   uncompressed_size: 274995831
   file_count: 3525
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: release 1.2.0 commit (2025-08-17)
+redistribution_status: cleared
+suite_status: retained

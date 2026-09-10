@@ -1,25 +1,44 @@
-schema: hpcperf-source-lock-1
-name: lammps
-level: 3
-application: LAMMPS
-variant: null
-benchmark_source_version: stable_22Jul2025_update6
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: lammps
+  level: 3
+  application: LAMMPS
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/lammps/lammps.git
+  repository: https://github.com/lammps/lammps.git
   tag: stable_22Jul2025_update6
   commit: 9c5ab448c78a14fd534619622162ba418d6a1fb1
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: lammps-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 115344817
   sha256: 4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 115344817
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 457028170
   tar_entries: 14793
   file_count: 13714
   symlink_count: 179
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
   algorithm: hpcperf-tree-1
@@ -104,6 +123,44 @@ licenses:
   project: LAMMPS potential files (upstream repository content)
   license: GPL-2.0-only (repository)
   url: https://github.com/lammps/lammps
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T08:10:27Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- 'LAMMPS is GPL-2.0-only: redistributing the (unmodified) source in a source bundle is permitted; the bundle carries the
+  upstream LICENSE and the complete corresponding source.'
+- lib/kokkos (Apache-2.0 with LLVM exception) and the other lib/ components keep their own license files inside the tree.
+- No dataset outside the upstream repository is bundled; the benchmark inputs (bench/in.lj, bench/POTENTIALS, potentials/)
+  are upstream repository files.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/lib/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/unittest/*
+  exclude:
+  - src/doc/*
+  - src/examples/*
+  - src/bench/*
+  - src/potentials/*
+  - src/tools/*
+  - src/python/*
+  - src/fortran/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:10:27Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: stable_22Jul2025_update6
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:40:37Z'
+  tool: migrate_from_lfs_bundle-1.0

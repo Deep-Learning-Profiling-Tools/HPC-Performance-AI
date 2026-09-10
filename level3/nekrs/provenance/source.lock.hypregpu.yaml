@@ -1,25 +1,44 @@
-schema: hpcperf-source-lock-1
-name: nekrs
-level: 3
-application: nekRS
-variant: hypregpu
-benchmark_source_version: v26.0
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: nekrs
+  level: 3
+  application: nekRS
+  variant: hypregpu
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/Nek5000/nekRS.git
+  repository: https://github.com/Nek5000/nekRS.git
   tag: v26.0
   commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
-archive:
-  path: archives/hypregpu.source.tar.zst
+artifact:
+  filename: nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 48167250
   sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 48167250
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 231107059
   tar_entries: 15617
   file_count: 14444
   symlink_count: 3
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
   algorithm: hpcperf-tree-1
@@ -29,23 +48,23 @@ materialized_tree:
 patches:
 - path: patches/0001-hypre-cuda-sm100.patch
   sha256: b2b977ff7ab7bcd6ee318ae0effa96e252604c556b0004f0671a91689e135cfd
-  upstream_source: cmake/hypre.cmake HYPRE_CUDA_SM list
   category: B
+  upstream_reference: cmake/hypre.cmake HYPRE_CUDA_SM list
   component: src
   files:
   - src/cmake/hypre.cmake
 - path: patches/0002-hypre-cuda13-thrust-pair.patch
   sha256: a46c189f6c981969d11cfd176519249f403ce7f6974d47228acf450a8aa6d6b7
-  upstream_source: hypre 2.32 device_utils/csr_matop_device thrust::reduce_by_key result type
   category: D
+  upstream_reference: hypre 2.32 device_utils/csr_matop_device thrust::reduce_by_key result type
   component: src
   files:
   - src/3rd_party/hypre/src/seq_mv/csr_matop_device.c
   - src/3rd_party/hypre/src/utilities/device_utils.c
 - path: patches/0003-hypre-cuda13-thrust3-compat.patch
   sha256: c31e077569a9d2934211f1657e9e501514503603b38b77e4d310ca409b644058
-  upstream_source: 'hypre device sources: thrust 3 includes, thrust::not1 -> not_fn'
   category: D
+  upstream_reference: 'hypre device sources: thrust 3 includes, thrust::not1 -> not_fn'
   component: src
   files:
   - src/3rd_party/hypre/src/IJ_mv/IJMatrix_parcsr_device.c
@@ -178,6 +197,36 @@ licenses:
   project: ADIOS2
   license: Apache-2.0
   url: https://github.com/ornladios/ADIOS2
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T08:00:13Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- nekRS vendors its third-party libraries as squashed subtrees with their license files; all are permissive (BSD/MIT/Apache).
+- The three hypre patches modify vendored hypre device sources (class B/D); the diff is in provenance/original_vs_baseline.hypregpu.diff.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/3rd_party/*
+  benchmark_specific:
+  - deps/*
+  test: []
+  exclude:
+  - src/examples/*
+  - src/doc/*
+  - src/scripts/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:00:13Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/hypregpu.source.tar.zst
+  old_upstream_version_label: v26.0
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:55:03Z'
+  tool: migrate_from_lfs_bundle-1.0

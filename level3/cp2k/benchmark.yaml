@@ -38,12 +38,18 @@ inputs:
 references:
 - src/tests/QS/regtest-gpw-1/TEST_FILES.toml
 - src/tests/QS/regtest-dm-ls-scf-1/TEST_FILES.toml
-source_version: v2026.2
+source_version: hpcperf-l3-v1
 source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: cp2k-hpcperf-l3-v1.tar.zst
   archive_sha256: d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2
   source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
-  compressed_size: 210932689
+  size: 210932689
   uncompressed_size: 519383421
   file_count: 9009
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: v2026.2
+redistribution_status: cleared
+suite_status: retained

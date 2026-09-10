@@ -301,13 +301,13 @@ fingerprinted), `run.sh` (cases/modes, decomposition guard, manifest),
 `validate.sh` + `nyx_particle_compare.py` (criteria above), this README.
 
 <!-- hpcperf:source-section:begin -->
-## Source distribution (frozen bundle, 2026-09-08)
+## Source distribution (frozen source artifact, scheme 3, 2026-09-10)
 
-The application source is no longer read from `_upstream/`: `tools/prepare_benchmark.sh level3 nyx` materializes the frozen bundle into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Identity, patch series, licenses and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); what an optimization agent may modify is in `optimization_scope.yaml`; `benchmark.yaml` is the machine-readable contract.
+The application source is not in git and not read from `_upstream/`: `tools/prepare_benchmark.sh level3 nyx` materializes the frozen source artifact (`<app>[-<variant>]-<source_version>.tar.zst`, found in the local content-addressed cache `.artifacts/sha256/` or downloaded from the immutable URL recorded in `provenance/source.lock*.yaml` once published; `--artifact FILE` for a local copy) into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Archive size + sha256 and `source_tree_sha256` are verified before anything is placed. Identity, patch series, licenses, redistribution status and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `optimization_scope.yaml` says what an agent may modify; `benchmark.yaml` is the machine-readable contract. Remote status: see `level3/SOURCE_ARTIFACTS.md`.
 
-| variant | archive | compressed / uncompressed | files | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | equivalence | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
-|---|---|---|---|---|---|---|---|---|---|
-| - | `archives/source_bundle.tar.zst` | 75.7 MB / 187.6 MB | 5933 | `71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120` | `218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36` | 26.09 `e06eabc1b9db` | none | src: EQUIVALENT, deps/amrex: EQUIVALENT | 32330 / 21644 / 595317 / 366200 / 0 / 994298 |
+| variant | artifact | source version | compressed / uncompressed | entries | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | redistribution | equivalence | remote | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| - | `nyx-hpcperf-l3-v1.tar.zst` | hpcperf-l3-v1 | 75.7 MB / 187.6 MB | 5933 | `71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120` | `218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36` | 26.09 `e06eabc1b9db` | none | cleared | src: EQUIVALENT, deps/amrex: EQUIVALENT | REMOTE_ARTIFACT_UNPUBLISHED | 32330 / 21644 / 595317 / 366200 / 0 / 994298 |
 
-LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to these bundles (`provenance/equivalence*.md`); they are not re-run by the migration.
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to this artifact (`provenance/equivalence*.md`); they are not re-run by the migration.
 <!-- hpcperf:source-section:end -->

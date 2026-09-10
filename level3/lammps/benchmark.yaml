@@ -26,12 +26,18 @@ inputs:
 - src/bench/in.lj
 references:
 - src/bench/log.15Jul25.lj.fixed.g++.1
-source_version: stable_22Jul2025_update6
+source_version: hpcperf-l3-v1
 source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: lammps-hpcperf-l3-v1.tar.zst
   archive_sha256: 4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1
   source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
-  compressed_size: 115344817
+  size: 115344817
   uncompressed_size: 457028170
   file_count: 13893
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: stable_22Jul2025_update6
+redistribution_status: cleared
+suite_status: retained

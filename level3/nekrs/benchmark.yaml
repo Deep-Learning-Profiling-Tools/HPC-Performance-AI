@@ -29,21 +29,29 @@ variant_env: HPCPERF_NEKRS_VARIANT
 default_variant: hypregpu
 variants:
   hypregpu:
-    archive: archives/hypregpu.source.tar.zst
-    archive_sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
     source_tree_sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
-    compressed_size: 48167250
     uncompressed_size: 231107059
     file_count: 14447
-    source_version: v26.0
+    source_version: hpcperf-l3-v1
+    filename: nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+    archive_sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
+    size: 48167250
+    primary_url: null
+    publish_status: unpublished
   cpucoarse:
-    archive: archives/cpucoarse.source.tar.zst
-    archive_sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
     source_tree_sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
-    compressed_size: 48167029
     uncompressed_size: 231106946
     file_count: 14447
-    source_version: v26.0
+    source_version: hpcperf-l3-v1
+    filename: nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+    archive_sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
+    size: 48167029
+    primary_url: null
+    publish_status: unpublished
 inputs:
 - src/examples/ethier
 references: []
+source_version: hpcperf-l3-v1
+upstream_version: v26.0
+redistribution_status: cleared
+suite_status: retained

@@ -1,25 +1,44 @@
-schema: hpcperf-source-lock-1
-name: sparta
-level: 3
-application: SPARTA
-variant: null
-benchmark_source_version: 27Aug2026
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: sparta
+  level: 3
+  application: SPARTA
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/sparta/sparta.git
+  repository: https://github.com/sparta/sparta.git
   tag: 27Aug2026
   commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: sparta-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 21330629
   sha256: ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 21330629
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 76042143
   tar_entries: 3284
   file_count: 3083
   symlink_count: 1
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
   algorithm: hpcperf-tree-1
@@ -93,6 +112,40 @@ licenses:
   project: Kokkos (bundled)
   license: Apache-2.0 WITH LLVM-exception
   version: 5.0.2
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T07:58:05Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- SPARTA is GPL-2.0-only; the unmodified source with its LICENSE is redistributed as a source bundle.
+- Benchmark inputs (bench/in.collide, bench/data.*, reference logs) are upstream repository files.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/lib/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tools/testing/*
+  exclude:
+  - src/doc/*
+  - src/examples/*
+  - src/bench/*
+  - src/data/*
+  - src/tools/*
+  - src/python/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:58:05Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: 27Aug2026
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:52:59Z'
+  tool: migrate_from_lfs_bundle-1.0

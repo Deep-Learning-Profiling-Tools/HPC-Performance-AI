@@ -1,25 +1,45 @@
-schema: hpcperf-source-lock-1
-name: geos
-level: 3
-application: GEOS
-variant: null
-benchmark_source_version: develop b7a0f13305 (2026-09-04) + thirdPartyLibs 9b55672 (TPL 361-1070)
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: geos
+  level: 3
+  application: GEOS
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/GEOS-DEV/GEOS.git
+  repository: https://github.com/GEOS-DEV/GEOS.git
   tag: develop @ 2026-09-04
   commit: b7a0f13305277c3d825ee93f34946ac4e8c94fee
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: geos-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 380218896
   sha256: cc5a6bfaf27504a200f46ca2f610dbca86a3a3e8a7753faa7bf7ca5dc8b309d1
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 380218896
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 787552164
   tar_entries: 8049
   file_count: 7017
   symlink_count: 9
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: 208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741
   algorithm: hpcperf-tree-1
@@ -30,29 +50,29 @@ materialized_tree:
 patches:
 - path: patches/geos-blt-0001-cuda13-memoryClockRate.patch
   sha256: eac87fe62db404708365807e448b34d467fd056d19406ba5f1774c0c45e46196
-  upstream_source: LLNL/blt 38b46203 (cudaDeviceProp::memoryClockRate removed in CUDA 13)
   category: D
+  upstream_reference: LLNL/blt 38b46203 (cudaDeviceProp::memoryClockRate removed in CUDA 13)
   component: src
   files:
   - src/src/cmake/blt/tests/smoke/blt_cuda_runtime_smoke.cpp
 - path: patches/0001-tpl-superlu_dist-url-hash-typo.patch
   sha256: c9b39dcdb883cdf4863a5384e548007c476ee0af0e94a7c517de048dc43e2e19
-  upstream_source: local fix of a 65-character URL hash
   category: B
+  upstream_reference: local fix of a 65-character URL hash
   component: deps/thirdPartyLibs
   files:
   - deps/thirdPartyLibs/CMakeLists.txt
 - path: patches/0002-tpl-raja-vectorization-overridable.patch
   sha256: 89aa47decce48f917760022dffe758dd2885c98e06f7615280d26024731df253
-  upstream_source: 'local: RAJA_ENABLE_VECTORIZATION overridable (upstream does the same for ROCm)'
   category: B
+  upstream_reference: 'local: RAJA_ENABLE_VECTORIZATION overridable (upstream does the same for ROCm)'
   component: deps/thirdPartyLibs
   files:
   - deps/thirdPartyLibs/CMakeLists.txt
 - path: patches/0003-tpl-hdf5-step-generator-and-build-command.patch
   sha256: d0acecac2ab94c0f50c8823fa8ae3b09deb09af30eb25b93215c1c5b4434c6bc
-  upstream_source: 'local: hdf5 ExternalProject step gets generator/build/install commands'
   category: B
+  upstream_reference: 'local: hdf5 ExternalProject step gets generator/build/install commands'
   component: deps/thirdPartyLibs
   files:
   - deps/thirdPartyLibs/CMakeLists.txt
@@ -516,6 +536,56 @@ licenses:
   project: OpenBLAS
   license: BSD-3-Clause
   version: 0.3.30
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T08:06:13Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- 'LICENSE BLOCKER (decision needed): parmetis-4.0.3.tar.gz -- ParMETIS is distributed under the University of Minnesota license,
+  which permits use for research/educational purposes but does not grant a general right to redistribute the source. GEOS''
+  superbuild downloads it from an ANL mirror. Bundling it into a redistributed source artifact that is distributed with this repository may
+  not be permitted; the freeze records it here and the user decides whether to (a) keep it in the bundle (private repository
+  only), (b) move it to an environment-provided download resolved by build.sh from the recorded URL+sha256, or (c) drop ParMETIS.
+  METIS 5.1.0 (inside the same tarball) is Apache-2.0.'
+- SuiteSparse 5.10.1 mixes LGPL/GPL modules (UMFPACK is GPL); the complete source is redistributed, which GPL permits; no
+  derived binary is distributed.
+- uncrustify (GPL-2.0-or-later) is only a build-time code formatter that the superbuild builds; its source is redistributed
+  complete.
+- 'The GEOS integrated-test baseline tarball (baseline_integratedTests-pr3994-17525-4ae3593.tar.gz, 1.57 GB, LGPL-2.1 GEOS
+  project data) is a DATASET, not source: it stays outside the source bundle (.deps/level3/geos/downloads/, url+sha256 recorded
+  in benchmark.yaml) -- see benchmark.yaml `datasets`.'
+redistribution_status: blocked
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/coreComponents/*
+  - src/src/main/*
+  bundled:
+  - src/src/coreComponents/LvArray/*
+  - src/src/coreComponents/constitutive/HPCReact/*
+  - src/src/coreComponents/fileIO/coupling/hdf5_interface/*
+  - src/src/cmake/blt/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/src/coreComponents/*/unitTests/*
+  - src/src/coreComponents/LvArray/unitTests/*
+  exclude:
+  - src/src/docs/*
+  - src/inputFiles/*
+  - src/examples/*
+  - src/scripts/*
+  - src/host-configs/*
+  - src/integratedTests/*
+  - src/.github/*
+  - src/src/pygeosx/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:06:13Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: develop b7a0f13305 (2026-09-04) + thirdPartyLibs 9b55672 (TPL 361-1070)
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:55:34Z'
+  tool: migrate_from_lfs_bundle-1.0

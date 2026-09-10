@@ -32,12 +32,18 @@ inputs:
 references:
 - src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS
 - src/utils/scripts/compare_seismogram_correlations.py
-source_version: v4.1.1
+source_version: hpcperf-l3-v1
 source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
-source_bundle:
-  archive: archives/source_bundle.tar.zst
+source_artifact:
+  filename: specfem3d-hpcperf-l3-v1.tar.zst
   archive_sha256: 62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316
   source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
-  compressed_size: 248289500
+  size: 248289500
   uncompressed_size: 665155680
   file_count: 6205
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: v4.1.1
+redistribution_status: cleared
+suite_status: retained

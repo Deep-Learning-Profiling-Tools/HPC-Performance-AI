@@ -1,25 +1,44 @@
-schema: hpcperf-source-lock-1
-name: nekrs
-level: 3
-application: nekRS
-variant: cpucoarse
-benchmark_source_version: v26.0
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: nekrs
+  level: 3
+  application: nekRS
+  variant: cpucoarse
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/Nek5000/nekRS.git
+  repository: https://github.com/Nek5000/nekRS.git
   tag: v26.0
   commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
-archive:
-  path: archives/cpucoarse.source.tar.zst
+artifact:
+  filename: nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 48167029
   sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 48167029
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 231106946
   tar_entries: 15617
   file_count: 14444
   symlink_count: 3
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
   algorithm: hpcperf-tree-1
@@ -150,6 +169,35 @@ licenses:
   project: ADIOS2
   license: Apache-2.0
   url: https://github.com/ornladios/ADIOS2
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T07:54:25Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- Exact upstream v26.0 tree (no patch); the same vendored third-party licenses as the hypregpu variant.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/3rd_party/*
+  benchmark_specific:
+  - deps/*
+  test: []
+  exclude:
+  - src/examples/*
+  - src/doc/*
+  - src/scripts/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:54:25Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/cpucoarse.source.tar.zst
+  old_upstream_version_label: v26.0
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:55:18Z'
+  tool: migrate_from_lfs_bundle-1.0

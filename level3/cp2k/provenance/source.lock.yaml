@@ -1,25 +1,45 @@
-schema: hpcperf-source-lock-1
-name: cp2k
-level: 3
-application: CP2K
-variant: null
-benchmark_source_version: v2026.2
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: cp2k
+  level: 3
+  application: CP2K
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/cp2k/cp2k.git
+  repository: https://github.com/cp2k/cp2k.git
   tag: v2026.2
   commit: 67b5da876dd6a76b8b021d5a04d1c81ba79a4c50
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: cp2k-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 210932689
   sha256: d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 210932689
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 519383421
   tar_entries: 9725
   file_count: 9006
   symlink_count: 3
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
   algorithm: hpcperf-tree-1
@@ -30,8 +50,8 @@ materialized_tree:
 patches:
 - path: patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch
   sha256: 7fa17badfbe47c80c94a82a5f8da2c1ab7237823ed1d6487391b013b4b590afa
-  upstream_source: cp2k/cp2k commit 378b2fab (B200 GPU_ARCH_NUMBER 100 for DBCSR, parameters_H100 reused)
   category: B
+  upstream_reference: cp2k/cp2k commit 378b2fab (B200 GPU_ARCH_NUMBER 100 for DBCSR, parameters_H100 reused)
   component: src
   files:
   - src/tools/toolchain/install_cp2k_toolchain.sh
@@ -263,7 +283,7 @@ equivalence:
     frozen_entries: 8999
     validated_entries_considered: 8999
 - archive_path: src/tools/toolchain
-  validated_tree: /tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/cuda132-gcc142-ompi5010
+  validated_tree: <node-local-scratch>/cp2k-toolchain/cuda132-gcc142-ompi5010
   status: EQUIVALENT
   summary:
     identical: 79
@@ -324,6 +344,41 @@ licenses:
   project: Eigen
   license: MPL-2.0
   version: 5.0.1
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T08:08:52Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- 'CP2K, DBCSR and FFTW are GPL-2.0-or-later: the bundle redistributes their complete, unmodified source (the toolchain scripts
+  of CP2K carry the class-B B200 back-port, recorded in provenance/original_vs_baseline.diff).'
+- The toolchain tarballs are the exact files CP2K's installer downloads from cp2k.org (same sha256 as recorded in tools/toolchain/scripts/*/install_*.sh);
+  they are redistributable under their own licenses (BSD/MPL/LGPL/GPL).
+- data/ (basis sets, potentials) and benchmarks/ are upstream repository content under the CP2K license.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/exts/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  exclude:
+  - src/data/*
+  - src/benchmarks/*
+  - src/docs/*
+  - src/tools/*
+  - src/.github/*
+  - src/cmake/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:08:52Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: v2026.2
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:54:37Z'
+  tool: migrate_from_lfs_bundle-1.0

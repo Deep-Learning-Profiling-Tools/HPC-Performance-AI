@@ -1,6 +1,7 @@
 {
  "benchmark_dir": "level3/nyx",
  "variant": null,
+ "mode": "baseline",
  "verdict": "PASS",
  "results": [
   {
@@ -53,15 +54,15 @@
   },
   {
    "check": 9,
-   "name": "provenance/source.lock.yaml complete",
+   "name": "provenance/source.lock.yaml valid (schema 2, complete, no node-private location)",
    "status": "PASS",
    "detail": ""
   },
   {
    "check": 10,
-   "name": "archive/tree hashes consistent between benchmark.yaml and the lock",
+   "name": "benchmark.yaml identity == source lock; no scheme-2 fields",
    "status": "PASS",
-   "detail": "archive sha256 ok"
+   "detail": "identity fields agree"
   },
   {
    "check": 11,
@@ -92,6 +93,18 @@
    "name": "no _upstream dependency in the benchmark scripts (fetch.sh = freeze-time only)",
    "status": "PASS",
    "detail": ""
+  },
+  {
+   "check": 16,
+   "name": "artifact publish status consistent, marker agrees with the lock, no LFS metadata",
+   "status": "PASS",
+   "detail": "publish status unpublished; marker agrees with the lock"
+  },
+  {
+   "check": 17,
+   "name": "redistribution_status and suite_status declared (benchmark.yaml == lock)",
+   "status": "PASS",
+   "detail": "redistribution cleared, suite retained"
   }
  ]
 }

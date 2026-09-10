@@ -2,55 +2,97 @@ schema: hpcperf-freeze-spec-1
 name: nyx
 level: 3
 application: Nyx
-benchmark_source_version: "26.09"
-archive: archives/source_bundle.tar.zst
+benchmark_source_version: hpcperf-l3-v1
 components:
-  - dest: src
-    category: application
-    kind: git
-    checkout: _upstream/level3/Nyx
-    url: https://github.com/AMReX-Astro/Nyx.git
-    ref: "26.09"
-    commit: e06eabc1b9dbcad5612db9529aced682402daede
-    submodules:
-      - {path: subprojects/sundials, url: https://github.com/LLNL/sundials.git, ref: v7.2.1, commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03, note: "heat/cool variant (CVODE); nested submodules (.gitlab/*, external/sundials-addon-example, test/answers) are not checked out and not bundled"}
-    exclude:
-      - {path: subprojects/amrex, reason: "Nyx's pinned AMReX submodule (6e875b7c) is NOT used: its CMake cannot emit sm_100; the build uses AMReX 26.09 from deps/amrex (README)"}
-    patches: []                                  # class A
-    license: {spdx: BSD-3-Clause-LBNL, files: [license.txt]}
-    bundled:
-      - {path: subprojects/sundials, project: SUNDIALS, version: 7.2.1, license: BSD-3-Clause}
-  - dest: deps/amrex
-    category: benchmark_specific
-    kind: git
-    checkout: _upstream/level3/amrex
-    url: https://github.com/AMReX-Codes/amrex.git
-    ref: "26.09"
-    commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
-    project: AMReX
-    version: "26.09"
-    submodules: []
-    exclude: []
-    patches: []
-    license: {spdx: BSD-3-Clause-LBNL, files: [LICENSE, NOTICE]}
-    note: "external AMReX 26.09 (private per-profile build; also provides the plotfile tools and particle_compare.cpp for the CPU reference profile)"
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/Nyx
+  url: https://github.com/AMReX-Astro/Nyx.git
+  ref: '26.09'
+  commit: e06eabc1b9dbcad5612db9529aced682402daede
+  submodules:
+  - path: subprojects/sundials
+    url: https://github.com/LLNL/sundials.git
+    ref: v7.2.1
+    commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03
+    note: heat/cool variant (CVODE); nested submodules (.gitlab/*, external/sundials-addon-example, test/answers) are not
+      checked out and not bundled
+  exclude:
+  - path: subprojects/amrex
+    reason: 'Nyx''s pinned AMReX submodule (6e875b7c) is NOT used: its CMake cannot emit sm_100; the build uses AMReX 26.09
+      from deps/amrex (README)'
+  patches: []
+  license:
+    spdx: BSD-3-Clause-LBNL
+    files:
+    - license.txt
+  bundled:
+  - path: subprojects/sundials
+    project: SUNDIALS
+    version: 7.2.1
+    license: BSD-3-Clause
+- dest: deps/amrex
+  category: benchmark_specific
+  kind: git
+  checkout: _upstream/level3/amrex
+  url: https://github.com/AMReX-Codes/amrex.git
+  ref: '26.09'
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
+  project: AMReX
+  version: '26.09'
+  submodules: []
+  exclude: []
+  patches: []
+  license:
+    spdx: BSD-3-Clause-LBNL
+    files:
+    - LICENSE
+    - NOTICE
+  note: external AMReX 26.09 (private per-profile build; also provides the plotfile tools and particle_compare.cpp for the
+    CPU reference profile)
 environment_provided:
-  - {name: CUDA Toolkit, version: 13.2.78}
-  - {name: GCC (host compiler), version: 13.3.0, provided_by: .conda_env}
-  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env}
-  - {name: CMake / Ninja, provided_by: .conda_env}
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC (host compiler)
+  version: 13.3.0
+  provided_by: .conda_env
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: CMake / Ninja
+  provided_by: .conda_env
 equivalence:
-  - archive_path: src
-    validated_tree: _upstream/level3/Nyx
-    ignore: ['.git/*', '*/.git', '*/.git/*']
-    excluded: ['subprojects/amrex/*']
-  - archive_path: deps/amrex
-    validated_tree: _upstream/level3/amrex
-    ignore: ['.git/*']
+- archive_path: src
+  validated_tree: _upstream/level3/Nyx
+  ignore:
+  - .git/*
+  - '*/.git'
+  - '*/.git/*'
+  excluded:
+  - subprojects/amrex/*
+- archive_path: deps/amrex
+  validated_tree: _upstream/level3/amrex
+  ignore:
+  - .git/*
 licenses:
-  - {path: src, project: Nyx, license: BSD-3-Clause-LBNL, url: https://github.com/AMReX-Astro/Nyx, commit: e06eabc1b9dbcad5612db9529aced682402daede}
-  - {path: src/subprojects/sundials, project: SUNDIALS, license: BSD-3-Clause, url: https://github.com/LLNL/sundials, commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03}
-  - {path: deps/amrex, project: AMReX, license: BSD-3-Clause-LBNL, url: https://github.com/AMReX-Codes/amrex, commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576}
+- path: src
+  project: Nyx
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/AMReX-Astro/Nyx
+  commit: e06eabc1b9dbcad5612db9529aced682402daede
+- path: src/subprojects/sundials
+  project: SUNDIALS
+  license: BSD-3-Clause
+  url: https://github.com/LLNL/sundials
+  commit: 5c53be85c88f63c5201c130b8cb2c686615cfb03
+- path: deps/amrex
+  project: AMReX
+  license: BSD-3-Clause-LBNL
+  url: https://github.com/AMReX-Codes/amrex
+  commit: a52ca73324ac2c7b65ec04f131e6df99eec9c576
 license_notes:
-  - "All three components are BSD-3-Clause (LBNL variant for Nyx/AMReX); license and notice files are kept in the bundle."
-  - "Initial-condition files inside the Nyx repository (Exec/MiniSB/ic_sb_32.ascii, Exec/LyA/32.nyx, 64sssss_20mpc.nyx) are upstream repository content under the same license; no external dataset is bundled."
+- All three components are BSD-3-Clause (LBNL variant for Nyx/AMReX); license and notice files are kept in the bundle.
+- Initial-condition files inside the Nyx repository (Exec/MiniSB/ic_sb_32.ascii, Exec/LyA/32.nyx, 64sssss_20mpc.nyx) are upstream
+  repository content under the same license; no external dataset is bundled.
+redistribution_status: cleared

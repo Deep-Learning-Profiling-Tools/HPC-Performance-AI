@@ -1,0 +1,32 @@
+schema: hpcperf-agent-workspace-verification-1
+benchmark: level3/lammps
+source_version: hpcperf-l3-v1
+canonical_source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
+verdict: PASS
+date: 2026-09-10
+node: dgx003 (4x NVIDIA B200, CUDA 13.2.78, conda GCC 13.3.0, Open MPI 5.0.10)
+run_id: loop-001
+workspace_location: outside the repository (a sibling directory of the clone; no symlink from the workspace resolves into the repository)
+driver: maintainer script (steps below), every step's exit code recorded
+steps:
+  - {step: 01, action: "tools/prepare_benchmark.sh level3 lammps --status on the canonical directory", expected: READY, rc: 0}
+  - {step: 02, action: "tools/create_agent_workspace.sh level3 lammps loop-001 --dest <outside-repo>", expected: "real copy, baseline written", rc: 0, note: "workspace_initial_tree_sha256 == canonical"}
+  - {step: 03, action: "tools/check_workspace.py <ws> (baseline mode, iteration 0)", expected: "PASS 17/17", rc: 0}
+  - {step: 04, action: "inject '#error HPCPERF_INJECTED_COMPILE_ERROR_loop001' at the top of src/src/KOKKOS/pair_lj_cut_kokkos.cpp (modifiable, application-owned GPU kernel source)", rc: 0}
+  - {step: 05, action: "tools/check_workspace.py --agent-mode --iteration 1", expected: "PASS (1 modified file inside the modifiable scope, readonly ranges intact)", rc: 0}
+  - {step: 06, action: "./build.sh CUDA inside the workspace", expected: FAIL, rc: 1, note: "the injected #error appears in the workspace build log; no lmp_kokkos_cuda binary exists afterwards (steps 06b/06c rc 0); 290 s until the failure with -j32"}
+  - {step: 07, action: "restore the file (byte-identical to the canonical copy)", rc: 0}
+  - {step: 08, action: "./build.sh CUDA inside the workspace", expected: BUILD_PASS, rc: 0, note: "90 s (incremental after the aborted build); binary sha256 622258b3f162f0c740863d9d06de59cf775fbc3f5a946385d1af04ca3637de8b"}
+  - {step: 09, action: "tools/validate_workspace.sh level3 lammps <ws> --iteration 2 --skip-build -- CUDA", expected: PASS, rc: 0, note: "LAMMPS CUDA validation (1 GPU, bench/in.lj vs log.15Jul25.lj.fixed.g++.1): PASS; launcher audit 1 verified, 0 mismatch; verdict recorded with source hash d7549c2f... and binary sha256 622258b3..."}
+  - {step: 10, action: "append a comment line to pair_lj_cut_kokkos.cpp (agent edit), tools/validate_workspace.sh --iteration 3 (build + validate)", expected: "recompiled, PASS", rc: 0, note: "check reports the modified file; Ninja recompiled pair_lj_cut_kokkos.cpp; NEW binary sha256 423fc91be978c0d9f03a8036456ffd59d35a01c11d87e16d6c034e8cdec7f9d5 (different from step 08); validation PASS on the new binary; current source hash 523cb1a46b51a76c... != baseline. The nvidia-smi sampling of this few-second run reported 'unverified' (no observation), not a mismatch."}
+  - {step: 11, action: "append a line to validate.sh in the workspace, tools/validate_workspace.sh --iteration 4", expected: REFUSED, rc: 3, note: "READONLY TAMPERING detected by the agent-mode check; nothing built or run; verdict REFUSED recorded"}
+  - {step: 11b, action: "append a line to src/bench/log.15Jul25.lj.fixed.g++.1 (reference), --iteration 5", expected: REFUSED, rc: 3}
+  - {step: 11c, action: "restore both files, --iteration 6 --skip-build", expected: PASS, rc: 0}
+  - {step: 12, action: "canonical level3/lammps tree hash before == after; tools/check_workspace.py level3/lammps --quick", expected: "unchanged, PASS", rc: 0}
+  - {step: 13, action: "no symlink under the workspace resolves into the repository", rc: 0}
+  - {step: 14, action: "build.ninja / CMakeCache.txt of the workspace build reference neither _upstream nor the canonical level3/lammps/src", rc: 0}
+evidence_kept_locally: "<workspace>/reports/iter-{1..6}.{check.json,diff,verdict.yaml,validate.log}, <workspace>/.deps/level3/lammps/logs/build-cuda.log (not committed: local run artifacts)"
+conclusions:
+  - an agent edit inside the modifiable scope enters compile -> run -> validate (the failing build proves compilation of the edited file; the changed binary hash proves no stale binary is reused)
+  - readonly tampering (validator, reference) is refused before anything runs
+  - the canonical benchmark is untouched by workspace activity; the workspace depends on no application source outside itself (environment symlinks .conda_env/.tools only)

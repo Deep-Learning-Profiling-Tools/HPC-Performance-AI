@@ -2,65 +2,97 @@ schema: hpcperf-freeze-spec-1
 name: qmcpack
 level: 3
 application: QMCPACK
-benchmark_source_version: v4.4.0
-archive: archives/source_bundle.tar.zst
+benchmark_source_version: hpcperf-l3-v1
 components:
-  - dest: src
-    category: application
-    kind: git
-    checkout: _upstream/level3/qmcpack
-    url: https://github.com/QMCPACK/qmcpack.git
-    ref: v4.4.0
-    commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
-    submodules: []
-    exclude: []
-    patches: []                                  # class A
-    license: {spdx: NCSA, files: [LICENSE]}
-    bundled:
-      - {path: external_codes, project: "QMCPACK bundled external codes (boost_multi, mpi_wrapper, ...)", license: "per external_codes/<name>"}
-  - dest: deps/hdf5/hdf5-1.14.5.tar.gz
-    category: benchmark_specific
-    kind: file
-    source: .deps/level3/qmcpack/downloads/hdf5-1.14.5.tar.gz
-    url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.5/hdf5-1.14.5.tar.gz
-    sha256: ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
-    project: HDF5
-    version: 1.14.5
-    license: BSD-3-Clause (HDF5 license)
-  - dest: deps/boost/boost-1.90.0-b2-nodocs.tar.xz
-    category: benchmark_specific
-    kind: file
-    source: .deps/level3/qmcpack/downloads/boost-1.90.0-b2-nodocs.tar.xz
-    url: https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.xz
-    sha256: 9e6bee9ab529fb2b0733049692d57d10a72202af085e553539a05b4204211a6f
-    project: Boost (headers only are used)
-    version: 1.90.0
-    license: BSL-1.0
-  - dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
-    category: benchmark_specific
-    kind: file
-    source: .deps/level3/qmcpack/downloads/OpenBLAS-0.3.30.tar.gz
-    url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
-    sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
-    project: OpenBLAS
-    version: 0.3.30
-    license: BSD-3-Clause
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/qmcpack
+  url: https://github.com/QMCPACK/qmcpack.git
+  ref: v4.4.0
+  commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
+  submodules: []
+  exclude: []
+  patches: []
+  license:
+    spdx: NCSA
+    files:
+    - LICENSE
+  bundled:
+  - path: external_codes
+    project: QMCPACK bundled external codes (boost_multi, mpi_wrapper, ...)
+    license: per external_codes/<name>
+- dest: deps/hdf5/hdf5-1.14.5.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/qmcpack/downloads/hdf5-1.14.5.tar.gz
+  url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.5/hdf5-1.14.5.tar.gz
+  sha256: ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
+  project: HDF5
+  version: 1.14.5
+  license: BSD-3-Clause (HDF5 license)
+- dest: deps/boost/boost-1.90.0-b2-nodocs.tar.xz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/qmcpack/downloads/boost-1.90.0-b2-nodocs.tar.xz
+  url: https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.xz
+  sha256: 9e6bee9ab529fb2b0733049692d57d10a72202af085e553539a05b4204211a6f
+  project: Boost (headers only are used)
+  version: 1.90.0
+  license: BSL-1.0
+- dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/qmcpack/downloads/OpenBLAS-0.3.30.tar.gz
+  url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+  sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+  project: OpenBLAS
+  version: 0.3.30
+  license: BSD-3-Clause
 environment_provided:
-  - {name: LLVM/Clang with NVPTX OpenMP offload runtime, version: 23.1.0, provided_by: "private compiler toolchain (level3/qmcpack/toolchain/build_llvm.sh from llvm-project-23.1.0.src.tar.xz), install .deps/level3/qmcpack/<profile>/install/llvm -- a compiler, hence environment, not benchmark source"}
-  - {name: CUDA Toolkit, version: 13.2.78}
-  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env}
-  - {name: FFTW3 (conda) and libxml2 (system), provided_by: environment}
-  - {name: CMake / Ninja, provided_by: .conda_env}
+- name: LLVM/Clang with NVPTX OpenMP offload runtime
+  version: 23.1.0
+  provided_by: private compiler toolchain (level3/qmcpack/toolchain/build_llvm.sh from llvm-project-23.1.0.src.tar.xz), install
+    .deps/level3/qmcpack/<profile>/install/llvm -- a compiler, hence environment, not benchmark source
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: FFTW3 (conda) and libxml2 (system)
+  provided_by: environment
+- name: CMake / Ninja
+  provided_by: .conda_env
 equivalence:
-  - archive_path: src
-    validated_tree: _upstream/level3/qmcpack
-    ignore: ['.git/*']
+- archive_path: src
+  validated_tree: _upstream/level3/qmcpack
+  ignore:
+  - .git/*
 licenses:
-  - {path: src, project: QMCPACK, license: NCSA (University of Illinois/NCSA Open Source), url: https://github.com/QMCPACK/qmcpack, commit: 2601d62e353934f1526cab1f67f30b6672b7c76f}
-  - {path: deps/hdf5, project: HDF5, license: BSD-3-Clause (HDF5), url: https://github.com/HDFGroup/hdf5, version: 1.14.5}
-  - {path: deps/boost, project: Boost, license: BSL-1.0, url: https://www.boost.org, version: 1.90.0}
-  - {path: deps/openblas, project: OpenBLAS, license: BSD-3-Clause, url: https://github.com/OpenMathLib/OpenBLAS, version: 0.3.30}
+- path: src
+  project: QMCPACK
+  license: NCSA (University of Illinois/NCSA Open Source)
+  url: https://github.com/QMCPACK/qmcpack
+  commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
+- path: deps/hdf5
+  project: HDF5
+  license: BSD-3-Clause (HDF5)
+  url: https://github.com/HDFGroup/hdf5
+  version: 1.14.5
+- path: deps/boost
+  project: Boost
+  license: BSL-1.0
+  url: https://www.boost.org
+  version: 1.90.0
+- path: deps/openblas
+  project: OpenBLAS
+  license: BSD-3-Clause
+  url: https://github.com/OpenMathLib/OpenBLAS
+  version: 0.3.30
 license_notes:
-  - "QMCPACK (NCSA), HDF5, Boost and OpenBLAS permit redistribution of the source with their license texts, which are inside the respective trees/tarballs."
-  - "The in-repository tests/ data (diamondC pseudopotentials, wavefunction h5) are upstream repository content; the NiO performance datasets (external Box links) are NOT bundled."
-  - "LLVM 23.1.0 (Apache-2.0 WITH LLVM-exception) is an environment-provided compiler and not part of the bundle."
+- QMCPACK (NCSA), HDF5, Boost and OpenBLAS permit redistribution of the source with their license texts, which are inside
+  the respective trees/tarballs.
+- The in-repository tests/ data (diamondC pseudopotentials, wavefunction h5) are upstream repository content; the NiO performance
+  datasets (external Box links) are NOT bundled.
+- LLVM 23.1.0 (Apache-2.0 WITH LLVM-exception) is an environment-provided compiler and not part of the bundle.
+redistribution_status: cleared

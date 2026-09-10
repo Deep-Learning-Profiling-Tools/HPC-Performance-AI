@@ -1,25 +1,45 @@
-schema: hpcperf-source-lock-1
-name: qmcpack
-level: 3
-application: QMCPACK
-variant: null
-benchmark_source_version: v4.4.0
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: qmcpack
+  level: 3
+  application: QMCPACK
+  variant: null
+  source_version: hpcperf-l3-v1
 upstream:
-  url: https://github.com/QMCPACK/qmcpack.git
+  repository: https://github.com/QMCPACK/qmcpack.git
   tag: v4.4.0
   commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
-archive:
-  path: archives/source_bundle.tar.zst
+artifact:
+  filename: qmcpack-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 225420139
   sha256: 6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3
-  compression: zstd
-  zstd_level: 19
-  zstd_version: 1.5.6
+  source_tree_sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+  tree_algorithm: hpcperf-tree-1
   tar_format: hpcperf-tar-1
-  compressed_size: 225420139
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
   uncompressed_size: 559170675
   tar_entries: 9344
   file_count: 8234
   symlink_count: 110
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
 materialized_tree:
   sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
   algorithm: hpcperf-tree-1
@@ -156,6 +176,43 @@ licenses:
   license: BSD-3-Clause
   url: https://github.com/OpenMathLib/OpenBLAS
   version: 0.3.30
-freeze_tool_version: freeze-1.0
-freeze_timestamp: '2026-09-08T07:47:37Z'
-note: freeze_timestamp and the archive metadata are not part of source_tree_sha256
+license_notes:
+- QMCPACK (NCSA), HDF5, Boost and OpenBLAS permit redistribution of the source with their license texts, which are inside
+  the respective trees/tarballs.
+- The in-repository tests/ data (diamondC pseudopotentials, wavefunction h5) are upstream repository content; the NiO performance
+  datasets (external Box links) are NOT bundled.
+- LLVM 23.1.0 (Apache-2.0 WITH LLVM-exception) is an environment-provided compiler and not part of the bundle.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/external_codes/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  exclude:
+  - src/docs/*
+  - src/labs/*
+  - src/nexus/*
+  - src/utils/*
+  - src/config/*
+  - src/CMake/*
+  - src/.github/*
+  - src/examples/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:47:37Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: v4.4.0
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:53:53Z'
+  tool: migrate_from_lfs_bundle-1.0
