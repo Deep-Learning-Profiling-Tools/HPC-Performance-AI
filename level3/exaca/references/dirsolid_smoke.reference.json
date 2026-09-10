@@ -1,0 +1,69 @@
+{
+ "schema": "hpcperf-exaca-reference-1",
+ "provenance": {
+  "case": "dirsolid smoke 128x128x128, inputs/dirsolid.template.json",
+  "ranks": 1,
+  "node": "dgx003 (4x NVIDIA B200, CUDA 13.2.78)",
+  "exaca_version": "2.1.0",
+  "kokkos_version": "4.7.4",
+  "source_tree_sha256": "b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44",
+  "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+  "input_sha256": "0f1c435b42ca47ad74b19ecb0cd17476693cb82218b85faf277957637ff1caca",
+  "template_sha256": "76a2e2e8aed23c0f9dd518dc1858ddeba38f0e5d310f3eeb1d474a477867a98d",
+  "run_id": "20260910T212600Z-214823-24494",
+  "utc": "2026-09-10T21:26:04Z",
+  "note": "statistics of the validated 1-GPU baseline run; the GrainID field itself is not bitwise reproducible (atomic captures), see README"
+ },
+ "stats": {
+  "vtk": "dirsolid_smoke_np1.vtk",
+  "nx": 128,
+  "ny": 128,
+  "nz": 128,
+  "cells": 2097152,
+  "unsolidified_cells": 0,
+  "n_grains": 3612,
+  "n_epitaxial": 3592,
+  "n_nucleated": 20,
+  "vol_fraction_nucleated": 0.5495171546936035,
+  "mean_grain_volume_cells": 580.6068660022148,
+  "top_layer_grains": 29,
+  "mean_misorientation_z_deg": 26.98837624961747,
+  "mean_misorientation_z_top_deg": 35.58406703154213,
+  "min_grain_id": -20,
+  "max_grain_id": 4096
+ },
+ "log": {
+  "ranks": 1,
+  "time_step_of_output": 7000,
+  "vol_fraction_nucleated_code": 0.549517,
+  "domain": {
+   "Nx": 128,
+   "Ny": 128,
+   "Nz": 128,
+   "CellSize": 1e-06,
+   "TimeStep": 6.66667e-08,
+   "XBounds": [
+    0,
+    0.000127
+   ],
+   "YBounds": [
+    0,
+    0.000127
+   ],
+   "ZBounds": [
+    0,
+    0.000127
+   ]
+  },
+  "decomposition": {
+   "SubdomainYSize": [
+    128
+   ],
+   "SubdomainYOffset": [
+    0
+   ]
+  },
+  "exaca_version": "2.1.0",
+  "kokkos_version": "4.7.4"
+ }
+}

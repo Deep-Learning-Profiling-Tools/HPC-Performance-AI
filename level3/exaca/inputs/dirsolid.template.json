@@ -1,0 +1,37 @@
+{
+   "_comment": "HPC-Performance-AI Level 3 ExaCA benchmark deck (directional solidification, analytic temperature field; the ExaCA upstream example Inp_DirSolidification.json parameters with the decomposition-independent SurfaceSiteDensity substrate). run.sh sets Domain.Nx/Ny/Nz (0 here = filled per scale mode), RandomSeed, Printing.PathToOutput/OutputFile and drops Printing.Interlayer outside smoke mode; nothing else changes between scale modes. Nuclei are placed from one global RNG stream (RandomSeed), so the initial condition is independent of the MPI decomposition.",
+   "SimulationType": "Directional",
+   "MaterialFileName": "Inconel625.json",
+   "GrainOrientationFile": "GrainOrientationVectors.csv",
+   "RandomSeed": 0,
+   "Domain": {
+      "CellSize": 1,
+      "TimeStep": 0.0666667,
+      "Nx": 0,
+      "Ny": 0,
+      "Nz": 0
+   },
+   "Nucleation": {
+      "Density": 10,
+      "MeanUndercooling": 5,
+      "StDev": 0.5
+   },
+   "TemperatureData": {
+      "G": 500000,
+      "R": 300000
+   },
+   "Substrate": {
+      "SurfaceSiteDensity": 0.25
+   },
+   "Printing": {
+      "PathToOutput": "./",
+      "OutputFile": "dirsolid",
+      "PrintBinary": true,
+      "PrintExaConstitSize": 0,
+      "Interlayer": {
+         "Fields": [
+            "GrainID"
+         ]
+      }
+   }
+}

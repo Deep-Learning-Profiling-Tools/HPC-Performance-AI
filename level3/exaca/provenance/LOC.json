@@ -1,0 +1,81 @@
+{
+ "benchmark": "exaca",
+ "cloc": "2.06",
+ "test_code_loc": {
+  "code": 2760,
+  "files": 24,
+  "languages": {
+   "C/C++ Header": 2645,
+   "CMake": 103,
+   "C++": 12
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 6512,
+  "files": 29,
+  "languages": {
+   "C/C++ Header": 5976,
+   "C++": 473,
+   "CMake": 63
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 278336,
+  "files": 1491,
+  "languages": {
+   "C/C++ Header": 212265,
+   "C++": 47861,
+   "CMake": 6896,
+   "Bourne Again Shell": 3107,
+   "Markdown": 3006,
+   "make": 2421,
+   "Groovy": 705,
+   "YAML": 494,
+   "Python": 467,
+   "Dockerfile": 302,
+   "Bourne Shell": 181,
+   "Fortran 77": 132,
+   "XML": 348,
+   "PHP": 90,
+   "Text": 55,
+   "Windows Module Definition": 4,
+   "C": 2
+  },
+  "tarballs": {
+   "deps/json/json-3.12.0.tar.xz": 36689
+  }
+ },
+ "unclassified": {
+  "code": 89,
+  "files": 4,
+  "languages": {
+   "JSON": 44,
+   "YAML": 40,
+   "CMake": 5
+  }
+ },
+ "agent_modifiable_code_loc": {
+  "code": 6368,
+  "files": 27,
+  "languages": {
+   "C/C++ Header": 5976,
+   "C++": 336,
+   "CMake": 56
+  }
+ },
+ "total_materialized_code_loc": 287697,
+ "summary": {
+  "application_owned_code_loc": 6512,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 278336,
+  "test_code_loc": 2760,
+  "agent_modifiable_code_loc": 6368,
+  "total_materialized_code_loc": 287697,
+  "unclassified_code_loc": 89
+ }
+}

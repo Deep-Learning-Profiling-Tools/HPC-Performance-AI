@@ -1,0 +1,11 @@
+{
+  "_comment": "Tolerances for exaca_check.py compare (absolute; keys ending in _rel are relative). Justified in README.md: measured run-to-run spread of identical 1-GPU smoke runs (ExaCA cell captures use atomic compare-exchange, so the GrainID field is not bitwise reproducible) and the 4-GPU vs 1-GPU spread, each multiplied by a safety factor >= 3.",
+  "unsolidified_cells": 0,
+  "vol_fraction_nucleated": 0.01,
+  "n_grains_rel": 0.01,
+  "n_nucleated_rel": 0.05,
+  "top_layer_grains_rel": 0.15,
+  "mean_misorientation_z_deg": 0.25,
+  "mean_misorientation_z_top_deg": 0.5,
+  "mean_grain_volume_cells_rel": 0.01
+}

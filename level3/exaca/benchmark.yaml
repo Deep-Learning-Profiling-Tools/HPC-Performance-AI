@@ -1,0 +1,56 @@
+name: exaca
+level: 3
+application: ExaCA
+description: ExaCA 2.1.0 (Kokkos/CUDA cellular automaton for additive-manufacturing grain growth; Kokkos 4.7.04 and nlohmann_json
+  3.12.0 from deps/), directional-solidification problem at 1/2/4 GPUs, one MPI rank per GPU (1-D decomposition in Y)
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (Kokkos CUDA), 1-D domain decomposition in Y with host-staged halo exchange (GPU-aware
+  MPI not required)
+default_scale_mode: smoke
+scale_modes:
+  smoke: directional solidification 128x128x128 cells (2.1M), Inconel625, G=5e5 K/m, R=3e5 K/s, nucleation density 10 (x1e12
+    m^-3), substrate SurfaceSiteDensity 0.25; validated 1/2/4 GPUs (2026-09-10, statistical criteria in validate.sh)
+  strong: fixed global box 512x256x512 cells (67.1M) decomposed over the ranks in Y; completed 1/2/4 GPU runs (CA time 8.02/6.26/5.17
+    s); a single rank cannot hold 512^3 (ExaCA int indexing of the 26-neighbour arrays)
+  weak: 512x128x512 cells per rank (33.5M/rank), Y extent = 128*N; completed 1/2/4 GPU runs (CA time 4.88/6.16/6.80 s)
+multi_node: UNVERIFIED on this site (multi-node MPI transport blocked)
+gpu_40_80: DRY-RUN only (HPCPERF_DRY_RUN=1 HPCPERF_NODES=10|20), never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+optimization_scope: ./optimization_scope.yaml
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler behind nvcc_wrapper, CUDA 13.2.78, Open MPI 5.0.10, site
+  profile gmu-hopper)
+install_root: .deps/level3/exaca
+dependency_installs:
+- install/kokkos
+- install/json
+inputs:
+- inputs/dirsolid.template.json
+- src/examples/Materials/Inconel625.json
+- src/examples/Substrate/GrainOrientationVectors.csv
+references:
+- references/dirsolid_smoke.reference.json
+- references/dirsolid_smoke.tolerances.json
+suite_status: candidate
+source_version: hpcperf-l3-v1
+source_tree_sha256: b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44
+source_artifact:
+  filename: exaca-hpcperf-l3-v1.tar.zst
+  archive_sha256: 3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316
+  source_tree_sha256: b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44
+  size: 2758430
+  uncompressed_size: 16024831
+  file_count: 1579
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: 2.1.0
+redistribution_status: cleared
+known_limits: GrainID field not bitwise reproducible (atomic captures) -> statistical validation; single-rank domain limit
+  ~82M cells (int overflow in ExaCA); Finch coupling, FromFile problems and unit tests not exercised
+admission: 'candidate: all 20 replacement criteria met on dgx003 (2026-09-10); maintainer confirmation pending'
