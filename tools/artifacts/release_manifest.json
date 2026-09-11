@@ -1,6 +1,6 @@
 {
  "schema": "hpcperf-release-manifest-1",
- "generated": "2026-09-10T22:11:30Z",
+ "generated": "2026-09-11T01:38:20Z",
  "suite": "level3-default",
  "source_version": "hpcperf-l3-v1",
  "release": {
@@ -18,13 +18,14 @@
   "nyx",
   "cp2k",
   "qmcpack",
-  "dftfe"
+  "dftfe",
+  "exaca"
  ],
  "totals": {
-  "retained_applications": 9,
-  "retained_artifacts": 10,
-  "retained_compressed_bytes": 1194243164,
-  "retained_uncompressed_bytes": 3252649837
+  "retained_applications": 10,
+  "retained_artifacts": 11,
+  "retained_compressed_bytes": 1197001594,
+  "retained_uncompressed_bytes": 3268674668
  },
  "artifacts": [
   {
@@ -70,7 +71,7 @@
     "total_materialized_code_loc": 1471402,
     "unclassified_code_loc": 58
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -117,7 +118,7 @@
     "total_materialized_code_loc": 354863,
     "unclassified_code_loc": 153
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -164,7 +165,7 @@
     "total_materialized_code_loc": 492389,
     "unclassified_code_loc": 2672
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -211,7 +212,7 @@
     "total_materialized_code_loc": 307549,
     "unclassified_code_loc": 16413
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -258,7 +259,7 @@
     "total_materialized_code_loc": 2366122,
     "unclassified_code_loc": 899
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -305,7 +306,7 @@
     "total_materialized_code_loc": 2366118,
     "unclassified_code_loc": 899
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": false,
    "check_workspace": "PASS"
@@ -352,7 +353,7 @@
     "total_materialized_code_loc": 994298,
     "unclassified_code_loc": 451
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -399,7 +400,7 @@
     "total_materialized_code_loc": 21479099,
     "unclassified_code_loc": 3319
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -446,7 +447,7 @@
     "total_materialized_code_loc": 12122677,
     "unclassified_code_loc": 2630
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -493,7 +494,7 @@
     "total_materialized_code_loc": 12896192,
     "unclassified_code_loc": 3518
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -551,9 +552,8 @@
    "app": "exaca",
    "application": "ExaCA",
    "variant": null,
-   "suite_status": "candidate",
+   "suite_status": "retained",
    "statuses": [
-    "CANDIDATE(pending)",
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
@@ -590,7 +590,7 @@
     "total_materialized_code_loc": 287697,
     "unclassified_code_loc": 89
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"

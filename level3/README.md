@@ -185,8 +185,11 @@ generate_release_manifest.py, publish_artifacts.sh, artifact_catalog.yaml,
 migrate_from_lfs_bundle.py}`, `check_workspace.py` (17 checks; `--agent-mode`
 for iterations > 0), `create_agent_workspace.sh`, `validate_workspace.sh`
 (trusted harness: refuses readonly tampering, builds and validates inside the
-workspace), `loc_report.py`; tests in `tools/tests/test_source_tools.sh` (62
-checks, run by `level3/tools/tests/run_all.sh`).
+workspace), `loc_report.py`; tests in `tools/tests/test_source_tools.sh` (68
+checks, run by `level3/tools/tests/run_all.sh`). Verdict layers of the trusted
+harness: 6 REFUSED (workspace integrity), 7 BUILD_FAIL, 0/1/3/4 numerical (the
+`validate.sh` contract); REFUSED is never PENDING and never enters a scientific or
+performance summary (`level3/tools/l3_verdict.py`).
 
 Identity: `source_tree_sha256` (algorithm hpcperf-tree-1: sorted paths, file
 content / symlink target, no mtime/uid/mode) is the identity of an artifact; the
@@ -199,12 +202,18 @@ benchmark-specific dependency source, inputs, references, validators and
 provenance are read-only and checked against a trusted baseline at every
 iteration).
 
-Default suite (2026-09-10): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx, CP2K,
-QMCPACK, DFT-FE (9 retained) + ExaCA as the replacement candidate for the tenth
-slot (see `exaca/README.md` for its admission status). GEOS is
-RETIRED_FROM_DEFAULT_SUITE (ParMETIS redistribution constraint + replacement
-decision); its directory, provenance and historical results stay as a record, no
-artifact is staged or published for it.
+Default suite (2026-09-11): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx, CP2K,
+QMCPACK, DFT-FE, ExaCA (10). ExaCA was admitted on 2026-09-11 as the replacement
+for GEOS on the basis of a **project-defined statistical validation** of its
+`dirsolid` smoke case (protocol v2, calibration/holdout separated, 9/9 holdout PASS
+at 1/2/4 GPUs; `exaca/README.md`, `exaca/references/validation_protocol.md`) --
+there is no upstream oracle for it, strong/weak are completion-only, HIP untested,
+multi-node unverified. GEOS is RETIRED_FROM_DEFAULT_SUITE (ParMETIS redistribution
+constraint + replacement decision); its directory, provenance and historical
+results stay as a record, no artifact is staged or published for it. Per-application
+evidence levels (source, build, workspace, agent edit, science, GPU binding,
+multi-GPU, remote): [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md). Publication:
+[RELEASE_PLAN.md](RELEASE_PLAN.md) (GitHub Release assets, nothing published yet).
 
 ## Dependency isolation
 

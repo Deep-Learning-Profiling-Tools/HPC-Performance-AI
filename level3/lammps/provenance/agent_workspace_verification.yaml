@@ -25,6 +25,13 @@ steps:
   - {step: 12, action: "canonical level3/lammps tree hash before == after; tools/check_workspace.py level3/lammps --quick", expected: "unchanged, PASS", rc: 0}
   - {step: 13, action: "no symlink under the workspace resolves into the repository", rc: 0}
   - {step: 14, action: "build.ninja / CMakeCache.txt of the workspace build reference neither _upstream nor the canonical level3/lammps/src", rc: 0}
+multi_gpu_regression_2026_09_11:
+  - {step: 15, action: "HPCPERF_GPUS=2 tools/validate_workspace.sh level3 lammps <ws> --iteration 7 --skip-build -- CUDA (existing workspace binary 423fc91be978c0d9f03a8036456ffd59d35a01c11d87e16d6c034e8cdec7f9d5, smoke bench/in.lj 32000 atoms 100 steps)", rc: 0,
+     result: "LAMMPS CUDA validation (2 GPU) PASS: all 8 compared quantities identical to the upstream CPU reference log and to this build's 1-GPU run (rel 0.0); agent-mode check PASS (1 modified file, repository baseline); run_id 20260911T012230Z-263185-31011, input sha256 a2a9f801e1b13b3b..., verdict layer numerical",
+     gpu_binding: "launcher audit 0 verified / 0 mismatch / 2 unverified -- the ~1 s run ended before nvidia-smi sampled it (observation gap, not a mismatch)"}
+  - {step: 16, action: "HPCPERF_L3_RUN_SUBDIR=run.binding HPCPERF_GPUS=2 HPCPERF_LAMMPS_STEPS=3000 ./run.sh CUDA in the same workspace (binding-evidence run, same binary; the numerical acceptance stays the 100-step case)", rc: 0,
+     result: "Loop time 1.98 s on 2 procs for 3000 steps; launcher audit 2 verified, 0 mismatch, 0 unverified (rank 0 -> GPU-d902db1a..., rank 1 -> GPU-a543dc0a...); run_id 20260911T012554Z-264512-1164"}
+  - {not_run: "4-GPU workspace validation (not requested this round; canonical 4-GPU results are the 2026-09-07 regression at fc4d2a1 on the equivalent tree); no rebuild of LAMMPS dependencies; no strong/weak scaling in the workspace"}
 evidence_kept_locally: "<workspace>/reports/iter-{1..6}.{check.json,diff,verdict.yaml,validate.log}, <workspace>/.deps/level3/lammps/logs/build-cuda.log (not committed: local run artifacts)"
 conclusions:
   - an agent edit inside the modifiable scope enters compile -> run -> validate (the failing build proves compilation of the edited file; the changed binary hash proves no stale binary is reused)

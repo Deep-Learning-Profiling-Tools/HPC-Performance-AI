@@ -77,8 +77,15 @@ Facts that differ from any "reference" you may read elsewhere:
   (cache `.artifacts/`); never let a build call it; a DIRTY tree is never
   overwritten without `--force-rematerialize`. Agents work in
   `workspaces/<run-id>/` (`tools/create_agent_workspace.sh`); validate agent
-  iterations only through `tools/validate_workspace.sh` (refuses readonly
-  tampering).
+  iterations only through `tools/validate_workspace.sh`: exit 6 REFUSED
+  (integrity: tampering / untrusted baseline; never a scientific result), 7
+  BUILD_FAIL, 0/1/3/4 numerical as validate.sh; rc 3 is PENDING only for Nyx.
+- Publication: provider = GitHub Release assets of this repo, first tag
+  `level3-source-hpcperf-l3-v1-rc1` (prerelease). Never upload: the adapter
+  `tools/artifacts/github_release_upload.sh` needs `HPCPERF_CONFIRM_UPLOAD=yes`,
+  which only the user grants per run; locks stay `unpublished` until
+  `tools/artifacts/remote_fetch_check.sh` (anonymous, clean clone, empty cache)
+  passed. GEOS/ParMETIS never enter a release.
 - One commit per application or infrastructure change, message = what/why with
   the measured facts. Branch names follow `CONTRIBUTING.md` (`level3/<app>`,
   `env/...`, `docs/...`).

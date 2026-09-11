@@ -13,7 +13,7 @@ PROJECT-CONTROLLED EXTERNAL SOURCE ARTIFACTS  +  AUTOMATIC MATERIALIZATION  +  S
 | step | what | where | tool |
 |---|---|---|---|
 | A freeze | exact upstream source (committed blobs of a pinned checkout) + approved compatibility patches (pre-applied) + benchmark-specific source dependencies (pinned git trees / sha256-pinned release tarballs) -> deterministic `<app>[-<variant>]-<source_version>.tar.zst` | maintainer's local artifact staging (`$HPCPERF_ARTIFACT_STAGING/level3/<app>/<source_version>/`, outside the git worktree) | `tools/freeze_benchmark_source.py` (spec `level3/<app>/provenance/freeze_spec*.yaml`) |
-| B publish | the artifact goes to project-controlled external artifact storage (GitHub Release assets, institutional/S3-compatible object storage, Zenodo, other project-controlled https hosting -- provider NOT decided yet); the lock then records the immutable https URL | external storage | `tools/artifacts/publish_artifacts.sh` (this round: `--dry-run` only, no adapter, nothing uploaded) |
+| B publish | **provider decided 2026-09-11: GitHub Release assets of this repository** (no mirror, bucket or paid service); first release name `level3-source-hpcperf-l3-v1-rc1` (a source-artifact prerelease, not a scientific acceptance statement); the lock records the immutable asset URL only after the published asset was re-downloaded anonymously and verified | GitHub Release assets | `tools/artifacts/release_plan.py` (plan, nothing uploaded), `tools/artifacts/github_release_upload.sh` (gated adapter, UNTESTED, needs `HPCPERF_CONFIRM_UPLOAD=yes` = explicit maintainer authorization), `tools/artifacts/remote_fetch_check.sh` (anonymous fetch test) |
 | C git | harness + contract + provenance only: `README.md benchmark.yaml optimization_scope.yaml build.sh run.sh validate.sh inputs/ references/ configs/ provenance/{source.lock.yaml, SOURCE_MANIFEST.json, upstream.lock, patch_series.txt, original_vs_baseline.diff, LICENSES.md, equivalence.md, LOC.md}` -- never `src/`, `deps/`, an archive or an LFS pointer | GitHub repository | -- |
 | D materialize | `tools/prepare_benchmark.sh level3 <app>`: source.lock -> local content-addressed cache -> (cache miss) immutable URL -> size + sha256 -> restricted extraction outside the benchmark directory -> `source_tree_sha256` -> safety scan -> atomic `level3/<app>/{src,deps}` | user clone | `tools/prepare_benchmark.sh` / `tools/hpcperf_materialize.py` |
 | E optimize | `tools/create_agent_workspace.sh level3 <app> <run-id>` -> `workspaces/<run-id>/level3/<app>/` (real copies, never symlinks to the canonical tree); the agent's cwd; iteration 0 must pass `tools/check_workspace.py`; later iterations are checked in agent mode and validated by `tools/validate_workspace.sh` (trusted harness) | per run | `tools/create_agent_workspace.sh`, `tools/check_workspace.py`, `tools/validate_workspace.sh` |
@@ -146,6 +146,22 @@ staging unavailable after prepare" by design: build/run/validate never touch the
   `reports/iter-N.{check.json,diff,verdict.yaml}` (verdict, exit code, source hashes, modified files, binary
   sha256 from `run_manifest.txt`).
 
+### 6a. Verdict layers of the trusted harness
+
+`tools/validate_workspace.sh` never mixes layers: **6 REFUSED** (workspace integrity: readonly/harness tampering,
+untrusted or in-workspace baseline, broken layout -- nothing is built or run, the result enters no scientific
+or performance summary), **7 BUILD_FAIL** (build layer), and the numerical layer propagated unchanged from
+`validate.sh` (**0 PASS, 1 FAIL, 3 PENDING** = Nyx `I_R_CHECK_PENDING`, **4 UNSUPPORTED_LAYOUT**). The
+`reports/iter-N.verdict.yaml` record carries `layer:` and `exit_code:`; `level3/tools/l3_verdict.py` classifies
+rc 6/7 as REFUSED/BUILD_FAIL and rc 3 as PENDING only with the Nyx line, never for a refusal.
+
+Trusted baseline: only the repository copy `<repo>/.hpcperf/workspace_baselines/<run-id>.json` or an explicit
+`--baseline` outside the workspace root is accepted; the copy inside the workspace is never consulted by the
+trusted harness (development use only with `--allow-workspace-baseline`, which still cannot produce a PASS from a
+forged file). The baseline covers the benchmark copy and the harness copies of the workspace root
+(`hpcperf_env.sh`, `level2/tools/**`, `level3/tools/**`), which are made read-only. These are file-hash and
+permission controls -- **not an operating-system sandbox**; the agent process is not confined by them.
+
 ## 7. Versioning
 
 Any change of application source, patch series, benchmark-specific or bundled dependency source produces a
@@ -159,7 +175,12 @@ README, catalog) do not touch the source identity. The release name proposed for
 
 An external artifact is a redistribution. Before an artifact enters the publish plan: license audit
 (`provenance/LICENSES*.md`, `redistribution_status: cleared` in the lock), secret scan, archive hash, tree hash
-and provenance checks all PASS. GEOS is retired from the default suite (ParMETIS 4.0.3 redistribution
+and provenance checks all PASS. The plan records the **application license** and the **review of the bundled
+dependency / data licenses** separately (the main project's license never clears the bundled components).
+GitHub "immutable releases" is not enabled on the repository (read-only probe 2026-09-11,
+`tools/artifacts/immutable_releases_probe.json`; the setting is an administrator decision and was not changed):
+the project rule applies regardless -- assets are never overwritten or deleted, a source change is a new
+`source_version` + new tag, and every consumer verifies size, sha256 and `source_tree_sha256`. GEOS is retired from the default suite (ParMETIS 4.0.3 redistribution
 constraint + replacement decision): no scheme-3 artifact, `redistribution_status: blocked`, `suite_status:
 retired`, code/provenance/results kept in git, its old archive kept only in controlled local research storage.
 
@@ -174,6 +195,7 @@ retired`, code/provenance/results kept in git, its old archive kept only in cont
 | `tools/artifacts/verify_artifact.py` | verify an artifact against its lock (staging entry, cache entry or file) |
 | `tools/artifacts/migrate_from_lfs_bundle.py` | one-time scheme-2 -> scheme-3 migration (copy, verify, rewrite lock, delete old) |
 | `tools/artifacts/artifact_catalog.yaml`, `generate_release_manifest.py`, `publish_artifacts.sh` (+ `publish_plan.py`) | suite catalog, release manifest / SOURCE_ARTIFACTS.md, publish preflight |
+| `tools/artifacts/release_plan.py`, `github_release_upload.sh` (gated, untested), `remote_fetch_check.sh` | release plan (`level3/RELEASE_PLAN.{md,json}`), GitHub Release adapter for the authorized upload step, anonymous REMOTE_FETCH_VERIFIED test |
 | `tools/create_agent_workspace.sh`, `tools/check_workspace.py`, `tools/validate_workspace.sh` | workspace, contract checks (baseline / agent mode), trusted validation |
 | `tools/loc_report.py`, `tools/readme_source_section.py` | LOC by ownership, README/audit sections |
-| `tools/tests/test_source_tools.sh` | 62 static checks of all of the above (run by `level3/tools/tests/run_all.sh`) |
+| `tools/tests/test_source_tools.sh` | 68 static checks of all of the above (run by `level3/tools/tests/run_all.sh`) |
