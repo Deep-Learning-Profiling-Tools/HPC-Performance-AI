@@ -1,10 +1,10 @@
 {
  "schema": "hpcperf-release-plan-1",
- "generated": "2026-09-11T06:58:33Z",
+ "generated": "2026-09-11T23:38:34Z",
  "provider": "GitHub Release assets of this repository (no mirror, bucket or paid service)",
  "repository": "Deep-Learning-Profiling-Tools/HPC-Performance-AI",
  "tag": "level3-source-hpcperf-l3-v1-rc1",
- "target_commit": "bdae7ce31836b75163810b4a687e3754ae7b8b1a",
+ "target_commit": "c72d669c91579a7d1cfdb5c0110e01de864b7e64",
  "release_kind": "prerelease (source-artifact release candidate): does not assert that HIP, multi-node or every scientific configuration is validated",
  "immutable_releases": {
   "enabled": false,
