@@ -7,10 +7,12 @@ Finch heat-transport coupling, grain-analysis post-processing), not a mini-app o
 automata, grain nucleation, decentred-octahedron grain growth, neighbourhood updates over a steering vector of
 active cells, MPI 1-D domain decomposition with halo exchange, Kokkos GPU execution.
 
-Status (2026-09-10, node dgx003, 4x B200, CUDA 13.2.78): BUILD_PASS, VALIDATED_PASS at 1/2/4 GPUs
-(smoke), strong/weak COMPLETED at 1/2/4 GPUs, 40/80 GPUs DRY-RUN only, HIP UNTESTED (no ROCm), multi-node
-UNVERIFIED. **Admission: all twenty criteria of the replacement checklist (below) are met on this node;
-the formal default suite stays "9 retained + ExaCA candidate" until the maintainer confirms the admission.**
+Status (2026-09-11, node dgx003, 4x B200, CUDA 13.2.78): BUILD_PASS; **project-defined statistical validation**
+of the `dirsolid` smoke case (128^3, seed 0) at 1/2/4 GPUs -- calibration 2026-09-10 (8 runs), frozen protocol
+v2, independent holdout 2026-09-11 **9/9 PASS**; strong/weak COMPLETED at 1/2/4 GPUs (no acceptance claim);
+40/80 GPUs DRY-RUN only; HIP UNTESTED (no ROCm); multi-node UNVERIFIED. **Admitted 2026-09-11** as the tenth
+application of the default suite (replacement for GEOS) on this basis; there is no upstream oracle for this
+problem, and only the smoke case is validated.
 
 ## Provenance
 
@@ -78,46 +80,65 @@ Overrides: `HPCPERF_EXACA_NX/NY/NZ` (Ny per rank in weak mode), `HPCPERF_EXACA_S
 deck on the command line is rejected. Results land in `build/level3/exaca/cuda/<run>/dirsolid.<mode>.np<N>/`
 with `run_manifest.txt` (run id, binary sha256, deck sha256, sizes, exit code).
 
-## Correctness criteria (`validate.sh`, exit 0 PASS / 1 FAIL)
+## Correctness criteria (`validate.sh` -> `exaca_check.py validate`, exit 0 PASS / 1 FAIL) -- protocol v2
 
 ExaCA ships no reference output for this problem, and its final GrainID field is **not bitwise
-reproducible**: liquid-cell captures are resolved with `Kokkos::atomic_compare_exchange`, so two identical
-1-GPU runs differ bitwise (measured) while every physically meaningful statistic agrees. The criteria are
-therefore statistical invariants of the final microstructure computed by `exaca_check.py` from the field
-the run writes, with tolerances derived from the measured spread (below) times a safety factor >= 3:
+reproducible**: identical 1-GPU runs differ in 2.2 % of the cells (46,499 of 2,097,152), 1- vs 4-rank runs in
+6.1 %; the differing cells carry thousands of distinct (id, id) pairs and the grain-ID sets differ, so these are
+real spatial differences of competitive growth, not a renumbering. Even a single growing grain (upstream
+`Inp_SmallEquiaxedGrain`, 64^3) differs by 3 edge cells between identical 1-GPU runs and its termination cycle
+by 1 between rank counts (`references/calibration.json: singlegrain_probe`). The code path consistent with this
+(not an upstream statement): active cells are collected with `Kokkos::atomic_fetch_add` (`src/CAupdate.hpp`
+lines 41/97/108/132) and a contested liquid cell is claimed with `Kokkos::atomic_compare_exchange` on
+`cell_type` (line 208); the winner sets the new octahedron's centre. Upstream's own deterministic checks are
+its GoogleTest unit tests, which are not built here (GoogleTest is neither in the environment nor in the
+artifact). The validation is therefore **project-defined and statistical**; the full protocol, the definition
+of the spread, and the calibration/holdout separation are in `references/validation_protocol.md`.
 
-1. completeness / single decomposition: run exits 0; field + log exist; `DIMENSIONS` = deck; every cell
-   solidified (`GrainID != 0`); log `NumberMPIRanks` = N; the Y subdomain sizes sum to Ny + 2(N-1)
-   (1-cell halos at the N-1 internal boundaries), i.e. one global run;
-2. self-consistency: ExaCA's own `VolFractionNucleated` (log) equals the value recomputed from the field
-   (|diff| <= 1e-3);
-3. vs the frozen reference `references/dirsolid_smoke.reference.json` (statistics of the validated 1-GPU
-   baseline run, with binary sha256 / source tree sha256 / run id recorded inside);
+Criteria (each must hold; `references/validation_protocol.yaml` names the frozen files):
+
+1. completeness / one global decomposition: run exits 0; field + log exist; `DIMENSIONS` = deck; every cell
+   solidified; log `NumberMPIRanks` = N; the Y subdomains **tile the box exactly once** (first offset 0,
+   `offset[i+1] = offset[i] + size[i] - 2`, last end = Ny, every size >= 2, N entries -- the halo-sum formula
+   alone would accept a missing + duplicated pair);
+2. self-consistency: ExaCA's own `VolFractionNucleated` (log) equals the value recomputed from the field (1e-3);
+3. vs the frozen reference `references/dirsolid_smoke.reference.json` (statistics of calibration run cal-08,
+   1 GPU, run id `20260910T212610Z-216184-29676`, binary sha256 `f2a8875c...`);
 4. with N > 1: the N-GPU statistics vs this build's 1-GPU run (rank-count independence).
 
-| statistic | meaning | tolerance | measured spread: identical 1-GPU runs | 4 GPU vs 1 GPU |
-|---|---|---|---|---|
-| `unsolidified_cells` | cells never captured | exactly 0 | 0 | 0 |
-| `n_grains` | distinct grain IDs in the final field | 1 % rel | 3612 = 3612 | 3621 vs 3612 (+0.25 %) |
-| `n_nucleated` | distinct nucleated (negative-ID) grains | 5 % rel (= +-1 of 20) | 20 = 20 | 20 = 20 |
-| `vol_fraction_nucleated` | volume fraction of nucleated grains | 0.01 abs | 0.5495 vs 0.5483 | 0.5490 vs 0.5495 |
-| `top_layer_grains` | grains reaching the top surface (growth selection) | 15 % rel | 28 = 28 | 30 vs 28 |
-| `mean_misorientation_z_deg` | cell-weighted mean angle between the grain's closest <001> axis and the build direction (texture) | 0.25 deg abs | 26.972 vs 26.961 | 26.990 vs 26.972 |
-| `mean_misorientation_z_top_deg` | the same over the top layer | 0.5 deg abs | 35.60 vs 35.51 | 35.50 vs 35.60 |
-| `mean_grain_volume_cells` | cells / grains | 1 % rel | equal | 579.2 vs 580.6 |
+Tolerances (frozen 2026-09-11 BEFORE the holdout; applied to a single run vs the reference; spread = range
+over the 8 calibration runs, rule = max(3 x range, floor); n = 8, an empirical range rule, **no 3-sigma
+claim**):
 
-The orientation of a grain is row (|GrainID| - 1) mod 10000 of `GrainOrientationVectors.csv` (ExaCA's
-mapping); each row lists the three <001> unit vectors. No tolerance was loosened to obtain a PASS; the
-tolerances were fixed before the 2- and 4-GPU validations were run.
+| statistic | meaning | calibration range (8 runs) | tolerance (v2) | holdout max deviation from the reference (9 runs) |
+|---|---|---|---|---|
+| `unsolidified_cells` | cells never captured | 0 | exactly 0 | 0 |
+| `n_grains` | distinct grain IDs in the final field | 10 (3612-3622) | 1 % rel | 9 (0.25 %) |
+| `n_nucleated` | distinct nucleated grains | 0 (20) | 5 % rel (= +-1) | 0 |
+| `vol_fraction_nucleated` | volume fraction of nucleated grains | 0.0012 | 0.01 abs (floor) | 0.0015 |
+| `top_layer_grains` | grains reaching the top surface | 2 (28-30) | 25 % rel | 2 (31 vs 29: 6.9 %) |
+| `mean_misorientation_z_deg` | cell-weighted mean angle, closest <001> axis to +z | 0.033 deg | 0.25 deg (floor) | 0.039 deg |
+| `mean_misorientation_z_top_deg` | the same over the top layer | 0.226 deg | 0.7 deg (3 x) | 0.155 deg |
+| `mean_grain_volume_cells` | cells / grains | 1.6 | 1 % rel | 1.4 (0.25 %) |
+
+Protocol v1 (2026-09-10, `top_layer_grains` 15 %, `mean_misorientation_z_top_deg` 0.5 deg = only 2.2 x the
+range) validated 1/2/4 GPUs against the same data that set its thresholds; those runs are re-labelled
+**CALIBRATION** (`references/calibration.json`, 8 runs incl. the reference). The **holdout**
+(`references/holdout.json`): 3 independent sets x fresh 1/2/4-GPU `validate.sh` runs (9 runs, new run ids,
+separate run directories `run.holdout-001-{1,2,3}`), evaluated with the frozen v2 rule: **9/9 PASS**, launcher
+audit N verified / 0 mismatch for every run. No tolerance was changed after the holdout; a failure would have
+been kept and analysed, and a revised rule would need a new holdout set. Negative tests of the validator
+(NaN/Inf statistics, unsolidified cells, gap/duplicate/short/wrong-rank decompositions, log/field inconsistency,
+out-of-tolerance statistics, non-finite reference, a stale result standing in for a failed run):
+`level3/tools/tests/test_exaca_validator.sh` (19 checks).
 
 ## RESULTS (2026-09-10, `run/` tree; reference run id 20260910T212610Z-216184-29676, binary sha256 `f2a8875c6565a619...`)
 
 | test | result |
 |---|---|
 | build (CUDA sm_100, Kokkos 4.7.04) | BUILD_PASS, 109 s |
-| smoke 1 GPU | **PASS** (3612 grains, 20 nucleated, vf 0.5496, top 29, misorientation 26.99 / 35.6 deg; CA 0.80 s) |
-| smoke 2 GPU | **PASS** (rank-count comparison ok; subdomains [65, 65]) |
-| smoke 4 GPU | **PASS** (subdomains [33, 34, 34, 33]; CA 1.5 s) |
+| smoke 1/2/4 GPU, protocol v1 (2026-09-10) | CALIBRATION (same data as the thresholds): 3612 grains, 20 nucleated, vf 0.5496, top 29, misorientation 26.99 / 35.6 deg; CA 0.80 s (1 GPU), 1.5 s (4 GPUs); subdomains [65, 65] and [33, 34, 34, 33] |
+| smoke holdout, protocol v2 (2026-09-11) | **PASS 9/9** (3 sets x 1/2/4 GPUs; run ids in `references/holdout.json`; 1-GPU runs 3612 grains, 2-GPU 3614, 4-GPU 3619-3621; top-layer grains 28-31; vf 0.5481-0.5499) |
 | strong 512x256x512, ExaCA "Time spent performing CA calculations" | 1 GPU 8.02 s, 2 GPU 6.26 s, 4 GPU 5.17 s (1.55x on 4 GPUs: the work per step is the active interface layer; per-step launch/halo overhead dominates at this size; COMPLETED, no correctness claim beyond the log statistics vf = 0.8833 / 0.8833 / 0.8833) |
 | weak 512x128x512 per rank | 1 GPU 4.88 s, 2 GPU 6.16 s, 4 GPU 6.80 s (COMPLETED) |
 | 40 / 80 GPUs | DRY-RUN (HYPOTHETICAL plan, `run/.dryrun/`), not executed |
@@ -126,7 +147,7 @@ tolerances were fixed before the 2- and 4-GPU validations were run.
 
 Launcher audit of every executed run: "N verified, 0 mismatch, 0 unverified".
 
-## Replacement-candidate checklist (requested criteria)
+## Replacement-candidate checklist (requested criteria) -- admitted 2026-09-11
 
 | # | criterion | status |
 |---|---|---|
@@ -138,9 +159,9 @@ Launcher audit of every executed run: "N verified, 0 mismatch, 0 unverified".
 | 6 | CUDA official path | Kokkos CUDA backend, documented; built and validated |
 | 7 | HIP official path | Kokkos HIP backend, documented; untested here |
 | 8 | MPI distributed path | 1-D Y decomposition, validated 1/2/4 ranks |
-| 9 | real 1/2/4 GPU | validated (audit "N verified") |
+| 9 | real 1/2/4 GPU | holdout runs at 1/2/4 GPUs, launcher audit "N verified, 0 mismatch" for all 9 |
 | 10 | one global run, not N copies | log decomposition check (criterion 1) |
-| 11 | correctness criterion | statistical invariants with measured tolerances (above) |
+| 11 | correctness criterion | project-defined statistical validation (protocol v2: invariants + frozen reference + rank-count independence; calibration/holdout separated; 9/9 holdout PASS); no upstream oracle exists |
 | 12 | strong / weak definition | fixed 67.1 M-cell box / 33.5 M cells per rank |
 | 13 | 40/80 GPU dry-run only | yes |
 | 14 | multi-node not claimed | UNVERIFIED |
@@ -156,8 +177,6 @@ built), any performance optimization.
 
 <!-- hpcperf:source-section:begin -->
 ## Source distribution (frozen source artifact, scheme 3, 2026-09-10)
-
-**Replacement candidate** for the tenth slot of the default suite; admission depends on the bring-up criteria recorded in this README.
 
 The application source is not in git and not read from `_upstream/`: `tools/prepare_benchmark.sh level3 exaca` materializes the frozen source artifact (`<app>[-<variant>]-<source_version>.tar.zst`, found in the local content-addressed cache `.artifacts/sha256/` or downloaded from the immutable URL recorded in `provenance/source.lock*.yaml` once published; `--artifact FILE` for a local copy) into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Archive size + sha256 and `source_tree_sha256` are verified before anything is placed. Identity, patch series, licenses, redistribution status and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `optimization_scope.yaml` says what an agent may modify; `benchmark.yaml` is the machine-readable contract. Remote status: see `level3/SOURCE_ARTIFACTS.md`.
 

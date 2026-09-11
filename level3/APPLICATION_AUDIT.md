@@ -29,7 +29,7 @@ candidates have an officially supported native CUDA path.
 | QMCPACK | v4.4.0 | OpenMP offload + cuBLAS | medium (needs Clang offload) | medium-high | medium | pkg `+cuda` broken for 4.x | CI only | SECOND_BATCH |
 | GEOS | 1.2.0 (develop differs) | RAJA/CHAI/Umpire + hypre | very high (~20 TPLs) | high (tag) / medium (develop) | high | uberenv only (LC systems) | CI images | SECOND_BATCH -> **RETIRED_FROM_DEFAULT_SUITE (2026-09-10)**: ParMETIS 4.0.3 redistribution constraint + replacement decision |
 | DFT-FE | 1.2.0 | native CUDA/HIP/SYCL + deal.II (CPU) | high | medium | medium-high | pkg stale (0.6) | CPU only | SECOND_BATCH |
-| ExaCA | 2.1.0 (+ Kokkos 4.7.04, nlohmann_json 3.12.0 in `deps/`) | Kokkos (external) | low | low-medium (Kokkos 4.7.04 documents CUDA 13; Kokkos 4.6.02's nvcc_wrapper still defaults to sm_70 = unusable with CUDA 13.2) | medium (Kokkos HIP path documented by ExaCA; untested here) | `exaca` package exists (`+cuda cuda_arch=`) | none | **REPLACEMENT_CANDIDATE (2026-09-10)**, admission pending (see the ExaCA section) |
+| ExaCA | 2.1.0 (+ Kokkos 4.7.04, nlohmann_json 3.12.0 in `deps/`) | Kokkos (external) | low | low-medium (Kokkos 4.7.04 documents CUDA 13; Kokkos 4.6.02's nvcc_wrapper still defaults to sm_70 = unusable with CUDA 13.2) | medium (Kokkos HIP path documented by ExaCA; untested here) | `exaca` package exists (`+cuda cuda_arch=`) | none | REPLACEMENT_CANDIDATE (2026-09-10) -> **ADMITTED 2026-09-11** (project-defined statistical validation, protocol v2 holdout 9/9 PASS; see the ExaCA section) |
 
 ---
 
@@ -451,7 +451,7 @@ candidates have an officially supported native CUDA path.
 - mi355x_hip_risk: medium (Kokkos HIP backend; gfx950 support in Kokkos 4.7 untested here)
 - container_availability: none official (Nix expression for the Serial backend only)
 - spack_availability: `exaca` package (`+cuda cuda_arch=...`, `+finch`); not used (native CMake build from the artifact)
-- recommended_integration_priority: REPLACEMENT_CANDIDATE for the tenth default-suite slot (GEOS retired); all twenty admission criteria met on this node, maintainer confirmation pending
+- recommended_integration_priority: ADMITTED 2026-09-11 as the tenth default-suite application (GEOS retired). Basis: project-defined statistical validation of the dirsolid smoke case only (protocol v2: calibration 8 runs, independent holdout 9/9 PASS at 1/2/4 GPUs); no upstream oracle; strong/weak completion-only; HIP untested; multi-node unverified
 - blocker: none found. Watch: small per-step GPU work (strong scaling 1.55x on 4 GPUs at 67 M cells), int-indexed arrays limit the cells per rank to ~82 M, no bitwise-reproducible output (atomic captures)
 - build_strategy_notes: **NATIVE** (CMake, out-of-source, no patch; Kokkos and json built from `deps/` inside the benchmark's private `.deps/level3/exaca/`)
 
@@ -502,5 +502,5 @@ cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, buil
 | QMCPACK | - | retained | 337840 | 294128 | 10949914 | 538165 | 12122677 | 337840 |
 | DFT-FE | - | retained | 107718 | 0 | 12784642 | 314 | 12896192 | 107718 |
 | GEOS | - | retired | 406925 | 330939 | 14602640 | 46778 | 15395169 | 406859 |
-| ExaCA | - | candidate | 6512 | 0 | 278336 | 2760 | 287697 | 6368 |
+| ExaCA | - | retained | 6512 | 0 | 278336 | 2760 | 287697 | 6368 |
 <!-- hpcperf:loc-table:end -->

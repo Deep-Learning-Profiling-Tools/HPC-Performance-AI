@@ -12,8 +12,9 @@ distributed_model: MPI, one rank per GPU (Kokkos CUDA), 1-D domain decomposition
   MPI not required)
 default_scale_mode: smoke
 scale_modes:
-  smoke: directional solidification 128x128x128 cells (2.1M), Inconel625, G=5e5 K/m, R=3e5 K/s, nucleation density 10 (x1e12
-    m^-3), substrate SurfaceSiteDensity 0.25; validated 1/2/4 GPUs (2026-09-10, statistical criteria in validate.sh)
+  smoke: 'directional solidification 128x128x128 cells (2.1M), Inconel625, G=5e5 K/m, R=3e5 K/s, nucleation density 10 (x1e12
+    m^-3), substrate SurfaceSiteDensity 0.25; project-defined statistical validation (protocol v2): holdout 9/9 PASS at 1/2/4
+    GPUs (2026-09-11)'
   strong: fixed global box 512x256x512 cells (67.1M) decomposed over the ranks in Y; completed 1/2/4 GPU runs (CA time 8.02/6.26/5.17
     s); a single rank cannot hold 512^3 (ExaCA int indexing of the 26-neighbour arrays)
   weak: 512x128x512 cells per rank (33.5M/rank), Y extent = 128*N; completed 1/2/4 GPU runs (CA time 4.88/6.16/6.80 s)
@@ -36,7 +37,7 @@ inputs:
 references:
 - references/dirsolid_smoke.reference.json
 - references/dirsolid_smoke.tolerances.json
-suite_status: candidate
+suite_status: retained
 source_version: hpcperf-l3-v1
 source_tree_sha256: b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44
 source_artifact:
@@ -53,4 +54,6 @@ upstream_version: 2.1.0
 redistribution_status: cleared
 known_limits: GrainID field not bitwise reproducible (atomic captures) -> statistical validation; single-rank domain limit
   ~82M cells (int overflow in ExaCA); Finch coupling, FromFile problems and unit tests not exercised
-admission: 'candidate: all 20 replacement criteria met on dgx003 (2026-09-10); maintainer confirmation pending'
+admission: 'admitted 2026-09-11 (replacement for GEOS): project-defined statistical validation of the dirsolid smoke case
+  (128^3, seed 0) under protocol v2 -- calibration 8 runs (2026-09-10), independent holdout 9/9 PASS at 1/2/4 GPUs (2026-09-11);
+  strong/weak modes completed only; HIP untested; multi-node unverified'

@@ -1,0 +1,378 @@
+{
+ "schema": "hpcperf-exaca-holdout-1",
+ "protocol_version": 2,
+ "date": "2026-09-11",
+ "purpose": "INDEPENDENT acceptance set executed after protocol v2 was frozen (references/validation_protocol.md); 3 sets x fresh 1/2/4-GPU validate.sh runs in separate run directories (run.holdout-001-{1,2,3}); no tolerance was changed after these runs",
+ "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+ "reference_run_id": "20260910T212610Z-216184-29676",
+ "budget": "9 runs x ~12 s wall each (2.1M cells); GPU binding audit N verified / 0 mismatch for every run",
+ "result": "PASS: 9 of 9 runs pass every criterion (1a-1d, 2a, 3, and 4 for N > 1)",
+ "runs": [
+  {
+   "set": 1,
+   "ranks": 1,
+   "run_id": "20260911T013130Z-269528-3834",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "ee070a016dd0b934d44e2ba9643c9ab988d8f93ad438899cb20cead3cfa9efe7",
+   "utc": "2026-09-11T01:31:34Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     128
+    ],
+    "SubdomainYOffset": [
+     0
+    ]
+   },
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5480680465698242,
+   "top_layer_grains": 31,
+   "mean_misorientation_z_deg": 26.948591768740673,
+   "mean_misorientation_z_top_deg": 35.499763144724355,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 1,
+   "ranks": 2,
+   "run_id": "20260911T013140Z-270162-9330",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "ce4a9898160570734aa33b867a4b9c2791a561d93e39e966279cff5d6c7f4a2d",
+   "utc": "2026-09-11T01:31:45Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     65,
+     65
+    ],
+    "SubdomainYOffset": [
+     0,
+     63
+    ]
+   },
+   "n_grains": 3614,
+   "n_epitaxial": 3594,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.548830509185791,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.954431345551047,
+   "mean_misorientation_z_top_deg": 35.62566080106271,
+   "mean_grain_volume_cells": 580.2855561704482,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 1,
+   "ranks": 4,
+   "run_id": "20260911T013152Z-270772-31350",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "d7e152ea691e26ee6ceca2f6601c55a4e438095886eca71d8621370b441e926c",
+   "utc": "2026-09-11T01:31:59Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     33,
+     34,
+     34,
+     33
+    ],
+    "SubdomainYOffset": [
+     0,
+     31,
+     63,
+     95
+    ]
+   },
+   "n_grains": 3621,
+   "n_epitaxial": 3601,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5498628616333008,
+   "top_layer_grains": 28,
+   "mean_misorientation_z_deg": 26.994120557884877,
+   "mean_misorientation_z_top_deg": 35.5957250103432,
+   "mean_grain_volume_cells": 579.1637669152168,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 2,
+   "ranks": 1,
+   "run_id": "20260911T013205Z-271501-8527",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "ebf795491dded89ffccb67da2108a0550431499149ae5821278b5f32530524b4",
+   "utc": "2026-09-11T01:32:08Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     128
+    ],
+    "SubdomainYOffset": [
+     0
+    ]
+   },
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5496478080749512,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.990766358287004,
+   "mean_misorientation_z_top_deg": 35.59318863674132,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 2,
+   "ranks": 2,
+   "run_id": "20260911T013215Z-272040-2309",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "00444e1a7bb1060d02d55869e6c5c1d7ab8f7a75b7f9d8003b77db98fe817ef0",
+   "utc": "2026-09-11T01:32:20Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     65,
+     65
+    ],
+    "SubdomainYOffset": [
+     0,
+     63
+    ]
+   },
+   "n_grains": 3614,
+   "n_epitaxial": 3594,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5492715835571289,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.959355258294657,
+   "mean_misorientation_z_top_deg": 35.55353796460322,
+   "mean_grain_volume_cells": 580.2855561704482,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 2,
+   "ranks": 4,
+   "run_id": "20260911T013227Z-272702-15631",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "c186d6744561fc18c0f4f5e4334f6d13b5e7d9478e729f0ae08055d90b149689",
+   "utc": "2026-09-11T01:32:34Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     33,
+     34,
+     34,
+     33
+    ],
+    "SubdomainYOffset": [
+     0,
+     31,
+     63,
+     95
+    ]
+   },
+   "n_grains": 3621,
+   "n_epitaxial": 3601,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.549407958984375,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.983697222041027,
+   "mean_misorientation_z_top_deg": 35.47995688803614,
+   "mean_grain_volume_cells": 579.1637669152168,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 3,
+   "ranks": 1,
+   "run_id": "20260911T013240Z-273329-10618",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "f0829796104cbd2f9f304265a06043bb64ff1f09110634ea96ce81b09427338d",
+   "utc": "2026-09-11T01:32:44Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     128
+    ],
+    "SubdomainYOffset": [
+     0
+    ]
+   },
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5491280555725098,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.986066648819055,
+   "mean_misorientation_z_top_deg": 35.62242726178319,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 3,
+   "ranks": 2,
+   "run_id": "20260911T013252Z-273958-29902",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "c610f0a9003a2e8f2bb26ca2e48901c1fddbf6e2f80c95700ee820241091e7c7",
+   "utc": "2026-09-11T01:32:57Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     65,
+     65
+    ],
+    "SubdomainYOffset": [
+     0,
+     63
+    ]
+   },
+   "n_grains": 3614,
+   "n_epitaxial": 3594,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5493464469909668,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.970727007444967,
+   "mean_misorientation_z_top_deg": 35.631112189017294,
+   "mean_grain_volume_cells": 580.2855561704482,
+   "unsolidified_cells": 0
+  },
+  {
+   "set": 3,
+   "ranks": 4,
+   "run_id": "20260911T013304Z-274571-8362",
+   "binary_sha256": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925",
+   "input_sha256": "9038d0f8f90240077c64c9058a39bad50b0d1197abd88f1e55a08b313a11e6d5",
+   "utc": "2026-09-11T01:33:11Z",
+   "verdict": "PASS",
+   "criteria_failed": [],
+   "time_step_of_output": 7000,
+   "decomposition": {
+    "SubdomainYSize": [
+     33,
+     34,
+     34,
+     33
+    ],
+    "SubdomainYOffset": [
+     0,
+     31,
+     63,
+     95
+    ]
+   },
+   "n_grains": 3619,
+   "n_epitaxial": 3599,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5491466522216797,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.97505973824332,
+   "mean_misorientation_z_top_deg": 35.429014517462264,
+   "mean_grain_volume_cells": 579.4838353136225,
+   "unsolidified_cells": 0
+  }
+ ],
+ "summary_over_holdout": {
+  "n_grains": {
+   "min": 3612,
+   "max": 3621,
+   "range": 9,
+   "mean": 3615.4444444444443,
+   "population_sd": 3.5935470286213844,
+   "max_abs_deviation_from_reference": 9,
+   "n": 9
+  },
+  "n_epitaxial": {
+   "min": 3592,
+   "max": 3601,
+   "range": 9,
+   "mean": 3595.4444444444443,
+   "population_sd": 3.5935470286213844,
+   "max_abs_deviation_from_reference": 9,
+   "n": 9
+  },
+  "n_nucleated": {
+   "min": 20,
+   "max": 20,
+   "range": 0,
+   "mean": 20,
+   "population_sd": 0.0,
+   "max_abs_deviation_from_reference": 0,
+   "n": 9
+  },
+  "vol_fraction_nucleated": {
+   "min": 0.5480680465698242,
+   "max": 0.5498628616333008,
+   "range": 0.0017948150634765625,
+   "mean": 0.5491899914211698,
+   "population_sd": 0.0004870201859846512,
+   "max_abs_deviation_from_reference": 0.0014491081237792969,
+   "n": 9
+  },
+  "top_layer_grains": {
+   "min": 28,
+   "max": 31,
+   "range": 3,
+   "mean": 29.555555555555557,
+   "population_sd": 0.8314794192830981,
+   "max_abs_deviation_from_reference": 2,
+   "n": 9
+  },
+  "mean_misorientation_z_deg": {
+   "min": 26.948591768740673,
+   "max": 26.994120557884877,
+   "range": 0.04552878914420333,
+   "mean": 26.973646211700736,
+   "population_sd": 0.015560904326376527,
+   "max_abs_deviation_from_reference": 0.03978448087679709,
+   "n": 9
+  },
+  "mean_misorientation_z_top_deg": {
+   "min": 35.429014517462264,
+   "max": 35.631112189017294,
+   "range": 0.20209767155503044,
+   "mean": 35.55893182375263,
+   "population_sd": 0.06901471119225633,
+   "max_abs_deviation_from_reference": 0.15505251407986975,
+   "n": 9
+  },
+  "mean_grain_volume_cells": {
+   "min": 579.1637669152168,
+   "max": 580.6068660022148,
+   "range": 1.4430990869980178,
+   "mean": 580.0542928513383,
+   "population_sd": 0.5761899877309853,
+   "max_abs_deviation_from_reference": 1.4430990869980178,
+   "n": 9
+  },
+  "unsolidified_cells": {
+   "min": 0,
+   "max": 0,
+   "range": 0,
+   "mean": 0,
+   "population_sd": 0.0,
+   "max_abs_deviation_from_reference": 0,
+   "n": 9
+  }
+ },
+ "observations": [
+  "top_layer_grains reached 31 in one 1-GPU run (calibration range 28-30; reference 29): deviation 6.9 % vs the frozen 25 % tolerance -- recorded, tolerance unchanged",
+  "n_grains of one 4-rank run was 3619 (calibration: 3621/3622); all 1-rank runs 3612, all 2-rank runs 3614: rank-count dependence of the epitaxial grain count is systematic and small (0.25 %)",
+  "mean_misorientation_z_top_deg max deviation from the reference 0.155 deg (tolerance 0.7 deg); mean_misorientation_z_deg max 0.039 deg (tolerance 0.25)",
+  "with n = 9 this is an empirical acceptance, not a 3-sigma statement"
+ ],
+ "statistical_caveat": "9 holdout + 8 calibration runs at one seed and one domain size; the rule is an empirical range rule; a different seed, deck or cell size needs its own reference and calibration"
+}

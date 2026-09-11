@@ -14,6 +14,7 @@ run "l3 infra (correctness/reproducibility)" "$HERE/test_l3_infra.sh"
 run "second-batch checkers (negative/positive)" "$HERE/test_l3_validators.sh"
 run "Nyx strict comparator + validate.sh chain" "$HERE/test_nyx_validator.sh"
 run "verdict classes / regression summary (rc 3 stays PENDING)" "$HERE/test_l3_verdict.sh"
+run "ExaCA validator (negative/positive, stale-result gate)" "$HERE/test_exaca_validator.sh"
 run "source distribution tools (freeze / prepare / check_workspace / agent workspace)" "$HERE/../../../tools/tests/test_source_tools.sh"
 [ $rc -eq 0 ] && echo "ALL LEVEL3 TEST GROUPS PASSED" || echo "SOME LEVEL3 TEST GROUPS FAILED"
 exit $rc

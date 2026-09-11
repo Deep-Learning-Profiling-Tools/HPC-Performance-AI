@@ -104,7 +104,7 @@
    "check": 17,
    "name": "redistribution_status and suite_status declared (benchmark.yaml == lock)",
    "status": "PASS",
-   "detail": "redistribution cleared, suite candidate"
+   "detail": "redistribution cleared, suite retained"
   }
  ]
 }

@@ -43,7 +43,9 @@ applications:
     variants: [null]
   exaca:
     application: ExaCA
-    suite_status: candidate                   # replacement candidate for the 10th slot; admission pending the bring-up criteria
-    admission: pending
+    suite_status: retained                    # admitted 2026-09-11 as the replacement for GEOS (tenth slot)
+    admission: admitted                       # project-defined statistical validation, dirsolid smoke case, protocol v2 holdout 9/9 PASS (level3/exaca/README.md)
+    admitted_on: 2026-09-11
+    validation_kind: project-defined statistical validation (no upstream oracle); validated case = dirsolid smoke 128^3 seed 0 at 1/2/4 GPUs
     variants: [null]
-default_suite_order: [lammps, sparta, warpx, specfem3d, nekrs, nyx, cp2k, qmcpack, dftfe]
+default_suite_order: [lammps, sparta, warpx, specfem3d, nekrs, nyx, cp2k, qmcpack, dftfe, exaca]

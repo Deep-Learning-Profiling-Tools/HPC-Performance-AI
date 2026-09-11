@@ -9,8 +9,9 @@
 # agrees). The criteria are therefore statistical invariants of the final microstructure, computed from the
 # GrainID field the run writes (exaca_check.py) with tolerances derived from the measured spread (see README):
 #   [1] completeness: run exits 0, the field and the log exist, DIMENSIONS == the deck, every cell solidified
-#       (GrainID != 0), the log reports N ranks and ONE global decomposition in Y (subdomain sizes sum to
-#       Ny + 2*(N-1): 1-cell halos at each internal boundary) -- never N independent copies
+#       (GrainID != 0), the log reports N ranks and ONE global decomposition in Y whose subdomains tile the box
+#       exactly once (offset chain with the 1-cell halo overlap, first offset 0, last end == Ny) -- never N
+#       independent copies, no missing or duplicated subdomain
 #   [2] self-consistency: ExaCA's own VolFractionNucleated equals the value recomputed from the field (1e-3)
 #   [3] vs the frozen reference statistics of the validated 1-GPU baseline run
 #       (references/dirsolid_smoke.reference.json): grain count, nucleated-grain count and volume fraction,
@@ -61,37 +62,6 @@ if [ "$N" -gt 1 ] && [ ! -f "$RUN_ROOT/dirsolid.smoke.np1/stats.json" ]; then
 fi
 "$PY" "$HERE/exaca_check.py" stats "$VTK" "$LOG" "$ORIENT" --json "$D/stats.json" > /dev/null || { echo "validate.sh: FAIL -- statistics of the $N-GPU field could not be computed"; exit 1; }
 
-"$PY" - "$D/stats.json" "$REF" "$TOL" "$N" "$RUN_ROOT/dirsolid.smoke.np1/stats.json" "$HERE" <<'PY'
-import json, os, sys
-sys.path.insert(0, sys.argv[6]); sys.path.insert(0, os.environ["L3_TOOLS"])
-import exaca_check as ec
-from l3_check import ValidationError
-st, ref, tol, n, st1 = json.load(open(sys.argv[1])), json.load(open(sys.argv[2])), json.load(open(sys.argv[3])), int(sys.argv[4]), sys.argv[5]
-tol = {k: v for k, v in tol.items() if not k.startswith("_")}
-ok = True
-def crit(label, good, detail):
-    global ok
-    ok = ok and good
-    print(f"  {label}: {detail} {'ok' if good else 'BAD'}")
-try:
-    print("[1] completeness / one global decomposition:")
-    crit("dimensions", (st["nx"], st["ny"], st["nz"]) == (128, 128, 128), f"{st['nx']}x{st['ny']}x{st['nz']}")
-    crit("all cells solidified", st["unsolidified_cells"] == 0, f"unsolidified {st['unsolidified_cells']} of {st['cells']}")
-    lg = st.get("log", {})
-    crit("ranks in the log", lg.get("ranks") == n, f"{lg.get('ranks')} (requested {n})")
-    ys = lg.get("decomposition", {}).get("SubdomainYSize", [])
-    crit("Y decomposition covers the box once", len(ys) == n and sum(ys) == st["ny"] + 2 * (n - 1), f"subdomain sizes {ys} sum {sum(ys)} == Ny + 2*(N-1) = {st['ny'] + 2 * (n - 1)}")
-    print("[2] self-consistency (ExaCA log vs field):")
-    vfc = lg.get("vol_fraction_nucleated_code")
-    crit("VolFractionNucleated", vfc is not None and abs(float(vfc) - st["vol_fraction_nucleated"]) <= 1e-3, f"log {vfc} field {st['vol_fraction_nucleated']:.6f}")
-    print(f"[3] {n}-GPU statistics vs the frozen reference (validated 1-GPU baseline, ExaCA {ref.get('provenance', {}).get('exaca_version')}):")
-    good, lines = ec.compare(st, ref["stats"], tol, "vs-ref"); print("\n".join(lines)); ok = ok and good
-    if n > 1:
-        s1 = json.load(open(st1))
-        print(f"[4] {n}-GPU statistics vs this build's 1-GPU run (rank-count independence):")
-        good, lines = ec.compare(st, s1, tol, "vs-1gpu"); print("\n".join(lines)); ok = ok and good
-except (ValidationError, KeyError, TypeError, ValueError) as ex:
-    print(f"  VALIDATION ERROR: {ex!r}"); ok = False
-print(f"ExaCA CUDA validation ({n} GPU, dirsolid smoke 128^3 vs dirsolid_smoke.reference.json): {'PASS' if ok else 'FAIL'}")
-sys.exit(0 if ok else 1)
-PY
+NP1=(); [ "$N" -gt 1 ] && NP1=(--np1 "$RUN_ROOT/dirsolid.smoke.np1/stats.json")
+echo "validate.sh: protocol $(sed -n 's/^protocol_version: *//p' "$HERE/references/validation_protocol.yaml" 2>/dev/null | head -1) run_id=$(sed -n 's/^run_id=//p' "$D/run_manifest.txt" | tail -1)"
+"$PY" "$HERE/exaca_check.py" validate "$D/stats.json" --ref "$REF" --tol "$TOL" --ranks "$N" "${NP1[@]}" --expect-dims 128,128,128 --json "$D/validation.json"

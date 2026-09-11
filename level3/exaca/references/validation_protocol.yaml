@@ -1,0 +1,8 @@
+protocol_version: 2
+frozen: 2026-09-11
+case: dirsolid smoke 128x128x128 (inputs/dirsolid.template.json, seed 0)
+reference: references/dirsolid_smoke.reference.json (calibration run cal-08, 1 GPU, run_id 20260910T212610Z-216184-29676)
+tolerances: references/dirsolid_smoke.tolerances.json
+calibration: references/calibration.json (8 runs, 2026-09-10, CALIBRATION only)
+holdout: references/holdout.json (independent acceptance runs executed after this freeze)
+criteria: exaca_check.py validate (1a-1d completeness + exact tiling, 2a self-consistency, 3 vs reference, 4 vs 1-GPU)
