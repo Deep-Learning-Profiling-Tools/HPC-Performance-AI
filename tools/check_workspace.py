@@ -7,10 +7,17 @@ agent workspace copy). No build is run.
 
 Baseline mode (default; canonical directory and iteration 0 of every run): the source tree must equal the
 frozen baseline. Agent mode (iteration > 0): files inside the `modifiable` ranges of optimization_scope.yaml may
-differ from the baseline recorded at workspace creation (workspace_baseline.json, kept outside the agent's cwd);
-every readonly/excluded/unclassified file -- build.sh, run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml,
-provenance/**, inputs/**, references/**, dependency source -- must still be identical, otherwise check 5 FAILS
-("readonly tampering"). Modified/added/deleted files, initial and current source hashes are recorded in --report.
+differ from the baseline recorded at workspace creation; every readonly/excluded/unclassified file -- build.sh,
+run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml, provenance/**, inputs/**, references/**, dependency
+source -- and every harness file of the workspace root (hpcperf_env.sh, level2/tools/**, level3/tools/**) must
+still be identical, otherwise check 5 FAILS ("READONLY TAMPERING" / "HARNESS TAMPERING"). Modified/added/deleted
+files, initial and current source hashes are recorded in --report.
+
+Trusted baseline (agent mode): --baseline FILE (must lie outside the workspace root) or the repository copy
+<repo>/.hpcperf/workspace_baselines/<run-id>.json written at workspace creation. The copy inside the workspace root
+(workspace_baseline.json) is NOT trusted by default -- a workspace cannot re-declare its own baseline -- and is
+accepted only with --allow-workspace-baseline (development use). These checks are file-hash and permission
+checks, not an operating-system sandbox: the agent process is not confined by them.
 
 Checks (each PASS/FAIL, all must pass):
   1  benchmark.yaml exists with the required keys (and hip is not claimed validated)
@@ -70,26 +77,40 @@ def classify(path, scope):
     return "unclassified"
 
 
-def find_baseline(D, explicit):
-    """trusted baseline: explicit > <repo>/.hpcperf/workspace_baselines/<run-id>.json > <workspace-root>/workspace_baseline.json"""
+def workspace_root(D):
+    return os.path.abspath(os.path.join(D, "..", ".."))
+
+
+def find_baseline(D, explicit, allow_workspace=False):
+    """(path, origin, problem): trusted baseline = explicit file outside the workspace root > the repository copy
+    <repo>/.hpcperf/workspace_baselines/<run-id>.json > (only with allow_workspace) <workspace-root>/workspace_baseline.json"""
+    wsr = workspace_root(D)
+    def inside(p):
+        p = os.path.abspath(p)
+        return p == wsr or p.startswith(wsr + os.sep)
     if explicit:
-        return explicit
+        if inside(explicit) and not allow_workspace:
+            return None, "explicit", f"--baseline {explicit} lies inside the workspace root (not trusted; pass --allow-workspace-baseline for development)"
+        return (explicit, "explicit", None) if os.path.isfile(explicit) else (None, "explicit", f"--baseline {explicit} missing")
     ws = hs.load_yaml(os.path.join(D, "workspace.yaml")) if os.path.isfile(os.path.join(D, "workspace.yaml")) else {}
     run_id = ws.get("run_id")
     root = os.path.abspath(os.path.join(HERE, ".."))
     if run_id:
         p = os.path.join(root, ".hpcperf", "workspace_baselines", f"{run_id}.json")
         if os.path.isfile(p):
-            return p
-    p = os.path.abspath(os.path.join(D, "..", "..", "workspace_baseline.json"))
-    return p if os.path.isfile(p) else None
+            return p, "repository", None
+    p = os.path.join(wsr, "workspace_baseline.json")
+    if os.path.isfile(p) and allow_workspace:
+        return p, "workspace (development, NOT trusted)", None
+    return None, None, ("no trusted baseline: the repository copy .hpcperf/workspace_baselines/<run-id>.json is absent and the copy "
+                        "inside the workspace is not trusted (--allow-workspace-baseline for development only)")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("bench_dir"); ap.add_argument("--variant"); ap.add_argument("--json"); ap.add_argument("--quick", action="store_true")
     ap.add_argument("--agent-mode", action="store_true"); ap.add_argument("--baseline"); ap.add_argument("--iteration", type=int)
-    ap.add_argument("--report"); ap.add_argument("--diff")
+    ap.add_argument("--report"); ap.add_argument("--diff"); ap.add_argument("--allow-workspace-baseline", action="store_true")
     a = ap.parse_args()
     D = os.path.abspath(a.bench_dir)
     results = []
@@ -156,12 +177,22 @@ def main():
     elif not a.agent_mode:
         rec(5, "source tree hash == canonical baseline", bool(expected) and tree == expected, f"{tree[:16]}... vs {str(expected)[:16]}...")
     else:
-        bp = find_baseline(D, a.baseline)
+        bp, borigin, bproblem = find_baseline(D, a.baseline, a.allow_workspace_baseline)
         if not bp:
-            rec(5, "agent mode: readonly ranges unchanged vs the trusted baseline", False, "no workspace_baseline.json found (create the workspace with tools/create_agent_workspace.sh)")
+            rec(5, "agent mode: readonly ranges unchanged vs the trusted baseline", False, bproblem)
         else:
             base = json.load(open(bp))
             bfiles = base.get("files", {})
+            # harness files of the workspace root (env, launcher, level3 helpers): the scripts inside the benchmark
+            # directory source them, so they are part of the trusted surface even though they are outside the agent cwd
+            wsr = workspace_root(D)
+            hviol = []
+            for rel, b in (base.get("harness_files") or {}).items():
+                pth = os.path.join(wsr, rel)
+                if not os.path.isfile(pth):
+                    hviol.append(f"{rel} (deleted)")
+                elif hs.sha256_file(pth) != b["sha256"]:
+                    hviol.append(f"{rel} (modified)")
             try:
                 cur = {e["path"]: e for e in hs.manifest(D)}
             except hs.SourceError as ex:
@@ -180,12 +211,16 @@ def main():
                         kind = classify(pth, scope)
                         (classes["added"] if kind == "modifiable" else classes["violations"]).append({"path": pth, "change": "added", "class": kind})
                 v = classes["violations"]
+                detail = (f"READONLY TAMPERING: " + "; ".join(f"{x['path']} ({x['change']}, {x['class']})" for x in v[:5])) if v else ""
+                if hviol:
+                    detail = (detail + "; " if detail else "") + "HARNESS TAMPERING: " + "; ".join(hviol[:5])
                 rec(5, "agent mode: readonly/excluded/harness files unchanged vs the trusted baseline",
-                    not v, (f"READONLY TAMPERING: " + "; ".join(f"{x['path']} ({x['change']}, {x['class']})" for x in v[:5])) if v else
-                    f"{len(classes['modified'])} modified, {len(classes['added'])} added, {len(classes['deleted'])} deleted file(s) inside the modifiable scope; baseline {os.path.relpath(bp)}")
+                    not v and not hviol, detail or
+                    f"{len(classes['modified'])} modified, {len(classes['added'])} added, {len(classes['deleted'])} deleted file(s) inside the modifiable scope; baseline {os.path.relpath(bp)} ({borigin})")
                 src_paths = [p for p in cur if p.startswith(("src/", "deps/"))]
                 cur_tree = hs.tree_hash_from_manifest([cur[p] for p in sorted(src_paths, key=lambda s: s.encode())])
-                report = {"schema": "hpcperf-workspace-check-1", "mode": "agent", "iteration": a.iteration, "baseline": os.path.relpath(bp),
+                report = {"schema": "hpcperf-workspace-check-1", "mode": "agent", "iteration": a.iteration, "baseline": os.path.relpath(bp), "baseline_origin": borigin,
+                          "harness_violations": hviol,
                           "run_id": base.get("run_id"), "benchmark": base.get("benchmark"), "variant": variant,
                           "initial_source_hash": base.get("canonical_source_tree_sha256"), "current_source_hash": cur_tree,
                           "modified_files": [x["path"] for x in classes["modified"]], "added_files": [x["path"] for x in classes["added"]],

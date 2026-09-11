@@ -336,23 +336,43 @@ chmod u+w "$W/validate.sh"; echo '# tampered' >> "$W/validate.sh"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 2)"; rc=$?
 [ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'READONLY TAMPERING' && echo "$out" | /usr/bin/grep -q 'validate.sh' && ok "8k: agent mode: a modified validator is readonly tampering (check 5 FAIL)" || bad "8k: rc=$rc"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 2)"; rc=$?
-[ $rc -eq 3 ] && echo "$out" | /usr/bin/grep -q 'REFUSED' && /usr/bin/grep -q 'verdict: REFUSED' "$RT/workspaces/run-001/reports/iter-2.verdict.yaml" && ok "8l: trusted validation REFUSES a workspace with a tampered validator (exit 3, no run)" || bad "8l: rc=$rc"
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'REFUSED' && /usr/bin/grep -q 'layer: integrity' "$RT/workspaces/run-001/reports/iter-2.verdict.yaml" && /usr/bin/grep -q 'verdict: REFUSED' "$RT/workspaces/run-001/reports/iter-2.verdict.yaml" && ok "8l: trusted validation REFUSES a workspace with a tampered validator (integrity layer, exit 6, no run)" || bad "8l: rc=$rc"
 sed -i '$d' "$W/validate.sh"; chmod a-w "$W/validate.sh"
 chmod u+w "$W/src/bench/log.ref"; echo 'x' >> "$W/src/bench/log.ref"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 3)"; rc=$?
-[ $rc -eq 3 ] && echo "$out" | /usr/bin/grep -q 'log.ref' && ok "8m: a modified reference file is refused too" || bad "8m: rc=$rc"
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'log.ref' && ok "8m: a modified reference file is refused too (exit 6)" || bad "8m: rc=$rc"
 printf 'ref\n' > "$W/src/bench/log.ref"; chmod a-w "$W/src/bench/log.ref"
 chmod u+w "$W/optimization_scope.yaml"; echo "modifiable: ['*']" >> "$W/optimization_scope.yaml"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4)"; rc=$?
 [ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'optimization_scope.yaml' && ok "8n: widening optimization_scope.yaml inside the workspace is detected as tampering" || bad "8n: rc=$rc"
 sed -i '$d' "$W/optimization_scope.yaml"; chmod a-w "$W/optimization_scope.yaml"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 5)"; rc=$?
-[ $rc -eq 0 ] && /usr/bin/grep -q 'verdict: PASS' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'src/src/main.cpp' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && ok "8o: trusted validation runs build + validate on a workspace with only modifiable changes; verdict + modified files recorded" || bad "8o: rc=$rc $(echo "$out" | tail -3)"
+[ $rc -eq 0 ] && /usr/bin/grep -q 'layer: numerical' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'verdict: PASS' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'src/src/main.cpp' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'baseline_origin: repository' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && ok "8o: trusted validation runs build + validate on a workspace with only modifiable changes; numerical-layer verdict, modified files and repository baseline recorded" || bad "8o: rc=$rc $(echo "$out" | tail -3)"
+# harness tampering (outside the agent cwd, inside the workspace root)
+chmod u+w "$RT/workspaces/run-001/level3/tools/l3_common.sh"; echo '# tampered harness' >> "$RT/workspaces/run-001/level3/tools/l3_common.sh"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 51)"; rc=$?
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'HARNESS TAMPERING' && ok "8o2: a modified harness copy (level3/tools) in the workspace root is refused (exit 6)" || bad "8o2: rc=$rc"
+sed -i '$d' "$RT/workspaces/run-001/level3/tools/l3_common.sh"; chmod a-w "$RT/workspaces/run-001/level3/tools/l3_common.sh"
+printf '#!/bin/bash\nexit 1\n' > "$TMP/badbuild.sh"; chmod +x "$TMP/badbuild.sh"; cp -p "$W/build.sh" "$TMP/build.sh.keep"; chmod u+w "$W/build.sh"; cp "$TMP/badbuild.sh" "$W/build.sh"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 52)"; rc=$?
+[ $rc -eq 6 ] && ok "8o3: a replaced build.sh is integrity tampering (refused before any build), not BUILD_FAIL" || bad "8o3: rc=$rc"
+cp -p "$TMP/build.sh.keep" "$W/build.sh"; chmod a-w "$W/build.sh"
+# an in-workspace baseline alone is not trusted; explicit --baseline inside the workspace is refused
+mv "$RT/.hpcperf/workspace_baselines/run-001.json" "$TMP/run-001.baseline.keep"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 53)"; rc=$?
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'not trusted' && ok "8o4: without the repository baseline copy the workspace's own baseline is NOT trusted (refused)" || bad "8o4: rc=$rc $(echo "$out" | /usr/bin/grep -E 'FAIL +5' | head -1)"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 54 --baseline "$RT/workspaces/run-001/workspace_baseline.json")"; rc=$?
+[ $rc -eq 6 ] && ok "8o5: --baseline pointing inside the workspace root is refused" || bad "8o5: rc=$rc"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 55 --baseline "$TMP/run-001.baseline.keep")"; rc=$?
+[ $rc -eq 0 ] && ok "8o6: an explicit baseline outside the workspace is accepted" || bad "8o6: rc=$rc"
+mv "$TMP/run-001.baseline.keep" "$RT/.hpcperf/workspace_baselines/run-001.json"
 rm -f "$RT/.hpcperf/workspace_baselines/run-001.json"; chmod u+w "$RT/workspaces/run-001/workspace_baseline.json"; python3 - "$RT/workspaces/run-001/workspace_baseline.json" <<'PY'
 import json, sys; b = json.load(open(sys.argv[1])); b["files"]["validate.sh"]["sha256"] = "0"*64; json.dump(b, open(sys.argv[1], "w"))
 PY
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 6)"; rc=$?
-[ $rc -ne 0 ] && ok "8p: a forged workspace-local baseline does not pass the untouched validator off as trusted (mismatch -> FAIL)" || bad "8p"
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'no trusted baseline' && ok "8p: a forged workspace-local baseline is ignored (no trusted baseline -> check 5 FAIL), never consulted" || bad "8p"
+out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 6 --allow-workspace-baseline)"; rc=$?
+[ $rc -ne 0 ] && ok "8p2: even with --allow-workspace-baseline (development) the forged baseline only produces a mismatch, never a PASS" || bad "8p2"
 
 # --- 9. release manifest / publish plan ----------------------------------------------------------------------
 cat > "$TMP/catalog.yaml" <<'EOF'

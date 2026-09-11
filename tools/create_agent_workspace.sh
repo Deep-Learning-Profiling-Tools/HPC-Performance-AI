@@ -24,8 +24,9 @@
 #   canonical tree, a symlink is placed in the workspace so build.sh skips that dependency stage
 #   (environment-provided prebuilt dependency; recorded in workspace.yaml). The application itself is
 #   always rebuilt inside the workspace.
-# Readonly ranges of optimization_scope.yaml are made non-writable (chmod a-w); the baseline check
-# (tools/check_workspace.py) must PASS before the workspace is used.
+# Readonly ranges of optimization_scope.yaml and the harness copies are made non-writable (chmod a-w); the
+# baseline check (tools/check_workspace.py) must PASS before the workspace is used. These are file-hash and
+# permission controls checked by the trusted harness, NOT an operating-system sandbox.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/.." && pwd)"
@@ -116,11 +117,25 @@ sys.path.insert(0, os.environ["HPCPERF_TOOLS_DIR"])
 import hpcperf_source as hs
 W, out, run_id, app, variant, tree, stamp = sys.argv[1:8]
 files = {e["path"]: {"sha256": e["sha256"], "type": e["type"]} for e in hs.manifest(W)}
-json.dump({"schema": "hpcperf-workspace-baseline-1", "run_id": run_id, "benchmark": f"level3/{app}", "variant": variant or None,
-           "canonical_source_tree_sha256": tree, "created": stamp, "file_count": len(files), "files": files}, open(out, "w"), indent=0)
-print(f"create_agent_workspace: baseline of {len(files)} files -> {out}")
+wsr = os.path.abspath(os.path.join(W, "..", ".."))
+harness = {}
+for top in ("hpcperf_env.sh", "check_env.sh", "level2/tools", "level3/tools"):
+    p = os.path.join(wsr, top)
+    if os.path.isfile(p):
+        harness[top] = {"sha256": hs.sha256_file(p)}
+    elif os.path.isdir(p):
+        for e in hs.manifest(p):
+            if e["type"] == "F":
+                harness[os.path.join(top, e["path"])] = {"sha256": e["sha256"]}
+json.dump({"schema": "hpcperf-workspace-baseline-2", "run_id": run_id, "benchmark": f"level3/{app}", "variant": variant or None,
+           "canonical_source_tree_sha256": tree, "created": stamp, "file_count": len(files), "files": files,
+           "harness_file_count": len(harness), "harness_files": harness,
+           "note": "file-hash baseline for check_workspace --agent-mode; trusted only from the repository copy or an external --baseline; not an OS sandbox"}, open(out, "w"), indent=0)
+print(f"create_agent_workspace: baseline of {len(files)} benchmark files + {len(harness)} harness files -> {out}")
 PY
 chmod a-w "$WS/workspace_baseline.json"
+find "$WS/level2/tools" "$WS/level3/tools" -type f -exec chmod a-w {} + 2>/dev/null || true; chmod a-w "$WS/hpcperf_env.sh" 2>/dev/null || true
 mkdir -p "$R/.hpcperf/workspace_baselines" && cp -p "$WS/workspace_baseline.json" "$R/.hpcperf/workspace_baselines/$RUN_ID.json"
+echo "create_agent_workspace: trusted baseline copy -> $R/.hpcperf/workspace_baselines/$RUN_ID.json (the copy inside the workspace is informational only)"
 echo "create_agent_workspace: $WAPP (tree $WS_TREE, $STAMP)"
 python3 "$HERE/check_workspace.py" "$WAPP" "${VARG[@]}" --quick

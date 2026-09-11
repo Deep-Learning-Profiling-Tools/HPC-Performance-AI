@@ -37,9 +37,17 @@ c() { python3 "$V" classify --rc "$1" --log "$TMP/$2"; }
 # summary: every class counted separately; the PENDING row is never marked PASS; unverified audits listed
 printf 'pass.log 0\npend.log 3\nunsup.log 4\nfail.log 1\nfirstbatch.log 0\n' > "$TMP/rc.txt"
 python3 "$V" summary --rc-file "$TMP/rc.txt" --log "$TMP"/{pass,pend,unsup,fail,noverdict,firstbatch}.log > "$TMP/sum.md" 2>&1; rc=$?
-[ "$rc" -eq 0 ] && /usr/bin/grep -q 'PASS=2, PENDING=1, UNSUPPORTED_LAYOUT=1, FAIL=1, MISSING=1' "$TMP/sum.md" && ok "11: summary counts PASS/PENDING/UNSUPPORTED_LAYOUT/FAIL/MISSING separately" || bad "11: rc=$rc: $(tail -3 "$TMP/sum.md")"
+[ "$rc" -eq 0 ] && /usr/bin/grep -q 'PASS=2, PENDING=1, UNSUPPORTED_LAYOUT=1, FAIL=1, REFUSED=0, BUILD_FAIL=0, MISSING=1' "$TMP/sum.md" && ok "11: summary counts PASS/PENDING/UNSUPPORTED_LAYOUT/FAIL/REFUSED/BUILD_FAIL/MISSING separately" || bad "11: rc=$rc: $(tail -3 "$TMP/sum.md")"
 /usr/bin/grep -E '^\| pend\.log ' "$TMP/sum.md" | /usr/bin/grep -q '\*\*PENDING\*\*' && ! /usr/bin/grep -E '^\| pend\.log ' "$TMP/sum.md" | /usr/bin/grep -q '\*\*PASS\*\*' && ok "12: the rc-3 row is labelled PENDING, not PASS" || bad "12: $(/usr/bin/grep -E '^\| pend\.log ' "$TMP/sum.md")"
 /usr/bin/grep -q 'unverified ranks.*noverdict.log \[0/0/1\]' "$TMP/sum.md" && ok "13: unverified launcher audit listed as a binding-evidence gap" || bad "13: $(/usr/bin/grep 'unverified ranks' "$TMP/sum.md")"
 echo
+# workspace-integrity / build layers (tools/validate_workspace.sh): never PASS, never PENDING
+printf 'validate_workspace: REFUSED -- the workspace violates the contract\n' > "$TMP/ref.log"
+[ "$(python3 "$V" classify --rc 6 --log "$TMP/ref.log")" = REFUSED ] && ok "rc 6 + REFUSED line -> REFUSED" || bad "rc 6 REFUSED"
+[ "$(python3 "$V" classify --rc 3 --log "$TMP/ref.log")" = FAIL ] && ok "rc 3 with a REFUSED line is FAIL, never PENDING" || bad "rc 3 refused"
+[ "$(python3 "$V" classify --rc 6 --log "$TMP/pass.log")" = FAIL ] && ok "rc 6 with a PASS line is FAIL (contradiction)" || bad "rc 6 pass line"
+printf 'validate_workspace: BUILD_FAIL (build layer, exit 7)\n' > "$TMP/bf.log"
+[ "$(python3 "$V" classify --rc 7 --log "$TMP/bf.log")" = BUILD_FAIL ] && ok "rc 7 + BUILD_FAIL line -> BUILD_FAIL" || bad "rc 7"
+[ "$(python3 "$V" classify --rc 0 --log "$TMP/ref.log")" = FAIL ] && ok "rc 0 with a REFUSED line is FAIL" || bad "rc 0 refused"
 echo "test_l3_verdict: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]

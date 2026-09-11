@@ -8,6 +8,10 @@ Exit-code contract of level3/<app>/validate.sh (documented in each script):
                               checks pass, the full acceptance is incomplete). NOT a PASS.
     4   UNSUPPORTED_LAYOUT -- Nyx: different but legal box layouts, comparison not performed. NOT a PASS.
     124 timeout -> FAIL; anything else -> FAIL
+Exit-code contract of tools/validate_workspace.sh (agent workspaces): 0/1/3/4 propagated from validate.sh
+(numerical layer), 6 REFUSED (workspace-integrity layer: tampering / untrusted baseline; nothing was built or
+run), 7 BUILD_FAIL (build layer). REFUSED and BUILD_FAIL are never PASS, never PENDING, and never enter a
+scientific or performance summary; rc 3 is PENDING only with the Nyx I_R_CHECK_PENDING line, never for a refusal.
 A queue records the exit code of every step (l3_run_recorded in l3_common.sh) and continues; this module
 turns (rc, log) into exactly one of PASS / PENDING / UNSUPPORTED_LAYOUT / FAIL / MISSING. PENDING and
 UNSUPPORTED_LAYOUT are counted separately, never as PASS, and never enter a performance summary. An exit
@@ -22,9 +26,9 @@ import os
 import re
 import sys
 
-CLASSES = ("PASS", "PENDING", "UNSUPPORTED_LAYOUT", "FAIL", "MISSING")
+CLASSES = ("PASS", "PENDING", "UNSUPPORTED_LAYOUT", "FAIL", "REFUSED", "BUILD_FAIL", "MISSING")
 NOISE = re.compile(r"lua|posix|traceback|\[C\]|no file|no field")  # lmod noise on this site
-VERDICT_RE = re.compile(r"validation \(.*\): |I_R_CHECK_PENDING|UNSUPPORTED_LAYOUT|: FAIL\b|\bPASS$")
+VERDICT_RE = re.compile(r"validation \(.*\): |I_R_CHECK_PENDING|UNSUPPORTED_LAYOUT|: FAIL\b|\bPASS$|validate_workspace: (REFUSED|BUILD_FAIL)")
 AUDIT_RE = re.compile(r"audit summary: (\d+) verified, (\d+) mismatch, (\d+) unverified")
 
 
@@ -49,6 +53,10 @@ def classify(rc, verdict_line):
         return "PENDING" if "I_R_CHECK_PENDING" in line and not is_pass_line(line) else "FAIL"
     if rc == 4:
         return "UNSUPPORTED_LAYOUT" if "UNSUPPORTED_LAYOUT" in line and not is_pass_line(line) else "FAIL"
+    if rc == 6:
+        return "REFUSED" if "validate_workspace: REFUSED" in line else "FAIL"
+    if rc == 7:
+        return "BUILD_FAIL" if "validate_workspace: BUILD_FAIL" in line else "FAIL"
     return "FAIL"
 
 
@@ -92,7 +100,7 @@ def cmd_summary(a):
     counts = {c: sum(1 for r in rows if r[2] == c) for c in CLASSES}
     print()
     print(f"{len(rows)} logs; " + ", ".join(f"{c}={counts[c]}" for c in CLASSES)
-          + "  (PASS counts only class PASS; PENDING and UNSUPPORTED_LAYOUT are not passes and are excluded from any performance summary)")
+          + "  (PASS counts only class PASS; PENDING and UNSUPPORTED_LAYOUT are not passes; REFUSED (workspace integrity) and BUILD_FAIL (build layer) are not scientific outcomes at all; none of these enter a performance summary)")
     unv = [f"{name} [{'; '.join('/'.join(x) for x in au)}]" for name, _, _, _, au in rows if any(x[2] != "0" for x in au)]
     mis = [name for name, _, _, _, au in rows if any(x[1] != "0" for x in au)]
     print("Launcher audits with unverified ranks (GPU-binding evidence gap, not a correctness signal): " + (", ".join(unv) or "none"))
