@@ -158,3 +158,117 @@ Every Level 3 `build.sh` builds from the materialized frozen source artifact and
   `src/` (Ninja incremental: only changed files are recompiled; the install fingerprint carries the
   configuration, not the source hash, so an edited file is always rebuilt, never served from a stale
   binary of another run).
+
+## Level 3 policy, correctness policy, isolation, runtime and per-application layout
+
+Moved here from `level3/README.md` on 2026-09-11, when that README was rewritten for first-time users. The
+content is unchanged; it is contributor/maintainer material (policy, conventions and the record of how the
+correctness criteria were chosen), not the user entry point. The user-facing description of source artifacts,
+GPU selection, workspaces and evidence levels now lives in [README.md](README.md) and
+[EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md).
+
+### Hard requirements (summary of the Level 3 policy)
+
+1. Full application workflow (mesher/solver/IO stages included where upstream
+   has them); no hotspot-only or single-kernel runs.
+2. `HPCPERF_GPUS=N|all` selects the GPU count; requested == launched. A rank
+   count the application's decomposition cannot support is an error -- never a
+   silent change of N, never silent GPU sharing, never a fallback to 1 GPU,
+   never a failure reported as PASS.
+3. Default policy is one MPI rank per GPU; if upstream officially recommends
+   another model (threads per GPU, MPI+OpenMP, several GPUs per rank) the
+   application follows upstream and its README says so. All five first-batch
+   applications document one rank per GPU.
+4. Every application defines smoke / strong / weak inputs (global size,
+   per-rank size, memory estimate, process topology, expected runtime,
+   validation quantity), the rank->GPU mapping and multi-node requirements.
+5. 40/80-GPU shapes are `DRY-RUN / UNVALIDATED` until a real allocation
+   exists; multi-node is BLOCKED/UNVERIFIED on this site; HIP is `untested`
+   without an AMD GPU.
+6. Toolchain follows the application's officially supported versions, not
+   Level 1's pins; compatibility modifications are classified (A none,
+   B build-system-only, C environment, D source-level compatibility) -- E
+   algorithm/performance modifications are forbidden in bring-up.
+7. The validated Level 2 dependency tree (`.deps/install`) is never modified.
+
+### Correctness policy as applied
+
+Exit code is never sufficient. Each `validate.sh` uses the application's own
+mechanism and prints a single `... validation (N GPU, ...): PASS|FAIL` line:
+LAMMPS thermo vs the shipped reference log (bit-identical here); SPARTA
+statistical stats vs the shipped reference log with justified tolerances
+(particle count exact, temperature 2 %, collision attempts 15 %); WarpX
+upstream's analytic Langmuir-wave regression test (5e-2) and charge
+conservation (1e-11) read from the plotfile, plus exact particle conservation;
+SPECFEM3D reference seismograms through upstream's comparison script
+(correlation, misfit, time shift); nekRS upstream's `--cimode` CI checks on the
+analytic Ethier solution. For these five, no tolerance was loosened to obtain a
+PASS and no precision or physics setting was changed. Second batch: CP2K
+regtest tolerances + MD energy consistency, QMCPACK `check_scalars.py`, DFT-FE
+upstream GPU reference, GEOS geos-ats metrics/restart baseline, Nyx official
+`fcompare` tolerances -- with one recorded exception: the Nyx heat/cool
+tolerance 5e-5 (upstream's value for that deck) was adopted after a first run at
+the adiabatic 2e-10 had FAILED, and the `I_R` field of that deck is not accepted
+by any tolerance (PENDING), see `nyx/README.md`.
+
+### Dependency isolation
+
+Every application owns a private tree -- no shared Level 3 install root:
+
+```
+level3/<app>/{src,deps}                        materialized frozen source artifact (the ONLY application source input)
+.deps/level3/<app>/{src,build,install,logs}     build-side copies (in-tree-writing builds), dependency builds, install, logs
+_upstream/level3/<Name>                        freeze-time checkout (fetch.sh; input of the freeze only)
+.artifacts/sha256/<archive_sha256>.tar.zst     content-addressed local artifact cache (prepare_benchmark.sh)
+build/level3/<app>/<cuda|hip>                  application build tree (+ run/ directories of run.sh)
+workspaces/<run-id>/                           per-run agent workspace (real copy; own build/ and .deps/)
+```
+
+Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream
+commit, dependency versions, compiler, Fortran compiler, CUDA/ROCm, GPU arch,
+MPI, CMake/configure options, GPU-aware-MPI setting, patch list, site profile,
+Spack lock hash, container image hash, build time). A recorded fingerprint
+that differs from the requested configuration fails fast
+(`level3/tools/l3_common.sh`).
+
+Spack, when chosen, uses one environment per application and backend
+(`level3/envs/<app>/{cuda,rocm}/spack.yaml` + `spack.lock`); containers, when
+chosen, commit the `.def`, build script, image SHA256 and README -- never the
+`.sif`. Neither is used by the first batch (see BUILD_STRATEGY.md for why).
+
+### Runtime
+
+Launches go through the common launcher (`HPCPERF_GPUS`, `HPCPERF_NODES`,
+`HPCPERF_GPUS_PER_NODE`, `HPCPERF_CPUS_PER_RANK`, `HPCPERF_SCALE_MODE`,
+`HPCPERF_SITE_PROFILE`, `HPCPERF_DRY_RUN=1`) with the per-rank GPU wrapper
+(each rank sees one GPU; expected vs observed GPU audited). Level 3 refers to
+it through `HPCPERF_RUNTIME_DIR` (default `level2/tools`); the plan to move
+the shared tools to `tools/runtime/` without breaking Level 2 is in
+[../tools/runtime/README.md](../tools/runtime/README.md).
+
+Site/transport observations recorded in the READMEs (single node, `pml ob1 /
+btl self,sm,smcuda`): GPU-aware MPI makes WarpX's 4-GPU step 3x slower
+(0.081 vs 0.026 s/step) but LAMMPS 2.5x faster (2.38 vs 5.87 s); SPARTA is
+indifferent. Defaults stay upstream's; this is a performance topic for a later
+round, not a bring-up change. Open MPI's one-sided layer still selects
+`osc ucx` on this node and aborts inside `uct_ib` with 4 ranks (nekRS uses
+`MPI_Win_lock`); nekRS' `run.sh` sets `OMPI_MCA_osc=^ucx`, which is proposed
+for the gmu-hopper site profile in the runtime commonization PR.
+
+### Per-application layout
+
+```
+level3/<app>/
+├── README.md        provenance, version/commit, license, LOC, build strategy, changes (A-D), execution model,
+│                    inputs (smoke/strong/weak), validation, 1/2/4-GPU results, dry-runs, limitations
+├── fetch.sh         shallow clone at the recorded tag/commit (no source trees committed)
+├── build.sh         native build into .deps/level3/<app>, fingerprinted; HIP branch present, untested
+├── run.sh           HPCPERF_GPUS + HPCPERF_SCALE_MODE aware, launched via the common launcher
+├── validate.sh      upstream correctness mechanism, PASS/FAIL line, exit code
+└── patches/         compatibility patches (classified, documented; SPECFEM3D, nekRS)
+```
+
+Inputs are upstream's own decks referenced from the read-only checkout;
+derived decks (size, steps, topology, diagnostics) are written into the build
+tree at run time and documented per application, so no upstream input file is
+modified and nothing large is committed.

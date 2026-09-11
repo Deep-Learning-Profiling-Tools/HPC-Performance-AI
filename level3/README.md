@@ -1,278 +1,335 @@
-# Level 3: Production / End-to-End HPC Applications
+# Level 3: Full HPC Applications
 
-Level 3 integrates **full production applications** -- complete workflows, not
-extracted kernels, not proxies, and never N independent replicas presented as
-one distributed run. Its primary execution mode is **multi-GPU with a
-user-selected GPU count**; single-GPU runs exist only for build smoke tests,
-environment compatibility and basic correctness bring-up.
+Level 3 runs **complete scientific applications** on their own inputs -- not extracted kernels, not proxy
+apps. Each benchmark is the upstream application at a pinned commit, its real build system, an official (or
+officially derived) input case, and a correctness check taken from the application's own validation mechanism
+wherever one exists.
 
-Branch `level3/second-batch-bringup` (contains the first-batch branch
-`level3/full-apps-bringup`, from `main`): STEP 1-2 audit and build strategy for
-all ten candidates ([APPLICATION_AUDIT.md](APPLICATION_AUDIT.md),
-[BUILD_STRATEGY.md](BUILD_STRATEGY.md)), STEP 3-6 first-batch bring-up on
-dgx003 (4x B200, CUDA 13.2.78, Slurm job 9552083, 2026-09-04), second batch
-2026-09-05/06 ([SECOND_BATCH_STATUS.md](SECOND_BATCH_STATUS.md)), validator
-rework and joint-HEAD regression 2026-09-07/08. Nothing is claimed validated
-beyond what the per-application README records for runs that actually happened
-on this node.
+The benchmarks are **multi-GPU by construction**: you choose the number of GPUs explicitly and the harness
+uses exactly that many, one MPI rank per GPU unless an application documents otherwise. A single GPU is used
+for deployment checks and small correctness cases. Multi-node is the design goal, **not** a validated state on
+the machine these results come from.
 
-Correctness / reproducibility hardening (post-review, 2026-09-05):
-[CORRECTNESS_FIXES.md](CORRECTNESS_FIXES.md) -- validators now capture the real
-exit code and fail on timeout/missing/non-finite output, reject NaN/Inf, require
-the expected steps/fields/traces, and write a per-run manifest; dry-runs can no
-longer overwrite real results; fingerprints record ordered patch-content hashes;
-Level 3 builds are isolated from Level 2 prefixes. CPU-only negative tests:
-`level3/tools/tests/run_all.sh` (four groups: infra helpers, second-batch
-checkers, the Nyx strict comparator + `validate.sh` chain, verdict classes; 88
-checks on 2026-09-08). nekRS CUDA/dependency decision:
-[nekrs/COMPATIBILITY.md](nekrs/COMPATIBILITY.md).
+Application source is **not stored in this repository**. Each benchmark carries the metadata of a frozen
+source artifact (upstream commit, patch series, archive SHA-256, source-tree hash, licenses) and
+`tools/prepare_benchmark.sh` restores the complete `src/` and `deps/` trees before any build or LLM
+optimization run begins.
 
-Verdict classes (`level3/tools/l3_verdict.py`): a `validate.sh` exit code is
-0 PASS, 1 FAIL, 3 PENDING (Nyx heat/cool: `STATE_AND_PARTICLES_PASS;
-I_R_CHECK_PENDING`), 4 UNSUPPORTED_LAYOUT (Nyx: legal but different box
-layouts, not compared). Only 0 is a pass; 3 and 4 are their own classes in every
-summary, never counted as PASS, never fed into a performance summary, and never
-a reason for a queue to stop (`l3_run_recorded` in `l3_common.sh` records the
-code and continues).
+## Current availability (2026-09-11)
 
-**Joint-HEAD regression (2026-09-07, code state `fc4d2a1`)**: after the shared
-helper change (`HPCPERF_L3_RUN_SUBDIR`, run trees `run.regress-<sha>` that never
-overwrite `run/`) and the Nyx validator rework, 27 `validate.sh` calls were made
-on dgx003: LAMMPS, SPARTA, WarpX, SPECFEM3D smoke at 1/2/4 GPUs (12 PASS), nekRS
-ethier hypregpu cimode 2 and 3 and cpucoarse cimode 2 at 1/2/4 GPUs (9 PASS), Nyx
-MiniSB + LyA-adiabatic at 1/2/4 GPUs (3 PASS), Nyx LyA heat/cool at 1/2/4 GPUs
-(3 PENDING). **24 PASS, 3 PENDING, 0 FAIL** -- not "all PASS". Launcher audits: 0
-mismatch; four logs carry unverified ranks (SPARTA np1/np2, WarpX np1/np2 second
-run: sub-0.3 s runs missed by the nvidia-smi sampling -- a binding-evidence gap,
-not a correctness signal). CP2K, QMCPACK, DFT-FE and GEOS were **not** re-run on
-the GPU in that round (their change is the one-line run-directory variable; the
-status below is their 2026-09-05/06 result, their checkers are covered offline by
-`test_l3_validators.sh`); a GPU regression of these four under the new directory
-logic is a follow-up. Logs: `build/level3/regress-firstbatch-fc4d2a1/` and
-`build/level3/nyx/regress-fc4d2a1/` (not committed).
+| | state |
+|---|---|
+| Source artifacts | **Not published yet.** No release exists; every `provenance/source.lock*.yaml` records `primary: {url: null, status: unpublished}`. Preparation currently requires a locally supplied artifact file (`--artifact`). |
+| Code | On the pull-request branch `level3/source-freeze` (PR #5, draft, base `main`). **Not merged into `main`**: a plain clone of `main` does not yet contain these tools. |
+| Validated hardware | One node, 4 × NVIDIA B200 (CUDA 13.2.78, driver 595.58.03), conda GCC 13.3.0, Open MPI 5.0.10. **CUDA backend only.** |
+| Scale | Single node, 1/2/4 GPUs. 8/40/80 GPUs exist as dry-run plans only. Multi-node is **unverified/blocked** on this site. |
+| HIP / ROCm | Build path present in the scripts, **never executed** (no ROCm here). |
+| Workspace coverage | The agent-workspace build/edit loop has been exercised end to end for **LAMMPS only**; other applications carry materialization and historical build/validation evidence. See [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md). |
+| Known limitations | [Section below](#known-limitations) and [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md); Nyx `I_R` is PENDING, GEOS is retired. |
 
-## Status
+Development history (how these applications were brought up, what failed and why) lives in
+[APPLICATION_AUDIT.md](APPLICATION_AUDIT.md), [BUILD_STRATEGY.md](BUILD_STRATEGY.md),
+[CORRECTNESS_FIXES.md](CORRECTNESS_FIXES.md) and [SECOND_BATCH_STATUS.md](SECOND_BATCH_STATUS.md).
+The project policy for a Level 3 benchmark (what counts as an application, how correctness criteria are
+chosen, per-application dependency isolation, the launcher contract and the directory conventions) is in
+[BUILD_STRATEGY.md](BUILD_STRATEGY.md#level-3-policy-correctness-policy-isolation-runtime-and-per-application-layout).
 
-| Application | Version | Build Strategy | CUDA Build | 1 GPU | 2 GPU | 4 GPU | HIP | Strong | Weak | Multi-node | Source Mod | Status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [LAMMPS](lammps/README.md) | stable_22Jul2025_update6 | NATIVE (bundled Kokkos 4.6.2) | OK, 220 s | PASS | PASS | PASS | untested | 16.4M atoms, 1/4 GPU run | 2.05M atoms/rank, 4 GPU run | BLOCKED/UNVERIFIED | A (derived deck) | FIRST_BATCH done |
-| [SPARTA](sparta/README.md) | 27Aug2026 | NATIVE (bundled Kokkos 5.0.2) | OK, 579 s | PASS | PASS | PASS | untested | 10M particles, 1/4 GPU run | 1.25M particles/rank, 4 GPU run | BLOCKED/UNVERIFIED | A | FIRST_BATCH done |
-| [WarpX](warpx/README.md) | 26.09 (+AMReX 26.09) | NATIVE (local AMReX source) | OK, 1219 s | PASS | PASS | PASS | untested | 33.6M particles, 1/4 GPU run | 4.2M particles/rank, 4 GPU run | BLOCKED/UNVERIFIED | A (derived inputs) | FIRST_BATCH done |
-| [SPECFEM3D Cartesian](specfem3d/README.md) | v4.1.1 (+2 devel back-ports) | NATIVE (autotools, bundled SCOTCH) | OK, 21 s | PASS | PASS | PASS | untested | 165,888 elements, 1/4 GPU run | 165,888 elements/rank, 4 GPU run | BLOCKED/UNVERIFIED | B+C+D (18 lines, upstream devel) | FIRST_BATCH done |
-| [nekRS](nekrs/README.md) | v26.0 | NATIVE (vendored OCCA/HYPRE) | OK (hypregpu ~30 min; cpucoarse 113 s) | PASS | PASS | PASS | untested | 32,000 elements N=7, 1/4 GPU run | 8,000 elements/rank, 4 GPU run | BLOCKED/UNVERIFIED | B+C+D, hypregpu variant (39 lines; vendored HYPRE 2.32.0 vs CUDA 13); cpucoarse variant 0 patches | FIRST_BATCH done; GPU-coarse verified (cimode 3), CPU-coarse candidate verified -- see [COMPATIBILITY.md](nekrs/COMPATIBILITY.md) |
-| [Nyx](nyx/README.md) | 26.09 (+AMReX 26.09, SUNDIALS 7.2.1) | NATIVE (private AMReX per profile) | OK, 121 s (adiabatic) / 310 s (heatcool) | PASS (MiniSB, LyA-adiabatic); heat/cool PENDING | PASS; heat/cool PENDING | PASS; heat/cool PENDING | untested | LyA 64^3 adiabatic + synthetic 256^3, 1/2/4 GPU run (too small to scale) | synthetic 64^3/rank, 4 GPU run | BLOCKED/UNVERIFIED | A | SECOND_BATCH: adiabatic decks VALIDATED_PASS (re-run 2026-09-07); heat/cool STATE_AND_PARTICLES_PASS; **I_R_CHECK_PENDING** (not a pass) |
-| [CP2K](cp2k/README.md) | v2026.2 (+DBCSR 2.10.0, upstream toolchain) | NATIVE + upstream toolchain (B200 back-port) | OK (toolchain hours; CP2K attempt 3) | PASS | PASS | PASS | untested | H2O-128 MD, 1/2/4 GPU run | H2O-32/64/128 size sweep, 1/2/4 GPU run | BLOCKED/UNVERIFIED | B (toolchain patch) + C | SECOND_BATCH done 2026-09-06 (historical result; not re-run on GPU 2026-09-07) |
-| [QMCPACK](qmcpack/README.md) | v4.4.0 (+LLVM 23.1.0 offload) | NATIVE + private LLVM toolchain | OK, 982 s | PASS | PASS | PASS | untested | 256 walkers total, 1/2/4 GPU run (4096-walker series FAILED: cuSOLVER/device memory) | 256 walkers/GPU, 1/2/4 GPU run (1024/GPU FAILED, same cause) | BLOCKED/UNVERIFIED | A (+ C zlib flag) | SECOND_BATCH done 2026-09-06; walker-memory anomaly open, <= 300 walkers/GPU enforced (historical; not re-run 2026-09-07) |
-| [DFT-FE](dftfe/README.md) | 1.2.0 (+deal.II 9.6.2, ELPA 2026.02.001) | NATIVE (install_DFTFE recipe) | OK | PASS | PASS | PASS | untested | LLZO 192 atoms, 1/2/4 GPU run | derived Al 32 atoms/GPU, synthetic size sweep | BLOCKED/UNVERIFIED | D (2-line isnan) + C | SECOND_BATCH done 2026-09-06 (historical; not re-run 2026-09-07); ELPA CPU cross-check SKIPPED |
-| [GEOS](geos/README.md) | develop `b7a0f13305` + TPL `9b55672` | NATIVE (thirdPartyLibs superbuild) | OK, 1718 s | PASS (beam workflow) | PASS | PASS | untested | beamBending_benchmark 160x16x8, 1/2/4 GPU run (too small to scale) | refinement weak 80x8x4/GPU (same caveat) | BLOCKED/UNVERIFIED | B (3 TPL) + D (BLT back-port) + C | SECOND_BATCH done 2026-09-06 (historical; not re-run 2026-09-07); **5 compositional-flow/well unit tests FAIL on this build -- those modules UNVERIFIED** |
+## Application catalog
 
-8/40/80-GPU shapes exist for every application as launcher dry-runs only
-(`HPCPERF_DRY_RUN=1`): **DRY-RUN / UNVALIDATED** (no 40/80-GPU run has ever
-happened). Multi-node MPI is BLOCKED/UNVERIFIED on this site. HIP recipes exist
-in every `build.sh` and exit with a clear message here (no ROCm): **untested**.
-Strong/weak entries above are runs that completed at 1/2/4 GPUs with the stated
-decks; where the deck is too small for a B200 (Nyx, GEOS, CP2K/DFT-FE size
-sweeps) they are completeness records, not scaling results; numerical
-acceptance of the strong/weak runs beyond the smoke criteria is not claimed.
+Ten applications, eleven source artifacts (nekRS ships two variants). The workload column names the **case that
+is actually run and validated**, which is a small part of what each application can do.
 
-## Hard requirements (summary of the Level 3 policy)
+| Application | Frozen version | Selected workload / motif | App-owned code LOC | Details |
+|---|---|---|---|---|
+| [LAMMPS](lammps/) | `stable_22Jul2025_update6` | Lennard-Jones molecular dynamics (`bench/in.lj`), KOKKOS/CUDA package. No long-range electrostatics (PPPM) is exercised. | 852,527 | [README](lammps/README.md) |
+| [SPARTA](sparta/) | `27Aug2026` | Direct simulation Monte Carlo: collisional flow (`bench/in.collide`), particle move/collide/sort. | 131,181 | [README](sparta/README.md) |
+| [WarpX](warpx/) | `26.09` (+ AMReX 26.09) | Electromagnetic particle-in-cell, Yee FDTD solver: `uniform_plasma` + the analytic `langmuir_multi` case. The FFT/PSATD solver path is not exercised. | 112,459 | [README](warpx/README.md) |
+| [SPECFEM3D Cartesian](specfem3d/) | `v4.1.1` | Spectral-element seismic wave propagation, `homogeneous_halfspace` mesher → database → solver workflow. No full-waveform inversion. | 142,516 | [README](specfem3d/README.md) |
+| [nekRS](nekrs/) | `v26.0` (2 variants) | Spectral-element CFD, `ethier` case with upstream `--cimode` checks. Variants: `hypregpu` (GPU coarse solver, 3 HYPRE CUDA-13 patches) and `cpucoarse` (exact upstream). | 53,131 | [README](nekrs/README.md) |
+| [Nyx](nyx/) | `26.09` (+ AMReX) | Cosmological N-body + hydrodynamics: `MiniSB` and `LyA-adiabatic` decks. The `LyA` heat/cool deck is **PENDING**, not a pass. | 32,330 | [README](nyx/README.md) |
+| [CP2K](cp2k/) | `v2026.2` | Gaussian-plane-wave DFT: `H2O-64` SCF + Born-Oppenheimer MD, plus a subset of upstream regtests. | 1,085,842 | [README](cp2k/README.md) |
+| [QMCPACK](qmcpack/) | `v4.4.0` | Quantum Monte Carlo: `diamondC_2x1x1_pp` VMC + DMC batched drivers (walker count limited, see the app README). | 337,840 | [README](qmcpack/README.md) |
+| [DFT-FE](dftfe/) | `1.2.0` | Finite-element DFT: 32-atom Al Born-Oppenheimer MD regression deck vs upstream's GPU reference. | 107,718 | [README](dftfe/README.md) |
+| [ExaCA](exaca/) | `2.1.0` | Cellular-automaton solidification / grain growth: directional-solidification case. Finch coupling is **not** exercised. | 6,512 | [README](exaca/README.md) |
 
-1. Full application workflow (mesher/solver/IO stages included where upstream
-   has them); no hotspot-only or single-kernel runs.
-2. `HPCPERF_GPUS=N|all` selects the GPU count; requested == launched. A rank
-   count the application's decomposition cannot support is an error -- never a
-   silent change of N, never silent GPU sharing, never a fallback to 1 GPU,
-   never a failure reported as PASS.
-3. Default policy is one MPI rank per GPU; if upstream officially recommends
-   another model (threads per GPU, MPI+OpenMP, several GPUs per rank) the
-   application follows upstream and its README says so. All five first-batch
-   applications document one rank per GPU.
-4. Every application defines smoke / strong / weak inputs (global size,
-   per-rank size, memory estimate, process topology, expected runtime,
-   validation quantity), the rank->GPU mapping and multi-node requirements.
-5. 40/80-GPU shapes are `DRY-RUN / UNVALIDATED` until a real allocation
-   exists; multi-node is BLOCKED/UNVERIFIED on this site; HIP is `untested`
-   without an AMD GPU.
-6. Toolchain follows the application's officially supported versions, not
-   Level 1's pins; compatibility modifications are classified (A none,
-   B build-system-only, C environment, D source-level compatibility) -- E
-   algorithm/performance modifications are forbidden in bring-up.
-7. The validated Level 2 dependency tree (`.deps/install`) is never modified.
+LOC = `cloc` code lines of the materialized application-owned source (no blank or comment lines), from each
+benchmark's `provenance/LOC.json`; it is not a diff size. Bundled-dependency, benchmark-dependency and
+agent-modifiable line counts are in [APPLICATION_AUDIT.md](APPLICATION_AUDIT.md) and the per-application
+`provenance/LOC.md`.
 
-## Correctness policy as applied
+**Retired:** [GEOS](geos/) was removed from the default suite (a third-party dependency, ParMETIS 4.0.3, may
+not be redistributed, and the application was replaced by ExaCA). Its code, provenance and historical results
+remain in the tree; no artifact is staged or published for it and it is not part of any download or count.
 
-Exit code is never sufficient. Each `validate.sh` uses the application's own
-mechanism and prints a single `... validation (N GPU, ...): PASS|FAIL` line:
-LAMMPS thermo vs the shipped reference log (bit-identical here); SPARTA
-statistical stats vs the shipped reference log with justified tolerances
-(particle count exact, temperature 2 %, collision attempts 15 %); WarpX
-upstream's analytic Langmuir-wave regression test (5e-2) and charge
-conservation (1e-11) read from the plotfile, plus exact particle conservation;
-SPECFEM3D reference seismograms through upstream's comparison script
-(correlation, misfit, time shift); nekRS upstream's `--cimode` CI checks on the
-analytic Ethier solution. For these five, no tolerance was loosened to obtain a
-PASS and no precision or physics setting was changed. Second batch: CP2K
-regtest tolerances + MD energy consistency, QMCPACK `check_scalars.py`, DFT-FE
-upstream GPU reference, GEOS geos-ats metrics/restart baseline, Nyx official
-`fcompare` tolerances -- with one recorded exception: the Nyx heat/cool
-tolerance 5e-5 (upstream's value for that deck) was adopted after a first run at
-the adiabatic 2e-10 had FAILED, and the `I_R` field of that deck is not accepted
-by any tolerance (PENDING), see `nyx/README.md`.
+## Prerequisites
 
-## Source distribution: external source artifacts + automatic materialization (scheme 3, 2026-09-10)
+**To download and unpack source artifacts** (`tools/prepare_benchmark.sh`): Python 3 with PyYAML, `zstd` on
+`PATH`, and network access (or a local artifact file). Nothing else -- no compiler and no GPU.
 
-Level 1 and Level 2 keep their kernel / mini-app sources in git. Level 3 keeps
-only the harness, the contract and the provenance in git and distributes the
-application source as **frozen source artifacts** stored in project-controlled
-external artifact storage (never in git, never in Git LFS):
-`<app>[-<variant>]-<source_version>.tar.zst`, top-level `src/` (application +
-upstream-bundled dependency source, approved patches pre-applied) and `deps/`
-(benchmark-specific source dependencies). Design: [EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md);
-per-artifact status, sizes and hashes: [SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md);
-the abandoned Git LFS design and its migration: [LFS_TO_ARTIFACT_MIGRATION.md](LFS_TO_ARTIFACT_MIGRATION.md).
+**To build**: a C/C++/Fortran toolchain, CUDA (or ROCm) matching your GPUs, an MPI implementation, CMake or
+GNU Make. Versions differ per application: several need a specific host-compiler/CUDA combination, CP2K builds
+its own dependency toolchain, and QMCPACK needs a private LLVM offload compiler. The per-application README
+and `benchmark.yaml` (`environment_profile`, `dependency_installs`) state what each one expects.
 
-```
-git clone <repo> && cd HPC-Performance-AI
-tools/prepare_benchmark.sh level3 lammps            # source.lock -> cache / immutable URL -> verify -> level3/lammps/{src,deps}
-tools/prepare_benchmark.sh level3 lammps --artifact /path/to/lammps-hpcperf-l3-v1.tar.zst   # local copy (air-gapped, unpublished)
-tools/create_agent_workspace.sh level3 lammps <run-id>       # workspaces/<run-id>/level3/lammps/ = the agent's cwd
-tools/check_workspace.py workspaces/<run-id>/level3/lammps   # iteration 0 must PASS (17 checks)
-tools/validate_workspace.sh level3 lammps workspaces/<run-id>/level3/lammps --iteration N   # trusted harness
+**To run**: a real GPU allocation (Slurm or equivalent), a working NVIDIA driver, enough CPU cores and host
+memory for the rank count, and a site MPI transport. Obtain an allocation first -- these are full applications
+and must not be started on a login node.
+
+The repository's `./setup_env.sh` bootstraps a project-local conda environment (compilers, MPI, CMake, Python,
+`cloc`) into `.conda_env`/`.tools` and `source hpcperf_env.sh` loads it in each shell. It does **not** install
+the NVIDIA driver, the CUDA Toolkit, ROCm, or any Level 3 application-specific toolchain (LLVM for QMCPACK,
+the CP2K dependency toolchain, deal.II for DFT-FE): those are built by the application's own `build.sh` or
+expected from the system, as documented per application.
+
+Site profiles (`HPCPERF_SITE_PROFILE`) encode machine-specific launch settings. The profile used for these
+results is single-node and its transport settings are not a cross-node configuration.
+
+## Quick start
+
+All commands are run **from the repository root**, after `./setup_env.sh` (once) and
+`source hpcperf_env.sh` (each shell), inside a GPU allocation.
+
+**A. Once artifacts are published and this work is merged** (not yet true -- see
+[Current availability](#current-availability-2026-09-11)):
+
+```bash
+git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
+cd HPC-Performance-AI
+source hpcperf_env.sh
+
+tools/prepare_benchmark.sh level3 lammps          # downloads, verifies and unpacks the source artifact
+level3/lammps/build.sh CUDA
+HPCPERF_GPUS=2 HPCPERF_SCALE_MODE=smoke level3/lammps/validate.sh CUDA
 ```
 
-`prepare_benchmark.sh` reads `provenance/source.lock[.variant].yaml`, finds the
-artifact (`--artifact FILE` > content-addressed cache `.artifacts/sha256/<sha256>.tar.zst`
-> the immutable https URL recorded in the lock > mirrors; `--offline` forbids
-fetches), verifies size + sha256, extracts with a restricted extractor outside
-the benchmark directory, verifies `source_tree_sha256`, scans for
-credentials/build output/escaping symlinks and only then places `src/` (+ `deps/`)
-atomically. It is idempotent (`READY`), refuses a modified tree (`DIRTY`, exit 3)
-unless `--force-rematerialize`, and is never called by a build. After it,
-`build.sh`/`run.sh`/`validate.sh` read source ONLY from `$HERE/src` and
-`$HERE/deps` (never `_upstream/`, another checkout, `.deps/.../src`, a home
-directory or `/tmp`); environment/system software (CUDA, compilers, MPI, Slurm,
-the site UCX profile, `.conda_env`) stays environment-provided. **Remote status
-of every artifact in this round: REMOTE_ARTIFACT_UNPUBLISHED** -- the artifacts
-exist in the maintainer's local staging (`LOCAL_ARTIFACT_VERIFIED`), provider and
-release naming are still to be decided; until then `--artifact FILE` is the way
-to materialize.
+**B. Today** (branch `level3/source-freeze`, artifacts unpublished): the artifact must be supplied as a local
+file that you obtained separately; `prepare` verifies it exactly as it would verify a download.
 
-```
-level3/<app>/                                  (git)
-├── README.md, benchmark.yaml, optimization_scope.yaml
-├── build.sh, run.sh, validate.sh         read $HERE/src and $HERE/deps only; no fetch, no patching
-├── inputs/, references/, configs/, patches/, <app>_check.py ...
-├── fetch.sh                              FREEZE-TIME ONLY (input of the freeze), not used by build.sh
-├── provenance/
-│   ├── freeze_spec[.variant].yaml        what the artifact is made of (pinned checkouts, submodules, tarballs, patches, exclusions)
-│   ├── source.lock[.variant].yaml        schema hpcperf-source-lock-2: upstream, artifact {filename,size,sha256,source_tree_sha256,primary url/status}, patches, dependencies, licenses, redistribution_status
-│   ├── upstream[.variant].lock, patch_series[.variant].txt, original_vs_baseline[.variant].diff
-│   ├── SOURCE_MANIFEST[.variant].json    every file of the artifact (path, sha256, size, exec bit) + the tree-hash algorithm
-│   ├── LICENSES[.variant].md, equivalence[.variant].{json,md}, LOC[.variant].{json,md}, check_workspace[.variant].json
-│   └── agent_workspace_verification.yaml (LAMMPS: the real closed-loop record)
-├── src/, deps/                           (local only) materialized by tools/prepare_benchmark.sh
-└── .hpcperf-materialized.yaml            (local only) variant, source version, tree hash, artifact sha256, origin
+```bash
+git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
+cd HPC-Performance-AI
+git checkout level3/source-freeze
+source hpcperf_env.sh
+
+tools/prepare_benchmark.sh level3 lammps --artifact /path/to/your/lammps-hpcperf-l3-v1.tar.zst
+level3/lammps/build.sh CUDA
+HPCPERF_GPUS=2 HPCPERF_SCALE_MODE=smoke level3/lammps/validate.sh CUDA
 ```
 
-Tools (`tools/`): `freeze_benchmark_source.py` (exact upstream HEAD blobs + declared
-submodules + pinned tarballs -> approved patch series applied -> credential/artifact
-scan -> `source_tree_sha256` -> equivalence check against the tree the recorded
-results were validated from -> deterministic archive into the local artifact
-staging `$HPCPERF_ARTIFACT_STAGING/level3/<app>/<source_version>/`),
-`compare_source_trees.py`, `prepare_benchmark.sh` / `hpcperf_materialize.py`,
-`hpcperf_lock.py` (lock schema), `artifacts/{verify_artifact.py,
-generate_release_manifest.py, publish_artifacts.sh, artifact_catalog.yaml,
-migrate_from_lfs_bundle.py}`, `check_workspace.py` (17 checks; `--agent-mode`
-for iterations > 0), `create_agent_workspace.sh`, `validate_workspace.sh`
-(trusted harness: refuses readonly tampering, builds and validates inside the
-workspace), `loc_report.py`; tests in `tools/tests/test_source_tools.sh` (68
-checks, run by `level3/tools/tests/run_all.sh`). Verdict layers of the trusted
-harness: 6 REFUSED (workspace integrity), 7 BUILD_FAIL, 0/1/3/4 numerical (the
-`validate.sh` contract); REFUSED is never PENDING and never enters a scientific or
-performance summary (`level3/tools/l3_verdict.py`).
+`validate.sh` **runs the case itself** (it invokes `run.sh` with the validated settings) and prints one
+verdict line; you do not run `run.sh` separately for validation. Use `run.sh` directly only for performance
+or scaling runs. There is no `prepare-all` command: prepare each benchmark you intend to use.
 
-Identity: `source_tree_sha256` (algorithm hpcperf-tree-1: sorted paths, file
-content / symlink target, no mtime/uid/mode) is the identity of an artifact; the
-archive sha256 is recorded separately. Any source change produces a new
-`source_version` and a new artifact (published artifacts are immutable).
-Iteration 0 of an optimization run = the materialized frozen baseline; the agent
-works in `workspaces/<run-id>/level3/<app>/` and may modify only the `modifiable`
-ranges of `optimization_scope.yaml` (application-owned source; bundled /
-benchmark-specific dependency source, inputs, references, validators and
-provenance are read-only and checked against a trusted baseline at every
-iteration).
+For nekRS, choose the variant once and use it for every step:
 
-Default suite (2026-09-11): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx, CP2K,
-QMCPACK, DFT-FE, ExaCA (10). ExaCA was admitted on 2026-09-11 as the replacement
-for GEOS on the basis of a **project-defined statistical validation** of its
-`dirsolid` smoke case (protocol v2, calibration/holdout separated, 9/9 holdout PASS
-at 1/2/4 GPUs; `exaca/README.md`, `exaca/references/validation_protocol.md`) --
-there is no upstream oracle for it, strong/weak are completion-only, HIP untested,
-multi-node unverified. GEOS is RETIRED_FROM_DEFAULT_SUITE (ParMETIS redistribution
-constraint + replacement decision); its directory, provenance and historical
-results stay as a record, no artifact is staged or published for it. Per-application
-evidence levels (source, build, workspace, agent edit, science, GPU binding,
-multi-GPU, remote): [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md). Publication:
-[RELEASE_PLAN.md](RELEASE_PLAN.md) (GitHub Release assets, nothing published yet).
-
-## Dependency isolation
-
-Every application owns a private tree -- no shared Level 3 install root:
-
-```
-level3/<app>/{src,deps}                        materialized frozen source artifact (the ONLY application source input)
-.deps/level3/<app>/{src,build,install,logs}     build-side copies (in-tree-writing builds), dependency builds, install, logs
-_upstream/level3/<Name>                        freeze-time checkout (fetch.sh; input of the freeze only)
-.artifacts/sha256/<archive_sha256>.tar.zst     content-addressed local artifact cache (prepare_benchmark.sh)
-build/level3/<app>/<cuda|hip>                  application build tree (+ run/ directories of run.sh)
-workspaces/<run-id>/                           per-run agent workspace (real copy; own build/ and .deps/)
+```bash
+tools/prepare_benchmark.sh level3 nekrs --variant hypregpu --artifact /path/to/nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+level3/nekrs/build.sh CUDA
+HPCPERF_GPUS=2 level3/nekrs/validate.sh CUDA
 ```
 
-Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream
-commit, dependency versions, compiler, Fortran compiler, CUDA/ROCm, GPU arch,
-MPI, CMake/configure options, GPU-aware-MPI setting, patch list, site profile,
-Spack lock hash, container image hash, build time). A recorded fingerprint
-that differs from the requested configuration fails fast
-(`level3/tools/l3_common.sh`).
+## GPU selection and workload sizes
 
-Spack, when chosen, uses one environment per application and backend
-(`level3/envs/<app>/{cuda,rocm}/spack.yaml` + `spack.lock`); containers, when
-chosen, commit the `.def`, build script, image SHA256 and README -- never the
-`.sif`. Neither is used by the first batch (see BUILD_STRATEGY.md for why).
+| Variable | Meaning |
+|---|---|
+| `HPCPERF_GPUS=N\|all` | Number of GPUs to use, one MPI rank per GPU by default. `N` means exactly `N`, even when the allocation holds more. `all` means every GPU of **your allocation**, not of the machine. |
+| `HPCPERF_NODES`, `HPCPERF_GPUS_PER_NODE` | Select a sub-shape of the allocation. They cannot create resources you were not allocated; larger values are accepted only in a dry run, as a hypothetical plan. |
+| `HPCPERF_CPUS_PER_RANK` | Host threads per rank (applications that use OpenMP on the host). |
+| `HPCPERF_SCALE_MODE` | `smoke` (deployment and correctness), `strong` (one fixed global problem split over the ranks), `weak` (fixed work per GPU). |
+| `HPCPERF_SITE_PROFILE` | Launch profile for the machine. |
+| `HPCPERF_DRY_RUN=1` | Print the plan (ranks, decomposition, command) without executing; writes into a throwaway directory and never touches real results. |
 
-## Runtime
+A rank count that cannot decompose the case, or that exceeds the allocation, is **refused** with an error --
+the harness never silently changes `N`. Not every application accepts every `N` (some require a factorizable
+grid). `strong` and `weak` mean what they say; for electronic-structure applications a size sweep is not
+automatically a weak-scaling series, and those runs are recorded as completed runs, not as scaling results.
 
-Launches go through the common launcher (`HPCPERF_GPUS`, `HPCPERF_NODES`,
-`HPCPERF_GPUS_PER_NODE`, `HPCPERF_CPUS_PER_RANK`, `HPCPERF_SCALE_MODE`,
-`HPCPERF_SITE_PROFILE`, `HPCPERF_DRY_RUN=1`) with the per-rank GPU wrapper
-(each rank sees one GPU; expected vs observed GPU audited). Level 3 refers to
-it through `HPCPERF_RUNTIME_DIR` (default `level2/tools`); the plan to move
-the shared tools to `tools/runtime/` without breaking Level 2 is in
-[../tools/runtime/README.md](../tools/runtime/README.md).
+```bash
+# real runs
+HPCPERF_GPUS=2 HPCPERF_SCALE_MODE=smoke  level3/lammps/validate.sh CUDA
+HPCPERF_GPUS=4 HPCPERF_SCALE_MODE=strong level3/lammps/run.sh CUDA
 
-Site/transport observations recorded in the READMEs (single node, `pml ob1 /
-btl self,sm,smcuda`): GPU-aware MPI makes WarpX's 4-GPU step 3x slower
-(0.081 vs 0.026 s/step) but LAMMPS 2.5x faster (2.38 vs 5.87 s); SPARTA is
-indifferent. Defaults stay upstream's; this is a performance topic for a later
-round, not a bring-up change. Open MPI's one-sided layer still selects
-`osc ucx` on this node and aborts inside `uct_ib` with 4 ranks (nekRS uses
-`MPI_Win_lock`); nekRS' `run.sh` sets `OMPI_MCA_osc=^ucx`, which is proposed
-for the gmu-hopper site profile in the runtime commonization PR.
-
-## Per-application layout
-
-```
-level3/<app>/
-├── README.md        provenance, version/commit, license, LOC, build strategy, changes (A-D), execution model,
-│                    inputs (smoke/strong/weak), validation, 1/2/4-GPU results, dry-runs, limitations
-├── fetch.sh         shallow clone at the recorded tag/commit (no source trees committed)
-├── build.sh         native build into .deps/level3/<app>, fingerprinted; HIP branch present, untested
-├── run.sh           HPCPERF_GPUS + HPCPERF_SCALE_MODE aware, launched via the common launcher
-├── validate.sh      upstream correctness mechanism, PASS/FAIL line, exit code
-└── patches/         compatibility patches (classified, documented; SPECFEM3D, nekRS)
+# hypothetical plans only (never executed here)
+HPCPERF_DRY_RUN=1 HPCPERF_NODES=10 HPCPERF_GPUS=40 HPCPERF_SCALE_MODE=strong level3/exaca/run.sh CUDA
+HPCPERF_DRY_RUN=1 HPCPERF_NODES=20 HPCPERF_GPUS=80 HPCPERF_SCALE_MODE=strong level3/exaca/run.sh CUDA
 ```
 
-Inputs are upstream's own decks referenced from the read-only checkout;
-derived decks (size, steps, topology, diagnostics) are written into the build
-tree at run time and documented per application, so no upstream input file is
-modified and nothing large is committed.
+## Source artifacts, hashes, cache and offline use
+
+```
+Git metadata (source.lock.yaml)  ->  local cache or Release asset  ->  archive SHA-256  ->  source-tree hash  ->  src/ + deps/
+```
+
+* **In Git**: upstream repository/tag/commit, the patch series and its hashes, the artifact filename, byte
+  size, archive SHA-256, `source_tree_sha256`, license and redistribution status, and -- once published --
+  the immutable asset URL. **Not in Git**: the source archive itself, materialized `src/`/`deps/`, build or
+  run output.
+* **Cache**: `$HPC_PERFORMANCE_AI_ROOT/.artifacts/sha256/<archive sha256>.tar.zst`, overridable with
+  `HPCPERF_ARTIFACT_CACHE` or `--cache-dir`. Entries are content-addressed and read-only; a download is
+  verified before it becomes a cache entry.
+* **Resolution order**: `--artifact FILE` → cache → the lock's `primary` URL → mirrors. `--offline` forbids
+  network access and fails on a cache miss. `--artifact` is verified exactly like a download (size, zstd
+  magic, SHA-256, tree hash, safety scans): a local file is never trusted because it exists.
+* **After prepare**, no build step needs the artifact, the cache or any upstream repository. Where a benchmark
+  needs pinned dependency source (for example CP2K's toolchain tarballs, GEOS' third-party sources, ExaCA's
+  JSON library), that source is inside the artifact under `deps/` and the build consumes it from there.
+* **Local modifications are never overwritten**: prepare reports `DIRTY` and stops. `--force-rematerialize`
+  *discards* your changes and restores the frozen baseline -- there is no undo.
+* **Four different identities**: `source_version` (which frozen source), archive SHA-256 (the file),
+  `source_tree_sha256` (the extracted tree), and the Git commit of this harness. Publishing metadata (a URL
+  becoming known) changes none of the source hashes and requires no re-freeze.
+* Hash verification proves you have the intended bytes. It does not prove that they build or produce correct
+  results on your machine.
+
+Status and per-artifact numbers: [SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md). Design and the full lifecycle:
+[EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md). Publication plan:
+[RELEASE_PLAN.md](RELEASE_PLAN.md).
+
+## LLM optimization workspace
+
+The canonical `level3/<app>` tree is never handed to an agent. Each optimization run gets its own copy:
+
+```bash
+tools/create_agent_workspace.sh level3 lammps lammps-demo-001
+python3 tools/check_workspace.py workspaces/lammps-demo-001/level3/lammps
+HPCPERF_GPUS=2 HPCPERF_SCALE_MODE=smoke tools/validate_workspace.sh level3 lammps \
+    workspaces/lammps-demo-001/level3/lammps --iteration 1 -- CUDA
+```
+
+`validate_workspace.sh` is the **trusted** entry point: it is executed from this repository, not from inside
+the workspace, it builds the workspace's current source for the same backend and variant it then validates,
+and it runs the workspace's (unmodified) `validate.sh`. Pass `--skip-build` only when you know a trusted
+build record already covers the current source; the record then states the build provenance explicitly.
+
+```
+workspaces/<run-id>/                     workspace root -- hand over this whole directory, not just the app folder
+├── hpcperf_env.sh, check_env.sh         copies of the environment loader
+├── level2/tools/, level3/tools/         copies of the launcher and Level 3 helpers (read-only)
+├── .conda_env, .tools, .deps/install    symlinks to the environment (must stay reachable)
+├── workspace.yaml, workspace_baseline.json
+├── build/, .deps/level3/<app>/          created by this run's build; private to the run
+├── reports/                             iteration records written by the trusted harness
+└── level3/<app>/                        <- the agent's working directory
+    ├── src/, deps/                      materialized source; the agent edits only what the scope allows
+    ├── build.sh, run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml
+    └── inputs/, references/, provenance/
+```
+
+The **trusted baseline** used to detect tampering lives outside the workspace, in
+`.hpcperf/workspace_baselines/<run-id>.json` of this repository; the copy inside the workspace is
+informational. Rules:
+
+* iteration 0 must match the frozen source hash; later iterations may differ **only** inside the
+  `modifiable` ranges of `optimization_scope.yaml`;
+* inputs, references, validators, provenance, dependency source and the harness copies are read-only and are
+  checked against the trusted baseline at every iteration; a change there is refused before anything is built
+  or run;
+* a build compiles the workspace's current source; nothing re-materializes the baseline behind the agent's back;
+* file permissions and hashes are integrity checks, **not** an operating-system sandbox;
+* the environment symlinks (and `--link-prebuilt-deps`, if used) mean the workspace is self-contained with
+  respect to *application source*, not with respect to the machine's toolchain: those paths must remain
+  reachable, so a workspace is not automatically portable to another machine;
+* giving a model an API key does not give it file access: reading, editing, building and running happen
+  through your agent harness's tools.
+
+For nekRS, prepare, create, build and validate must all use the same `--variant`; do not switch variants by
+patching inside a workspace.
+
+The closed loop (inject a compile error → build fails → restore → build succeeds → validate) has been
+executed for **LAMMPS only** ([lammps/provenance/agent_workspace_verification.yaml](lammps/provenance/agent_workspace_verification.yaml)).
+It is not evidence for the other applications.
+
+## Validation and evidence status
+
+| Evidence | Where it stands |
+|---|---|
+| Source equivalence + materialization | All 11 artifacts: verified (extracted tree hash equals the frozen hash, 17/17 contract checks). |
+| Current workspace build | LAMMPS: verified. ExaCA: canonical build from the artifact verified. All others: historical builds only. |
+| Agent edit takes effect | LAMMPS: verified (changed binary hash, rebuilt and revalidated). All others: not run. |
+| Scientific validation | See the per-application README for the criterion and the date; several results are historical runs on trees proven content-equivalent to the artifacts. |
+| Workspace multi-GPU | LAMMPS: 1 and 2 GPUs inside a workspace. Others: not run in a workspace. |
+| GPU binding | Recorded per run from the launcher audit (`N verified, 0 mismatch`); short runs can end before the sampler observes them and are reported as `unverified`, which is an observation gap, not a mismatch. |
+| Remote fetch by an ordinary user | Not run: nothing is published. |
+
+Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
+
+Criteria differ per application and are **not** all "upstream official validation":
+
+* upstream reference output: DFT-FE (GPU reference), SPECFEM3D (reference seismograms), LAMMPS (shipped CPU
+  reference log), nekRS (upstream `--cimode` checks), CP2K (upstream regtest tolerances);
+* analytic solution: WarpX (`langmuir_multi`);
+* adapted subset of upstream's own regression comparison: LAMMPS thermo columns, SPARTA statistics;
+* cross-rank consistency (same build, different rank counts): all applications, as an additional check;
+* CPU cross-check: where an application provides one;
+* project-defined statistical protocol: ExaCA only (no upstream oracle exists for that case;
+  calibration and holdout are separated, `exaca/references/validation_protocol.md`).
+
+Exit codes, by program:
+
+| Program | Codes |
+|---|---|
+| `level3/<app>/validate.sh` | `0` PASS, `1` FAIL, `3` PENDING (Nyx `I_R_CHECK_PENDING`), `4` UNSUPPORTED_LAYOUT |
+| `tools/validate_workspace.sh` | the above, plus `6` REFUSED (workspace integrity: tampering or untrusted baseline; nothing was built or run) and `7` BUILD_FAIL; `2` for usage errors |
+| `tools/prepare_benchmark.sh` | `0` ok, `1` invalid, `2` usage, `3` DIRTY (local modifications), `4` artifact unavailable/unpublished/offline miss, `5` hash, size or content mismatch |
+
+A completed run is not a correctness result. PENDING, UNSUPPORTED_LAYOUT and REFUSED are never counted as
+passes and never enter a performance summary.
+
+## Known limitations
+
+* **Nyx**: the `LyA` heat/cool deck ends as `STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING` (exit 3) at 1/2/4
+  GPUs -- state and particle checks pass, the `I_R` field is not accepted by any tolerance and the cause is
+  **not** established. `MiniSB` and `LyA-adiabatic` pass separately. [nyx/README.md](nyx/README.md).
+* **ExaCA**: acceptance covers the `dirsolid` case at 128³, seed 0, 1/2/4 GPUs, under a project-defined
+  empirical protocol (calibration and holdout separated; 8 + 9 runs; an empirical range rule, **not** a 3σ
+  guarantee, and not a general oracle for spatial fields or other sizes). Its upstream GoogleTest unit tests
+  were built and run: **30 of 52 pass**; the failures are test-side host/device view issues and an invalid
+  host-variant configuration in a CUDA build, partly unexplained -- evidence and a follow-up item, not a pass
+  ([exaca/references/upstream_unit_tests.json](exaca/references/upstream_unit_tests.json)).
+* **QMCPACK**: walker count and cuSOLVER behaviour constrain the validated case; this is a property of that
+  case, not a universal limit. [qmcpack/README.md](qmcpack/README.md).
+* **Not rebuilt from a materialized workspace**: eight applications keep historical build evidence only.
+  DFT-FE's install fingerprint changed with the freeze, so its next build refuses to reuse the existing
+  install until that install is removed.
+* **Strong/weak runs** for several applications are recorded as COMPLETED (they ran to completion) and are not
+  scaling conclusions.
+* **HIP untested; multi-node unverified/blocked on this site; 8/40/80 GPUs are dry-run plans only.**
+* The environment (driver, MPI transport, site scheduler) is a prerequisite, not something this repository
+  provides: nothing here is guaranteed to work out of the box on an arbitrary machine.
+* **GEOS is retired** (see the catalog); its results remain for reference only.
+
+## Troubleshooting
+
+| Symptom | Meaning |
+|---|---|
+| `REMOTE_ARTIFACT_UNPUBLISHED` / exit 4 | No published URL yet: pass `--artifact <file>`. |
+| `--offline` + cache miss | The artifact is not in the cache; supply it or allow the download. |
+| Archive or tree hash mismatch (exit 5) | The file is not the frozen artifact. Do not force it; re-obtain the artifact. |
+| `source not materialized ... run tools/prepare_benchmark.sh` | The benchmark has no `src/` yet. |
+| `DIRTY` (exit 3) | `src/`/`deps/` differ from the frozen baseline. `--force-rematerialize` **discards** those changes. |
+| Variant mismatch | Marker and requested variant disagree (nekRS): prepare the variant you intend to use. |
+| Fingerprint mismatch at build time | The recorded install was built with a different toolchain/configuration; remove that install or restore the configuration. |
+| Rank count refused | The case cannot be decomposed that way, or the allocation is smaller than requested. |
+| Multi-node hang or launch failure | The site transport is unverified for multi-node here. |
+| `REFUSED` (exit 6) | Workspace integrity: readonly/harness files changed or the baseline is untrusted. Restore them; do not weaken the check. |
+| `PENDING` (exit 3) | A scientific result that is explicitly incomplete (Nyx `I_R`). It is not a pass and must not be converted into one. |
+
+Forcing a rematerialization, loosening a tolerance or lowering precision are **not** general remedies; they
+change what is being measured.
+
+Where to look: each run writes `run_manifest.txt` (run id, binary and input hashes, exit code) and its logs
+next to the results under `build/level3/<app>/<profile>/run*/`; each workspace iteration writes
+`reports/iter-N.{check.json,diff,verdict.yaml,validate.log}` in the workspace root. Older bring-up logs from
+the original development runs are not packaged for download; the facts extracted from them are in the
+documents linked above.
+
+Provenance and further reading: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md),
+[SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md), [EXTERNAL_ARTIFACT_DESIGN.md](EXTERNAL_ARTIFACT_DESIGN.md),
+[RELEASE_PLAN.md](RELEASE_PLAN.md), [BUILD_STRATEGY.md](BUILD_STRATEGY.md),
+[APPLICATION_AUDIT.md](APPLICATION_AUDIT.md), [CORRECTNESS_FIXES.md](CORRECTNESS_FIXES.md),
+per-application `README.md` and `provenance/` (licenses, patch series, manifests). Maintainer/history:
+[SECOND_BATCH_STATUS.md](SECOND_BATCH_STATUS.md), [LFS_TO_ARTIFACT_MIGRATION.md](LFS_TO_ARTIFACT_MIGRATION.md).
+
+Every application here is upstream software under its own license, redistributed unmodified except for the
+recorded patch series; this repository contributes the benchmark harness, the input selection, the validation
+criteria and the provenance.
