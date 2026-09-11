@@ -42,6 +42,29 @@ cat > "$B/patches/0001-fix.patch" <<'EOF'
 +int main(){return 7;}
 EOF
 for s in build.sh run.sh validate.sh; do printf '#!/bin/bash\nHERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\nSRC="$HERE/src"\n[ -d "$SRC" ] || { echo "Benchmark source is not prepared. Run: tools/prepare_benchmark.sh level3 miniapp"; exit 3; }\necho %s from "$SRC"\n' "$s" > "$B/$s"; chmod +x "$B/$s"; done
+# build.sh: emit a >1 MB "binary" whose content depends on the current source (so a source edit changes its hash)
+cat > "$B/build.sh" <<'EOF'
+#!/bin/bash
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; R="$(cd "$HERE/../.." && pwd)"; BK="$(echo "${1:-CUDA}" | tr '[:upper:]' '[:lower:]')"
+SRC="$HERE/src"; [ -d "$SRC" ] || { echo "Benchmark source is not prepared. Run: tools/prepare_benchmark.sh level3 miniapp"; exit 3; }
+D="$R/build/level3/miniapp/$BK"; mkdir -p "$D"
+{ cat "$SRC/src/main.cpp"; head -c 1200000 /dev/zero | tr '\0' 'x'; } > "$D/mini.bin"; chmod +x "$D/mini.bin"
+echo "built $D/mini.bin from $SRC"
+EOF
+chmod +x "$B/build.sh"
+# validate.sh: run the binary and write this run's manifest (as the real run.sh scripts do)
+cat > "$B/validate.sh" <<'EOF'
+#!/bin/bash
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; R="$(cd "$HERE/../.." && pwd)"; BK="$(echo "${1:-CUDA}" | tr '[:upper:]' '[:lower:]')"
+SRC="$HERE/src"; [ -d "$SRC" ] || { echo "Benchmark source is not prepared"; exit 3; }
+BIN="$R/build/level3/miniapp/$BK/mini.bin"; [ -x "$BIN" ] || { echo "validate.sh: no binary for backend $BK"; exit 1; }
+RD="$R/build/level3/miniapp/$BK/run/smoke.np1"; mkdir -p "$RD"
+{ echo "run_id=$(date -u +%Y%m%dT%H%M%SZ)-$$-$RANDOM"; echo "app=miniapp"; echo "backend=${1:-CUDA}"; echo "ranks=1"; echo "exit_code=0";
+  echo "binary=$BIN"; echo "binary_sha256=$(sha256sum "$BIN" | cut -d' ' -f1)"; echo "utc=$(date -u +%FT%TZ)"; } >> "$RD/run_manifest.txt"
+echo "hpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks)" > "$RD/stdout.log"
+echo "miniapp validation (1 GPU, synthetic): PASS"
+EOF
+chmod +x "$B/validate.sh"
 cat > "$B/provenance/freeze_spec.yaml" <<EOF
 schema: hpcperf-freeze-spec-1
 name: miniapp
@@ -373,6 +396,39 @@ out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 6)"; r
 [ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'no trusted baseline' && ok "8p: a forged workspace-local baseline is ignored (no trusted baseline -> check 5 FAIL), never consulted" || bad "8p"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 6 --allow-workspace-baseline)"; rc=$?
 [ $rc -ne 0 ] && ok "8p2: even with --allow-workspace-baseline (development) the forged baseline only produces a mismatch, never a PASS" || bad "8p2"
+
+# --- 8q-8v. fix C: iteration/run association, build provenance, backend & variant consistency -------------
+bash tools/create_agent_workspace.sh level3 miniapp run-003 > /dev/null 2>&1
+W3="$RT/workspaces/run-003/level3/miniapp"; R3="$RT/workspaces/run-003/reports"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W3" --iteration 1 -- CUDA)"; rc=$?
+[ $rc -eq 0 ] && /usr/bin/grep -q 'build_provenance: built_this_iteration' "$R3/iter-1.verdict.yaml" && ok "8q: a built iteration records build_provenance built_this_iteration" || bad "8q: rc=$rc $(/usr/bin/grep build_provenance "$R3/iter-1.verdict.yaml" | head -1)"
+python3 - "$R3/iter-1.verdict.yaml" <<'PY' && ok "8r: the verdict lists exactly this iteration's runs (run id, binary, sha256, audit) -- no historical manifest" || bad "8r"
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1])); r = d["runs_this_iteration"]
+assert d["runs_this_iteration_count"] == 1 and len(r) == 1, d["runs_this_iteration_count"]
+assert r[0]["run_id"] and r[0]["binary_sha256"] and r[0]["binary"].endswith("mini.bin"), r[0]
+assert r[0]["gpu_binding_audits"] == [{"verified": 1, "mismatch": 0, "unverified": 0}], r[0].get("gpu_binding_audits")
+assert d["validated_binaries"] == [r[0]["binary_sha256"]]
+PY
+RUN1="$(python3 -c 'import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))["runs_this_iteration"][0]["run_id"])' "$R3/iter-1.verdict.yaml")"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W3" --iteration 2 --skip-build -- CUDA)"; rc=$?
+RUN2="$(python3 -c 'import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))["runs_this_iteration"][0]["run_id"])' "$R3/iter-2.verdict.yaml" 2>/dev/null)"
+[ -n "$RUN2" ] && [ "$RUN1" != "$RUN2" ] && ok "8r2: the second iteration reports ITS OWN appended run record, not the first iteration's (manifests are appended to)" || bad "8r2: iter1 $RUN1 iter2 $RUN2"
+[ $rc -eq 0 ] && /usr/bin/grep -q 'build_provenance: verified_from_build_record' "$R3/iter-2.verdict.yaml" && ok "8s: --skip-build with an unchanged source is covered by the trusted build record" || bad "8s: rc=$rc $(/usr/bin/grep build_provenance "$R3/iter-2.verdict.yaml" | head -1)"
+echo '// another agent edit' >> "$W3/src/src/main.cpp"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W3" --iteration 3 --skip-build -- CUDA)"; rc=$?
+[ $rc -eq 0 ] && /usr/bin/grep -q 'build_provenance: UNVERIFIED' "$R3/iter-3.verdict.yaml" && /usr/bin/grep -q 'NOT proven to be compiled' "$R3/iter-3.verdict.yaml" && ok "8t: --skip-build after a source edit reports UNVERIFIED build provenance (never claims the edit was compiled)" || bad "8t: rc=$rc $(/usr/bin/grep build_provenance "$R3/iter-3.verdict.yaml" | head -1)"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W3" --iteration 4 -- CUDA)"; rc=$?
+[ $rc -eq 0 ] && /usr/bin/grep -q 'build_provenance: built_this_iteration' "$R3/iter-4.verdict.yaml" && ok "8u: rebuilding the edited source restores a proven build provenance" || bad "8u: rc=$rc"
+out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W3" --iteration 5 --backend HIP -- CUDA)"; rc=$?
+[ $rc -eq 2 ] && echo "$out" | /usr/bin/grep -q 'disagree' && ok "8v: a backend given twice and inconsistently is refused (build and validation cannot diverge)" || bad "8v: rc=$rc"
+# variant consistency: a workspace whose marker names a variant refuses a contradicting environment
+FK="$TMP/fakevar/level3/miniapp"; mkdir -p "$FK"
+printf 'run_id: fake-001\niteration: 0\n' > "$FK/workspace.yaml"
+printf 'variant_env: HPCPERF_MINI_VARIANT\nvariants: {a: {}, b: {}}\n' > "$FK/benchmark.yaml"
+printf 'variant: a\n' > "$FK/.hpcperf-materialized.yaml"
+out="$(cap env HPCPERF_MINI_VARIANT=b bash tools/validate_workspace.sh level3 miniapp "$FK" --iteration 1 -- CUDA)"; rc=$?
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'does not match the materialized variant' && ok "8w: an environment variant that contradicts the materialized one is REFUSED (exit 6) before any build" || bad "8w: rc=$rc"
 
 # --- 9. release manifest / publish plan ----------------------------------------------------------------------
 cat > "$TMP/catalog.yaml" <<'EOF'
