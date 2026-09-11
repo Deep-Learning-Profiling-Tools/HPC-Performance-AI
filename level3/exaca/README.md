@@ -90,9 +90,13 @@ real spatial differences of competitive growth, not a renumbering. Even a single
 by 1 between rank counts (`references/calibration.json: singlegrain_probe`). The code path consistent with this
 (not an upstream statement): active cells are collected with `Kokkos::atomic_fetch_add` (`src/CAupdate.hpp`
 lines 41/97/108/132) and a contested liquid cell is claimed with `Kokkos::atomic_compare_exchange` on
-`cell_type` (line 208); the winner sets the new octahedron's centre. Upstream's own deterministic checks are
-its GoogleTest unit tests, which are not built here (GoogleTest is neither in the environment nor in the
-artifact). The validation is therefore **project-defined and statistical**; the full protocol, the definition
+`cell_type` (line 208); the winner sets the new octahedron's centre. Upstream's own deterministic checks are its GoogleTest unit tests. They **were** built and run
+(2026-09-11, using the fused GoogleTest 1.11.0 that Kokkos vendors inside the artifact as a build-side shim):
+**30 of 52 pass, 22 fail deterministically** -- host-space test variants abort in a CUDA-enabled build,
+two CUDA suites read device views from the host without a mirror copy, and the Nucleation/Update CUDA failures
+are not yet explained (`references/upstream_unit_tests.json`). They are therefore evidence and a follow-up
+item, **not** acceptance evidence, and no unit-test result is counted as a PASS anywhere here.
+The validation is therefore **project-defined and statistical**; the full protocol, the definition
 of the spread, and the calibration/holdout separation are in `references/validation_protocol.md`.
 
 Criteria (each must hold; `references/validation_protocol.yaml` names the frozen files):
