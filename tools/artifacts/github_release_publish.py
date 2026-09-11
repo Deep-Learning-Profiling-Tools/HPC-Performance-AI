@@ -15,6 +15,18 @@ for such a run. Assets are never overwritten or deleted: an existing asset of th
 (a corrected upload needs a new source version and tag). The working tree's SOURCE_MANIFEST files and the staged
 archives must hash-match the reviewed plan before anything is uploaded.
 
+Two checks that a release-only view cannot give:
+  * the real **Git tag**: /repos/.../git/ref/tags/<tag> is consulted, not just /releases/tags/<tag> (a tag can
+    exist without a release). A lightweight tag resolves directly, an annotated tag through /git/tags/<sha>, to
+    a full commit SHA which must equal the plan's target commit. Before a draft the tag must not exist at all
+    (tags and assets are never reused); after publishing, the tag that GitHub created must resolve to the plan
+    target. release.target_commitish is not evidence: GitHub ignores it when the tag already exists.
+  * the **remote asset content**: before a draft is published every remote asset is verified by digest -- the
+    API's own `digest` when present, otherwise by re-downloading and hashing -- against the reviewed plan
+    (archives), the plan-derived SHA256SUMS, the recorded SOURCE_MANIFEST hashes and the local plan file. Equal
+    byte sizes are never accepted as evidence, the asset list is paged to completion, and every asset must be in
+    state `uploaded`.
+
 Modes
   preflight  local only, no network: plan schema, per-asset staging file (size + sha256 == plan), working-tree
              SOURCE_MANIFEST hashes == plan, generated SHA256SUMS content, the plan's own sha256.
@@ -208,6 +220,116 @@ def upload_all(api, plan, plan_path, staging, repo_root, release, tmpdir, log):
     return {n for n, _, _, _ in items}
 
 
+def resolve_git_tag(api, repo, tag, log):
+    """(exists, commit_sha, kind). Consults the Git ref, not the release: a tag may exist without a release.
+    An annotated tag is resolved through /git/tags/<sha> to its commit."""
+    try:
+        ref = api.get(f"/repos/{repo}/git/ref/tags/{tag}")
+    except Fail as e:
+        if "HTTP 404" in str(e):
+            return False, None, None
+        raise
+    obj = need(ref, "object", f"git ref tags/{tag}")
+    kind, sha = obj.get("type"), obj.get("sha")
+    if not sha:
+        raise Fail(f"git ref tags/{tag}: response has no object.sha")
+    if kind == "tag":
+        tag_obj = api.get(f"/repos/{repo}/git/tags/{sha}")
+        inner = need(tag_obj, "object", f"git tag object {sha}")
+        if inner.get("type") != "commit" or not inner.get("sha"):
+            raise Fail(f"annotated tag {tag}: object {inner.get('type')} {inner.get('sha')} is not a commit")
+        log(f"git tag {tag}: annotated, resolves to commit {inner['sha']}")
+        return True, inner["sha"], "annotated"
+    if kind != "commit":
+        raise Fail(f"git ref tags/{tag}: object type {kind!r} is neither commit nor tag")
+    log(f"git tag {tag}: lightweight, commit {sha}")
+    return True, sha, "lightweight"
+
+
+def require_tag_absent(api, plan, log):
+    exists, sha, kind = resolve_git_tag(api, plan["repository"], plan["tag"], log)
+    if exists:
+        where = "the plan target" if sha == plan["target_commit"] else f"a DIFFERENT commit than the plan target {plan['target_commit']}"
+        raise Fail(f"a Git tag {plan['tag']} already exists ({kind}, commit {sha}, i.e. {where}): tags are never reused or moved. "
+                   f"Use a new source version/tag instead.")
+    log(f"git tag {plan['tag']}: does not exist yet (as expected before a draft)")
+
+
+def require_tag_at_target(api, plan, log):
+    exists, sha, kind = resolve_git_tag(api, plan["repository"], plan["tag"], log)
+    if not exists:
+        raise Fail(f"after publishing there is no Git tag {plan['tag']}: the release did not create it")
+    if sha != plan["target_commit"]:
+        raise Fail(f"Git tag {plan['tag']} ({kind}) points at {sha}, not at the plan target {plan['target_commit']}; "
+                   f"the tag is NOT moved to hide this")
+    log(f"git tag {plan['tag']} ({kind}) resolves to the plan target {sha}")
+
+
+def list_assets(api, repo, rid, log):
+    """Complete, paged asset list."""
+    out, page = [], 1
+    while True:
+        batch = api.get(f"/repos/{repo}/releases/{rid}/assets?per_page=100&page={page}")
+        if not isinstance(batch, list):
+            raise Fail(f"asset listing page {page}: expected a JSON array")
+        out += batch
+        if len(batch) < 100:
+            break
+        page += 1
+        if page > 50:
+            raise Fail("asset listing did not terminate")
+    log(f"release {rid}: {len(out)} asset(s) listed ({page} page(s))")
+    return out
+
+
+def expected_asset_digests(plan, plan_path, repo_root):
+    """{name: (size, sha256)} for every asset the plan implies: archives, SHA256SUMS, manifests, the plan."""
+    exp = {}
+    for a in plan["assets"]:
+        exp[a["filename"]] = (int(a["size_bytes"]), a["sha256"])
+        m = a["source_manifest"]
+        exp[m["planned_asset"]] = (os.path.getsize(os.path.join(repo_root, m["path"])), m["sha256"])
+    sums = build_sha256sums(plan).encode()
+    exp["SHA256SUMS"] = (len(sums), hashlib.sha256(sums).hexdigest())
+    exp["RELEASE_PLAN.json"] = (os.path.getsize(plan_path), sha256_file(plan_path))
+    return exp
+
+
+def verify_remote_asset_content(api, plan, plan_path, repo_root, rid, log, allow_redownload=True):
+    """Every remote asset must be `uploaded` and match the expected digest. The API's own digest is used when
+    present; otherwise the asset is re-downloaded and hashed. Equal size is never sufficient."""
+    exp = expected_asset_digests(plan, plan_path, repo_root)
+    assets = list_assets(api, plan["repository"], rid, log)
+    names = {a.get("name") for a in assets}
+    missing, extra = set(exp) - names, names - set(exp)
+    if missing or extra:
+        raise Fail(f"remote asset set differs from the plan (missing {sorted(missing)[:4]}, unexpected {sorted(extra)[:4]})")
+    by_digest, by_download = 0, 0
+    for a in assets:
+        name = a["name"]; want_size, want_sha = exp[name]
+        if a.get("state") not in (None, "uploaded"):
+            raise Fail(f"remote asset {name}: state {a.get('state')!r}, expected uploaded")
+        if int(a.get("size", -1)) != want_size:
+            raise Fail(f"remote asset {name}: size {a.get('size')} != expected {want_size}")
+        digest = (a.get("digest") or "").strip()
+        if digest.startswith("sha256:"):
+            got = digest.split(":", 1)[1].lower()
+            if got != want_sha:
+                raise Fail(f"remote asset {name}: API digest {got} != expected {want_sha}")
+            by_digest += 1
+            continue
+        if not allow_redownload:
+            raise Fail(f"remote asset {name}: no API digest and re-downloading is disabled")
+        aid = need(a, "id", f"asset {name}")
+        blob = api.get(f"/repos/{plan['repository']}/releases/assets/{aid}", accept="application/octet-stream", parse_json=False)
+        got = hashlib.sha256(blob).hexdigest()
+        if len(blob) != want_size or got != want_sha:
+            raise Fail(f"remote asset {name}: re-downloaded {len(blob)} B sha256 {got} != expected {want_size} B {want_sha}")
+        by_download += 1
+    log(f"remote content verified for {len(assets)} asset(s): {by_digest} by API digest, {by_download} by re-download")
+    return exp
+
+
 def check_release_identity(api, plan, rid, want_draft, want_prerelease, expect_assets, log, where):
     rel = api.get(f"/repos/{plan['repository']}/releases/{rid}")
     if int(need(rel, "id", where)) != int(rid):
@@ -243,6 +365,7 @@ def main():
     ap.add_argument("--api-base", default=os.environ.get("HPCPERF_GH_API", "https://api.github.com"))
     ap.add_argument("--expect-plan-sha256"); ap.add_argument("--timeout", type=float, default=60.0)
     ap.add_argument("--redownload", action="store_true"); ap.add_argument("--json-out"); ap.add_argument("--tmpdir")
+    ap.add_argument("--no-redownload", action="store_true", help="publish/verify: rely on the API digest only; fail when an asset has none")
     a = ap.parse_args()
     repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     log = lambda m: print(f"release: {m}", flush=True)  # noqa: E731
@@ -275,6 +398,7 @@ def main():
                 except Fail as e:
                     if "HTTP 404" not in str(e):
                         raise
+                require_tag_absent(api, plan, log)   # a Git tag can exist without a release
                 rel = api.post(f"/repos/{repo}/releases", {
                     "tag_name": plan["tag"], "target_commitish": plan["target_commit"], "name": plan["tag"],
                     "draft": True, "prerelease": True,
@@ -291,20 +415,28 @@ def main():
                 if not a.release_id:
                     raise Fail("--release-id is required")
                 rel, assets = check_release_identity(api, plan, a.release_id, True, True, None, log, "pre-publish check")
-                names = {x.get("name") for x in assets}
-                expect = {x["filename"] for x in plan["assets"]} | {"SHA256SUMS", "RELEASE_PLAN.json"} | {x["source_manifest"]["planned_asset"] for x in plan["assets"]}
-                if names != expect:
-                    raise Fail(f"pre-publish: asset set incomplete (missing {sorted(expect - names)[:4]}, unexpected {sorted(names - expect)[:4]})")
+                # the asset CONTENT (not just the name set and size) must match the reviewed plan before anything
+                # becomes public, and a pre-existing Git tag must not point somewhere else
+                exp = verify_remote_asset_content(api, plan, a.plan, repo_root, a.release_id, log, allow_redownload=not a.no_redownload)
+                expect = set(exp)
+                exists, tag_sha, tag_kind = resolve_git_tag(api, repo, plan["tag"], log)
+                if exists and tag_sha != plan["target_commit"]:
+                    raise Fail(f"a Git tag {plan['tag']} ({tag_kind}) already points at {tag_sha}, not at the plan target "
+                               f"{plan['target_commit']}: refusing to publish (the tag is never moved)")
                 out = api.patch(f"/repos/{repo}/releases/{a.release_id}", {"draft": False, "prerelease": True})
                 if bool(out.get("draft")) is not False or bool(out.get("prerelease")) is not True:
                     raise Fail(f"publish: response says draft={out.get('draft')} prerelease={out.get('prerelease')}")
                 check_release_identity(api, plan, a.release_id, False, True, expect, log, "post-publish verification")
+                require_tag_at_target(api, plan, log)   # the tag GitHub created must be the reviewed commit
+                verify_remote_asset_content(api, plan, a.plan, repo_root, a.release_id, log, allow_redownload=not a.no_redownload)
                 result.update({"release_id": a.release_id, "assets": sorted(expect), "verdict": "PUBLISHED_PRERELEASE"})
                 log(f"release {a.release_id} published as a prerelease and re-verified. REMOTE_FETCH_VERIFIED still requires the anonymous check (tools/artifacts/remote_fetch_check.sh).")
             else:
                 if not a.release_id:
                     raise Fail("--release-id is required")
                 rel, assets = check_release_identity(api, plan, a.release_id, False, True, None, log, "verify")
+                require_tag_at_target(api, plan, log)
+                verify_remote_asset_content(api, plan, a.plan, repo_root, a.release_id, log, allow_redownload=a.redownload)
                 if a.redownload:
                     by_name = {x.get("name"): x for x in assets}
                     for nm, _p, size, sha in asset_paths(plan, a.staging, repo_root):

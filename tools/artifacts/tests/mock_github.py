@@ -3,11 +3,14 @@
 
     mock_github.py [--fault MODE] [--port 0] [--state FILE]
 
-Implements only what tools/artifacts/github_release_publish.py calls: commit lookup, release by tag, create
-release, upload asset, list assets, download asset, get release, patch release. `--fault` injects one failure so
+Implements only what tools/artifacts/github_release_publish.py calls: commit lookup, release by tag, Git ref /
+Git tag object lookup, create release, upload asset, list assets (paged, with digests), download asset, get
+release, patch release. Publishing a draft creates the Git tag, as GitHub does. `--fault` injects one failure so
 that the error paths can be tested without touching the real API:
   none unauthorized forbidden notfound-commit tag-exists unprocessable server-error-upload invalid-json
   wrong-id truncated-asset asset-exists timeout incomplete-set publish-not-applied
+  git-tag-exists-elsewhere annotated-tag-wrong-commit asset-content-mismatch manifest-replaced plan-replaced
+  asset-not-uploaded no-digest
 Prints "MOCK_READY <port>" on stdout when listening.
 """
 import argparse
@@ -19,7 +22,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-STATE = {"releases": {}, "assets": {}, "tags": {}, "next_id": 1000, "fault": "none"}
+STATE = {"releases": {}, "assets": {}, "tags": {}, "git_tags": {}, "next_id": 1000, "fault": "none"}
+WRONG_COMMIT = "f" * 40
 LOCK = threading.Lock()
 
 
@@ -69,14 +73,38 @@ class H(BaseHTTPRequestHandler):
             if f == "tag-exists" or tag in STATE["tags"]:
                 return self._send(200, STATE["releases"].get(STATE["tags"].get(tag), {"id": 1, "tag_name": tag}))
             return self._send(404, {"message": "Not Found"})
-        m = re.match(r"/repos/[^/]+/[^/]+/releases/(\d+)/assets$", self.path)
+        m = re.match(r"/repos/[^/]+/[^/]+/git/ref/tags/(.+)$", self.path)
+        if m:
+            tag = m.group(1)
+            if f == "git-tag-exists-elsewhere":
+                return self._send(200, {"ref": f"refs/tags/{tag}", "object": {"type": "commit", "sha": WRONG_COMMIT}})
+            if f == "annotated-tag-wrong-commit":
+                return self._send(200, {"ref": f"refs/tags/{tag}", "object": {"type": "tag", "sha": "a" * 40}})
+            if tag in STATE["git_tags"]:
+                return self._send(200, {"ref": f"refs/tags/{tag}", "object": {"type": "commit", "sha": STATE["git_tags"][tag]}})
+            return self._send(404, {"message": "Not Found"})
+        m = re.match(r"/repos/[^/]+/[^/]+/git/tags/([0-9a-f]+)$", self.path)
+        if m:
+            if f == "annotated-tag-wrong-commit":
+                return self._send(200, {"tag": "t", "object": {"type": "commit", "sha": WRONG_COMMIT}})
+            return self._send(200, {"tag": "t", "object": {"type": "commit", "sha": STATE.get("target", "b" * 40)}})
+        m = re.match(r"/repos/[^/]+/[^/]+/releases/(\d+)/assets(?:\?.*)?$", self.path)
         if m:
             rid = int(m.group(1))
-            items = [{"id": a["id"], "name": a["name"], "size": a["size"], "state": "uploaded"}
-                     for a in STATE["assets"].values() if a["release"] == rid]
+            items = []
+            for a in STATE["assets"].values():
+                if a["release"] != rid:
+                    continue
+                it = {"id": a["id"], "name": a["name"], "size": a["size"],
+                      "state": "starter" if f == "asset-not-uploaded" else "uploaded"}
+                if f != "no-digest":
+                    it["digest"] = "sha256:" + hashlib.sha256(a["data"]).hexdigest()
+                items.append(it)
             if f == "incomplete-set" and items:
                 items = items[:-1]
-            return self._send(200, items)
+            q = dict(kv.split("=", 1) for kv in (self.path.split("?", 1)[1].split("&") if "?" in self.path else []) if "=" in kv)
+            per, page = int(q.get("per_page", 100)), int(q.get("page", 1))
+            return self._send(200, items[(page - 1) * per: page * per])
         m = re.match(r"/repos/[^/]+/[^/]+/releases/assets/(\d+)$", self.path)
         if m:
             a = STATE["assets"].get(int(m.group(1)))
@@ -127,8 +155,16 @@ class H(BaseHTTPRequestHandler):
             with LOCK:
                 if any(a["release"] == rid and a["name"] == name for a in STATE["assets"].values()):
                     return self._send(422, {"message": "Validation Failed: already_exists"})
+                stored = body
+                # content tampering with the SAME byte size: only a digest/hash check can catch this
+                if f == "asset-content-mismatch" and name.endswith(".tar.zst") and len(body) > 8:
+                    stored = body[:-1] + bytes([body[-1] ^ 0xFF])
+                if f == "manifest-replaced" and name.startswith("SOURCE_MANIFEST"):
+                    stored = bytes([b ^ 0x01 for b in body])
+                if f == "plan-replaced" and name == "RELEASE_PLAN.json":
+                    stored = bytes([b ^ 0x01 for b in body])
                 aid = nid()
-                STATE["assets"][aid] = {"id": aid, "release": rid, "name": name, "size": len(body), "data": body}
+                STATE["assets"][aid] = {"id": aid, "release": rid, "name": name, "size": len(stored), "data": stored}
             return self._send(201, {"id": aid, "name": name, "size": len(body), "state": "uploaded"})
         self._send(404, {"message": "Not Found"})
 
@@ -148,6 +184,9 @@ class H(BaseHTTPRequestHandler):
         with LOCK:
             if f != "publish-not-applied":
                 r.update({k: bool(v) for k, v in req.items() if k in ("draft", "prerelease")})
+                if r.get("draft") is False and r.get("tag_name"):
+                    STATE["git_tags"][r["tag_name"]] = r.get("target_commitish") or ("b" * 40)
+                    STATE["patched_public"] = STATE.get("patched_public", 0) + 1
         return self._send(200, r)
 
 
@@ -156,6 +195,7 @@ def main():
     ap.add_argument("--fault", default="none"); ap.add_argument("--port", type=int, default=0)
     a = ap.parse_args()
     STATE["fault"] = a.fault
+    STATE["target"] = "b" * 40
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
     STATE["port"] = srv.server_address[1]
     print(f"MOCK_READY {srv.server_address[1]}", flush=True)

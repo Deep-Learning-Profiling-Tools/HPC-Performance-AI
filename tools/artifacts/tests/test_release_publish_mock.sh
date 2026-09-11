@@ -113,6 +113,62 @@ out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --pla
 [ $rc -ne 0 ] && echo "$out" | grep -q 'already exists' && ok "3f: a second draft for the same tag is refused (no asset reuse/overwrite)" || bad "3f: rc=$rc"
 stop_mock
 
+# --- 3g-3n. real Git tag checking and remote content verification before publication ---------------------
+# a Git tag that exists (without a release) and points elsewhere must block the draft
+start_mock git-tag-exists-elsewhere
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.gt1")"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'Git tag .* already exists' && echo "$out" | grep -q 'DIFFERENT commit' && ok "3g: a Git tag that exists without a release and points elsewhere blocks the draft" || bad "3g: rc=$rc $(echo "$out" | tail -1)"
+stop_mock
+start_mock annotated-tag-wrong-commit
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.gt2")"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'annotated' && ok "3h: an annotated tag is resolved through the tag object and its wrong commit blocks the draft" || bad "3h: rc=$rc $(echo "$out" | tail -1)"
+stop_mock
+# remote content faults: the draft uploads fine, but publication must be refused and no PATCH may reach the API
+publish_guard() { # <fault> <needle> <label>
+    start_mock "$1"
+    local o1 r1 o2 r2 rid
+    o1="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.$1" --json-out "$T/draft.$1.json")"; r1=$?
+    rid="$(python3 -c "import json;print(json.load(open('$T/draft.$1.json')).get('release_id',''))" 2>/dev/null)"
+    if [ -z "$rid" ]; then
+        # the upload check already caught it (also acceptable): no publication attempt was possible
+        [ $r1 -ne 0 ] && ok "$3 (caught at upload time, no draft id, no publish attempt)" || bad "$3: draft rc=$r1 but no id"
+        stop_mock; return
+    fi
+    o2="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode publish --release-id "$rid" --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5)"; r2=$?
+    local still_draft; still_draft="$(cap env GITHUB_TOKEN=mock python3 - "$MOCK_PORT" "$rid" <<'PY'
+import json, sys, urllib.request
+u=f"http://127.0.0.1:{sys.argv[1]}/repos/acme/mini/releases/{sys.argv[2]}"
+r=urllib.request.Request(u, headers={"Authorization":"Bearer mock","Accept":"application/vnd.github+json"})
+print(json.load(urllib.request.urlopen(r)).get("draft"))
+PY
+)"
+    if [ $r2 -ne 0 ] && echo "$o2" | grep -q "$2" && [ "$still_draft" = "True" ]; then ok "$3"; else bad "$3: publish rc=$r2 still_draft=$still_draft $(echo "$o2" | tail -1)"; fi
+    stop_mock; }
+publish_guard asset-content-mismatch 'digest' "3i: an archive with the same size but different content blocks publication (release stays draft)"
+publish_guard manifest-replaced 'digest' "3j: a replaced SOURCE_MANIFEST asset (same name) blocks publication (release stays draft)"
+publish_guard plan-replaced 'digest' "3k: a replaced RELEASE_PLAN.json asset blocks publication (release stays draft)"
+publish_guard asset-not-uploaded 'state' "3l: an asset that is not in state uploaded blocks publication (release stays draft)"
+# digest-less API: re-download is used, and --no-redownload must then refuse rather than trust the size
+start_mock no-digest
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.nd" --json-out "$T/draft.nd.json")"; rc=$?
+RID="$(python3 -c "import json;print(json.load(open('$T/draft.nd.json'))['release_id'])" 2>/dev/null)"
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode publish --release-id "$RID" --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5)"; rc2=$?
+[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && echo "$out" | grep -q 'by re-download' && ok "3m: without an API digest the content is verified by re-downloading every asset" || bad "3m: rc=$rc/$rc2 $(echo "$out" | tail -1)"
+stop_mock
+start_mock no-digest    # fresh state: the previous release was published, so a new draft is needed
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.nd2" --json-out "$T/draft.nd2.json")"; rc=$?
+RID="$(python3 -c "import json;print(json.load(open('$T/draft.nd2.json'))['release_id'])" 2>/dev/null)"
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode publish --release-id "$RID" --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --no-redownload)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'no API digest' && ok "3n: --no-redownload refuses when the API offers no digest (size alone is never accepted)" || bad "3n: rc=$rc $(echo "$out" | tail -1)"
+stop_mock
+# the good path must verify the real tag after publication
+start_mock none
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.tag" --json-out "$T/draft.tag.json")"; rc=$?
+RID="$(python3 -c "import json;print(json.load(open('$T/draft.tag.json'))['release_id'])" 2>/dev/null)"
+out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode publish --release-id "$RID" --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5)"; rc2=$?
+[ $rc2 -eq 0 ] && echo "$out" | grep -q 'remote content verified' && echo "$out" | grep -q 'resolves to the plan target' && ok "3o: the good path verifies remote content before publishing and the created Git tag afterwards" || bad "3o: rc=$rc2 $(echo "$out" | tail -2)"
+stop_mock
+
 # --- 4. anonymous plan-URL verification (fix for the publish/lock circular dependency) ------------------
 SERVE="$T/www"; mkdir -p "$SERVE"; cp "$STG/mini-hpcperf-l3-v1.tar.zst" "$SERVE/"
 cat > "$T/fileserver.py" <<'PY'
