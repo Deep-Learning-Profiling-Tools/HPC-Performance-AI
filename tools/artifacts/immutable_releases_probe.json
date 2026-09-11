@@ -1,0 +1,5 @@
+{
+ "enabled": false,
+ "enforced_by_owner": false,
+ "probed": "2026-09-11 via GET /repos/{owner}/{repo}/immutable-releases (read-only); repository setting not changed"
+}
