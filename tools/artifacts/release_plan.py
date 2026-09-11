@@ -62,6 +62,9 @@ def main():
                 excluded.append({"artifact": label, "reason": "RETIRED (never published): " + ent.get("reason", "")}); continue
             if ent.get("suite_status") == "candidate" and ent.get("admission") != "admitted":
                 excluded.append({"artifact": label, "reason": f"CANDIDATE_EXCLUDED (admission {ent.get('admission')}): " + str(by.get("admission", ""))}); continue
+            acc = ent.get("release_acceptance") or by.get("release_acceptance") or "accepted"
+            if str(acc).startswith(("on_hold", "under_review")):
+                excluded.append({"artifact": label, "reason": f"RELEASE_ACCEPTANCE_{str(acc).upper()}: {by.get('release_acceptance_note', 'acceptance is on hold; not part of an unconditional publish-all')}"}); continue
             if not lock or lock.get("schema") != hl.LOCK_SCHEMA:
                 excluded.append({"artifact": label, "reason": "no schema-2 lock"}); continue
             art = lock["artifact"]; entry = hl.staging_entry(a.staging, app, lock["benchmark"]["source_version"]); local = os.path.join(entry, art["filename"])

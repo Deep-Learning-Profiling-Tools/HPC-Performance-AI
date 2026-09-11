@@ -57,3 +57,13 @@ known_limits: GrainID field not bitwise reproducible (atomic captures) -> statis
 admission: 'admitted 2026-09-11 (replacement for GEOS): project-defined statistical validation of the dirsolid smoke case
   (128^3, seed 0) under protocol v2 -- calibration 8 runs (2026-09-10), independent holdout 9/9 PASS at 1/2/4 GPUs (2026-09-11);
   strong/weak modes completed only; HIP untested; multi-node unverified'
+release_acceptance: restored 2026-09-11 (was ON_HOLD the same day while the upstream unit-test failures were unattributed)
+release_acceptance_note: 'attribution complete: 0 application-class failures among the 22 upstream unit-test failures (7 test-fixture,
+  13 unsupported host-space-in-CUDA-build configuration, 2 test-harness/GPU-binding), and upstream''s own small full-application
+  cases pass at 1/2/4 real GPUs within upstream tolerances; with unmodified tests under CTest''s own launcher the failures
+  still reproduce. See references/upstream_unit_test_matrix.json'
+upstream_tests:
+  original: 30/52 pass under CTest (mpiexec without per-rank GPU binding)
+  after_test_side_fixture_patches_and_per_rank_gpu: 23/23 CUDA pass; 23/23 SERIAL pass in a separate Serial-only Kokkos build
+  patches: patches/upstream-tests/ (label patched-upstream-tests; NOT part of the frozen artifact or the release payload)
+  matrix: references/upstream_unit_test_matrix.json

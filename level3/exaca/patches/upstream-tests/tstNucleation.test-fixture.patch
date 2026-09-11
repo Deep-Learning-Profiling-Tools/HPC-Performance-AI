@@ -1,0 +1,19 @@
+--- a/unit_test/tstNucleation.hpp	2026-09-10 17:09:41.135565729 -0400
++++ b/unit_test/tstNucleation.hpp	2026-09-11 19:10:09.695035834 -0400
+@@ -280,7 +280,15 @@
+ 
+     // Copy host views to device
+     celldata.cell_type = Kokkos::create_mirror_view_and_copy(TEST_MEMSPACE(), cell_type_host);
+-    grain_id = Kokkos::create_mirror_view_and_copy(TEST_MEMSPACE(), grain_id_host);
++    // TEST-SIDE FIX (HPC-Performance-AI): create_mirror_view_and_copy allocates a NEW View when TEST_MEMSPACE
++    // differs from HostSpace, so assigning it to the local `grain_id` handle left celldata's own grain-ID
++    // subview (which nucleateGrain and the assertions below read) untouched: on CUDA the fixture's initial
++    // grain IDs 1/2/3 never reached the device data. deep_copy into that subview instead; expectations unchanged.
++    {
++        auto grain_id_target = celldata.getGrainIDSubview(grid);
++        Kokkos::deep_copy(grain_id_target, grain_id_host);
++        grain_id = grain_id_target;
++    }
+     nucleation.nuclei_locations = Kokkos::create_mirror_view_and_copy(TEST_MEMSPACE(), nuclei_locations_host);
+     nucleation.nuclei_grain_id = Kokkos::create_mirror_view_and_copy(TEST_MEMSPACE(), nuclei_grain_id_host);
+ 

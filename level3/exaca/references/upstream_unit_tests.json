@@ -2,7 +2,7 @@
  "schema": "hpcperf-exaca-upstream-unit-tests-1",
  "date": "2026-09-11",
  "question": "Can ExaCA's own (deterministic) GoogleTest unit tests be used as upstream validation evidence for this build?",
- "answer": "They were built and run, but they do NOT pass cleanly in this configuration (30 of 52 pass). They are therefore recorded as evidence and as a follow-up item, and are NOT used as acceptance evidence. The inspected failures are test-side host/device view issues and an invalid test configuration, not demonstrated application defects -- but neither can they be claimed as a passing upstream validation.",
+ "answer": "They were built and run: 30 of 52 passed under CTest. Attribution (same day, see the matrix file) showed 0 application-class failures: 7 TEST_FIXTURE (host/device view handling in unit_test/*.hpp; all pass after a fixture-only patch), 13 UNSUPPORTED_CONFIG (host-space test variants inside a CUDA-enabled build; all pass in a Serial-only build), 2 TEST_INFRA (CTest runs mpiexec without per-rank GPU binding; both pass through the project launcher). Upstream's own small full-application cases pass at 1/2/4 real GPUs within upstream tolerances. Unmodified tests under CTest's own launcher still fail in this environment.",
  "how_built": {
   "gtest": "GoogleTest is not installed in this environment; the artifact carries Kokkos' vendored fused GoogleTest 1.11.0 at deps/kokkos/tpls/gtest (LICENSE + README + gtest.h + gtest-all.cc). It was compiled into a static library in the private build tree and exposed through GTEST_ROOT: a build-side shim, no source change, no system installation, the artifact and the validated benchmark install are untouched.",
   "configure": "cmake -S src -B build/level3/exaca/cuda-unittests -DExaCA_ENABLE_TESTING=ON -DExaCA_REQUIRE_EXTERNAL_JSON=ON -DExaCA_REQUIRE_FINCH=OFF with the benchmark's Kokkos 4.7.04 and nlohmann_json prefixes",
@@ -57,5 +57,7 @@
   "no upstream unit test result is counted as PASS anywhere in this repository",
   "follow-up (not done): a Serial-only test build for the host variants, an upstream report for the mirror-view issues, and an explanation of the Nucleation/Update CUDA failures"
  ],
- "artifacts_local_only": "build/level3/exaca/cuda-unittests (build tree), /tmp scratch logs of the two ctest runs; not committed"
+ "artifacts_local_only": "build/level3/exaca/cuda-unittests (build tree), /tmp scratch logs of the two ctest runs; not committed",
+ "superseded_by": "references/upstream_unit_test_matrix.json (per-test matrix, classifications, retests) -- this file keeps the first observation of 2026-09-11",
+ "correction": "An earlier statement in this repository said upstream had no full-application numerical reference. That was wrong: unit_test/tstUpdate.hpp checks VolFractionNucleated against 0.1882 +- 0.0100 for Inp_SmallDirSolidification.json and TimeStepOfOutput against 4820 +- 1 for Inp_SmallEquiaxedGrain.json. Those references apply to those two SMALL official cases only; they are not transferable to this benchmark's 128^3 dirsolid case and do not relax its frozen statistical protocol."
 }

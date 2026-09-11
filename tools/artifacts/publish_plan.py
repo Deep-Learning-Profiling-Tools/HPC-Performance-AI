@@ -40,6 +40,9 @@ def main():
                 reasons.append(f"retired from the default suite ({ent.get('reason', '')[:60]}...)")
             if ent.get("suite_status") == "candidate" and ent.get("admission") != "admitted":
                 reasons.append("candidate not admitted")
+            acc = ent.get("release_acceptance") or "accepted"
+            if str(acc).startswith(("on_hold", "under_review")):
+                reasons.append(f"release_acceptance={acc}")
             lp = hl.lock_path(d, v)
             lock = hs.load_yaml(lp) if os.path.isfile(lp) else None
             if not lock or lock.get("schema") != hl.LOCK_SCHEMA:

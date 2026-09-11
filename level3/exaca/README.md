@@ -11,8 +11,10 @@ Status (2026-09-11, node dgx003, 4x B200, CUDA 13.2.78): BUILD_PASS; **project-d
 of the `dirsolid` smoke case (128^3, seed 0) at 1/2/4 GPUs -- calibration 2026-09-10 (8 runs), frozen protocol
 v2, independent holdout 2026-09-11 **9/9 PASS**; strong/weak COMPLETED at 1/2/4 GPUs (no acceptance claim);
 40/80 GPUs DRY-RUN only; HIP UNTESTED (no ROCm); multi-node UNVERIFIED. **Admitted 2026-09-11** as the tenth
-application of the default suite (replacement for GEOS) on this basis; there is no upstream oracle for this
-problem, and only the smoke case is validated.
+application of the default suite (replacement for GEOS) on this basis; only the smoke case is validated by that
+protocol. Release acceptance was put **ON_HOLD** the same day when 22 of 52 upstream unit tests were found to
+fail, and **restored** after every failure was attributed (0 application-class failures) and upstream's own
+small full-application cases were shown to pass at 1/2/4 real GPUs -- see the two sections below.
 
 ## Provenance
 
@@ -90,13 +92,14 @@ real spatial differences of competitive growth, not a renumbering. Even a single
 by 1 between rank counts (`references/calibration.json: singlegrain_probe`). The code path consistent with this
 (not an upstream statement): active cells are collected with `Kokkos::atomic_fetch_add` (`src/CAupdate.hpp`
 lines 41/97/108/132) and a contested liquid cell is claimed with `Kokkos::atomic_compare_exchange` on
-`cell_type` (line 208); the winner sets the new octahedron's centre. Upstream's own deterministic checks are its GoogleTest unit tests. They **were** built and run
-(2026-09-11, using the fused GoogleTest 1.11.0 that Kokkos vendors inside the artifact as a build-side shim):
-**30 of 52 pass, 22 fail deterministically** -- host-space test variants abort in a CUDA-enabled build,
-two CUDA suites read device views from the host without a mirror copy, and the Nucleation/Update CUDA failures
-are not yet explained (`references/upstream_unit_tests.json`). They are therefore evidence and a follow-up
-item, **not** acceptance evidence, and no unit-test result is counted as a PASS anywhere here.
-The validation is therefore **project-defined and statistical**; the full protocol, the definition
+`cell_type` (line 208); the winner sets the new octahedron's centre. Upstream's own deterministic checks are its GoogleTest unit tests, and `unit_test/tstUpdate.hpp` additionally
+runs two **complete** official simulations with numerical references (see the next section). The unit tests were
+built and run on 2026-09-11 with the fused GoogleTest 1.11.0 that Kokkos vendors inside the artifact:
+**30 of 52 passed** under CTest, and all 22 failures have since been attributed with before/after evidence
+(`references/upstream_unit_test_matrix.json`): 7 test-fixture bugs, 13 host-space test variants that are invalid
+inside a CUDA-enabled build, 2 caused by CTest launching `mpiexec` without per-rank GPU binding, **0 application
+defects and 0 unresolved**. For the project's own `dirsolid` case the validation remains **project-defined and
+statistical**; the full protocol, the definition
 of the spread, and the calibration/holdout separation are in `references/validation_protocol.md`.
 
 Criteria (each must hold; `references/validation_protocol.yaml` names the frozen files):
@@ -135,6 +138,45 @@ been kept and analysed, and a revised rule would need a new holdout set. Negativ
 (NaN/Inf statistics, unsolidified cells, gap/duplicate/short/wrong-rank decompositions, log/field inconsistency,
 out-of-tolerance statistics, non-finite reference, a stale result standing in for a failed run):
 `level3/tools/tests/test_exaca_validator.sh` (19 checks).
+
+## Upstream tests: what they cover and what they showed
+
+Two independent things live in upstream's test suite:
+
+1. **kernel-level unit tests** (`unit_test/tst*.hpp`): 52 CTest entries here (26 per backend, SERIAL and CUDA,
+   MPI suites at 1/2/4 ranks).
+2. **two complete official simulations** inside `tstUpdate.hpp` (`full_simulations`), each with an upstream
+   numerical reference: `Inp_SmallDirSolidification.json` -> `VolFractionNucleated` = 0.1882 ± 0.0100, and
+   `Inp_SmallEquiaxedGrain.json` -> `TimeStepOfOutput` = 4820 ± 1 (upstream notes a possible race in a FIXME).
+   These references belong to those two small official cases; they are **not** transferable to this benchmark's
+   128³ `dirsolid` case and are not a reason to relax its frozen protocol.
+
+Results (2026-09-11, private test build, Kokkos 4.7.04, artifact source unchanged):
+
+| run | result |
+|---|---|
+| CTest as upstream defines it (`mpiexec -n N`, no per-rank GPU binding), after `cmake --install` | 30/52 pass, 22 fail, identical pattern in two runs |
+| the same CUDA suites with **test-side fixture patches** and one GPU per rank | **23/23 pass** (np1/2/4 where MPI-enabled) |
+| the same SERIAL suites in a **Serial-only Kokkos build** | **23/23 pass** |
+| the two official full simulations through the project launcher | **PASS at 1, 2 and 4 GPUs**: VolFractionNucleated 0.1881 / 0.188 / 0.191 (expect 0.1882 ± 0.0100); TimeStepOfOutput 4820 / 4820 / 4820 (expect 4820 ± 1); launcher audit N verified, 0 mismatch |
+| the same official cases under plain `mpiexec` (no GPU binding) | np1 PASS, np2 and np4 **segfault** inside `runExaCA` (all ranks on GPU 0) |
+
+Attribution of the 22 failures (`references/upstream_unit_test_matrix.json`, per test: name, backend, ranks,
+assertion or exit code, expected vs actual, command, class, evidence):
+
+| class | count | what it is |
+|---|---|---|
+| TEST_FIXTURE | 7 | `tstNucleation` rebinds a local `grain_id` handle with `create_mirror_view_and_copy` instead of writing celldata's own subview (instrumented proof: the subview held 0,0,0 while the handle held 1,2,3); `tstOrientation` reads a `create_mirror_view` that was never copied; `tstInterface` calls two `KOKKOS_INLINE_FUNCTION`s from host loops and indexes the device view `octahedron_center_test` ("DOCenter") on the host. Fixture-only patches in `patches/upstream-tests/` make all of them pass; no expectation was changed. |
+| UNSUPPORTED_CONFIG | 13 | the host-space ("SERIAL") test variants inside a CUDA-enabled build: Kokkos' default execution space is Cuda, so application kernels touch HostSpace views ("attempt to access inaccessible memory space"). They pass in a Serial-only build. |
+| TEST_INFRA | 2 | `ExaCA_Update_test_CUDA` at 2 and 4 ranks: CTest launches `mpiexec` without per-rank GPU assignment. Through the validated launcher the same binary passes and meets both upstream metrics. (6 further tests had failed before `cmake --install`, for the same class of reason: the tests resolve data files through the install prefix.) |
+| APPLICATION | 0 | no failure was traced to the application's own kernels. |
+| UNRESOLVED | 0 | |
+
+The patches are **test code only**, labelled `patched-upstream-tests`, recorded with the upstream commit, the
+target file hashes and their own hashes, and they are **not** part of the frozen artifact or the release payload
+(`patches/upstream-tests/README.json`). Adopting them would require a new `source_version` and a new artifact.
+Therefore: unmodified upstream tests do **not** all pass in this environment, and no unit-test result is counted
+as a PASS in this repository's own totals.
 
 ## RESULTS (2026-09-10, `run/` tree; reference run id 20260910T212610Z-216184-29676, binary sha256 `f2a8875c6565a619...`)
 
