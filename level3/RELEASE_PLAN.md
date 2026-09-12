@@ -1,6 +1,6 @@
 # Release plan: `level3-source-hpcperf-l3-v1-rc1` (source-artifact prerelease, NOT published)
 
-Generated 2026-09-11T23:38:34Z at target commit `c72d669c91579a7d1cfdb5c0110e01de864b7e64`. Provider: GitHub Release assets of `Deep-Learning-Profiling-Tools/HPC-Performance-AI`. Immutable releases on the repository: `{'enabled': False, 'enforced_by_owner': False, 'probed': '2026-09-11 via GET /repos/{owner}/{repo}/immutable-releases (read-only); repository setting not changed'}` -- the project rule (never overwrite or delete an asset; consumers verify size, sha256 and source_tree_sha256) holds regardless. Nothing has been uploaded; every URL below is PLANNED and the locks stay `unpublished` until the asset exists and was re-downloaded and verified.
+Generated 2026-09-12T01:34:59Z at target commit `16dcf18a605c21dfcfb4aaddb2a35aef39bff8ee`. Provider: GitHub Release assets of `Deep-Learning-Profiling-Tools/HPC-Performance-AI`. Immutable releases on the repository: `{'enabled': False, 'enforced_by_owner': False, 'probed': '2026-09-11 via GET /repos/{owner}/{repo}/immutable-releases (read-only); repository setting not changed'}` -- the project rule (never overwrite or delete an asset; consumers verify size, sha256 and source_tree_sha256) holds regardless. Nothing has been uploaded; every URL below is PLANNED and the locks stay `unpublished` until the asset exists and was re-downloaded and verified.
 
 **11 assets, 1.1 GB (1197001594 bytes)** + SHA256SUMS + one SOURCE_MANIFEST per artifact.
 
