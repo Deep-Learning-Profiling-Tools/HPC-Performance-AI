@@ -148,6 +148,8 @@ publish_guard asset-content-mismatch 'digest' "3i: an archive with the same size
 publish_guard manifest-replaced 'digest' "3j: a replaced SOURCE_MANIFEST asset (same name) blocks publication (release stays draft)"
 publish_guard plan-replaced 'digest' "3k: a replaced RELEASE_PLAN.json asset blocks publication (release stays draft)"
 publish_guard asset-not-uploaded 'state' "3l: an asset that is not in state uploaded blocks publication (release stays draft)"
+publish_guard asset-state-missing 'state' "3l2: an asset response WITHOUT a state field is rejected (never assumed uploaded)"
+publish_guard asset-state-null 'state' "3l3: an asset with state=null is rejected"
 # digest-less API: re-download is used, and --no-redownload must then refuse rather than trust the size
 start_mock no-digest
 out="$(cap env HPCPERF_CONFIRM_UPLOAD=yes GITHUB_TOKEN=mock python3 "$ENG" --plan "$PLAN" --mode draft --api-base "http://127.0.0.1:$MOCK_PORT" --timeout 5 --tmpdir "$T/up.nd" --json-out "$T/draft.nd.json")"; rc=$?

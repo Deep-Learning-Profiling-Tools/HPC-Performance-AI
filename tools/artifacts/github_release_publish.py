@@ -25,7 +25,7 @@ Two checks that a release-only view cannot give:
     API's own `digest` when present, otherwise by re-downloading and hashing -- against the reviewed plan
     (archives), the plan-derived SHA256SUMS, the recorded SOURCE_MANIFEST hashes and the local plan file. Equal
     byte sizes are never accepted as evidence, the asset list is paged to completion, and every asset must be in
-    state `uploaded`.
+    state `uploaded` (a missing or null state is rejected).
 
 Modes
   preflight  local only, no network: plan schema, per-asset staging file (size + sha256 == plan), working-tree
@@ -209,8 +209,9 @@ def upload_all(api, plan, plan_path, staging, repo_root, release, tmpdir, log):
             raise Fail(f"upload {name}: response names the asset {resp.get('name')!r}")
         if int(need(resp, "size", f"upload {name}")) != size:
             raise Fail(f"upload {name}: response size {resp.get('size')} != {size}")
-        if resp.get("state") not in (None, "uploaded"):
-            raise Fail(f"upload {name}: asset state {resp.get('state')!r}")
+        state = resp.get("state")
+        if state != "uploaded":
+            raise Fail(f"upload {name}: asset state {state!r} (a missing or null state is not accepted; only 'uploaded' is)")
         aid = need(resp, "id", f"upload {name}")
         blob = api.get(f"/repos/{plan['repository']}/releases/assets/{aid}", accept="application/octet-stream", parse_json=False)
         got = hashlib.sha256(blob).hexdigest()
@@ -307,8 +308,9 @@ def verify_remote_asset_content(api, plan, plan_path, repo_root, rid, log, allow
     by_digest, by_download = 0, 0
     for a in assets:
         name = a["name"]; want_size, want_sha = exp[name]
-        if a.get("state") not in (None, "uploaded"):
-            raise Fail(f"remote asset {name}: state {a.get('state')!r}, expected uploaded")
+        state = a.get("state")
+        if state != "uploaded":
+            raise Fail(f"remote asset {name}: state {state!r}, expected 'uploaded' (a missing or null state is not accepted)")
         if int(a.get("size", -1)) != want_size:
             raise Fail(f"remote asset {name}: size {a.get('size')} != expected {want_size}")
         digest = (a.get("digest") or "").strip()

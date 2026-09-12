@@ -49,7 +49,8 @@
   {
    "class": "unexplained",
    "evidence": "tstNucleation.hpp:311/313/315 (grain_id of the three cells that must not nucleate) fail on the CUDA variants at every rank count; ExaCA_Update_test_CUDA np_2/np_4 abort without a gtest assertion",
-   "conclusion": "not explained; must be investigated before any claim in either direction"
+   "conclusion": "not explained; must be investigated before any claim in either direction",
+   "resolved_by": "RESOLVED on the same day; this entry is kept verbatim as the first observation and its 'conclusion' is the state at that moment, not the current one. tstNucleation 311/313/315 = TEST_FIXTURE: the fixture rebinds a local grain_id handle obtained with create_mirror_view_and_copy instead of writing celldata's subview (instrumented: subview 0,0,0 vs handle 1,2,3); it passes with a fixture-only patch, expectations unchanged. ExaCA_Update_test_CUDA np_2/np_4 = TEST_INFRA: CTest launches mpiexec without per-rank GPU binding, so ranks collide on one device; through the project launcher np1/2/4 pass and reproduce upstream's own references. See references/upstream_unit_test_matrix.json."
   }
  ],
  "consequences": [
@@ -58,6 +59,6 @@
   "follow-up (not done): a Serial-only test build for the host variants, an upstream report for the mirror-view issues, and an explanation of the Nucleation/Update CUDA failures"
  ],
  "artifacts_local_only": "build/level3/exaca/cuda-unittests (build tree), /tmp scratch logs of the two ctest runs; not committed",
- "superseded_by": "references/upstream_unit_test_matrix.json (per-test matrix, classifications, retests) -- this file keeps the first observation of 2026-09-11",
+ "superseded_by": "references/upstream_unit_test_matrix.json (per-test matrix, classifications, retests) -- this file keeps the first observation of 2026-09-11. No class in this file is open: the 'unexplained' entry carries its resolution in 'resolved_by'.",
  "correction": "An earlier statement in this repository said upstream had no full-application numerical reference. That was wrong: unit_test/tstUpdate.hpp checks VolFractionNucleated against 0.1882 +- 0.0100 for Inp_SmallDirSolidification.json and TimeStepOfOutput against 4820 +- 1 for Inp_SmallEquiaxedGrain.json. Those references apply to those two SMALL official cases only; they are not transferable to this benchmark's 128^3 dirsolid case and do not relax its frozen statistical protocol."
 }

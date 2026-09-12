@@ -13,8 +13,10 @@ v2, independent holdout 2026-09-11 **9/9 PASS**; strong/weak COMPLETED at 1/2/4 
 40/80 GPUs DRY-RUN only; HIP UNTESTED (no ROCm); multi-node UNVERIFIED. **Admitted 2026-09-11** as the tenth
 application of the default suite (replacement for GEOS) on this basis; only the smoke case is validated by that
 protocol. Release acceptance was put **ON_HOLD** the same day when 22 of 52 upstream unit tests were found to
-fail, and **restored** after every failure was attributed (0 application-class failures) and upstream's own
-small full-application cases were shown to pass at 1/2/4 real GPUs -- see the two sections below.
+fail, and **restored** after every one of those failures was attributed (no failure fell into the APPLICATION
+class, a statement about these 22 failures in this environment and not a general claim about the application)
+and upstream's own small full-application cases were shown to pass at 1/2/4 real GPUs -- see the two sections
+below.
 
 ## Provenance
 
@@ -97,8 +99,9 @@ runs two **complete** official simulations with numerical references (see the ne
 built and run on 2026-09-11 with the fused GoogleTest 1.11.0 that Kokkos vendors inside the artifact:
 **30 of 52 passed** under CTest, and all 22 failures have since been attributed with before/after evidence
 (`references/upstream_unit_test_matrix.json`): 7 test-fixture bugs, 13 host-space test variants that are invalid
-inside a CUDA-enabled build, 2 caused by CTest launching `mpiexec` without per-rank GPU binding, **0 application
-defects and 0 unresolved**. For the project's own `dirsolid` case the validation remains **project-defined and
+inside a CUDA-enabled build, 2 caused by CTest launching `mpiexec` without per-rank GPU binding, **0 in the
+APPLICATION class and 0 unresolved** -- a classification of those 22 failures here, not a claim that the
+application is free of defects in other environments or in code paths no test covers. For the project's own `dirsolid` case the validation remains **project-defined and
 statistical**; the full protocol, the definition
 of the spread, and the calibration/holdout separation are in `references/validation_protocol.md`.
 
@@ -169,7 +172,7 @@ assertion or exit code, expected vs actual, command, class, evidence):
 | TEST_FIXTURE | 7 | `tstNucleation` rebinds a local `grain_id` handle with `create_mirror_view_and_copy` instead of writing celldata's own subview (instrumented proof: the subview held 0,0,0 while the handle held 1,2,3); `tstOrientation` reads a `create_mirror_view` that was never copied; `tstInterface` calls two `KOKKOS_INLINE_FUNCTION`s from host loops and indexes the device view `octahedron_center_test` ("DOCenter") on the host. Fixture-only patches in `patches/upstream-tests/` make all of them pass; no expectation was changed. |
 | UNSUPPORTED_CONFIG | 13 | the host-space ("SERIAL") test variants inside a CUDA-enabled build: Kokkos' default execution space is Cuda, so application kernels touch HostSpace views ("attempt to access inaccessible memory space"). They pass in a Serial-only build. |
 | TEST_INFRA | 2 | `ExaCA_Update_test_CUDA` at 2 and 4 ranks: CTest launches `mpiexec` without per-rank GPU assignment. Through the validated launcher the same binary passes and meets both upstream metrics. (6 further tests had failed before `cmake --install`, for the same class of reason: the tests resolve data files through the install prefix.) |
-| APPLICATION | 0 | no failure was traced to the application's own kernels. |
+| APPLICATION | 0 | none of these 22 failures was traced to the application's own kernels. The scope is exactly this matrix, on this machine, for the tests upstream ships at commit `d26e59cd`: it is evidence that these failures are not application defects, not evidence that the application has no defects. |
 | UNRESOLVED | 0 | |
 
 The patches are **test code only**, labelled `patched-upstream-tests`, recorded with the upstream commit, the

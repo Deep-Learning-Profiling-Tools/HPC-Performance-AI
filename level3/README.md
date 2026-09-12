@@ -26,7 +26,7 @@ optimization run begins.
 | HIP / ROCm | Build path present in the scripts, **never executed** (no ROCm here). |
 | Workspace coverage | The agent-workspace build/edit loop has been exercised end to end for **LAMMPS only**; other applications carry materialization and historical build/validation evidence. See [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md). |
 | Known limitations | [Section below](#known-limitations) and [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md); Nyx `I_R` is PENDING, GEOS is retired. |
-| ExaCA release acceptance | Put **ON_HOLD** on 2026-09-11 when 22 of 52 upstream unit tests failed, and **restored** the same day after every failure was attributed (0 application defects) and upstream's own small full-application cases passed at 1/2/4 real GPUs. Unmodified upstream tests still fail under CTest's own launcher. [exaca/README.md](exaca/README.md) |
+| ExaCA release acceptance | Put **ON_HOLD** on 2026-09-11 when 22 of 52 upstream unit tests failed, and **restored** the same day after every one of those 22 failures was attributed with before/after evidence and upstream's own small full-application cases passed at 1/2/4 real GPUs. The attribution matrix contains **no application-class failure**, which is a statement about these 22 failures in this environment and **not** a claim that ExaCA is defect-free here or anywhere else. Unmodified upstream tests still fail under CTest's own launcher; the fixture-only test patches that make them pass are in git (`exaca/patches/upstream-tests/`) and are deliberately **not** part of the frozen source artifact. [exaca/README.md](exaca/README.md) |
 
 Development history (how these applications were brought up, what failed and why) lives in
 [APPLICATION_AUDIT.md](APPLICATION_AUDIT.md), [BUILD_STRATEGY.md](BUILD_STRATEGY.md),
@@ -255,9 +255,9 @@ It is not evidence for the other applications.
 Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
 
 This repository's own regression suite (`level3/tools/tests/run_all.sh`, CPU only, no GPU) currently reports
-**239/239 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
+**241/241 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
 comparator 33, verdict classes 18, ExaCA validator 19, source-distribution tools 76, release publication and
-anonymous-fetch API mock 42. These are **this project's** harness, validator and publisher tests. They are a
+anonymous-fetch API mock 44. These are **this project's** harness, validator and publisher tests. They are a
 different thing from an application's own upstream test suite: ExaCA's upstream unit-test result (30/52 as
 upstream runs them) is **not** part of that number and never counted as a pass here.
 
@@ -278,14 +278,19 @@ Criteria differ per application and are **not** all "upstream official validatio
 * upstream full-application reference: ExaCA's two **small official** cases inside its own test suite
   (`VolFractionNucleated` 0.1882 ± 0.0100, `TimeStepOfOutput` 4820 ± 1) -- verified here at 1/2/4 GPUs, and not
   transferable to the 128³ `dirsolid` case;
-* upstream kernel-level unit tests: run for ExaCA (30/52 pass as upstream defines the run; all 22 failures
-  attributed to test-side or configuration causes, 0 application defects,
-  `exaca/references/upstream_unit_test_matrix.json`). No unit-test result is counted as a pass in this
-  repository's own totals.
+* upstream kernel-level unit tests: run for ExaCA. Three separate results, never merged into one sentence:
+  the **first observation** (2026-09-11) was 30 of 52 passing as upstream defines the run; the **attribution**
+  of those 22 failures classifies every one of them as test-side or configuration
+  (`exaca/references/upstream_unit_test_matrix.json`), with zero in the APPLICATION class -- a statement about
+  those 22 failures in this environment, not a general claim about the application; the
+  **patched-upstream-tests** result is 23/23 of the applicable CUDA tests passing with the fixture-only patches
+  in `exaca/patches/upstream-tests/` plus per-rank GPU binding, and 23/23 in a Serial-only build. No unit-test
+  result is counted as a pass in this repository's own totals.
 
 For ExaCA these are three separate statements and must stay separate: (a) the project's statistical `dirsolid`
 smoke protocol passes (calibration + 9/9 holdout); (b) upstream's applicable tests fail as upstream runs them in
-this environment and pass only with test-side fixture patches and per-rank GPU binding; (c) release acceptance
+this environment, and pass only with the test-side fixture patches (in git, not in the artifact) and per-rank
+GPU binding; (c) release acceptance
 was on hold and is now restored on the basis of (a), the attribution of (b), and the official small full cases at
 1/2/4 GPUs.
 
@@ -308,13 +313,17 @@ passes and never enter a performance summary.
 * **ExaCA**: acceptance covers the `dirsolid` case at 128³, seed 0, 1/2/4 GPUs, under a project-defined
   empirical protocol (calibration and holdout separated; 8 + 9 runs; an empirical range rule, **not** a 3σ
   guarantee, and not a general oracle for spatial fields or other sizes). Upstream's kernel-level unit tests
-  give **30/52 passing as upstream runs them** here; all 22 failures are attributed (7 test-fixture, 13
-  host-space variants inside a CUDA build, 2 CTest GPU-binding, 0 application, 0 unresolved) and pass after
-  test-side fixture patches (not in the artifact) or in a Serial-only build
+  gave **30/52 passing as upstream runs them** when first observed here, and unmodified upstream tests under
+  CTest's own launcher still fail in this environment today. All 22 failures are attributed (7 test-fixture, 13
+  host-space variants inside a CUDA build, 2 CTest GPU-binding, 0 application, 0 unresolved); `0 application`
+  describes this attribution matrix only and is not a claim that the application has no defects in other
+  environments or in untested code paths
   ([exaca/references/upstream_unit_test_matrix.json](exaca/references/upstream_unit_test_matrix.json)).
-  Upstream's two small full-application cases pass at 1/2/4 GPUs within upstream tolerances. Release acceptance
-  was ON_HOLD and is restored on that basis; the Finch coupling, `FromFile` problems and other sizes remain
-  unexercised.
+  Separately, with the fixture-only test patches applied (they live in git under
+  [exaca/patches/upstream-tests/](exaca/patches/upstream-tests/) and are **not** inside the frozen source
+  artifact) the applicable CUDA tests pass 23/23, as they do in a Serial-only build. Upstream's two small
+  full-application cases pass at 1/2/4 GPUs within upstream tolerances. Release acceptance was ON_HOLD and is
+  restored on that basis; the Finch coupling, `FromFile` problems and other sizes remain unexercised.
 * **QMCPACK**: walker count and cuSOLVER behaviour constrain the validated case; this is a property of that
   case, not a universal limit. [qmcpack/README.md](qmcpack/README.md).
 * **Not rebuilt from a materialized workspace**: eight applications keep historical build evidence only.

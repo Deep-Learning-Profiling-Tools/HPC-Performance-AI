@@ -10,7 +10,7 @@ that the error paths can be tested without touching the real API:
   none unauthorized forbidden notfound-commit tag-exists unprocessable server-error-upload invalid-json
   wrong-id truncated-asset asset-exists timeout incomplete-set publish-not-applied
   git-tag-exists-elsewhere annotated-tag-wrong-commit asset-content-mismatch manifest-replaced plan-replaced
-  asset-not-uploaded no-digest
+  asset-not-uploaded asset-state-missing asset-state-null no-digest
 Prints "MOCK_READY <port>" on stdout when listening.
 """
 import argparse
@@ -95,8 +95,13 @@ class H(BaseHTTPRequestHandler):
             for a in STATE["assets"].values():
                 if a["release"] != rid:
                     continue
-                it = {"id": a["id"], "name": a["name"], "size": a["size"],
-                      "state": "starter" if f == "asset-not-uploaded" else "uploaded"}
+                it = {"id": a["id"], "name": a["name"], "size": a["size"]}
+                if f == "asset-not-uploaded":
+                    it["state"] = "starter"
+                elif f == "asset-state-null":
+                    it["state"] = None
+                elif f != "asset-state-missing":          # asset-state-missing: no state key at all
+                    it["state"] = "uploaded"
                 if f != "no-digest":
                     it["digest"] = "sha256:" + hashlib.sha256(a["data"]).hexdigest()
                 items.append(it)
@@ -165,7 +170,12 @@ class H(BaseHTTPRequestHandler):
                     stored = bytes([b ^ 0x01 for b in body])
                 aid = nid()
                 STATE["assets"][aid] = {"id": aid, "release": rid, "name": name, "size": len(stored), "data": stored}
-            return self._send(201, {"id": aid, "name": name, "size": len(body), "state": "uploaded"})
+            resp = {"id": aid, "name": name, "size": len(body)}
+            if f == "asset-state-null":
+                resp["state"] = None
+            elif f != "asset-state-missing":
+                resp["state"] = "uploaded"
+            return self._send(201, resp)
         self._send(404, {"message": "Not Found"})
 
     def do_PATCH(self):
