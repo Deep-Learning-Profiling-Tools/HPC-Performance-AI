@@ -15,12 +15,12 @@ source artifact (upstream commit, patch series, archive SHA-256, source-tree has
 `tools/prepare_benchmark.sh` restores the complete `src/` and `deps/` trees before any build or LLM
 optimization run begins.
 
-## Current availability (2026-09-11)
+## Current availability (2026-09-12)
 
 | | state |
 |---|---|
-| Source artifacts | **Not published yet.** No release exists; every `provenance/source.lock*.yaml` records `primary: {url: null, status: unpublished}`. Preparation currently requires a locally supplied artifact file (`--artifact`). |
-| Code | On the pull-request branch `level3/source-freeze` (PR #5, draft, base `main`). **Not merged into `main`**: a plain clone of `main` does not yet contain these tools. |
+| Source artifacts | **Published** on 2026-09-12 as the prerelease [`level3-source-hpcperf-l3-v1-rc1`](https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/tag/level3-source-hpcperf-l3-v1-rc1): 11 archives, `SHA256SUMS`, one `SOURCE_MANIFEST` per artifact and the release plan. Every archive was downloaded anonymously, with no credentials, and verified against the hashes the locks already carried. `prepare_benchmark.sh` now downloads without `--artifact`. |
+| Code | On the pull-request branch `level3/source-freeze` (PR #5, draft, base `main`). **Not merged into `main`**: a plain clone of the default branch still does **not** contain these tools, so you must check out the branch or the release tag. Publishing the artifacts changed nothing about that. |
 | Validated hardware | One node, 4 × NVIDIA B200 (CUDA 13.2.78, driver 595.58.03), conda GCC 13.3.0, Open MPI 5.0.10. **CUDA backend only.** |
 | Scale | Single node, 1/2/4 GPUs. 8/40/80 GPUs exist as dry-run plans only. Multi-node is **unverified/blocked** on this site. |
 | HIP / ROCm | Build path present in the scripts, **never executed** (no ROCm here). |
@@ -90,12 +90,14 @@ results is single-node and its transport settings are not a cross-node configura
 All commands are run **from the repository root**, after `./setup_env.sh` (once) and
 `source hpcperf_env.sh` (each shell), inside a GPU allocation.
 
-**A. Once artifacts are published and this work is merged** (not yet true -- see
-[Current availability](#current-availability-2026-09-11)):
+**A. Today** (artifacts published; the code is on the PR branch, **not** in `main`). Clone, check out the
+branch or the release tag, and `prepare` downloads the artifact from the release and verifies it against the
+lock. This is the path that was exercised anonymously, from a clean clone with an empty cache:
 
 ```bash
 git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
 cd HPC-Performance-AI
+git checkout level3/source-freeze            # or: git checkout level3-source-hpcperf-l3-v1-rc1
 source hpcperf_env.sh
 
 tools/prepare_benchmark.sh level3 lammps          # downloads, verifies and unpacks the source artifact
@@ -103,8 +105,8 @@ level3/lammps/build.sh CUDA
 HPCPERF_GPUS=2 HPCPERF_SCALE_MODE=smoke level3/lammps/validate.sh CUDA
 ```
 
-**B. Today** (branch `level3/source-freeze`, artifacts unpublished): the artifact must be supplied as a local
-file that you obtained separately; `prepare` verifies it exactly as it would verify a download.
+**B. Offline or from a local copy**: supply the artifact as a file you obtained separately. `prepare` verifies
+it exactly as it verifies a download, so an air-gapped machine needs no network at all.
 
 ```bash
 git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
@@ -124,7 +126,7 @@ or scaling runs. There is no `prepare-all` command: prepare each benchmark you i
 For nekRS, choose the variant once and use it for every step:
 
 ```bash
-tools/prepare_benchmark.sh level3 nekrs --variant hypregpu --artifact /path/to/nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+tools/prepare_benchmark.sh level3 nekrs --variant hypregpu      # add --artifact FILE to use a local copy
 level3/nekrs/build.sh CUDA
 HPCPERF_GPUS=2 level3/nekrs/validate.sh CUDA
 ```
@@ -250,14 +252,14 @@ It is not evidence for the other applications.
 | Scientific validation | See the per-application README for the criterion and the date; several results are historical runs on trees proven content-equivalent to the artifacts. |
 | Workspace multi-GPU | LAMMPS: 1 and 2 GPUs inside a workspace. Others: not run in a workspace. |
 | GPU binding | Recorded per run from the launcher audit (`N verified, 0 mismatch`); short runs can end before the sampler observes them and are reported as `unverified`, which is an observation gap, not a mismatch. |
-| Remote fetch by an ordinary user | Not run: nothing is published. |
+| Remote fetch by an ordinary user | **VERIFIED** on 2026-09-12 for all 11 artifacts, twice: an anonymous download from the release URL checked against the locks' own hashes, then a clean clone of the lock-update commit with an empty cache and an ordinary `prepare_benchmark.sh`. No credential was present in either check. |
 
 Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
 
 This repository's own regression suite (`level3/tools/tests/run_all.sh`, CPU only, no GPU) currently reports
-**241/241 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
+**242/242 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
 comparator 33, verdict classes 18, ExaCA validator 19, source-distribution tools 76, release publication and
-anonymous-fetch API mock 44. These are **this project's** harness, validator and publisher tests. They are a
+anonymous-fetch API mock 45. These are **this project's** harness, validator and publisher tests. They are a
 different thing from an application's own upstream test suite: ExaCA's upstream unit-test result (30/52 as
 upstream runs them) is **not** part of that number and never counted as a pass here.
 
