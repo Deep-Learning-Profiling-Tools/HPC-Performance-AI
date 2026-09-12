@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: cp2k
+variant: null
+source_version: hpcperf-l3-v1
+artifact: cp2k-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/cp2k-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.yaml (size, archive sha256, source_tree_sha256)
+size: 210932689
+archive_sha256: d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2
+source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:43:25Z'

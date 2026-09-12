@@ -51,6 +51,11 @@ def main():
     cache = a.cache or tempfile.mkdtemp(prefix="hpcperf-anon-cache-")
     scratch = a.scratch or tempfile.mkdtemp(prefix="hpcperf-anon-extract-")
     owned = (a.cache is None, a.scratch is None)
+    # a caller-supplied --cache/--scratch may name a directory that does not exist yet (remote_fetch_check.sh
+    # hands out paths inside a fresh mktemp -d); create them here, otherwise the decompression step fails with
+    # "No such file or directory" after a perfectly good download
+    for d in (cache, scratch):
+        os.makedirs(d, exist_ok=True)
     log = lambda m: print(f"verify_published_artifact: {m}", flush=True)  # noqa: E731
     try:
         log(f"anonymous download of {art['filename']} ({art['size']} B) from {a.url}")

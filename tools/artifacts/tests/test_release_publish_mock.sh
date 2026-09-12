@@ -185,6 +185,11 @@ for i in $(seq 1 50); do HPORT="$(sed -n 's/^HTTP_READY //p' "$T/http.log" | hea
 LOCK="$RT/level3/mini/provenance/source.lock.yaml"
 out="$(cap env -u GITHUB_TOKEN -u GH_TOKEN HPCPERF_ALLOW_INSECURE_FETCH=1 python3 "$RT/tools/artifacts/verify_published_artifact.py" --lock "$LOCK" --url "http://127.0.0.1:$HPORT/mini-hpcperf-l3-v1.tar.zst" --record "$T/rec.yaml")"; rc=$?
 [ $rc -eq 0 ] && echo "$out" | grep -q 'REMOTE ARTIFACT VERIFIED' && grep -q 'expected_identity_source' "$T/rec.yaml" && ok "4a: anonymous download verified against the lock's identity (URL from the plan, hashes from the lock)" || bad "4a: rc=$rc $(echo "$out" | tail -2)"
+
+# 4a2: remote_fetch_check.sh hands out --cache/--scratch paths inside a fresh mktemp -d, i.e. directories that do
+# not exist yet. They must be created, not assumed (this failed against the live release after a good download).
+out="$(cap env -u GITHUB_TOKEN -u GH_TOKEN HPCPERF_ALLOW_INSECURE_FETCH=1 python3 "$RT/tools/artifacts/verify_published_artifact.py" --lock "$LOCK" --url "http://127.0.0.1:$HPORT/mini-hpcperf-l3-v1.tar.zst" --cache "$T/absent-cache/sub" --scratch "$T/absent-scratch/sub")"; rc=$?
+[ $rc -eq 0 ] && echo "$out" | grep -q 'REMOTE ARTIFACT VERIFIED' && ok "4a2: a --cache/--scratch directory that does not exist yet is created, not assumed" || bad "4a2: rc=$rc $(echo "$out" | tail -2)"
 out="$(cap env GITHUB_TOKEN=x HPCPERF_ALLOW_INSECURE_FETCH=1 python3 "$RT/tools/artifacts/verify_published_artifact.py" --lock "$LOCK" --url "http://127.0.0.1:$HPORT/mini-hpcperf-l3-v1.tar.zst")"; rc=$?
 [ $rc -ne 0 ] && echo "$out" | grep -q 'not an anonymous fetch' && ok "4b: a token in the environment makes the anonymous check refuse" || bad "4b: rc=$rc"
 out="$(cap env -u GITHUB_TOKEN -u GH_TOKEN python3 "$RT/tools/artifacts/verify_published_artifact.py" --lock "$LOCK" --url "http://127.0.0.1:$HPORT/mini-hpcperf-l3-v1.tar.zst")"; rc=$?

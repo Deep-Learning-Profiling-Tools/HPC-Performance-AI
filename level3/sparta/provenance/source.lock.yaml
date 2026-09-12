@@ -31,8 +31,8 @@ artifact:
   symlink_count: 1
   immutable: true
   primary:
-    url: null
-    status: unpublished
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/sparta-hpcperf-l3-v1.tar.zst
+    status: published
   mirrors: []
 cache:
   content_addressed: true
