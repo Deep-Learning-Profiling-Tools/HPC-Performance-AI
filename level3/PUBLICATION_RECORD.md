@@ -53,8 +53,10 @@ check was relaxed or skipped to get past it.
 
 * It is a **source-artifact prerelease**. It does not assert that the ten applications are validated on any
   machine other than this one, nor that HIP, multi-node, or the 8/40/80-GPU plans work anywhere.
-* The code is **not merged into `main`**. A plain clone of the default branch does not contain these tools; the
-  branch `level3/source-freeze` or the release tag must be checked out.
+* The code is **not merged into `main`**. A plain clone of the default branch does not contain these tools; check out
+  the branch `level3/source-freeze` until PR #5 is merged, then `main`. The release tag is the identity of the commit the
+  artifacts were cut from (its locks still say `unpublished`), not a harness entry point: a plain `prepare` at that tag
+  does not download.
 * Scientific status is unchanged by publication: Nyx `LyA` heat/cool stays `I_R_CHECK_PENDING`, eight
   applications keep historical build evidence rather than a workspace rebuild, ExaCA's acceptance remains the
   project-defined `dirsolid` protocol plus upstream's two small official cases, and unmodified upstream ExaCA

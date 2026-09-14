@@ -20,7 +20,7 @@ optimization run begins.
 | | state |
 |---|---|
 | Source artifacts | **Published** on 2026-09-12 as the prerelease [`level3-source-hpcperf-l3-v1-rc1`](https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/tag/level3-source-hpcperf-l3-v1-rc1): 11 archives, `SHA256SUMS`, one `SOURCE_MANIFEST` per artifact and the release plan. Every archive was downloaded anonymously, with no credentials, and verified against the hashes the locks already carried. `prepare_benchmark.sh` now downloads without `--artifact`. |
-| Code | On the pull-request branch `level3/source-freeze` (PR #5, draft, base `main`). **Not merged into `main`**: a plain clone of the default branch still does **not** contain these tools, so you must check out the branch or the release tag. Publishing the artifacts changed nothing about that. |
+| Code | On the pull-request branch `level3/source-freeze` (PR #5, draft, base `main`). **Not merged into `main`**: a plain clone of the default branch still does **not** contain these tools, so check out that branch until the PR is merged; afterwards `main` is the entry. The release tag `level3-source-hpcperf-l3-v1-rc1` is **not** an entry point: it names the commit the artifacts were cut from, whose locks still say `url: null, status: unpublished`, so a plain `prepare` at that tag cannot download anything. The real URLs entered the locks in a later commit on the branch. |
 | Validated hardware | One node, 4 × NVIDIA B200 (CUDA 13.2.78, driver 595.58.03), conda GCC 13.3.0, Open MPI 5.0.10. **CUDA backend only.** |
 | Scale | Single node, 1/2/4 GPUs. 8/40/80 GPUs exist as dry-run plans only. Multi-node is **unverified/blocked** on this site. |
 | HIP / ROCm | Build path present in the scripts, **never executed** (no ROCm here). |
@@ -94,13 +94,16 @@ All commands are run **from the repository root**, after `./setup_env.sh` (once)
 `source hpcperf_env.sh` (each shell), inside a GPU allocation.
 
 **A. Today** (artifacts published; the code is on the PR branch, **not** in `main`). Clone, check out the
-branch or the release tag, and `prepare` downloads the artifact from the release and verifies it against the
-lock. This is the path that was exercised anonymously, from a clean clone with an empty cache:
+PR branch, and `prepare` downloads the artifact from the release and verifies it against the lock. This is the
+path that was exercised anonymously, from a clean clone with an empty cache. Once PR #5 is merged, drop the
+`git checkout` line and use `main`. Do **not** check out the release tag `level3-source-hpcperf-l3-v1-rc1` for
+this: it marks the commit the artifacts were built from, before the locks received their download URLs, so a
+plain `prepare` there reports the artifact as unpublished.
 
 ```bash
 git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
 cd HPC-Performance-AI
-git checkout level3/source-freeze            # or: git checkout level3-source-hpcperf-l3-v1-rc1
+git checkout level3/source-freeze            # until PR #5 is merged; afterwards stay on main
 source hpcperf_env.sh
 
 tools/prepare_benchmark.sh level3 lammps          # downloads, verifies and unpacks the source artifact

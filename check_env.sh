@@ -87,6 +87,11 @@ if python -c "import numpy, scipy" 2>/dev/null; then
 else
     fail "numpy/scipy not importable in the active python"
 fi
+if python -c "import yaml" 2>/dev/null; then
+    ok "PyYAML importable ($(python -c 'import yaml; print(yaml.__version__)'); needed by the Level 3 harness tools)"
+else
+    fail "PyYAML not importable in the active python (tools/prepare_benchmark.sh, check_workspace.py and the freeze tools need it; rerun ./setup_env.sh)"
+fi
 
 # --- CUDA (system-provided; NOT installed by setup_env.sh)
 if [ -n "${CUDA_HOME:-}" ] && [ -x "$CUDA_HOME/bin/nvcc" ]; then

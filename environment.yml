@@ -20,6 +20,7 @@ dependencies:
   - numpy=2.5.2                # used by the verify.py correctness checks
   - scipy=1.18.0
   - perl=5.32.1                # runs .tools/bin/cloc (cloc is not on conda-forge)
+  - pyyaml=6.0.3               # Level 3 harness tools (source locks, benchmark.yaml, freeze specs, workspace checks)
   # ---- Level 2 mini-app dependencies (added 2026-09-01) ----------------------
   # CUDA-aware Open MPI (conda-forge "cuda" build variant, pinned by build
   # string so the solver picks the same variant on every machine).
