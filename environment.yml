@@ -31,3 +31,5 @@ dependencies:
   - fftw=3.3.11=mpi_openmpi_*  # heFFTe (Cabana) CPU backend
   - hdf5=2.2.0=mpi_openmpi_*   # parallel HDF5 (Cabana / ExaMPM / branson optional)
   - libpnetcdf=1.15.0=mpi_openmpi_*  # miniWeather output
+  - libnetcdf=4.10.1=mpi_openmpi_*   # Exodus/Ioss inside the Trilinos build for MiniEM (level2/miniem)
+  - gtest=1.17.0               # TPL the Trilinos STK packages declare as required even with tests off (MiniEM dependency build)

@@ -7,7 +7,7 @@ An End-to-End AI Framework for Performance Prediction and Optimization in HPC Ap
 | Level | Content | Status |
 |-------|---------|--------|
 | [level1/](level1/) | 50 standalone GPU benchmarks (independently buildable / runnable / validatable) | 50/50 working, CUDA-validated |
-| [level2/](level2/) | 20 proxy applications / mini-apps (upstream build systems kept, wrapped by `build.sh` / `run.sh` / `validate.sh`) | 19/20 working, CUDA-validated; MiniEM pending (Trilinos) |
+| [level2/](level2/) | 20 proxy applications / mini-apps (upstream build systems kept, wrapped by `build.sh` / `run.sh` / `validate.sh`) | 20/20 working, CUDA-validated (MiniEM added 2026-09-14 on a Trilinos dependency) |
 | [level3/](level3/) | 10 production / end-to-end HPC applications, multi-GPU, with frozen source artifacts restored by `tools/prepare_benchmark.sh` (see [level3/README.md](level3/README.md)) | 10 applications brought up and CUDA-validated at 1/2/4 GPUs on one node (criteria and evidence levels per application); source artifacts **published** on 2026-09-12 as the prerelease `level3-source-hpcperf-l3-v1-rc1` and verified by an anonymous download; the code itself is **not merged into `main`** yet, so check out the PR branch `level3/source-freeze` (the release tag is the artifacts' source identity, not an entry point) |
 
 Level 1 benchmarks are extracted (or faithfully ported) from six upstream
