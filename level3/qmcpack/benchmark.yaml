@@ -1,0 +1,51 @@
+name: qmcpack
+level: 3
+application: QMCPACK
+description: QMCPACK v4.4.0 (OpenMP target offload + CUDA, private LLVM 23.1 toolchain); diamondC_2x1x1_pp VMC+DMC batched
+  drivers at 1/2/4 GPUs
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU, OpenMP threads per rank = walker crowds (8)
+default_scale_mode: smoke
+scale_modes:
+  smoke: qmc_short_vmcbatch_dmcbatch.in.xml verbatim (256 walkers), validated 1/2/4 GPUs 2026-09-06 (historical; not re-run
+    in the 2026-09-07 regression)
+  strong: 256 walkers total over N GPUs, completed 1/2/4 GPU runs; the 4096-walker series FAILED (cuSOLVER INTERNAL_ERROR,
+    ~320 MB device memory per walker)
+  weak: 256 walkers per GPU, completed 1/2/4 GPU runs; 1024 walkers/GPU FAILED (same cause); run.sh refuses > 300 walkers/GPU
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only (HYPOTHETICAL), never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh + private LLVM 23.1.0 offload toolchain (toolchain/build_llvm.sh; HPCPERF_QMCPACK_LLVM
+  overrides its location), CUDA 13.2.78, Open MPI 5.0.10, FFTW3 (conda), libxml2 (system)
+install_root: .deps/level3/qmcpack/clang231-cuda132-offload
+dependency_installs:
+- install/llvm
+- install/openblas
+- install/hdf5
+- install/boost-1.90.0
+inputs:
+- src/tests/solids/diamondC_2x1x1_pp/qmc_short_vmcbatch_dmcbatch.in.xml
+- src/tests/solids/diamondC_2x1x1_pp/C.BFD.xml
+- src/tests/solids/diamondC_2x1x1_pp/pwscf.pwscf.h5
+references:
+- src/tests/scripts/check_scalars.py
+source_version: hpcperf-l3-v1
+source_tree_sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+source_artifact:
+  filename: qmcpack-hpcperf-l3-v1.tar.zst
+  archive_sha256: 6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3
+  source_tree_sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+  size: 225420139
+  uncompressed_size: 559170675
+  file_count: 8344
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: v4.4.0
+redistribution_status: cleared
+suite_status: retained

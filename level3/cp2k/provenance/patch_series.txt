@@ -1,0 +1,2 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch	7fa17badfbe47c80c94a82a5f8da2c1ab7237823ed1d6487391b013b4b590afa	B	cp2k/cp2k commit 378b2fab (B200 GPU_ARCH_NUMBER 100 for DBCSR, parameters_H100 reused)	src/tools/toolchain/install_cp2k_toolchain.sh,src/tools/toolchain/scripts/stage9/install_dbcsr.sh

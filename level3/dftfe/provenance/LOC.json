@@ -1,0 +1,115 @@
+{
+ "benchmark": "dftfe",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30",
+ "test_code_loc": {
+  "code": 314,
+  "files": 18,
+  "languages": {
+   "Bourne Shell": 204,
+   "Bourne Again Shell": 86,
+   "CMake": 24
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 107718,
+  "files": 358,
+  "languages": {
+   "C++": 86410,
+   "C/C++ Header": 21187,
+   "Windows Module Definition": 104,
+   "Markdown": 17
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 12784642,
+  "files": 37060,
+  "languages": {
+   "C": 6088044,
+   "CSV": 8519,
+   "Python": 13166,
+   "Markdown": 12481,
+   "YAML": 6786,
+   "Fortran 90": 95024,
+   "C++": 868029,
+   "C/C++ Header": 2929753,
+   "Ruby": 795,
+   "CMake": 38339,
+   "TeX": 57548,
+   "Bourne Shell": 108004,
+   "TOML": 63,
+   "reStructuredText": 32,
+   "make": 125949,
+   "Text": 6059,
+   "HTML": 202015,
+   "PHP": 15205,
+   "SVG": 3950,
+   "diff": 1392,
+   "Perl": 6349,
+   "Assembly": 1091325,
+   "MATLAB": 1328,
+   "Fortran 77": 1028099,
+   "Jupyter Notebook": 748,
+   "Windows Module Definition": 718,
+   "XML": 17048,
+   "CSS": 3818,
+   "Bourne Again Shell": 2839,
+   "m4": 40520,
+   "ERB": 217,
+   "ReasonML": 192,
+   "GLSL": 133,
+   "Dockerfile": 53,
+   "DTD": 15,
+   "DOS Batch": 14,
+   "JavaScript": 6411,
+   "CUDA": 2909,
+   "Cython": 179,
+   "R": 113,
+   "Meson": 107,
+   "Prolog": 54,
+   "Groovy": 14,
+   "JSON": 137,
+   "INI": 132,
+   "awk": 17
+  },
+  "tarballs": {
+   "deps/alglib/alglib-4.06.0.cpp.gpl.tgz": 519557,
+   "deps/dealii/dealii-9.6.2.tar.gz": 3081193,
+   "deps/elpa/elpa-2026.02.001.tar.gz": 315862,
+   "deps/kokkos/4.6.00.tar.gz": 231374,
+   "deps/libxc/libxc-7.0.0.tar.gz": 3795605,
+   "deps/openblas/OpenBLAS-0.3.30.tar.gz": 3876648,
+   "deps/p4est/p4est-2.8.7.tar.gz": 394135,
+   "deps/scalapack/v2.2.2.tar.gz": 419635
+  }
+ },
+ "unclassified": {
+  "code": 3518,
+  "files": 20,
+  "languages": {
+   "Bourne Shell": 1318,
+   "C++": 676,
+   "CMake": 615,
+   "Python": 593,
+   "YAML": 136,
+   "Bourne Again Shell": 135,
+   "Markdown": 45
+  }
+ },
+ "total_materialized_code_loc": 12896192,
+ "summary": {
+  "application_owned_code_loc": 107718,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 12784642,
+  "test_code_loc": 314,
+  "total_materialized_code_loc": 12896192,
+  "unclassified_code_loc": 3518
+ }
+}

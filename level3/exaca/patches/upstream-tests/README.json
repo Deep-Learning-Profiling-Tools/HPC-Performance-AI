@@ -1,0 +1,42 @@
+{
+ "schema": "hpcperf-upstream-test-patches-1",
+ "label": "patched-upstream-tests",
+ "upstream": {
+  "repository": "https://github.com/LLNL/ExaCA",
+  "commit": "d26e59cd51e241a327c5267d43fd70537e5425f7",
+  "tag": "2.1.0"
+ },
+ "scope": "TEST CODE ONLY (unit_test/*.hpp). No production source, no expectation, no tolerance and no input deck is changed; every EXPECT_* and its expected value is kept verbatim.",
+ "status": "NOT part of the frozen source artifact and NOT part of the release payload; applied only in the private test workspace used for this attribution. The frozen archive, its source_tree_sha256 and all nine other artifacts are unchanged.",
+ "if_adopted": "adopting these patches into the benchmark source would produce a NEW source_version, a new source_tree_sha256 and a new artifact; the current identity would not be overwritten.",
+ "apply": "patch -p1 -d <copy of level3/exaca/src> < <patch>  (a copy, never the materialized canonical tree)",
+ "patches": [
+  {
+   "patch": "level3/exaca/patches/upstream-tests/tstNucleation.test-fixture.patch",
+   "patch_sha256": "f6ff09d2339370980f1f59a9c78a47fb76013fd77f4eb91347b7a308aa54e0c4",
+   "target": "unit_test/tstNucleation.hpp",
+   "target_upstream_sha256": "fc2079722080ebcbf42873c312ddfdeac429ca84380b0a7328ad3329104136fa",
+   "reason": "create_mirror_view_and_copy(TEST_MEMSPACE(), grain_id_host) rebinds the local `grain_id` handle to a NEW device View, so the fixture's initial grain IDs 1/2/3 never reach celldata's own grain-ID subview, which nucleateGrain and the assertions read. Confirmed by instrumentation: aliases_celldata=0, celldata_subview[2,6,8]=0,0,0 while the local handle held 1,2,3. Fixed by deep_copy into celldata.getGrainIDSubview(grid)."
+  },
+  {
+   "patch": "level3/exaca/patches/upstream-tests/tstOrientation.test-fixture.patch",
+   "patch_sha256": "674788bf44be7a277d0d9ccbb15dd30b6cc499b4c98288a835102048eba724a8",
+   "target": "unit_test/tstOrientation.hpp",
+   "target_upstream_sha256": "5174a563c36992a4a4b7e84ca17c64a505df6a03de83934c97d01f6aeffe93b8",
+   "reason": "create_mirror_view (no copy) is read as if it held the kernel's result; on CUDA it reads uninitialised host memory. Fixed by create_mirror_view_and_copy."
+  },
+  {
+   "patch": "level3/exaca/patches/upstream-tests/tstInterface.test-fixture.patch",
+   "patch_sha256": "989179c05db277454f73890fbf910bfcc13a35b36e5580d2ec182c7e7fd3bc6c",
+   "target": "unit_test/tstInterface.hpp",
+   "target_upstream_sha256": "35cb5da29f19753f0792c9a6dfbc2da097c7669f9f322cf1b97734d07f19b519",
+   "reason": "three problems: the same grain-ID subview aliasing as tstNucleation; calcCritDiagonalLength and createNewOctahedron (KOKKOS_INLINE_FUNCTIONs writing device Views) are called from host loops; and the DEVICE view octahedron_center_test (label \"DOCenter\") is indexed on the host for their arguments. Fixed by writing into celldata's subview and by running the same calls/expressions inside kernels."
+  }
+ ],
+ "verification": {
+  "method": "each suite run before and after the patch through the validated launcher (one GPU per rank), same binary otherwise",
+  "cuda_after_patch": "23/23 tests pass (all suites, np1/2/4 where applicable)",
+  "serial_after_patch": "23/23 tests pass in a separate Serial-only Kokkos build",
+  "evidence": ".hpcperf/test-evidence/exaca-unit-tests/2026-09-11-attribution/ (gitignored: logs, matrices)"
+ }
+}

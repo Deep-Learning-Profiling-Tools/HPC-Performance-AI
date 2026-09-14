@@ -1,0 +1,59 @@
+schema: hpcperf-agent-workspace-verification-1
+benchmark: level3/lammps
+source_version: hpcperf-l3-v1
+canonical_source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
+verdict: PASS
+date: 2026-09-10
+node: dgx003 (4x NVIDIA B200, CUDA 13.2.78, conda GCC 13.3.0, Open MPI 5.0.10)
+run_id: loop-001
+workspace_location: outside the repository (a sibling directory of the clone; no symlink from the workspace resolves into the repository)
+driver: maintainer script (steps below), every step's exit code recorded
+steps:
+  - {step: 01, action: "tools/prepare_benchmark.sh level3 lammps --status on the canonical directory", expected: READY, rc: 0}
+  - {step: 02, action: "tools/create_agent_workspace.sh level3 lammps loop-001 --dest <outside-repo>", expected: "real copy, baseline written", rc: 0, note: "workspace_initial_tree_sha256 == canonical"}
+  - {step: 03, action: "tools/check_workspace.py <ws> (baseline mode, iteration 0)", expected: "PASS 17/17", rc: 0}
+  - {step: 04, action: "inject '#error HPCPERF_INJECTED_COMPILE_ERROR_loop001' at the top of src/src/KOKKOS/pair_lj_cut_kokkos.cpp (modifiable, application-owned GPU kernel source)", rc: 0}
+  - {step: 05, action: "tools/check_workspace.py --agent-mode --iteration 1", expected: "PASS (1 modified file inside the modifiable scope, readonly ranges intact)", rc: 0}
+  - {step: 06, action: "./build.sh CUDA inside the workspace", expected: FAIL, rc: 1, note: "the injected #error appears in the workspace build log; no lmp_kokkos_cuda binary exists afterwards (steps 06b/06c rc 0); 290 s until the failure with -j32"}
+  - {step: 07, action: "restore the file (byte-identical to the canonical copy)", rc: 0}
+  - {step: 08, action: "./build.sh CUDA inside the workspace", expected: BUILD_PASS, rc: 0, note: "90 s (incremental after the aborted build); binary sha256 622258b3f162f0c740863d9d06de59cf775fbc3f5a946385d1af04ca3637de8b"}
+  - {step: 09, action: "tools/validate_workspace.sh level3 lammps <ws> --iteration 2 --skip-build -- CUDA", expected: PASS, rc: 0, note: "LAMMPS CUDA validation (1 GPU, bench/in.lj vs log.15Jul25.lj.fixed.g++.1): PASS; launcher audit 1 verified, 0 mismatch; verdict recorded with source hash d7549c2f... and binary sha256 622258b3..."}
+  - {step: 10, action: "append a comment line to pair_lj_cut_kokkos.cpp (agent edit), tools/validate_workspace.sh --iteration 3 (build + validate)", expected: "recompiled, PASS", rc: 0, note: "check reports the modified file; Ninja recompiled pair_lj_cut_kokkos.cpp; NEW binary sha256 423fc91be978c0d9f03a8036456ffd59d35a01c11d87e16d6c034e8cdec7f9d5 (different from step 08); validation PASS on the new binary; current source hash 523cb1a46b51a76c... != baseline. The nvidia-smi sampling of this few-second run reported 'unverified' (no observation), not a mismatch."}
+  - {step: 11, action: "append a line to validate.sh in the workspace, tools/validate_workspace.sh --iteration 4", expected: REFUSED, rc: 3, note: "READONLY TAMPERING detected by the agent-mode check; nothing built or run; verdict REFUSED recorded"}
+  - {step: 11b, action: "append a line to src/bench/log.15Jul25.lj.fixed.g++.1 (reference), --iteration 5", expected: REFUSED, rc: 3}
+  - {step: 11c, action: "restore both files, --iteration 6 --skip-build", expected: PASS, rc: 0}
+  - {step: 12, action: "canonical level3/lammps tree hash before == after; tools/check_workspace.py level3/lammps --quick", expected: "unchanged, PASS", rc: 0}
+  - {step: 13, action: "no symlink under the workspace resolves into the repository", rc: 0}
+  - {step: 14, action: "build.ninja / CMakeCache.txt of the workspace build reference neither _upstream nor the canonical level3/lammps/src", rc: 0}
+multi_gpu_regression_2026_09_11:
+  - {step: 15, action: "HPCPERF_GPUS=2 tools/validate_workspace.sh level3 lammps <ws> --iteration 7 --skip-build -- CUDA (existing workspace binary 423fc91be978c0d9f03a8036456ffd59d35a01c11d87e16d6c034e8cdec7f9d5, smoke bench/in.lj 32000 atoms 100 steps)", rc: 0,
+     result: "LAMMPS CUDA validation (2 GPU) PASS: all 8 compared quantities identical to the upstream CPU reference log and to this build's 1-GPU run (rel 0.0); agent-mode check PASS (1 modified file, repository baseline); run_id 20260911T012230Z-263185-31011, input sha256 a2a9f801e1b13b3b..., verdict layer numerical",
+     gpu_binding: "launcher audit 0 verified / 0 mismatch / 2 unverified -- the ~1 s run ended before nvidia-smi sampled it (observation gap, not a mismatch)"}
+  - {step: 16, action: "HPCPERF_L3_RUN_SUBDIR=run.binding HPCPERF_GPUS=2 HPCPERF_LAMMPS_STEPS=3000 ./run.sh CUDA in the same workspace (binding-evidence run, same binary; the numerical acceptance stays the 100-step case)", rc: 0,
+     result: "Loop time 1.98 s on 2 procs for 3000 steps; launcher audit 2 verified, 0 mismatch, 0 unverified (rank 0 -> GPU-d902db1a..., rank 1 -> GPU-a543dc0a...); run_id 20260911T012554Z-264512-1164"}
+  - {not_run: "4-GPU workspace validation (not requested this round; canonical 4-GPU results are the 2026-09-07 regression at fc4d2a1 on the equivalent tree); no rebuild of LAMMPS dependencies; no strong/weak scaling in the workspace"}
+evidence_kept_locally: "<workspace>/reports/iter-{1..6}.{check.json,diff,verdict.yaml,validate.log}, <workspace>/.deps/level3/lammps/logs/build-cuda.log (not committed: local run artifacts)"
+conclusions:
+  - an agent edit inside the modifiable scope enters compile -> run -> validate (the failing build proves compilation of the edited file; the changed binary hash proves no stale binary is reused)
+  - readonly tampering (validator, reference) is refused before anything runs
+  - the canonical benchmark is untouched by workspace activity; the workspace depends on no application source outside itself (environment symlinks .conda_env/.tools only)
+workspace_integrity_regression_2026_09_13:
+  reason: "optimization_scope.yaml and the modifiable/readonly/excluded classification were removed; the integrity model is now 'protected by default, source tree (src/**, deps/**) explicitly mutable'. This regression proves the protection is unchanged in substance on the existing loop-001 workspace (2026-09-10 baseline, schema 1) and on a fresh ExaCA workspace created with the current tooling (schema-2 baseline with harness hashes)."
+  driver: maintainer script, static checks except step 12; no hpcperf_env.sh in the harness shell (the tools need the system python with PyYAML; the workspace's validate.sh sets up the toolchain itself)
+  steps:
+    - {step: 1, action: "check_workspace level3/lammps (baseline mode) and check_workspace <ws> --agent-mode --iteration 10", result: "canonical 15/15; workspace PASS with its existing edit of src/src/KOKKOS/pair_lj_cut_kokkos.cpp, 0 protected violations", rc: 0}
+    - {step: 2, action: "append a line to src/lib/kokkos/CMakeLists.txt (bundled dependency source inside src/)", result: "allowed, listed as modified; restored byte-identical to the baseline", rc: 0}
+    - {step: 3, action: "append a line to deps/kokkos/CMakeLists.txt in the ExaCA workspace (loop-001 has no deps/)", result: "allowed, listed as modified", rc: 0}
+    - {step: 4, action: "append a line to src/cmake/CMakeLists.txt (source build configuration)", result: "allowed, listed as modified; restored", rc: 0}
+    - {step: 5, action: "append a line to validate.sh; tools/validate_workspace.sh --iteration 11 --skip-build -- CUDA", result: "REFUSED, exit 6, layer integrity, no run directory created; restored", rc: 6}
+    - {step: 6, action: "append a line to src/bench/log.15Jul25.lj.fixed.g++.1 (reference declared in benchmark.yaml, lives under src/); --iteration 12", result: "REFUSED, exit 6", rc: 6}
+    - {step: 7, action: "append a line to src/bench/in.lj (input declared in benchmark.yaml, under src/); --iteration 13", result: "REFUSED, exit 6", rc: 6}
+    - {step: 8, action: "append a line to benchmark.yaml; --iteration 14", result: "REFUSED, exit 6", rc: 6}
+    - {step: 9, action: "append a line to the harness copy level3/tools/l3_common.sh of the ExaCA workspace root; check_workspace --agent-mode", result: "HARNESS TAMPERING: level3/tools/l3_common.sh (modified) -> FAIL. Not testable on loop-001: its 2026-09-10 baseline (schema 1) carries no harness hashes", rc: 1}
+    - {step: 10, action: "create src/src/KOKKOS/hpcperf_probe.cpp and delete src/src/KOKKOS/pair_lj_cut_kokkos.h", result: "allowed; report lists added_files=[hpcperf_probe.cpp], deleted_files=[pair_lj_cut_kokkos.h]; restored", rc: 0}
+    - {step: 11, action: "tools/prepare_benchmark.sh level3 lammps --status; hash of the workspace's edited file vs canonical", result: "canonical READY and untouched; the workspace edit persists (hash differs from canonical); no prepare tool exists inside a workspace", rc: 0}
+    - {step: 12, action: "HPCPERF_GPUS=1 HPCPERF_SCALE_MODE=smoke tools/validate_workspace.sh --iteration 15 --skip-build -- CUDA on the existing binary 423fc91be978...", result: "layer numerical, verdict PASS, 1 run recorded for this iteration; build_provenance UNVERIFIED -- correct: reports/build-records.json does not exist in loop-001 (the trusted build record was introduced on 2026-09-11, after this binary was built in iteration 3 on 2026-09-10), exactly as iterations 8 and 9 already recorded. The layering is unchanged.", rc: 0}
+    - {step: extra, action: "write an optimization_scope.yaml with modifiable: ['*'] into the ExaCA workspace", result: "PROTECTED FILE TAMPERING: optimization_scope.yaml (added) -> FAIL; the file is not read by any tool", rc: 1}
+  exaca_workspace: "hpcperf-agent-runs/exaca-scope-regress-001 (outside the repository): 1614 benchmark files + 28 harness files in the trusted baseline; 40 protected entries chmod a-w; deps/ and src/ writable, validate.sh / references/ / inputs/ / benchmark.yaml and the declared input src/examples/Materials/Inconel625.json non-writable; check_workspace 15/15 in baseline and agent mode. Static only: nothing was built or run there."
+  canonical_after: "check_workspace level3/lammps and level3/exaca: PASS 15/15 (baseline mode); every touched workspace file verified byte-identical to its trusted baseline hash after restoration"
+  not_claimed: "no rebuild, no multi-GPU run, no scientific result beyond the 1-GPU smoke validation of step 12"

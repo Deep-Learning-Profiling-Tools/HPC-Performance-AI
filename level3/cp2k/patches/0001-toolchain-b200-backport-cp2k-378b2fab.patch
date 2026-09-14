@@ -1,0 +1,92 @@
+Backport of upstream CP2K commit 378b2fab2f20224e5468d3279fa7f051403977c1
+("Add NVIDIA B200 GPU support (#5788)", 2026-08-20, master) to the v2026.2
+toolchain scripts, restricted to the two files this build uses. Class B
+(build-system only). The CP2K CMakeLists.txt hunk of that commit
+(CP2K_SUPPORTED_CUDA_ARCHITECTURES += B200, CP2K_GPU_ARCH_NUMBER_B200 100) is NOT
+needed: v2026.2 accepts -DCMAKE_CUDA_ARCHITECTURES=100 directly (build.sh uses
+that instead of the legacy -DCP2K_WITH_GPU=B200 selector). The DBCSR hunk keeps
+upstream's behaviour: DBCSR 2.10.0 predates B200, so the toolchain adds the B200
+name with GPU_ARCH_NUMBER 100 to DBCSR's CMakeLists.txt (native sm_100 device code)
+and copies parameters_H100.json to parameters_B200.json -- i.e. the libsmm_acc
+kernel PARAMETERS are the H100 ones REUSED, not tuned for B200 (correctness on
+B200 is what the DBCSR tests in build.sh verify; performance tuning is out of scope).
+Apply inside a private copy of tools/toolchain with: patch -p1
+--- a/install_cp2k_toolchain.sh
++++ b/install_cp2k_toolchain.sh
+@@ -140,7 +140,7 @@ OPTIONS:
+                           Default = native
+   --gpu-ver               Select the target GPU architecture for compiling.
+                           Available options are: K20X, K40, K80, P100, V100,
+-                          A100, H100, GB10, A40, Mi50, Mi100, Mi250, and no.
++                          A100, H100, B200, GB10, A40, Mi50, Mi100, Mi250, and no.
+                           This option determines the value of nvcc -arch flag.
+                           Default = no
+   --libint-lmax           Maximum supported angular momentum by libint if the
+@@ -720,13 +720,13 @@ Otherwise use option no."
+     --gpu-ver=*)
+       user_input="${1#*=}"
+       case "${user_input}" in
+-        K20X | K40 | K80 | P100 | V100 | A100 | H100 | GB10 | A40 | Mi50 | Mi100 | Mi250 | no)
++        K20X | K40 | K80 | P100 | V100 | A100 | H100 | B200 | GB10 | A40 | Mi50 | Mi100 | Mi250 | no)
+           export GPUVER="${user_input}"
+           ;;
+         *)
+           echo "ERROR: Invalid value for --gpu-ver found."
+           echo "Currently only one of the following options is supported:
+-            K20X, K40, K80, P100, V100, A100, H100, GB10, A40, Mi50, Mi100, Mi250.
++            K20X, K40, K80, P100, V100, A100, H100, B200, GB10, A40, Mi50, Mi100, Mi250.
+ Otherwise use option no."
+           exit 1
+           ;;
+@@ -1104,7 +1104,7 @@ if [ "${ENABLE_GAUXC_CUTLASS}" = "__TRUE__" ]; then
+     report_error ${LINENO} "--enable-gauxc-cutlass requires --enable-cuda=yes."
+   fi
+   case "${GPUVER}" in
+-    A100 | A40 | H100 | GB10) ;;
++    A100 | A40 | H100 | B200 | GB10) ;;
+     *)
+       report_error ${LINENO} "--enable-gauxc-cutlass requires CUDA compute capability >= 8.0."
+       ;;
+@@ -1287,6 +1287,9 @@ case ${GPUVER} in
+   H100)
+     export ARCH_NUM="90"
+     ;;
++  B200)
++    export ARCH_NUM="100"
++    ;;
+   GB10)
+     export ARCH_NUM="121"
+     ;;
+@@ -1305,7 +1308,7 @@ case ${GPUVER} in
+   *)
+     echo "ERROR: Invalid value for --gpu-ver found."
+     echo "Currently only one of the following options is supported:
+-      K20X, K40, K80, P100, V100, A100, H100, A40, Mi50, Mi100, Mi250.
++      K20X, K40, K80, P100, V100, A100, H100, B200, GB10, A40, Mi50, Mi100, Mi250.
+ Otherwise use option no."
+     exit 1
+     ;;
+--- a/scripts/stage9/install_dbcsr.sh
++++ b/scripts/stage9/install_dbcsr.sh
+@@ -32,14 +32,15 @@ case "${with_dbcsr}" in
+       [ -d dbcsr-${dbcsr_ver} ] && rm -rf dbcsr-${dbcsr_ver}
+       tar -xzf dbcsr-${dbcsr_ver}.tar.gz
+       cd dbcsr-${dbcsr_ver}
+-      # DBCSR may predate GB10. Build native sm_121 code while
++      # DBCSR 2.10 predates GB10 and B200. Build native device code while
+       # reusing the closest available libsmm_acc parameters.
+-      if [ "${ENABLE_CUDA}" == "__TRUE__" ] && [ "${GPUVER}" == "GB10" ]; then
+-        if ! grep -q "GB10" CMakeLists.txt; then
+-          sed -i "s/    H100)/    H100\\n    GB10)/" CMakeLists.txt
+-          sed -i "/  set(GPU_ARCH_NUMBER_H100 90)/a\\  set(GPU_ARCH_NUMBER_GB10 121)" CMakeLists.txt
++      if [ "${ENABLE_CUDA}" == "__TRUE__" ] &&
++        { [ "${GPUVER}" == "GB10" ] || [ "${GPUVER}" == "B200" ]; }; then
++        if ! grep -q "${GPUVER}" CMakeLists.txt; then
++          sed -i "s/    H100)/    H100\\n    ${GPUVER})/" CMakeLists.txt
++          sed -i "/  set(GPU_ARCH_NUMBER_H100 90)/a\\  set(GPU_ARCH_NUMBER_${GPUVER} ${ARCH_NUM})" CMakeLists.txt
+           cp src/acc/libsmm_acc/parameters/parameters_H100.json \
+-            src/acc/libsmm_acc/parameters/parameters_GB10.json
++            "src/acc/libsmm_acc/parameters/parameters_${GPUVER}.json"
+         fi
+       fi
+       mkdir build-cpu

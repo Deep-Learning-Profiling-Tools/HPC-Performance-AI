@@ -1,0 +1,67 @@
+schema: hpcperf-freeze-spec-1
+name: exaca
+level: 3
+application: ExaCA
+benchmark_source_version: hpcperf-l3-v1
+redistribution_status: cleared
+components:
+  - dest: src
+    category: application
+    kind: git
+    checkout: _upstream/level3/ExaCA
+    url: https://github.com/LLNL/ExaCA.git
+    ref: 2.1.0
+    commit: d26e59cd51e241a327c5267d43fd70537e5425f7
+    exclude:
+      - {path: .github, reason: upstream CI configuration}
+    patches: []
+    license: {spdx: MIT, files: [LICENSE, NOTICE]}
+    bundled: []
+  - dest: deps/kokkos
+    category: benchmark_specific
+    kind: git
+    checkout: _upstream/level3/kokkos
+    url: https://github.com/kokkos/kokkos.git
+    ref: 4.7.04
+    commit: 82799e4577568f9666bde36265ac15d78da3e6c8
+    project: Kokkos
+    version: 4.7.04
+    exclude:
+      - {path: .github, reason: upstream CI configuration}
+    patches: []
+    license: {spdx: Apache-2.0 WITH LLVM-exception, files: [LICENSE]}
+  - dest: deps/json/json-3.12.0.tar.xz
+    category: benchmark_specific
+    kind: file
+    source: .deps/level3/_freeze_downloads/json-3.12.0.tar.xz
+    url: https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+    sha256: 42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    project: nlohmann_json
+    version: 3.12.0
+    license: MIT
+environment_provided:
+  - {name: CUDA Toolkit, version: 13.2.78, provided_by: node /usr/local/cuda (hpcperf_env.sh)}
+  - {name: GCC (nvcc_wrapper host compiler), version: 13.3.0, provided_by: .conda_env}
+  - {name: Open MPI, version: 5.0.10, provided_by: .conda_env (site profile gmu-hopper)}
+  - {name: CMake / Ninja, provided_by: .conda_env}
+  - {name: Slurm / GPU driver / UCX, provided_by: site}
+equivalence:
+  - archive_path: src
+    validated_tree: _upstream/level3/ExaCA
+    ignore: ['.git/*']
+    excluded: ['.github/*']
+  - archive_path: deps/kokkos
+    validated_tree: _upstream/level3/kokkos
+    ignore: ['.git/*']
+    excluded: ['.github/*']
+licenses:
+  - {path: src, project: ExaCA, license: MIT, url: https://github.com/LLNL/ExaCA, commit: d26e59cd51e241a327c5267d43fd70537e5425f7}
+  - {path: deps/kokkos, project: Kokkos, license: Apache-2.0 WITH LLVM-exception, url: https://github.com/kokkos/kokkos, commit: 82799e4577568f9666bde36265ac15d78da3e6c8}
+  - {path: deps/json/json-3.12.0.tar.xz, project: nlohmann_json (release tarball), license: MIT, url: https://github.com/nlohmann/json, version: 3.12.0}
+  - {path: src/examples/Materials + src/examples/Substrate, project: ExaCA example material/orientation data (upstream repository content), license: MIT, url: https://github.com/LLNL/ExaCA}
+license_notes:
+  - "ExaCA (LLNL, MIT with NOTICE) and its example data (material interfacial-response files, 10,000-orientation grain files) are upstream repository content; redistribution in a source artifact is permitted."
+  - "Kokkos 4.7.04 (Apache-2.0 WITH LLVM-exception) is a benchmark-specific source dependency (not bundled by ExaCA upstream); its LICENSE stays in the tree."
+  - "nlohmann_json 3.12.0 (MIT) is the exact release tarball ExaCA's CMake would otherwise download at configure time (FetchContent); bundling it removes the build-time download."
+  - "Finch (coupled heat transport) and GoogleTest are NOT bundled: the benchmark case does not use Finch and the unit tests are not built; no Finch-ExaCA coupled workflow is claimed."
+  - "No external dataset (ExaCA-Data temperature files) is bundled: the benchmark uses the analytic Directional problem type."

@@ -1,0 +1,74 @@
+--- a/unit_test/tstInterface.hpp	2026-09-10 17:09:41.078780487 -0400
++++ b/unit_test/tstInterface.hpp	2026-09-11 19:20:01.334342373 -0400
+@@ -159,7 +159,13 @@
+ 
+     // Copy view data to the device
+     celldata.cell_type = Kokkos::create_mirror_view_and_copy(memory_space(), cell_type_host);
+-    grain_id = Kokkos::create_mirror_view_and_copy(memory_space(), grain_id_host);
++    // TEST-SIDE FIX (HPC-Performance-AI): same aliasing problem as in tstNucleation -- write into celldata's
++    // own grain-ID subview instead of rebinding the local handle. Expectations unchanged.
++    {
++        auto grain_id_target = celldata.getGrainIDSubview(grid);
++        Kokkos::deep_copy(grain_id_target, grain_id_host);
++        grain_id = grain_id_target;
++    }
+     interface.diagonal_length = Kokkos::create_mirror_view_and_copy(memory_space(), diagonal_length_host);
+     interface.crit_diagonal_length = Kokkos::create_mirror_view_and_copy(memory_space(), crit_diagonal_length_host);
+     interface.octahedron_center = Kokkos::create_mirror_view_and_copy(memory_space(), octahedron_center_host);
+@@ -675,12 +681,23 @@
+         2.248777,  1.851513, 1.914002,  2.266173,  2.291471, 1.914002,  2.266173,  2.291471,  2.902006,
+         2.613426,  2.236490, 2.346452,  2.346452,  2.236490, 2.613426,  2.902006};
+ 
+-    // For first grain, calculate critical diagonal lengths using test octahedron centers
+-    interface.calcCritDiagonalLength(0, 31.5, 3.5, 1.5, octahedron_center_test(0), octahedron_center_test(1),
+-                                     octahedron_center_test(2), 0, grain_unit_vector);
+-    // For second grain, calculate critical diagonal lengths
+-    interface.calcCritDiagonalLength(1, 110.5, 60.5, 0.5, octahedron_center_test(3), octahedron_center_test(4),
+-                                     octahedron_center_test(5), 1, grain_unit_vector);
++    // TEST-SIDE FIX (HPC-Performance-AI): calcCritDiagonalLength is a KOKKOS_INLINE_FUNCTION that writes into
++    // interface.crit_diagonal_length; calling it from host code touches device memory (Kokkos aborts with
++    // "attempt to access inaccessible memory space"), and so does reading octahedron_center_test -- a DEVICE
++    // view labelled "DOCenter" -- for the arguments. Run the same two calls with the same expressions inside a
++    // kernel. Expectations unchanged.
++    Kokkos::parallel_for(
++        "testCalcCritDiagonalLength", 2, KOKKOS_LAMBDA(const int n) {
++            if (n == 0)
++                interface.calcCritDiagonalLength(0, 31.5, 3.5, 1.5, octahedron_center_test(0),
++                                                 octahedron_center_test(1), octahedron_center_test(2), 0,
++                                                 grain_unit_vector);
++            else
++                interface.calcCritDiagonalLength(1, 110.5, 60.5, 0.5, octahedron_center_test(3),
++                                                 octahedron_center_test(4), octahedron_center_test(5), 1,
++                                                 grain_unit_vector);
++        });
++    Kokkos::fence();
+ 
+     // Copy calculated critical diagonal lengths to the host to check against expected values
+     auto crit_diagonal_length_host =
+@@ -708,15 +725,17 @@
+     MPI_Comm_rank(MPI_COMM_WORLD, &id);
+     Interface<memory_space> interface(id, grid.domain_size, 0.01);
+ 
+-    // Octahedra now use the layer coordinates, not the coordinates of the multilayer domain
+-    for (int coord_z = 0; coord_z < grid.nz_layer; coord_z++) {
+-        for (int coord_x = 0; coord_x < grid.nx; coord_x++) {
+-            for (int coord_y = 0; coord_y < grid.ny_local; coord_y++) {
+-                int index = grid.get1DIndex(coord_x, coord_y, coord_z);
+-                interface.createNewOctahedron(index, coord_x, coord_y, grid.y_offset, coord_z);
+-            }
+-        }
+-    }
++    // TEST-SIDE FIX (HPC-Performance-AI): createNewOctahedron is a KOKKOS_INLINE_FUNCTION writing into device
++    // views (diagonal_length, octahedron_center = "DOCenter"); the original host loop aborts on CUDA. Cover the
++    // same index set in a kernel, using the same coordinates. Expectations unchanged.
++    Kokkos::parallel_for(
++        "testCreateNewOctahedron", grid.domain_size, KOKKOS_LAMBDA(const int index) {
++            const int coord_x = grid.getCoordX(index);
++            const int coord_y = grid.getCoordY(index);
++            const int coord_z = grid.getCoordZ(index);
++            interface.createNewOctahedron(index, coord_x, coord_y, grid.y_offset, coord_z);
++        });
++    Kokkos::fence();
+ 
+     // Copy back to host and check values
+     auto diagonal_length_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), interface.diagonal_length);

@@ -1,0 +1,40 @@
+GEOS thirdPartyLibs 9b55672f6f8a73d02fd632396eb0410e58c9b120 (TPL tag 361-1070) -- make RAJA_ENABLE_VECTORIZATION overridable
+
+Class: build-system compatibility fix (no source/algorithm change in RAJA or GEOS).
+Problem: CMakeLists.txt unconditionally forces RAJA_ENABLE_VECTORIZATION=ON for
+every non-HIP build (upstream switches it OFF for ROCm because "RAJA's
+vectorization layer does not compile with the ROCm toolchain"). On this node the
+same layer does not compile with nvcc 13.2.78 + system GCC 14.2.1 as host
+compiler: EL10's GCC defaults to -march=x86-64-v3, so __AVX2__ is defined in
+every nvcc host pass and RAJA/policy/tensor/arch/avx2/avx2_int32.hpp is pulled
+in; nvcc's front end rejects GCC 14's __m256i intrinsics there
+('"__m256i" ... is a vector type', broadcast/self_type errors) in every CUDA
+translation unit that includes RAJA/RAJA.hpp (RAJA's own exercises fail first).
+Fix: only default the option when the caller has not set it, so build.sh can pass
+-D RAJA_ENABLE_VECTORIZATION=OFF (exactly the switch upstream uses for ROCm).
+Impact: RAJA's experimental RAJA::expt tensor/vector-register layer is not
+built; GEOS and LvArray do not use it (no RAJA::expt tensor symbols in
+GEOS/src or LvArray/src -- checked 2026-09-06), RAJA::forall/kernel/CUDA
+policies are unaffected. Verified: TPL superbuild proceeds past RAJA with the
+option OFF. Applied by level3/geos/build.sh (git apply, idempotent); the
+option and the patch hash are recorded in the profile fingerprint.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -397,10 +397,14 @@
+ message(STATUS "Building RAJA found at ${RAJA_URL}")
+ 
+ # RAJA's vectorization layer does not compile with the ROCm toolchain.
+-if( ENABLE_HIP )
++# (hpcperf: honour a value given on the command line, e.g. -D RAJA_ENABLE_VECTORIZATION=OFF for
++#  toolchains whose nvcc cannot compile the layer's AVX2 register code -- see level3/geos/patches/0002)
++if( NOT DEFINED RAJA_ENABLE_VECTORIZATION )
++  if( ENABLE_HIP )
+     set( RAJA_ENABLE_VECTORIZATION OFF )
+-else()
++  else()
+     set( RAJA_ENABLE_VECTORIZATION ON )
++  endif()
+ endif()
+ 
+ ExternalProject_Add( raja

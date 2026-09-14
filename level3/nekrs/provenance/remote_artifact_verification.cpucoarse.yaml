@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: nekrs
+variant: cpucoarse
+source_version: hpcperf-l3-v1
+artifact: nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.cpucoarse.yaml (size, archive sha256, source_tree_sha256)
+size: 48167029
+archive_sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
+source_tree_sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:42:49Z'

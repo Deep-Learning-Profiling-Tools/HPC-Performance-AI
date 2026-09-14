@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: specfem3d
+variant: null
+source_version: hpcperf-l3-v1
+artifact: specfem3d-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/specfem3d-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.yaml (size, archive sha256, source_tree_sha256)
+size: 248289500
+archive_sha256: 62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316
+source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:42:22Z'

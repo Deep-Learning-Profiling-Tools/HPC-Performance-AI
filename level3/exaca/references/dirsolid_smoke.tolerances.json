@@ -1,0 +1,12 @@
+{
+  "_comment": "Frozen tolerances of validation protocol v2 (references/validation_protocol.md): absolute unless the key ends with _rel. Rule: tolerance = max(3 x calibration range over the 8 calibration runs (references/calibration.json), physical floor). Applied to ONE run vs the frozen reference (itself one calibration run) and, for N > 1, to the N-rank run vs the same build's 1-rank run. n = 8 calibration runs: an empirical range rule, not a 3-sigma guarantee.",
+  "_protocol_version": 2,
+  "unsolidified_cells": 0,
+  "vol_fraction_nucleated": 0.01,
+  "n_grains_rel": 0.01,
+  "n_nucleated_rel": 0.05,
+  "top_layer_grains_rel": 0.25,
+  "mean_misorientation_z_deg": 0.25,
+  "mean_misorientation_z_top_deg": 0.7,
+  "mean_grain_volume_cells_rel": 0.01
+}

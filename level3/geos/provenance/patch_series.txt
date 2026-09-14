@@ -1,0 +1,5 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/geos-blt-0001-cuda13-memoryClockRate.patch	eac87fe62db404708365807e448b34d467fd056d19406ba5f1774c0c45e46196	D	LLNL/blt 38b46203 (cudaDeviceProp::memoryClockRate removed in CUDA 13)	src/src/cmake/blt/tests/smoke/blt_cuda_runtime_smoke.cpp
+2	deps/thirdPartyLibs	patches/0001-tpl-superlu_dist-url-hash-typo.patch	c9b39dcdb883cdf4863a5384e548007c476ee0af0e94a7c517de048dc43e2e19	B	local fix of a 65-character URL hash	deps/thirdPartyLibs/CMakeLists.txt
+3	deps/thirdPartyLibs	patches/0002-tpl-raja-vectorization-overridable.patch	89aa47decce48f917760022dffe758dd2885c98e06f7615280d26024731df253	B	local: RAJA_ENABLE_VECTORIZATION overridable (upstream does the same for ROCm)	deps/thirdPartyLibs/CMakeLists.txt
+4	deps/thirdPartyLibs	patches/0003-tpl-hdf5-step-generator-and-build-command.patch	d0acecac2ab94c0f50c8823fa8ae3b09deb09af30eb25b93215c1c5b4434c6bc	B	local: hdf5 ExternalProject step gets generator/build/install commands	deps/thirdPartyLibs/CMakeLists.txt

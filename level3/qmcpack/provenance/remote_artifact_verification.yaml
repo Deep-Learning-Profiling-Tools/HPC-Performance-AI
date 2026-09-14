@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: qmcpack
+variant: null
+source_version: hpcperf-l3-v1
+artifact: qmcpack-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/qmcpack-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.yaml (size, archive sha256, source_tree_sha256)
+size: 225420139
+archive_sha256: 6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3
+source_tree_sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:43:52Z'

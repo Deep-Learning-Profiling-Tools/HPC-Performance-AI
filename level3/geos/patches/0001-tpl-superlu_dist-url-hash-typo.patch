@@ -1,0 +1,32 @@
+GEOS thirdPartyLibs 9b55672f6f8a73d02fd632396eb0410e58c9b120 (TPL tag 361-1070) -- superlu_dist URL hash typo
+
+Class: build-system compatibility fix (no source/algorithm change).
+Problem: CMakeLists.txt sets SUPERLU_URL_HASH to a 65-character string
+("...a2edf58a"); a SHA-256 has 64 hex characters, so ExternalProject's
+URL_HASH check can never succeed and the superlu_dist download step fails
+("does not match expected value ... Each download failed!").  The tarball
+https://github.com/xiaoyeli/superlu_dist/archive/0f6efc3.tar.gz actually
+downloaded on 2026-09-05 has sha256
+49cd47da22fe72a37011e8dfaf94bd63ad8d61cc8144eac7a571bcbd0a2edf58, i.e. the
+upstream string minus its trailing extra "a".  The same 65-character string is
+still present on upstream master (checked 2026-09-05); upstream CI evidently
+builds superlu_dist from a pre-populated mirror, not through this hash.
+Fix: drop the trailing character.  Impact: none on the built code; the hash now
+verifies the very tarball upstream intended.  Verified: TPL superbuild proceeds
+past the superlu_dist download.
+Applied by level3/geos/build.sh (git apply, idempotent); recorded in the
+profile fingerprint.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ab7fe24..9a6ecac 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -851,7 +851,7 @@ list(APPEND build_list metis )
+ if( ENABLE_MPI AND ENABLE_SUPERLU_DIST )
+   set(SUPERLU_DIR "${CMAKE_INSTALL_PREFIX}/superlu_dist")
+   set(SUPERLU_URL "https://github.com/xiaoyeli/superlu_dist/archive/0f6efc3.tar.gz")
+-  set(SUPERLU_URL_HASH "49cd47da22fe72a37011e8dfaf94bd63ad8d61cc8144eac7a571bcbd0a2edf58a")
++  set(SUPERLU_URL_HASH "49cd47da22fe72a37011e8dfaf94bd63ad8d61cc8144eac7a571bcbd0a2edf58")
+ 
+   if ( CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 16.0 )
+     set(SUPERLU_C_FLAGS "-fPIC ${C_FLAGS_NO_WARNINGS}")

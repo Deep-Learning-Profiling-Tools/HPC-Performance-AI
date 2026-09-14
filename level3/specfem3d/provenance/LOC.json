@@ -1,0 +1,84 @@
+{
+ "benchmark": "specfem3d",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f",
+ "test_code_loc": {
+  "code": 1027,
+  "files": 22,
+  "languages": {
+   "Bourne Shell": 623,
+   "Fortran 90": 315,
+   "make": 89
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 147593,
+  "files": 885,
+  "languages": {
+   "Fortran 90": 71975,
+   "C": 56490,
+   "C/C++ Header": 5038,
+   "C Shell": 4022,
+   "make": 3289,
+   "Bourne Shell": 2615,
+   "Text": 2048,
+   "yacc": 612,
+   "MATLAB": 441,
+   "Perl": 332,
+   "TeX": 258,
+   "Python": 200,
+   "lex": 142,
+   "CMake": 97,
+   "Bourne Again Shell": 26,
+   "Markdown": 6,
+   "DOS Batch": 2
+  }
+ },
+ "application_owned_code_loc": {
+  "code": 142516,
+  "files": 500,
+  "languages": {
+   "Fortran 90": 119129,
+   "CUDA": 12214,
+   "make": 2208,
+   "C++": 2013,
+   "C/C++ Header": 2002,
+   "C": 1617,
+   "Python": 1066,
+   "Perl": 854,
+   "Fortran 77": 427,
+   "Bourne Again Shell": 414,
+   "TeX": 413,
+   "C Shell": 112,
+   "Text": 47
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {},
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 16413,
+  "files": 19,
+  "languages": {
+   "Bourne Shell": 15015,
+   "m4": 702,
+   "YAML": 540,
+   "Markdown": 108,
+   "Dockerfile": 48
+  }
+ },
+ "total_materialized_code_loc": 307549,
+ "summary": {
+  "application_owned_code_loc": 142516,
+  "bundled_dependency_code_loc": 147593,
+  "benchmark_specific_dependency_code_loc": 0,
+  "test_code_loc": 1027,
+  "total_materialized_code_loc": 307549,
+  "unclassified_code_loc": 16413
+ }
+}

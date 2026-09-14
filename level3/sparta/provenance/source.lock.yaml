@@ -1,0 +1,151 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: sparta
+  level: 3
+  application: SPARTA
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/sparta/sparta.git
+  tag: 27Aug2026
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+artifact:
+  filename: sparta-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 21330629
+  sha256: ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09
+  source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
+  uncompressed_size: 76042143
+  tar_entries: 3284
+  file_count: 3083
+  symlink_count: 1
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/sparta-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
+  algorithm: hpcperf-tree-1
+  entries: 3084
+  layout:
+  - src/
+patches: []
+dependencies:
+  bundled:
+  - path: lib/kokkos
+    project: Kokkos
+    version: 5.0.2
+    license: Apache-2.0 WITH LLVM-exception
+    component: src
+  - path: lib
+    project: SPARTA bundled libraries
+    license: per lib/<name>
+    note: only lib/kokkos is built here
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (nvcc_wrapper host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/sparta/sparta.git
+  ref: 27Aug2026
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+  sha256: null
+  checkout: _upstream/level3/sparta
+  submodules: []
+  excluded: []
+  license:
+    spdx: GPL-2.0-only
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/sparta
+  status: EQUIVALENT
+  summary:
+    identical: 3084
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 3084
+    validated_entries_considered: 3084
+licenses:
+- path: src
+  project: SPARTA
+  license: GPL-2.0-only
+  url: https://github.com/sparta/sparta
+  commit: 95b9abaa8bd548991cc3c3f1c58b34722f7ade74
+- path: src/lib/kokkos
+  project: Kokkos (bundled)
+  license: Apache-2.0 WITH LLVM-exception
+  version: 5.0.2
+license_notes:
+- SPARTA is GPL-2.0-only; the unmodified source with its LICENSE is redistributed as a source bundle.
+- Benchmark inputs (bench/in.collide, bench/data.*, reference logs) are upstream repository files.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/lib/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tools/testing/*
+  exclude:
+  - src/doc/*
+  - src/examples/*
+  - src/bench/*
+  - src/data/*
+  - src/tools/*
+  - src/python/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:58:05Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: 27Aug2026
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:52:59Z'
+  tool: migrate_from_lfs_bundle-1.0

@@ -1,0 +1,2 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/0001-std-isnan.patch	a5a96e7daab783321ad4c57a6fca23513998cf6ef9b637f56fe9eafa60d4ce3d	D	local 2-line fix: unqualified isnan in a template (GCC 14)	src/src/atom/AtomicCenteredNonLocalOperator.cc

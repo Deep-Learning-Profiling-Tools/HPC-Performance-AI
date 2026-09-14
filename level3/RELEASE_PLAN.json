@@ -1,0 +1,1506 @@
+{
+ "schema": "hpcperf-release-plan-1",
+ "generated": "2026-09-12T01:34:59Z",
+ "provider": "GitHub Release assets of this repository (no mirror, bucket or paid service)",
+ "repository": "Deep-Learning-Profiling-Tools/HPC-Performance-AI",
+ "tag": "level3-source-hpcperf-l3-v1-rc1",
+ "target_commit": "16dcf18a605c21dfcfb4aaddb2a35aef39bff8ee",
+ "release_kind": "prerelease (source-artifact release candidate): does not assert that HIP, multi-node or every scientific configuration is validated",
+ "immutable_releases": {
+  "enabled": false,
+  "enforced_by_owner": false,
+  "probed": "2026-09-11 via GET /repos/{owner}/{repo}/immutable-releases (read-only); repository setting not changed"
+ },
+ "asset_policy": "assets are never overwritten or deleted after publication; a source change is a new source_version + new tag; every consumer verifies size + sha256 + source_tree_sha256 (prepare_benchmark.sh) -- platform immutability is NOT relied upon",
+ "publication_procedure": [
+  "draft release on the target commit (maintainer authorization required)",
+  "upload assets + SHA256SUMS + SOURCE_MANIFEST.<artifact>.json, re-download each asset and compare sha256/size",
+  "publish as prerelease",
+  "clean clone + empty cache + anonymous (no token) download through prepare_benchmark.sh, tree hash verified (tools/artifacts/remote_fetch_check.sh)",
+  "only then: locks primary.url = asset URL, status published; provenance/remote_fetch_verification*.yaml written; REMOTE_FETCH_VERIFIED"
+ ],
+ "totals": {
+  "assets": 11,
+  "bytes": 1197001594,
+  "human": "1.1 GB"
+ },
+ "assets": [
+  {
+   "artifact": "lammps",
+   "application": "LAMMPS",
+   "variant": null,
+   "filename": "lammps-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 115344817,
+   "sha256": "4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1",
+   "source_tree_sha256": "d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/lammps/lammps.git",
+    "tag": "stable_22Jul2025_update6",
+    "commit": "9c5ab448c78a14fd534619622162ba418d6a1fb1"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/lammps-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "GPL-2.0-only",
+    "project": "LAMMPS"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 3,
+    "record": "level3/lammps/provenance/LICENSES.md",
+    "notes": [
+     "LAMMPS is GPL-2.0-only: redistributing the (unmodified) source in a source bundle is permitted; the bundle carries the upstream LICENSE and the complete corresponding source.",
+     "lib/kokkos (Apache-2.0 with LLVM exception) and the other lib/ components keep their own license files inside the tree.",
+     "No dataset outside the upstream repository is bundled; the benchmark inputs (bench/in.lj, bench/POTENTIALS, potentials/) are upstream repository files."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "lammps-hpcperf-l3-v1.tar.zst 115344817 B sha256 4f6e1096de3a6671..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "d7549c2f6d1b5b6c... vs d7549c2f6d1b5b6c..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "13893 vs 13893"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "4f6e1096de3a6671326c9aaabd40510ee4a610df961b605633f8cffd2c2cbca1  lammps-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/lammps/provenance/SOURCE_MANIFEST.json",
+    "sha256": "ba1c1b3a7ac23f2732f598294f5c01b74d0284b36c76d5a7cc8753e250054176",
+    "planned_asset": "SOURCE_MANIFEST.lammps.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "bench/in.lj 32^3 lattice x 4 = 131,072 atoms, 100 steps, validated 1/2/4 GPUs (2026-09-07 regression fc4d2a1)",
+    "strong": "16.4M atoms, completed 1/4 GPU runs (no numerical acceptance beyond smoke criteria)",
+    "weak": "2.05M atoms per rank, completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only (HPCPERF_DRY_RUN=1), never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78",
+     "provided_by": "node /usr/local/cuda (hpcperf_env.sh)"
+    },
+    {
+     "name": "GCC (nvcc_wrapper host compiler)",
+     "version": "13.3.0",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env (site profile gmu-hopper)"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Slurm",
+     "GPU driver": null,
+     "UCX": null,
+     "provided_by": "site"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "sparta",
+   "application": "SPARTA",
+   "variant": null,
+   "filename": "sparta-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 21330629,
+   "sha256": "ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09",
+   "source_tree_sha256": "63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/sparta/sparta.git",
+    "tag": "27Aug2026",
+    "commit": "95b9abaa8bd548991cc3c3f1c58b34722f7ade74"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/sparta-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "GPL-2.0-only",
+    "project": "SPARTA"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 2,
+    "record": "level3/sparta/provenance/LICENSES.md",
+    "notes": [
+     "SPARTA is GPL-2.0-only; the unmodified source with its LICENSE is redistributed as a source bundle.",
+     "Benchmark inputs (bench/in.collide, bench/data.*, reference logs) are upstream repository files."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "sparta-hpcperf-l3-v1.tar.zst 21330629 B sha256 ea3be3032b3d6a41..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "63519f0e3e9ac974... vs 63519f0e3e9ac974..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "3084 vs 3084"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09  sparta-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/sparta/provenance/SOURCE_MANIFEST.json",
+    "sha256": "002aa452a41181718e9c90e28c5933c794854a281f30f5e07876a573a1772ccc",
+    "planned_asset": "SOURCE_MANIFEST.sparta.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "bench/in.collide 10x10x10 cells, 10,000 particles, 30+100 steps, validated 1/2/4 GPUs (2026-09-07 regression fc4d2a1)",
+    "strong": "100^3 cells = 10M particles, completed 1/4 GPU runs",
+    "weak": "50^3 cells per rank (1.25M particles/rank), completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only, never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC (nvcc_wrapper host compiler)",
+     "version": "13.3.0",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "warpx",
+   "application": "WarpX",
+   "variant": null,
+   "filename": "warpx-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 14235980,
+   "sha256": "d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0",
+   "source_tree_sha256": "e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/BLAST-WarpX/warpx.git",
+    "tag": "26.09",
+    "commit": "0c62c75e53a9ad08241535444bd7e53fd1deba88"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/warpx-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "BSD-3-Clause-LBNL",
+    "project": "WarpX"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 2,
+    "record": "level3/warpx/provenance/LICENSES.md",
+    "notes": [
+     "WarpX and AMReX carry the LBNL BSD-3-Clause license with NOTICE files; both files are kept in the bundle.",
+     "PICSAR-QED and openPMD are not part of this build (WarpX_QED=OFF, WarpX_OPENPMD=OFF) and are not bundled."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "warpx-hpcperf-l3-v1.tar.zst 14235980 B sha256 d4eca1ca57907dd2..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "e90d20b2a7d82634... vs e90d20b2a7d82634..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "4632 vs 4632"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "d4eca1ca57907dd238ee9391585acacaa60ff46c9f972ecd9024f05fe985f7d0  warpx-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/warpx/provenance/SOURCE_MANIFEST.json",
+    "sha256": "6f7da91d963e428325f4dfb5a9f4036951dfd89a5d75ec405c378ab87f10ebda",
+    "planned_asset": "SOURCE_MANIFEST.warpx.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "uniform_plasma 64x32x32 cells (131,072 particles), 10 steps + langmuir_multi 64^3, 40 steps; validated 1/2/4 GPUs (2026-09-07 regression fc4d2a1)",
+    "strong": "uniform_plasma 256^3 cells (33.6M particles), completed 1/4 GPU runs",
+    "weak": "uniform_plasma 128^3 cells per rank (4.2M particles/rank), completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only, never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC (host compiler)",
+     "version": "13.3.0",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "specfem3d",
+   "application": "SPECFEM3D",
+   "variant": null,
+   "filename": "specfem3d-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 248289500,
+   "sha256": "62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316",
+   "source_tree_sha256": "9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/SPECFEM/specfem3d.git",
+    "tag": "v4.1.1",
+    "commit": "c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/specfem3d-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "GPL-3.0-or-later",
+    "project": "SPECFEM3D Cartesian"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 2,
+    "record": "level3/specfem3d/provenance/LICENSES.md",
+    "notes": [
+     "SPECFEM3D is GPL (see LICENSE); redistribution of the complete source with the two back-ported devel patches (also GPL) is permitted; the diff is recorded in provenance/original_vs_baseline.diff.",
+     "SCOTCH 5.1.12b is bundled by upstream under CeCILL-C (LGPL-compatible free software license); its own license file stays in the tree.",
+     "EXAMPLES/ (meshes, reference seismograms used by validate.sh) are upstream repository content; doc/ is excluded (documentation only)."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "specfem3d-hpcperf-l3-v1.tar.zst 248289500 B sha256 62b9739b1440a1cb..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "9bdc4eed3a3593e4... vs 9bdc4eed3a3593e4..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "6205 vs 6205"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316  specfem3d-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/specfem3d/provenance/SOURCE_MANIFEST.json",
+    "sha256": "c3ff181884e9ee49942631cc55b05b792c770f5a3d5e2276631451968a8e1e61",
+    "planned_asset": "SOURCE_MANIFEST.specfem3d.json"
+   },
+   "patches": [
+    "patches/0001-cuda13-deviceOverlap-guard.patch",
+    "patches/0002-blackwell-device-block.patch"
+   ],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "EXAMPLES/applications/homogeneous_halfspace as shipped (20,736 HEX8, NSTEP 5000), validated 1/2/4 GPUs (2026-09-07 regression fc4d2a1)",
+    "strong": "xmeshfem3D refined domain, 165,888 elements, completed 1/4 GPU runs",
+    "weak": "165,888 elements per rank (domain extended), completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only, never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC 13.3.0 (conda",
+     "C + nvcc host) and system gfortran 14.2.1": null,
+     "provided_by": ".conda_env / node"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "nekrs.hypregpu",
+   "application": "nekRS",
+   "variant": "hypregpu",
+   "filename": "nekrs-hypregpu-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 48167250,
+   "sha256": "83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2",
+   "source_tree_sha256": "76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/Nek5000/nekRS.git",
+    "tag": "v26.0",
+    "commit": "96b3cf9e5bacede16568826c04a21bc0fe50dc7d"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-hypregpu-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "BSD-3-Clause",
+    "project": "nekRS"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 8,
+    "record": "level3/nekrs/provenance/LICENSES.hypregpu.md",
+    "notes": [
+     "nekRS vendors its third-party libraries as squashed subtrees with their license files; all are permissive (BSD/MIT/Apache).",
+     "The three hypre patches modify vendored hypre device sources (class B/D); the diff is in provenance/original_vs_baseline.hypregpu.diff."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "nekrs-hypregpu-hpcperf-l3-v1.tar.zst 48167250 B sha256 83c721f69eb47bea..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "76e6ad3cdd624a90... vs 76e6ad3cdd624a90..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "14447 vs 14447"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2  nekrs-hypregpu-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/nekrs/provenance/SOURCE_MANIFEST.hypregpu.json",
+    "sha256": "a614b51ba7cd8540298030dc0b51e41684db0e29177066fe31419445b075b825",
+    "planned_asset": "SOURCE_MANIFEST.nekrs.hypregpu.json"
+   },
+   "patches": [
+    "patches/0001-hypre-cuda-sm100.patch",
+    "patches/0002-hypre-cuda13-thrust-pair.patch",
+    "patches/0003-hypre-cuda13-thrust3-compat.patch"
+   ],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "examples/ethier (32 elements, N=9, 100 steps), 9/9 CI checks; validated 1/2/4 GPUs for hypregpu cimode 2 and 3 and cpucoarse cimode 2 (2026-09-07 regression fc4d2a1)",
+    "strong": "ethierRefine hrefine=10 (32,000 elements, N=7), completed 1/4 GPU runs",
+    "weak": "~8,000 elements per rank, completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only, never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC 13.3.0 (conda",
+     "C/C++) + system gfortran 14.2.1": null,
+     "provided_by": ".conda_env / node"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "CMake",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "nekrs.cpucoarse",
+   "application": "nekRS",
+   "variant": "cpucoarse",
+   "filename": "nekrs-cpucoarse-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 48167029,
+   "sha256": "a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169",
+   "source_tree_sha256": "6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/Nek5000/nekRS.git",
+    "tag": "v26.0",
+    "commit": "96b3cf9e5bacede16568826c04a21bc0fe50dc7d"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-cpucoarse-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "BSD-3-Clause",
+    "project": "nekRS"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 8,
+    "record": "level3/nekrs/provenance/LICENSES.cpucoarse.md",
+    "notes": [
+     "Exact upstream v26.0 tree (no patch); the same vendored third-party licenses as the hypregpu variant."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "nekrs-cpucoarse-hpcperf-l3-v1.tar.zst 48167029 B sha256 a0b1d0a9a8a45edb..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "6bde03184c09b236... vs 6bde03184c09b236..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "14447 vs 14447"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169  nekrs-cpucoarse-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/nekrs/provenance/SOURCE_MANIFEST.cpucoarse.json",
+    "sha256": "ca98806e6ce94dab11dc484b7ca8aae1973b3b95fad715ec6387975310471fda",
+    "planned_asset": "SOURCE_MANIFEST.nekrs.cpucoarse.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "examples/ethier (32 elements, N=9, 100 steps), 9/9 CI checks; validated 1/2/4 GPUs for hypregpu cimode 2 and 3 and cpucoarse cimode 2 (2026-09-07 regression fc4d2a1)",
+    "strong": "ethierRefine hrefine=10 (32,000 elements, N=7), completed 1/4 GPU runs",
+    "weak": "~8,000 elements per rank, completed 4-GPU run",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only, never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC 13.3.0 (conda",
+     "C/C++) + system gfortran 14.2.1": null,
+     "provided_by": ".conda_env / node"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "CMake",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "nyx",
+   "application": "Nyx",
+   "variant": null,
+   "filename": "nyx-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 79400559,
+   "sha256": "218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36",
+   "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/AMReX-Astro/Nyx.git",
+    "tag": "26.09",
+    "commit": "e06eabc1b9dbcad5612db9529aced682402daede"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nyx-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "BSD-3-Clause-LBNL",
+    "project": "Nyx"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 3,
+    "record": "level3/nyx/provenance/LICENSES.md",
+    "notes": [
+     "All three components are BSD-3-Clause (LBNL variant for Nyx/AMReX); license and notice files are kept in the bundle.",
+     "Initial-condition files inside the Nyx repository (Exec/MiniSB/ic_sb_32.ascii, Exec/LyA/32.nyx, 64sssss_20mpc.nyx) are upstream repository content under the same license; no external dataset is bundled."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "nyx-hpcperf-l3-v1.tar.zst 79400559 B sha256 218ba208e5d270ab..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "71b64ddffc1e5c5f... vs 71b64ddffc1e5c5f..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "5933 vs 5933"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "218ba208e5d270abbc880a6f50fccd167f6f144361e3ef6e68e2677abd7dff36  nyx-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/nyx/provenance/SOURCE_MANIFEST.json",
+    "sha256": "8b785a644703785c07fce4c1b5e3547449a61f9e036d849ca9b55b047eb9d23d",
+    "planned_asset": "SOURCE_MANIFEST.nyx.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "MiniSB (32^3, 10 steps) and LyA-adiabatic (32^3, 10 steps) PASS at 1/2/4 GPUs (2026-09-07 regression fc4d2a1); LyA heat/cool 1/2/4 GPUs STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (exit 3, not a pass)",
+    "strong": "LyA 64^3 adiabatic derivative + synthetic 256^3, completed 1/2/4 GPU runs (too small to scale, completeness records)",
+    "weak": "synthetic 64^3 cells per rank (RandomPerCell), completed runs, labelled synthetic",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only (8 planned, 40 IMBALANCED, 80 refused as designed), never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "GCC (host compiler)",
+     "version": "13.3.0",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "cp2k",
+   "application": "CP2K",
+   "variant": null,
+   "filename": "cp2k-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 210932689,
+   "sha256": "d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2",
+   "source_tree_sha256": "d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/cp2k/cp2k.git",
+    "tag": "v2026.2",
+    "commit": "67b5da876dd6a76b8b021d5a04d1c81ba79a4c50"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/cp2k-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "GPL-2.0-or-later",
+    "project": "CP2K"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 11,
+    "record": "level3/cp2k/provenance/LICENSES.md",
+    "notes": [
+     "CP2K, DBCSR and FFTW are GPL-2.0-or-later: the bundle redistributes their complete, unmodified source (the toolchain scripts of CP2K carry the class-B B200 back-port, recorded in provenance/original_vs_baseline.diff).",
+     "The toolchain tarballs are the exact files CP2K's installer downloads from cp2k.org (same sha256 as recorded in tools/toolchain/scripts/*/install_*.sh); they are redistributable under their own licenses (BSD/MPL/LGPL/GPL).",
+     "data/ (basis sets, potentials) and benchmarks/ are upstream repository content under the CP2K license."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "cp2k-hpcperf-l3-v1.tar.zst 210932689 B sha256 d6776dd4fa3107d4..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "d877d2d4de4643ce... vs d877d2d4de4643ce..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "9009 vs 9009"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2  cp2k-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/cp2k/provenance/SOURCE_MANIFEST.json",
+    "sha256": "6944e35c41872d83e861730a30cbd84b750d7c2267d44e6c4d602adfe796e6e9",
+    "planned_asset": "SOURCE_MANIFEST.cp2k.json"
+   },
+   "patches": [
+    "patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch"
+   ],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "benchmarks/QS/H2O-64.inp (10 MD steps) + regtests Ar, H2O-geoopt, pyridine, H2-big-1, H2-big-5 within upstream tolerances; validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07 regression)",
+    "strong": "H2O-128, 10 MD steps, completed 1/2/4 GPU runs",
+    "weak": "H2O-32/64/128 on 1/2/4 GPUs (a size sweep, not iso-efficiency), completed",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only (strong planned; weak 40/80 REFUSED -- no upstream deck), never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "system GCC / g++ / gfortran",
+     "version": "14.2.1",
+     "provided_by": "node"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env (wrappers redirected to the system GCC)"
+    },
+    {
+     "name": "CMake / Ninja / Python",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "qmcpack",
+   "application": "QMCPACK",
+   "variant": null,
+   "filename": "qmcpack-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 225420139,
+   "sha256": "6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3",
+   "source_tree_sha256": "f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/QMCPACK/qmcpack.git",
+    "tag": "v4.4.0",
+    "commit": "2601d62e353934f1526cab1f67f30b6672b7c76f"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/qmcpack-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "NCSA (University of Illinois/NCSA Open Source)",
+    "project": "QMCPACK"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 4,
+    "record": "level3/qmcpack/provenance/LICENSES.md",
+    "notes": [
+     "QMCPACK (NCSA), HDF5, Boost and OpenBLAS permit redistribution of the source with their license texts, which are inside the respective trees/tarballs.",
+     "The in-repository tests/ data (diamondC pseudopotentials, wavefunction h5) are upstream repository content; the NiO performance datasets (external Box links) are NOT bundled.",
+     "LLVM 23.1.0 (Apache-2.0 WITH LLVM-exception) is an environment-provided compiler and not part of the bundle."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "qmcpack-hpcperf-l3-v1.tar.zst 225420139 B sha256 6c1585bd027f44f4..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "f0dbdc83677ff4a6... vs f0dbdc83677ff4a6..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "8344 vs 8344"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3  qmcpack-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/qmcpack/provenance/SOURCE_MANIFEST.json",
+    "sha256": "dd3c363355cf9a0ff730c96f012bec8b317a306d45f547f148d662ae4974b56f",
+    "planned_asset": "SOURCE_MANIFEST.qmcpack.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "qmc_short_vmcbatch_dmcbatch.in.xml verbatim (256 walkers), validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07 regression)",
+    "strong": "256 walkers total over N GPUs, completed 1/2/4 GPU runs; the 4096-walker series FAILED (cuSOLVER INTERNAL_ERROR, ~320 MB device memory per walker)",
+    "weak": "256 walkers per GPU, completed 1/2/4 GPU runs; 1024 walkers/GPU FAILED (same cause); run.sh refuses > 300 walkers/GPU",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only (HYPOTHETICAL), never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "LLVM/Clang with NVPTX OpenMP offload runtime",
+     "version": "23.1.0",
+     "provided_by": "private compiler toolchain (level3/qmcpack/toolchain/build_llvm.sh from llvm-project-23.1.0.src.tar.xz), install .deps/level3/qmcpack/<profile>/install/llvm -- a compiler, hence environment, not benchmark source"
+    },
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "FFTW3 (conda) and libxml2 (system)",
+     "provided_by": "environment"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "dftfe",
+   "application": "DFT-FE",
+   "variant": null,
+   "filename": "dftfe-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 182954572,
+   "sha256": "0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670",
+   "source_tree_sha256": "54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/dftfeDevelopers/dftfe.git",
+    "tag": "release 1.2.0 commit (2025-08-17)",
+    "commit": "7147faa51f7c9f3075fffaa5e48ba989bcd329c1"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/dftfe-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "LGPL-2.1-or-later",
+    "project": "DFT-FE"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 10,
+    "record": "level3/dftfe/provenance/LICENSES.md",
+    "notes": [
+     "All dependency sources are redistributable source tarballs/checkouts with their license files inside (LGPL/GPL/MPL/BSD/Apache); the bundle redistributes them unmodified.",
+     "ALGLIB free edition and p4est are GPL: the bundle ships their complete source, which satisfies the source-distribution requirement; the resulting dftfe binary is not distributed.",
+     "deal.II 9.7.1 (attempt 1, incompatible API) is NOT bundled; only the 9.6.2 tarball used by the validated build is.",
+     "Pseudopotentials and the upstream GPU reference outputs (testsGPU/, accuracyBenchmarks) are upstream repository content."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "dftfe-hpcperf-l3-v1.tar.zst 182954572 B sha256 0259dfec2c9459f7..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "54bea98826f91a4c... vs 54bea98826f91a4c..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "3525 vs 3525"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670  dftfe-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/dftfe/provenance/SOURCE_MANIFEST.json",
+    "sha256": "878cd2f8688f706bcd054dc915f8805c979b517a57c2f7f9c8c6a8f0a3ad2403",
+    "planned_asset": "SOURCE_MANIFEST.dftfe.json"
+   },
+   "patches": [
+    "patches/0001-std-isnan.patch"
+   ],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "testsGPU Input_MD_0.prm verbatim (32-atom Al, 4 BOMD steps) vs upstream's GPU reference output_MD_0, identical at printed precision; validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07 regression)",
+    "strong": "LLZO 192 atoms / 720 states, completed 1/2/4 GPU runs",
+    "weak": "derived Al supercells, 32 atoms per GPU (synthetic size sweep), completed 1/2/4 GPU runs",
+    "multi_node": "BLOCKED/UNVERIFIED on this site",
+    "gpu_40_80": "DRY-RUN only (HYPOTHETICAL), never executed",
+    "known_limits": null,
+    "admission": null
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78"
+    },
+    {
+     "name": "system GCC / gfortran",
+     "version": "14.2.1",
+     "provided_by": "node"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "zlib",
+     "libxml2 (system headers/libraries)": null,
+     "provided_by": "node"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    }
+   ],
+   "decision": "PLAN"
+  },
+  {
+   "artifact": "exaca",
+   "application": "ExaCA",
+   "variant": null,
+   "filename": "exaca-hpcperf-l3-v1.tar.zst",
+   "size_bytes": 2758430,
+   "sha256": "3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316",
+   "source_tree_sha256": "b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44",
+   "source_version": "hpcperf-l3-v1",
+   "upstream": {
+    "repository": "https://github.com/LLNL/ExaCA.git",
+    "tag": "2.1.0",
+    "commit": "d26e59cd51e241a327c5267d43fd70537e5425f7"
+   },
+   "planned_url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/exaca-hpcperf-l3-v1.tar.zst",
+   "planned_url_status": "PLANNED (not published; lock primary stays url null / unpublished)",
+   "application_license": {
+    "spdx": "MIT",
+    "project": "ExaCA"
+   },
+   "bundle_dependency_and_data_license_review": {
+    "status": "cleared",
+    "components_reviewed": 4,
+    "record": "level3/exaca/provenance/LICENSES.md",
+    "notes": [
+     "ExaCA (LLNL, MIT with NOTICE) and its example data (material interfacial-response files, 10,000-orientation grain files) are upstream repository content; redistribution in a source artifact is permitted.",
+     "Kokkos 4.7.04 (Apache-2.0 WITH LLVM-exception) is a benchmark-specific source dependency (not bundled by ExaCA upstream); its LICENSE stays in the tree.",
+     "nlohmann_json 3.12.0 (MIT) is the exact release tarball ExaCA's CMake would otherwise download at configure time (FetchContent); bundling it removes the build-time download.",
+     "Finch (coupled heat transport) and GoogleTest are NOT bundled: the benchmark case does not use Finch and the unit tests are not built; no Finch-ExaCA coupled workflow is claimed.",
+     "No external dataset (ExaCA-Data temperature files) is bundled: the benchmark uses the analytic Directional problem type."
+    ]
+   },
+   "verification": {
+    "verdict": "PASS",
+    "checks": [
+     {
+      "check": 1,
+      "name": "source lock valid",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 2,
+      "name": "artifact file: size, zstd magic, sha256",
+      "status": "PASS",
+      "detail": "exaca-hpcperf-l3-v1.tar.zst 2758430 B sha256 3de419c92222c0a7..."
+     },
+     {
+      "check": 3,
+      "name": "staging metadata consistent",
+      "status": "PASS",
+      "detail": "artifact.json entry + SHA256SUMS line agree"
+     },
+     {
+      "check": 4,
+      "name": "restricted extraction (no absolute path, '..', hard link, device)",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 5,
+      "name": "top-level layout == lock",
+      "status": "PASS",
+      "detail": "['deps', 'src']"
+     },
+     {
+      "check": 6,
+      "name": "source_tree_sha256 == lock",
+      "status": "PASS",
+      "detail": "b88e84b74db34b8a... vs b88e84b74db34b8a..."
+     },
+     {
+      "check": 7,
+      "name": "entry count == lock",
+      "status": "PASS",
+      "detail": "1579 vs 1579"
+     },
+     {
+      "check": 8,
+      "name": "no symlink escaping the tree",
+      "status": "PASS",
+      "detail": ""
+     },
+     {
+      "check": 9,
+      "name": "secret / build-output scan (paths + rules only)",
+      "status": "PASS",
+      "detail": ""
+     }
+    ],
+    "mode": "full re-extraction"
+   },
+   "sha256sums_line": "3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316  exaca-hpcperf-l3-v1.tar.zst",
+   "source_manifest": {
+    "path": "level3/exaca/provenance/SOURCE_MANIFEST.json",
+    "sha256": "1b4fed93bf2207648029c6309aa31967bcd953bc2009e63f765ccb05bccf4e53",
+    "planned_asset": "SOURCE_MANIFEST.exaca.json"
+   },
+   "patches": [],
+   "scientific_status": {
+    "validated_backends": [
+     "cuda"
+    ],
+    "smoke": "directional solidification 128x128x128 cells (2.1M), Inconel625, G=5e5 K/m, R=3e5 K/s, nucleation density 10 (x1e12 m^-3), substrate SurfaceSiteDensity 0.25; project-defined statistical validation (protocol v2): holdout 9/9 PASS at 1/2/4 GPUs (2026-09-11)",
+    "strong": "fixed global box 512x256x512 cells (67.1M) decomposed over the ranks in Y; completed 1/2/4 GPU runs (CA time 8.02/6.26/5.17 s); a single rank cannot hold 512^3 (ExaCA int indexing of the 26-neighbour arrays)",
+    "weak": "512x128x512 cells per rank (33.5M/rank), Y extent = 128*N; completed 1/2/4 GPU runs (CA time 4.88/6.16/6.80 s)",
+    "multi_node": "UNVERIFIED on this site (multi-node MPI transport blocked)",
+    "gpu_40_80": "DRY-RUN only (HPCPERF_DRY_RUN=1 HPCPERF_NODES=10|20), never executed",
+    "known_limits": "GrainID field not bitwise reproducible (atomic captures) -> statistical validation; single-rank domain limit ~82M cells (int overflow in ExaCA); Finch coupling, FromFile problems and unit tests not exercised",
+    "admission": "admitted 2026-09-11 (replacement for GEOS): project-defined statistical validation of the dirsolid smoke case (128^3, seed 0) under protocol v2 -- calibration 8 runs (2026-09-10), independent holdout 9/9 PASS at 1/2/4 GPUs (2026-09-11); strong/weak modes completed only; HIP untested; multi-node unverified"
+   },
+   "build_prerequisites": [
+    {
+     "name": "CUDA Toolkit",
+     "version": "13.2.78",
+     "provided_by": "node /usr/local/cuda (hpcperf_env.sh)"
+    },
+    {
+     "name": "GCC (nvcc_wrapper host compiler)",
+     "version": "13.3.0",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Open MPI",
+     "version": "5.0.10",
+     "provided_by": ".conda_env (site profile gmu-hopper)"
+    },
+    {
+     "name": "CMake / Ninja",
+     "provided_by": ".conda_env"
+    },
+    {
+     "name": "Slurm / GPU driver / UCX",
+     "provided_by": "site"
+    }
+   ],
+   "decision": "PLAN"
+  }
+ ],
+ "excluded": [
+  {
+   "artifact": "geos",
+   "reason": "RETIRED (never published): dependency redistribution/licensing constraints (ParMETIS 4.0.3, University of Minnesota research license) + project decision to replace the application"
+  }
+ ],
+ "extra_assets": [
+  "SHA256SUMS (all planned artifacts)",
+  "SOURCE_MANIFEST.<artifact>.json per artifact",
+  "RELEASE_PLAN.json (this file, at the target commit)"
+ ]
+}

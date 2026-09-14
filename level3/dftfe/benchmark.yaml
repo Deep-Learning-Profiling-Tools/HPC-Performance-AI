@@ -1,0 +1,60 @@
+name: dftfe
+level: 3
+application: DFT-FE
+description: DFT-FE 1.2.0 (CUDA, deal.II 9.6.2 / ELPA GPU kernels / p4est stack built from deps/); al_md 32-atom Al BOMD regression
+  deck at 1/2/4 GPUs
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU, 1 thread per rank (upstream GPU job scripts)
+default_scale_mode: smoke
+scale_modes:
+  smoke: testsGPU Input_MD_0.prm verbatim (32-atom Al, 4 BOMD steps) vs upstream's GPU reference output_MD_0, identical at
+    printed precision; validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07 regression)
+  strong: LLZO 192 atoms / 720 states, completed 1/2/4 GPU runs
+  weak: derived Al supercells, 32 atoms per GPU (synthetic size sweep), completed 1/2/4 GPU runs
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only (HYPOTHETICAL), never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh with system GCC/gfortran 14.2.1 (OMPI_* redirection), CUDA 13.2.78, Open MPI 5.0.10, system
+  zlib/libxml2
+install_root: .deps/level3/dftfe/cuda132-gcc142-ompi5010
+dependency_installs:
+- install/openblas
+- install/scalapack
+- install/libxc
+- install/spglib
+- install/alglib
+- install/p4est
+- install/kokkos
+- install/dealii
+- install/elpa
+inputs:
+- src/testsGPU/pseudopotential/real/Input_MD_0.prm
+- src/testsGPU/pseudopotential/real/aluminumMD_coordinates.inp
+- src/testsGPU/pseudopotential/real/aluminumMD_domainBoundingVectors.inp
+- src/testsGPU/pseudopotential/real/aluminumMD_pseudo.inp
+- src/testsGPU/pseudopotential/real/Al.upf
+- src/testsGPU/pseudopotential/real/Mass.inp
+- src/testsGPU/pseudopotential/real/parameterFile_LLZO.prm
+references:
+- src/testsGPU/pseudopotential/real/accuracyBenchmarks/output_MD_0
+- src/testsGPU/pseudopotential/real/accuracyBenchmarks/outputLLZO
+source_version: hpcperf-l3-v1
+source_tree_sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
+source_artifact:
+  filename: dftfe-hpcperf-l3-v1.tar.zst
+  archive_sha256: 0259dfec2c9459f7ddd824a5eef468d04f77638b0a3cdd323a2cc342fe637670
+  source_tree_sha256: 54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30
+  size: 182954572
+  uncompressed_size: 274995831
+  file_count: 3525
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: release 1.2.0 commit (2025-08-17)
+redistribution_status: cleared
+suite_status: retained

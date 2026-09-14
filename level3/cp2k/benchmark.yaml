@@ -1,0 +1,54 @@
+name: cp2k
+level: 3
+application: CP2K
+description: CP2K v2026.2 psmp (MPI+OpenMP+CUDA, DBCSR 2.10.0 with the B200 back-port; toolchain dependencies built from deps/);
+  H2O-64 GPW-DFT MD + upstream regtest subset at 1/2/4 GPUs
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU, 8 OpenMP threads per rank (psmp)
+default_scale_mode: smoke
+scale_modes:
+  smoke: benchmarks/QS/H2O-64.inp (10 MD steps) + regtests Ar, H2O-geoopt, pyridine, H2-big-1, H2-big-5 within upstream tolerances;
+    validated 1/2/4 GPUs 2026-09-06 (historical; not re-run in the 2026-09-07 regression)
+  strong: H2O-128, 10 MD steps, completed 1/2/4 GPU runs
+  weak: H2O-32/64/128 on 1/2/4 GPUs (a size sweep, not iso-efficiency), completed
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: DRY-RUN only (strong planned; weak 40/80 REFUSED -- no upstream deck), never executed
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh with system GCC/g++/gfortran 14.2.1 (OMPI_* redirection), CUDA 13.2.78, Open MPI 5.0.10;
+  toolchain build directory on local scratch (HPCPERF_CP2K_TOOLCHAIN_SCRATCH)
+install_root: .deps/level3/cp2k/cuda132-gcc142-ompi5010
+dependency_installs:
+- install/toolchain
+inputs:
+- src/benchmarks/QS/H2O-32.inp
+- src/benchmarks/QS/H2O-64.inp
+- src/benchmarks/QS/H2O-128.inp
+- src/tests/QS/regtest-gpw-1/Ar.inp
+- src/tests/QS/regtest-gpw-1/H2O-geoopt.inp
+- src/tests/QS/regtest-gpw-1/pyridine.inp
+- src/tests/QS/regtest-dm-ls-scf-1/H2-big-1.inp
+- src/tests/QS/regtest-dm-ls-scf-1/H2-big-5.inp
+- src/data
+references:
+- src/tests/QS/regtest-gpw-1/TEST_FILES.toml
+- src/tests/QS/regtest-dm-ls-scf-1/TEST_FILES.toml
+source_version: hpcperf-l3-v1
+source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+source_artifact:
+  filename: cp2k-hpcperf-l3-v1.tar.zst
+  archive_sha256: d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2
+  source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+  size: 210932689
+  uncompressed_size: 519383421
+  file_count: 9009
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished
+upstream_version: v2026.2
+redistribution_status: cleared
+suite_status: retained

@@ -1,0 +1,196 @@
+schema: hpcperf-freeze-spec-1
+name: dftfe
+level: 3
+application: DFT-FE
+benchmark_source_version: hpcperf-l3-v1
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/dftfe
+  url: https://github.com/dftfeDevelopers/dftfe.git
+  ref: release 1.2.0 commit (2025-08-17)
+  commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+  submodules: []
+  exclude: []
+  patches:
+  - path: patches/0001-std-isnan.patch
+    upstream_source: 'local 2-line fix: unqualified isnan in a template (GCC 14)'
+    category: D
+  license:
+    spdx: LGPL-2.1-or-later
+    files:
+    - LICENSE
+  bundled: []
+- dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/OpenBLAS-0.3.30.tar.gz
+  url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+  sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+  project: OpenBLAS
+  version: 0.3.30
+  license: BSD-3-Clause
+- dest: deps/scalapack/v2.2.2.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/v2.2.2.tar.gz
+  url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v2.2.2.tar.gz
+  sha256: a2f0c9180a210bf7ffe126c9cb81099cf337da1a7120ddb4cbe4894eb7b7d022
+  project: ScaLAPACK
+  version: 2.2.2
+  license: BSD-3-Clause (modified)
+- dest: deps/libxc/libxc-7.0.0.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/libxc-7.0.0.tar.gz
+  url: https://gitlab.com/libxc/libxc/-/archive/7.0.0/libxc-7.0.0.tar.gz
+  sha256: 8d4e343041c9cd869833822f57744872076ae709a613c118d70605539fb13a77
+  project: libxc
+  version: 7.0.0
+  license: MPL-2.0
+- dest: deps/alglib/alglib-4.06.0.cpp.gpl.tgz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/alglib-4.06.0.cpp.gpl.tgz
+  url: https://www.alglib.net/translator/re/alglib-4.06.0.cpp.gpl.tgz
+  sha256: 27fa4b0b8160cbb2ace4f69d1a8ef0990cf894c87dff3f46dc86ec8ac2d30c68
+  project: ALGLIB (free edition)
+  version: 4.06.0
+  license: GPL-2.0-or-later
+- dest: deps/p4est/p4est-2.8.7.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/p4est-2.8.7.tar.gz
+  url: https://p4est.github.io/release/p4est-2.8.7.tar.gz
+  sha256: 0a1e912f3529999ca6d62fee335d51f24b5650b586e95a03ef39ebf73936d7f4
+  project: p4est
+  version: 2.8.7
+  license: GPL-2.0-or-later
+- dest: deps/p4est/p4est-setup.sh
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/p4est-setup.sh
+  url: https://raw.githubusercontent.com/dftfeDevelopers/dftfe/manual/p4est-setup.sh
+  sha256: 86269c2ef751b33d06916299a3d15fa80f4c8c9de40eceedfb8b7f45bd90fb8b
+  project: dftfe p4est-setup.sh (manual branch)
+  version: manual
+  license: LGPL-2.1-or-later
+- dest: deps/kokkos/4.6.00.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/4.6.00.tar.gz
+  url: https://github.com/kokkos/kokkos/archive/refs/tags/4.6.00.tar.gz
+  sha256: 348b2d860046fc3ddef5ca3a128317be1a6f3fa35196f268338a180fcae52264
+  project: Kokkos (Serial
+  for deal.II): null
+  version: 4.6.00
+  license: Apache-2.0 WITH LLVM-exception
+- dest: deps/dealii/dealii-9.6.2.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/dealii-9.6.2.tar.gz
+  url: https://github.com/dealii/dealii/releases/download/v9.6.2/dealii-9.6.2.tar.gz
+  sha256: 1051e332de3822488e91c2b0460681052a3c4c5ac261cdd7a6af784869a25523
+  project: deal.II
+  version: 9.6.2
+  license: LGPL-2.1-or-later
+- dest: deps/elpa/elpa-2026.02.001.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/elpa-2026.02.001.tar.gz
+  url: https://elpa.mpcdf.mpg.de/software/tarball-archive/Releases/2026.02.001/elpa-2026.02.001.tar.gz
+  sha256: a379f27f4dbd27b2ee45017afec656d064301e97150c874649bdfd64957b75ed
+  project: ELPA
+  version: 2026.02.001
+  license: LGPL-3.0-only
+- dest: deps/spglib
+  category: benchmark_specific
+  kind: git
+  checkout: .deps/level3/dftfe/downloads/spglib
+  url: https://github.com/spglib/spglib.git
+  ref: commit 02159eef (install_DFTFE pin)
+  commit: 02159eef6e7349535049a43fe2272bb634c77945
+  project: spglib
+  version: 02159eef
+  submodules: []
+  exclude: []
+  patches: []
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - COPYING
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: system GCC / gfortran
+  version: 14.2.1
+  provided_by: node
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: zlib
+  libxml2 (system headers/libraries): null
+  provided_by: node
+- name: CMake / Ninja
+  provided_by: .conda_env
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/dftfe
+  ignore:
+  - .git/*
+  - include/git_info.h
+- archive_path: deps/spglib
+  validated_tree: .deps/level3/dftfe/downloads/spglib
+  ignore:
+  - .git/*
+licenses:
+- path: src
+  project: DFT-FE
+  license: LGPL-2.1-or-later
+  url: https://github.com/dftfeDevelopers/dftfe
+  commit: 7147faa51f7c9f3075fffaa5e48ba989bcd329c1
+- path: deps/openblas
+  project: OpenBLAS
+  license: BSD-3-Clause
+  version: 0.3.30
+- path: deps/scalapack
+  project: ScaLAPACK
+  license: BSD-3-Clause (modified)
+  version: 2.2.2
+- path: deps/libxc
+  project: libxc
+  license: MPL-2.0
+  version: 7.0.0
+- path: deps/alglib
+  project: ALGLIB free edition
+  license: GPL-2.0-or-later
+  version: 4.06.0
+- path: deps/p4est
+  project: p4est
+  license: GPL-2.0-or-later
+  version: 2.8.7
+- path: deps/kokkos
+  project: Kokkos
+  license: Apache-2.0 WITH LLVM-exception
+  version: 4.6.00
+- path: deps/dealii
+  project: deal.II
+  license: LGPL-2.1-or-later
+  version: 9.6.2
+- path: deps/elpa
+  project: ELPA
+  license: LGPL-3.0-only
+  version: 2026.02.001
+- path: deps/spglib
+  project: spglib
+  license: BSD-3-Clause
+  commit: 02159eef6e7349535049a43fe2272bb634c77945
+license_notes:
+- All dependency sources are redistributable source tarballs/checkouts with their license files inside (LGPL/GPL/MPL/BSD/Apache);
+  the bundle redistributes them unmodified.
+- 'ALGLIB free edition and p4est are GPL: the bundle ships their complete source, which satisfies the source-distribution
+  requirement; the resulting dftfe binary is not distributed.'
+- deal.II 9.7.1 (attempt 1, incompatible API) is NOT bundled; only the 9.6.2 tarball used by the validated build is.
+- Pseudopotentials and the upstream GPU reference outputs (testsGPU/, accuracyBenchmarks) are upstream repository content.
+redistribution_status: cleared

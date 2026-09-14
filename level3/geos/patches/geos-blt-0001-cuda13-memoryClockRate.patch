@@ -1,0 +1,44 @@
+GEOS submodule src/cmake/blt (BLT 0.6.2, 9ff77344f0b2a6ee345e452bddd6bfd46cbbfa35) -- CUDA 13: memoryClockRate
+
+Class: build-system/test-fixture compatibility fix, back-port of upstream BLT
+commit 38b46203cf42 ("Set memory clock rate based on the cuda runtime version",
+LLNL/blt develop, 2025-09-07); applied to the smoke test only.
+Problem: CUDA 13 removed cudaDeviceProp::memoryClockRate; BLT 0.6.2's CUDA
+runtime smoke test (built whenever ENABLE_TESTS is on, GEOS' default) fails to
+compile with nvcc 13.2 ("'struct cudaDeviceProp' has no member named
+'memoryClockRate'"), which stops the GEOS build although nothing in GEOS itself
+is affected. Fix: query cudaDevAttrMemoryClockRate through
+cudaDeviceGetAttribute when CUDART_VERSION >= 13000, exactly as upstream BLT
+does. Impact: none on GEOS (a smoke-test executable). Verified: the target
+compiles; GEOS builds with upstream's default ENABLE_TESTS=ON. Applied by
+level3/geos/build.sh (git apply in the submodule, idempotent); hash recorded in
+the profile fingerprint.
+
+--- a/tests/smoke/blt_cuda_runtime_smoke.cpp
++++ b/tests/smoke/blt_cuda_runtime_smoke.cpp
+@@ -27,15 +27,23 @@
+   for (int i = 0; i < nDevices; i++)
+   {
+     cudaDeviceProp prop;
++    int memoryClockRate;
+     cudaGetDeviceProperties(&prop, i);
++
++#if CUDART_VERSION >= 13000
++    cudaDeviceGetAttribute(&memoryClockRate, cudaDevAttrMemoryClockRate, i);
++#else
++    memoryClockRate = prop.memoryClockRate;
++#endif
++
+     printf("Device Number: %d\n", i);
+     printf("  Device name: %s\n", prop.name);
+     printf("  Memory Clock Rate (KHz): %d\n",
+-           prop.memoryClockRate);
++           memoryClockRate);
+     printf("  Memory Bus Width (bits): %d\n",
+            prop.memoryBusWidth);
+     printf("  Peak Memory Bandwidth (GB/s): %f\n\n",
+-           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
++           2.0*memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+   }
+ 
+   return 0;

@@ -1,0 +1,203 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: nekrs
+  level: 3
+  application: nekRS
+  variant: cpucoarse
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/Nek5000/nekRS.git
+  tag: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+artifact:
+  filename: nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 48167029
+  sha256: a0b1d0a9a8a45edb6cf108373c7a79e06fdb3d1d08405100c8b024f8253db169
+  source_tree_sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
+  uncompressed_size: 231106946
+  tar_entries: 15617
+  file_count: 14444
+  symlink_count: 3
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-cpucoarse-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e
+  algorithm: hpcperf-tree-1
+  entries: 14447
+  layout:
+  - src/
+patches: []
+dependencies:
+  bundled:
+  - path: 3rd_party/occa
+    project: OCCA
+    license: MIT
+    component: src
+  - path: 3rd_party/hypre
+    project: hypre
+    version: 2.32.0
+    license: Apache-2.0 OR MIT
+    component: src
+  - path: 3rd_party/gslib
+    project: gslib
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/nek5000
+    project: Nek5000
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/nek5000_parRSB
+    project: parRSB
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/lapack
+    project: LAPACK (vendored subset)
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/cpptrace
+    project: cpptrace
+    license: MIT
+    component: src
+  - path: 3rd_party/adios
+    project: ADIOS2 (vendored
+    not built): null
+    license: Apache-2.0
+    component: src
+  - path: 3rd_party/cvode
+    project: CVODE glue (not built)
+    license: BSD-3-Clause
+    component: src
+  - path: 3rd_party/plugins
+    project: nekRS plugins
+    license: BSD-3-Clause
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC 13.3.0 (conda
+    C/C++) + system gfortran 14.2.1: null
+    provided_by: .conda_env / node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/Nek5000/nekRS.git
+  ref: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+  sha256: null
+  checkout: _upstream/level3/nekRS
+  submodules: []
+  excluded: []
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/nekrs/cpucoarse/src
+  status: EQUIVALENT
+  summary:
+    identical: 14447
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 14447
+    validated_entries_considered: 14447
+licenses:
+- path: src
+  project: nekRS
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/nekRS
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+- path: src/3rd_party/occa
+  project: OCCA
+  license: MIT
+  url: https://github.com/libocca/occa
+- path: src/3rd_party/hypre
+  project: hypre
+  license: Apache-2.0 OR MIT
+  url: https://github.com/hypre-space/hypre
+  version: 2.32.0
+- path: src/3rd_party/gslib
+  project: gslib
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/gslib
+- path: src/3rd_party/nek5000
+  project: Nek5000
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/Nek5000
+- path: src/3rd_party/lapack
+  project: LAPACK
+  license: BSD-3-Clause
+  url: https://github.com/Reference-LAPACK/lapack
+- path: src/3rd_party/cpptrace
+  project: cpptrace
+  license: MIT
+  url: https://github.com/jeremy-rifkin/cpptrace
+- path: src/3rd_party/adios
+  project: ADIOS2
+  license: Apache-2.0
+  url: https://github.com/ornladios/ADIOS2
+license_notes:
+- Exact upstream v26.0 tree (no patch); the same vendored third-party licenses as the hypregpu variant.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/3rd_party/*
+  benchmark_specific:
+  - deps/*
+  test: []
+  exclude:
+  - src/examples/*
+  - src/doc/*
+  - src/scripts/*
+  - src/cmake/*
+  - src/.github/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:54:25Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/cpucoarse.source.tar.zst
+  old_upstream_version_label: v26.0
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:55:18Z'
+  tool: migrate_from_lfs_bundle-1.0

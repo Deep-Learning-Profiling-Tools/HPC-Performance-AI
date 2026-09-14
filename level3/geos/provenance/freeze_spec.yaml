@@ -1,0 +1,332 @@
+schema: hpcperf-freeze-spec-1
+name: geos
+level: 3
+application: GEOS
+benchmark_source_version: hpcperf-l3-v1
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/GEOS
+  url: https://github.com/GEOS-DEV/GEOS.git
+  ref: develop @ 2026-09-04
+  commit: b7a0f13305277c3d825ee93f34946ac4e8c94fee
+  submodules:
+  - path: src/cmake/blt
+    url: https://github.com/LLNL/blt.git
+    ref: BLT 0.6.2
+    commit: 9ff77344f0b2a6ee345e452bddd6bfd46cbbfa35
+  - path: src/coreComponents/LvArray
+    url: https://github.com/GEOS-DEV/LvArray.git
+    ref: develop
+    commit: b8bc3ef762bf0236d7f94965b3fbbd458e6d537d
+  - path: src/coreComponents/LvArray/cmake/blt
+    url: https://github.com/LLNL/blt.git
+    ref: pinned
+    commit: 5a792c1775e7a7628d84dcde31652a689f1df7b5
+  - path: src/coreComponents/constitutive/HPCReact
+    url: https://github.com/GEOS-DEV/HPCReact.git
+    ref: main
+    commit: 7423e3e2cd55e959d9a823ab8241351f8b1087df
+  - path: src/coreComponents/constitutive/HPCReact/cmake/blt
+    url: https://github.com/LLNL/blt.git
+    ref: pinned
+    commit: fe075e596c5fde30acbe4e05f40baaf0a258ff54
+  - path: src/coreComponents/fileIO/coupling/hdf5_interface
+    url: https://github.com/GEOS-DEV/hdf5_interface.git
+    ref: master
+    commit: efe82a8ed0f8ac4995b8859bff9f0bf5bf0b6ef4
+  exclude: []
+  patches:
+  - path: patches/geos-blt-0001-cuda13-memoryClockRate.patch
+    apply_in: src/cmake/blt
+    upstream_source: LLNL/blt 38b46203 (cudaDeviceProp::memoryClockRate removed in CUDA 13)
+    category: D
+  license:
+    spdx: LGPL-2.1-only
+    files:
+    - LICENSE
+    - NOTICE
+  bundled:
+  - path: src/cmake/blt
+    project: BLT
+    version: 0.6.2
+    license: BSD-3-Clause
+  - path: src/coreComponents/LvArray
+    project: LvArray
+    license: BSD-3-Clause
+  - path: src/coreComponents/constitutive/HPCReact
+    project: HPCReact
+    license: BSD-3-Clause
+  - path: src/coreComponents/fileIO/coupling/hdf5_interface
+    project: hdf5_interface
+    license: BSD-3-Clause
+- dest: deps/thirdPartyLibs
+  category: benchmark_specific
+  kind: git
+  checkout: _upstream/level3/thirdPartyLibs
+  url: https://github.com/GEOS-DEV/thirdPartyLibs.git
+  ref: TPL tag 361-1070
+  commit: 9b55672f6f8a73d02fd632396eb0410e58c9b120
+  project: GEOS thirdPartyLibs superbuild
+  version: 361-1070
+  submodules:
+  - path: cmake/blt
+    url: https://github.com/LLNL/blt.git
+    ref: pinned
+    commit: f08f95e0f49b1d53db8be2dd577d1cdbfd9e9f90
+  exclude:
+  - path: scripts/uberenv
+    reason: Spack/uberenv tooling, not used by the native superbuild
+  patches:
+  - path: patches/0001-tpl-superlu_dist-url-hash-typo.patch
+    upstream_source: local fix of a 65-character URL hash
+    category: B
+  - path: patches/0002-tpl-raja-vectorization-overridable.patch
+    upstream_source: 'local: RAJA_ENABLE_VECTORIZATION overridable (upstream does the same for ROCm)'
+    category: B
+  - path: patches/0003-tpl-hdf5-step-generator-and-build-command.patch
+    upstream_source: 'local: hdf5 ExternalProject step gets generator/build/install commands'
+    category: B
+  license:
+    spdx: LGPL-2.1-only
+    files: []
+- dest: deps/tpl-dist/chai/chai-v2026.07.0.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/chai/src/chai-v2026.07.0.tar.gz
+  url: https://github.com/LLNL/CHAI/releases/download/v2026.07.0/chai-v2026.07.0.tar.gz
+  sha256: a03616ab5488d9d816d2ef007559c2ad7da988f82c0b7d7ddf9f8931518d99d8
+  project: CHAI (+Umpire
+  camp): null
+  version: 2026.07.0
+  license: BSD-3-Clause
+- dest: deps/tpl-dist/conduit/conduit-v0.9.5-src-with-blt.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/conduit/src/conduit-v0.9.5-src-with-blt.tar.gz
+  url: https://github.com/LLNL/conduit/releases/download/v0.9.5/conduit-v0.9.5-src-with-blt.tar.gz
+  sha256: d93294efbf0936da5a27941e13486aa1a04a74a59285786a2303eed19a24265a
+  project: Conduit
+  version: 0.9.5
+  license: BSD-3-Clause
+- dest: deps/tpl-dist/fmt/12.1.0.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/fmt/src/12.1.0.tar.gz
+  url: https://github.com/fmtlib/fmt/archive/refs/tags/12.1.0.tar.gz
+  sha256: ea7de4299689e12b6dddd392f9896f08fb0777ac7168897a244a6d6085043fea
+  project: fmt
+  version: 12.1.0
+  license: MIT
+- dest: deps/tpl-dist/hdf5/hdf5-1_12_1.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/hdf5/src/hdf5-1_12_1.tar.gz
+  url: https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz
+  sha256: e6dde173c2d243551922d23a0387a79961205b018502e6a742acb30b61bc2d5f
+  project: HDF5
+  version: 1.12.1
+  license: BSD-3-Clause (HDF5)
+- dest: deps/tpl-dist/hypre/f1374fb6182c9e730abaa82f865a87b36f9ad50a.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/hypre/src/f1374fb6182c9e730abaa82f865a87b36f9ad50a.tar.gz
+  url: see deps/thirdPartyLibs/CMakeLists.txt (HYPRE_URL, commit f1374fb6)
+  sha256: 8b3c9176e9a4e3bc3e526d497aa52e5adbfbdff8810b90e9cc7413e898de6524
+  project: hypre
+  version: f1374fb6
+  license: Apache-2.0 OR MIT
+- dest: deps/tpl-dist/parmetis/parmetis-4.0.3.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/parmetis/src/parmetis-4.0.3.tar.gz
+  url: https://ftp.mcs.anl.gov/pub/pdetools/spack-pkgs/parmetis-4.0.3.tar.gz
+  sha256: f2d9a231b7cf97f1fee6e8c9663113ebf6c240d407d3c118c55b3633d6be6e5f
+  project: ParMETIS (bundles METIS 5.1.0; used for both the metis and parmetis steps)
+  version: 4.0.3
+  license: ParMETIS license (University of Minnesota, non-commercial/research use; redistribution restricted) -- SEE license_notes
+- dest: deps/tpl-dist/pugixml/v1.13.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/pugixml/src/v1.13.tar.gz
+  url: https://github.com/zeux/pugixml/archive/refs/tags/v1.13.tar.gz
+  sha256: 5c5ad5d7caeb791420408042a7d88c2c6180781bf218feca259fd9d840a888e1
+  project: pugixml
+  version: 1.13
+  license: MIT
+- dest: deps/tpl-dist/raja/RAJA-v2026.07.0.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/raja/src/RAJA-v2026.07.0.tar.gz
+  url: https://github.com/LLNL/RAJA/releases/download/v2026.07.0/RAJA-v2026.07.0.tar.gz
+  sha256: 2774a569f19a7d8e37d1e166d197c828c6b614e7f8ef6d16ccbfb144b8284d02
+  project: RAJA (+camp)
+  version: 2026.07.0
+  license: BSD-3-Clause
+- dest: deps/tpl-dist/scotch/scotch-v7.0.8.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/scotch/src/scotch-v7.0.8.tar.gz
+  url: see deps/thirdPartyLibs/CMakeLists.txt (SCOTCH_URL)
+  sha256: 21f48ac85c7991a5eb5fae9232dd68584556ccc500f85e2ebd6b5b275617e11a
+  project: Scotch
+  version: 7.0.8
+  license: CeCILL-C
+- dest: deps/tpl-dist/silo/silo-4.11.1-bsd.tar.xz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/silo/src/silo-4.11.1-bsd.tar.xz
+  url: https://github.com/LLNL/Silo/releases/download/4.11.1/silo-4.11.1-bsd.tar.xz
+  sha256: 51ccfdf3c09dfc98c7858a0a6f08cc3b2a07ee3c4142ee6482ba7b24e314c2aa
+  project: Silo (BSD variant)
+  version: 4.11.1
+  license: BSD-3-Clause
+- dest: deps/tpl-dist/suitesparse/v5.10.1.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/suitesparse/src/v5.10.1.tar.gz
+  url: see deps/thirdPartyLibs/CMakeLists.txt (SUITESPARSE_URL)
+  sha256: acb4d1045f48a237e70294b950153e48dce5b5f9ca8190e86c2b8c54ce00a7ee
+  project: SuiteSparse
+  version: 5.10.1
+  license: 'mixed: LGPL-2.1+/GPL-2.0+/BSD per package (UMFPACK GPL, CHOLMOD LGPL/GPL modules, AMD/COLAMD BSD)'
+- dest: deps/tpl-dist/superlu_dist/0f6efc3.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/superlu_dist/src/0f6efc3.tar.gz
+  url: see deps/thirdPartyLibs/CMakeLists.txt (SUPERLU_URL, commit 0f6efc3)
+  sha256: 49cd47da22fe72a37011e8dfaf94bd63ad8d61cc8144eac7a571bcbd0a2edf58
+  project: SuperLU_DIST
+  version: 0f6efc3
+  license: BSD-3-Clause
+- dest: deps/tpl-dist/uncrustify/401a409.zip
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/uncrustify/src/401a409.zip
+  url: https://github.com/uncrustify/uncrustify/archive/401a409.zip
+  sha256: 3d948d9d9047a7749632946f323313b9603f026302c37fb932c8414dfc714207
+  project: uncrustify (code formatter built by the superbuild; not used at run time)
+  version: 401a409
+  license: GPL-2.0-or-later
+- dest: deps/tpl-dist/vtk/VTK-9.7.0.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/geos/cuda132-gcc142-ompi5010/build/tpl/vtk/src/VTK-9.7.0.tar.gz
+  url: see deps/thirdPartyLibs/CMakeLists.txt (VTK_URL)
+  sha256: affdb7a15ec34ee0174407f911ab70b646c7af01161818bbab4e1160b7eff720
+  project: VTK
+  version: 9.7.0
+  license: BSD-3-Clause
+- dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
+  category: benchmark_specific
+  kind: file
+  source: .deps/level3/dftfe/downloads/OpenBLAS-0.3.30.tar.gz
+  url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+  sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+  project: OpenBLAS
+  version: 0.3.30
+  license: BSD-3-Clause
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: system GCC / gfortran
+  version: 14.2.1
+  provided_by: node
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: Python 3 (config-build.py
+  geos-ats style checkers): null
+  provided_by: .conda_env
+- name: CMake / Ninja
+  provided_by: .conda_env
+- name: 'hypredrive (not built: ENABLE_HYPREDRV=OFF) and doxygen (off) tarballs'
+  provided_by: not bundled -- unused
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/GEOS
+  ignore:
+  - .git/*
+  - '*/.git'
+  - '*/.git/*'
+  - '*/__pycache__/*'
+  - src/coreComponents/LvArray/docs/doxygen/LvArrayConfig.hpp
+- archive_path: deps/thirdPartyLibs
+  validated_tree: _upstream/level3/thirdPartyLibs
+  ignore:
+  - .git/*
+  - '*/.git'
+  - '*/.git/*'
+  excluded:
+  - scripts/uberenv/*
+licenses:
+- path: src
+  project: GEOS
+  license: LGPL-2.1-only
+  url: https://github.com/GEOS-DEV/GEOS
+  commit: b7a0f13305277c3d825ee93f34946ac4e8c94fee
+- path: src/src/cmake/blt
+  project: BLT
+  license: BSD-3-Clause
+  url: https://github.com/LLNL/blt
+  commit: 9ff77344f0b2a6ee345e452bddd6bfd46cbbfa35
+- path: src/src/coreComponents/LvArray
+  project: LvArray
+  license: BSD-3-Clause
+  url: https://github.com/GEOS-DEV/LvArray
+  commit: b8bc3ef762bf0236d7f94965b3fbbd458e6d537d
+- path: src/src/coreComponents/constitutive/HPCReact
+  project: HPCReact
+  license: BSD-3-Clause
+  url: https://github.com/GEOS-DEV/HPCReact
+  commit: 7423e3e2cd55e959d9a823ab8241351f8b1087df
+- path: src/src/coreComponents/fileIO/coupling/hdf5_interface
+  project: hdf5_interface
+  license: BSD-3-Clause
+  url: https://github.com/GEOS-DEV/hdf5_interface
+  commit: efe82a8ed0f8ac4995b8859bff9f0bf5bf0b6ef4
+- path: deps/thirdPartyLibs
+  project: GEOS thirdPartyLibs
+  license: LGPL-2.1-only (GEOS project)
+  url: https://github.com/GEOS-DEV/thirdPartyLibs
+  commit: 9b55672f6f8a73d02fd632396eb0410e58c9b120
+- path: deps/tpl-dist/parmetis
+  project: ParMETIS 4.0.3 (+METIS 5.1.0)
+  license: 'ParMETIS: University of Minnesota research license (redistribution restricted); METIS 5: Apache-2.0'
+  url: https://ftp.mcs.anl.gov/pub/pdetools/spack-pkgs/parmetis-4.0.3.tar.gz
+- path: deps/tpl-dist/suitesparse
+  project: SuiteSparse 5.10.1
+  license: mixed LGPL/GPL/BSD per package
+  url: https://github.com/DrTimothySDavis/SuiteSparse
+- path: deps/tpl-dist/uncrustify
+  project: uncrustify
+  license: GPL-2.0-or-later
+  url: https://github.com/uncrustify/uncrustify
+- path: deps/tpl-dist/scotch
+  project: Scotch 7.0.8
+  license: CeCILL-C
+  url: https://gitlab.inria.fr/scotch/scotch
+- path: deps/tpl-dist/{chai,raja,conduit,silo,vtk,superlu_dist,hdf5,pugixml,fmt,hypre}
+  project: CHAI/Umpire/camp, RAJA, Conduit, Silo, VTK, SuperLU_DIST, HDF5, pugixml, fmt, hypre
+  license: BSD-3-Clause / MIT / Apache-2.0 (permissive)
+  url: see the component list
+- path: deps/openblas
+  project: OpenBLAS
+  license: BSD-3-Clause
+  version: 0.3.30
+license_notes:
+- 'LICENSE BLOCKER (decision needed): parmetis-4.0.3.tar.gz -- ParMETIS is distributed under the University of Minnesota license,
+  which permits use for research/educational purposes but does not grant a general right to redistribute the source. GEOS''
+  superbuild downloads it from an ANL mirror. Bundling it into a redistributed source artifact that is distributed with this repository may
+  not be permitted; the freeze records it here and the user decides whether to (a) keep it in the bundle (private repository
+  only), (b) move it to an environment-provided download resolved by build.sh from the recorded URL+sha256, or (c) drop ParMETIS.
+  METIS 5.1.0 (inside the same tarball) is Apache-2.0.'
+- SuiteSparse 5.10.1 mixes LGPL/GPL modules (UMFPACK is GPL); the complete source is redistributed, which GPL permits; no
+  derived binary is distributed.
+- uncrustify (GPL-2.0-or-later) is only a build-time code formatter that the superbuild builds; its source is redistributed
+  complete.
+- 'The GEOS integrated-test baseline tarball (baseline_integratedTests-pr3994-17525-4ae3593.tar.gz, 1.57 GB, LGPL-2.1 GEOS
+  project data) is a DATASET, not source: it stays outside the source bundle (.deps/level3/geos/downloads/, url+sha256 recorded
+  in benchmark.yaml) -- see benchmark.yaml `datasets`.'
+redistribution_status: blocked

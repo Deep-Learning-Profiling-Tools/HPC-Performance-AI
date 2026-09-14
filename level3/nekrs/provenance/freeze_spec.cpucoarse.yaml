@@ -1,0 +1,108 @@
+schema: hpcperf-freeze-spec-1
+name: nekrs
+level: 3
+application: nekRS
+benchmark_source_version: hpcperf-l3-v1
+variant: cpucoarse
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/nekRS
+  url: https://github.com/Nek5000/nekRS.git
+  ref: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+  submodules: []
+  exclude: []
+  patches: []
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - LICENSE
+  bundled:
+  - path: 3rd_party/occa
+    project: OCCA
+    license: MIT
+  - path: 3rd_party/hypre
+    project: hypre
+    version: 2.32.0
+    license: Apache-2.0 OR MIT
+  - path: 3rd_party/gslib
+    project: gslib
+    license: BSD-3-Clause
+  - path: 3rd_party/nek5000
+    project: Nek5000
+    license: BSD-3-Clause
+  - path: 3rd_party/nek5000_parRSB
+    project: parRSB
+    license: BSD-3-Clause
+  - path: 3rd_party/lapack
+    project: LAPACK (vendored subset)
+    license: BSD-3-Clause
+  - path: 3rd_party/cpptrace
+    project: cpptrace
+    license: MIT
+  - path: 3rd_party/adios
+    project: ADIOS2 (vendored
+    not built): null
+    license: Apache-2.0
+  - path: 3rd_party/cvode
+    project: CVODE glue (not built)
+    license: BSD-3-Clause
+  - path: 3rd_party/plugins
+    project: nekRS plugins
+    license: BSD-3-Clause
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC 13.3.0 (conda
+  C/C++) + system gfortran 14.2.1: null
+  provided_by: .conda_env / node
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: CMake
+  provided_by: .conda_env
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/nekrs/cpucoarse/src
+  ignore:
+  - .hpcperf-src-stamp
+licenses:
+- path: src
+  project: nekRS
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/nekRS
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+- path: src/3rd_party/occa
+  project: OCCA
+  license: MIT
+  url: https://github.com/libocca/occa
+- path: src/3rd_party/hypre
+  project: hypre
+  license: Apache-2.0 OR MIT
+  url: https://github.com/hypre-space/hypre
+  version: 2.32.0
+- path: src/3rd_party/gslib
+  project: gslib
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/gslib
+- path: src/3rd_party/nek5000
+  project: Nek5000
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/Nek5000
+- path: src/3rd_party/lapack
+  project: LAPACK
+  license: BSD-3-Clause
+  url: https://github.com/Reference-LAPACK/lapack
+- path: src/3rd_party/cpptrace
+  project: cpptrace
+  license: MIT
+  url: https://github.com/jeremy-rifkin/cpptrace
+- path: src/3rd_party/adios
+  project: ADIOS2
+  license: Apache-2.0
+  url: https://github.com/ornladios/ADIOS2
+license_notes:
+- Exact upstream v26.0 tree (no patch); the same vendored third-party licenses as the hypregpu variant.
+redistribution_status: cleared

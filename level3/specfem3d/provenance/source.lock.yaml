@@ -1,0 +1,168 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: specfem3d
+  level: 3
+  application: SPECFEM3D Cartesian
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/SPECFEM/specfem3d.git
+  tag: v4.1.1
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+artifact:
+  filename: specfem3d-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 248289500
+  sha256: 62b9739b1440a1cb1d33c58d282b5f418f9f92f6c152cfde4697ee28c22eb316
+  source_tree_sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
+  uncompressed_size: 665155680
+  tar_entries: 6808
+  file_count: 6147
+  symlink_count: 58
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/specfem3d-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 9bdc4eed3a3593e4d87e57ed1802eff37d0a7b78a060e083cbcd3155592adc4f
+  algorithm: hpcperf-tree-1
+  entries: 6205
+  layout:
+  - src/
+patches:
+- path: patches/0001-cuda13-deviceOverlap-guard.patch
+  sha256: 553baab7a0fa8545f0462e97dff57432ddcc80f3836279dbbfabc48aef2321c5
+  category: D
+  upstream_reference: SPECFEM/specfem3d devel cc2e9ffa
+  component: src
+  files:
+  - src/src/gpu/initialize_gpu.cu
+- path: patches/0002-blackwell-device-block.patch
+  sha256: adaacdfc726f589852c4aefa7c2abd719bd6bcfcb738f18271863129e9ce59c1
+  category: D
+  upstream_reference: SPECFEM/specfem3d devel cc2e9ffa
+  component: src
+  files:
+  - src/src/gpu/mesh_constants_cuda.h
+dependencies:
+  bundled:
+  - path: external_libs/scotch_5.1.12b
+    project: SCOTCH
+    version: 5.1.12b
+    license: CeCILL-C
+    component: src
+  - path: external_libs
+    project: other bundled libraries (ADIOS glue, ...)
+    license: per directory
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC 13.3.0 (conda
+    C + nvcc host) and system gfortran 14.2.1: null
+    provided_by: .conda_env / node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/SPECFEM/specfem3d.git
+  ref: v4.1.1
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+  sha256: null
+  checkout: _upstream/level3/specfem3d
+  submodules: []
+  excluded:
+  - path: doc
+    reason: documentation (PDF manuals, figures); the validated private build copy was made without doc/ as well
+  license:
+    spdx: GPL-3.0-or-later
+    files:
+    - LICENSE
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/specfem3d/src
+  status: EQUIVALENT
+  summary:
+    identical: 6196
+    expected_patch_difference: 0
+    expected_generated_difference: 3
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 6
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 6205
+    validated_entries_considered: 6199
+licenses:
+- path: src
+  project: SPECFEM3D Cartesian
+  license: GPL-3.0-or-later
+  url: https://github.com/SPECFEM/specfem3d
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+- path: src/external_libs/scotch_5.1.12b
+  project: SCOTCH (bundled)
+  license: CeCILL-C
+  url: https://gitlab.inria.fr/scotch/scotch
+  version: 5.1.12b
+license_notes:
+- SPECFEM3D is GPL (see LICENSE); redistribution of the complete source with the two back-ported devel patches (also GPL)
+  is permitted; the diff is recorded in provenance/original_vs_baseline.diff.
+- SCOTCH 5.1.12b is bundled by upstream under CeCILL-C (LGPL-compatible free software license); its own license file stays
+  in the tree.
+- EXAMPLES/ (meshes, reference seismograms used by validate.sh) are upstream repository content; doc/ is excluded (documentation
+  only).
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/external_libs/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  exclude:
+  - src/EXAMPLES/*
+  - src/utils/*
+  - src/DATA/*
+  - src/CUBIT_GEOCUBIT/*
+  - src/doc/*
+  - src/.github/*
+  - src/m4/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:03:30Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: v4.1.1
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:53:20Z'
+  tool: migrate_from_lfs_bundle-1.0

@@ -111,6 +111,7 @@ report "CMake"   cmake --version
 report "Ninja"   ninja --version
 report "cloc"    cloc --version
 report "numpy"   python -c "import numpy; print(numpy.__version__)"
+report "PyYAML"  python -c "import yaml; print(yaml.__version__)"
 CONDA_GCC="$CONDA_ENV_PREFIX/bin/x86_64-conda-linux-gnu-cc"
 CONDA_GXX="$CONDA_ENV_PREFIX/bin/x86_64-conda-linux-gnu-c++"
 if [ -x "$CONDA_GCC" ]; then

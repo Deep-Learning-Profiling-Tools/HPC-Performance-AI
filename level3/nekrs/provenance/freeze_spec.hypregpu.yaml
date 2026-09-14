@@ -1,0 +1,121 @@
+schema: hpcperf-freeze-spec-1
+name: nekrs
+level: 3
+application: nekRS
+benchmark_source_version: hpcperf-l3-v1
+variant: hypregpu
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/nekRS
+  url: https://github.com/Nek5000/nekRS.git
+  ref: v26.0
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+  submodules: []
+  exclude: []
+  patches:
+  - path: patches/0001-hypre-cuda-sm100.patch
+    upstream_source: cmake/hypre.cmake HYPRE_CUDA_SM list
+    category: B
+  - path: patches/0002-hypre-cuda13-thrust-pair.patch
+    upstream_source: hypre 2.32 device_utils/csr_matop_device thrust::reduce_by_key result type
+    category: D
+  - path: patches/0003-hypre-cuda13-thrust3-compat.patch
+    upstream_source: 'hypre device sources: thrust 3 includes, thrust::not1 -> not_fn'
+    category: D
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - LICENSE
+  bundled:
+  - path: 3rd_party/occa
+    project: OCCA
+    license: MIT
+  - path: 3rd_party/hypre
+    project: hypre
+    version: 2.32.0
+    license: Apache-2.0 OR MIT
+  - path: 3rd_party/gslib
+    project: gslib
+    license: BSD-3-Clause
+  - path: 3rd_party/nek5000
+    project: Nek5000
+    license: BSD-3-Clause
+  - path: 3rd_party/nek5000_parRSB
+    project: parRSB
+    license: BSD-3-Clause
+  - path: 3rd_party/lapack
+    project: LAPACK (vendored subset)
+    license: BSD-3-Clause
+  - path: 3rd_party/cpptrace
+    project: cpptrace
+    license: MIT
+  - path: 3rd_party/adios
+    project: ADIOS2 (vendored, not built -- ENABLE_ADIOS=OFF)
+    license: Apache-2.0
+  - path: 3rd_party/cvode
+    project: CVODE glue (not built -- ENABLE_CVODE=OFF)
+    license: BSD-3-Clause
+  - path: 3rd_party/plugins
+    project: nekRS plugins
+    license: BSD-3-Clause
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC 13.3.0 (conda
+  C/C++) + system gfortran 14.2.1: null
+  provided_by: .conda_env / node
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: CMake
+  provided_by: .conda_env
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/nekrs/src
+  ignore:
+  - .hpcperf-src-stamp
+  added:
+  - 3rd_party/cvode/doc/*
+  - 3rd_party/adios/thirdparty/*/doc/*
+  - 3rd_party/adios/thirdparty/*/docs/*
+licenses:
+- path: src
+  project: nekRS
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/nekRS
+  commit: 96b3cf9e5bacede16568826c04a21bc0fe50dc7d
+- path: src/3rd_party/occa
+  project: OCCA
+  license: MIT
+  url: https://github.com/libocca/occa
+- path: src/3rd_party/hypre
+  project: hypre
+  license: Apache-2.0 OR MIT
+  url: https://github.com/hypre-space/hypre
+  version: 2.32.0
+- path: src/3rd_party/gslib
+  project: gslib
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/gslib
+- path: src/3rd_party/nek5000
+  project: Nek5000
+  license: BSD-3-Clause
+  url: https://github.com/Nek5000/Nek5000
+- path: src/3rd_party/lapack
+  project: LAPACK
+  license: BSD-3-Clause
+  url: https://github.com/Reference-LAPACK/lapack
+- path: src/3rd_party/cpptrace
+  project: cpptrace
+  license: MIT
+  url: https://github.com/jeremy-rifkin/cpptrace
+- path: src/3rd_party/adios
+  project: ADIOS2
+  license: Apache-2.0
+  url: https://github.com/ornladios/ADIOS2
+license_notes:
+- nekRS vendors its third-party libraries as squashed subtrees with their license files; all are permissive (BSD/MIT/Apache).
+- The three hypre patches modify vendored hypre device sources (class B/D); the diff is in provenance/original_vs_baseline.hypregpu.diff.
+redistribution_status: cleared

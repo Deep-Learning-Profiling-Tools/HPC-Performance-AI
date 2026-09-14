@@ -1,0 +1,90 @@
+schema: hpcperf-freeze-spec-1
+name: specfem3d
+level: 3
+application: SPECFEM3D Cartesian
+benchmark_source_version: hpcperf-l3-v1
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/specfem3d
+  url: https://github.com/SPECFEM/specfem3d.git
+  ref: v4.1.1
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+  submodules: []
+  exclude:
+  - path: doc
+    reason: documentation (PDF manuals, figures); the validated private build copy was made without doc/ as well
+  patches:
+  - path: patches/0001-cuda13-deviceOverlap-guard.patch
+    upstream_source: SPECFEM/specfem3d devel cc2e9ffa
+    category: D
+  - path: patches/0002-blackwell-device-block.patch
+    upstream_source: SPECFEM/specfem3d devel cc2e9ffa
+    category: D
+  license:
+    spdx: GPL-3.0-or-later
+    files:
+    - LICENSE
+  bundled:
+  - path: external_libs/scotch_5.1.12b
+    project: SCOTCH
+    version: 5.1.12b
+    license: CeCILL-C
+  - path: external_libs
+    project: other bundled libraries (ADIOS glue, ...)
+    license: per directory
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC 13.3.0 (conda
+  C + nvcc host) and system gfortran 14.2.1: null
+  provided_by: .conda_env / node
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+equivalence:
+- archive_path: src
+  validated_tree: .deps/level3/specfem3d/src
+  ignore:
+  - obj/*
+  - bin/*
+  - OUTPUT_FILES/*
+  - config.log
+  - config.status
+  - Makefile
+  - setup/*
+  - '*.o'
+  - '*.a'
+  - '*.mod'
+  - external_libs/scotch_5.1.12b/bin/*
+  - external_libs/scotch_5.1.12b/lib/*
+  - external_libs/scotch_5.1.12b/include/*
+  - external_libs/scotch_5.1.12b/src/Makefile.inc
+  - external_libs/scotch_5.1.12b/src/libscotch/*
+  - external_libs/scotch_5.1.12b/src/scotch/*
+  generated:
+  - DATA/CMTSOLUTION
+  - DATA/Par_file
+  - DATA/STATIONS
+  added:
+  - external_libs/scotch_5.1.12b/doc/*
+licenses:
+- path: src
+  project: SPECFEM3D Cartesian
+  license: GPL-3.0-or-later
+  url: https://github.com/SPECFEM/specfem3d
+  commit: c67d3ae7d4bfc5ac75cb9e5601d93afa262d3d8d
+- path: src/external_libs/scotch_5.1.12b
+  project: SCOTCH (bundled)
+  license: CeCILL-C
+  url: https://gitlab.inria.fr/scotch/scotch
+  version: 5.1.12b
+license_notes:
+- SPECFEM3D is GPL (see LICENSE); redistribution of the complete source with the two back-ported devel patches (also GPL)
+  is permitted; the diff is recorded in provenance/original_vs_baseline.diff.
+- SCOTCH 5.1.12b is bundled by upstream under CeCILL-C (LGPL-compatible free software license); its own license file stays
+  in the tree.
+- EXAMPLES/ (meshes, reference seismograms used by validate.sh) are upstream repository content; doc/ is excluded (documentation
+  only).
+redistribution_status: cleared

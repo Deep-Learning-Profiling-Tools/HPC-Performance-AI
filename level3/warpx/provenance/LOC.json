@@ -1,0 +1,97 @@
+{
+ "benchmark": "warpx",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "e90d20b2a7d82634313efff4bc23fb190fef8b12c607c5ffad94cf0f04a9b6a2",
+ "test_code_loc": {
+  "code": 11058,
+  "files": 387,
+  "languages": {
+   "JSON": 10402,
+   "Python": 513,
+   "Bourne Shell": 131,
+   "Text": 12
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 112459,
+  "files": 661,
+  "languages": {
+   "C++": 69266,
+   "C/C++ Header": 37146,
+   "Text": 5103,
+   "CMake": 697,
+   "Python": 204,
+   "reStructuredText": 31,
+   "Markdown": 12
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 366200,
+  "files": 1782,
+  "languages": {
+   "C/C++ Header": 170983,
+   "C++": 137533,
+   "Fortran 90": 18910,
+   "reStructuredText": 10011,
+   "Markdown": 5839,
+   "CMake": 5722,
+   "YAML": 3115,
+   "Python": 2929,
+   "make": 2221,
+   "INI": 1537,
+   "CSS": 1462,
+   "SVG": 1163,
+   "Bourne Shell": 1027,
+   "yacc": 777,
+   "Fortran 77": 517,
+   "Perl": 394,
+   "MATLAB": 390,
+   "TeX": 367,
+   "lex": 344,
+   "Snakemake": 267,
+   "Text": 171,
+   "Org Mode": 136,
+   "JSON": 105,
+   "Modula3": 76,
+   "HTML": 49,
+   "TOML": 46,
+   "Korn Shell": 44,
+   "diff": 36,
+   "Haskell": 15,
+   "Logos": 12,
+   "Bourne Again Shell": 2
+  },
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 2672,
+  "files": 28,
+  "languages": {
+   "YAML": 715,
+   "CMake": 624,
+   "Markdown": 615,
+   "JSON": 299,
+   "Python": 273,
+   "Text": 75,
+   "INI": 29,
+   "make": 24,
+   "TOML": 18
+  }
+ },
+ "total_materialized_code_loc": 492389,
+ "summary": {
+  "application_owned_code_loc": 112459,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 366200,
+  "test_code_loc": 11058,
+  "total_materialized_code_loc": 492389,
+  "unclassified_code_loc": 2672
+ }
+}

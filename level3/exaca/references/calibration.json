@@ -1,0 +1,272 @@
+{
+ "schema": "hpcperf-exaca-calibration-1",
+ "purpose": "CALIBRATION data set of validation protocol v2: the 8 runs used to measure the run-to-run and rank-count spread of the statistics and to derive the frozen tolerances. NOT independent acceptance evidence (the 1/2/4-GPU validations of 2026-09-10 in README.md RESULTS were produced against protocol v1 tolerances from the same data and are re-labelled CALIBRATION; the independent acceptance is the holdout set of protocol v2).",
+ "spread_definition": "range = max - min over the 8 runs (all rank counts pooled); population standard deviation reported for information only; the reference is calibration run cal-08 (the fresh 1-GPU run of 2026-09-10, run_id 20260910T212610Z-216184-29676)",
+ "tolerance_rule": "tolerance = max(3 x range, floor); floors: vol_fraction_nucleated 0.01 abs, n_nucleated 5 % (= +-1 of 20), mean_misorientation_z 0.25 deg, unsolidified_cells exactly 0; the 4 % of cells that differ between identical 1-GPU runs (2.2 %) and between 1- and 4-rank runs (6.1 %) are real spatial differences, not renumbering (references/validation_protocol.md)",
+ "binary_sha256_of_calibration_runs": "f2a8875c6565a61977423a0d67ebba365a807f6b428bf2c59c0e9f48fbfd6925 (canonical build of 2026-09-10, Kokkos 4.7.04)",
+ "runs": [
+  {
+   "tag": "cal-01",
+   "ranks": 1,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5493946075439453,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.987502278415977,
+   "mean_misorientation_z_top_deg": 35.664298124976355,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-02",
+   "ranks": 2,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3614,
+   "n_epitaxial": 3594,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5490059852600098,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.956660188148213,
+   "mean_misorientation_z_top_deg": 35.648302302414315,
+   "mean_grain_volume_cells": 580.2855561704482,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-03",
+   "ranks": 4,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3622,
+   "n_epitaxial": 3602,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5489153861999512,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.971029044463638,
+   "mean_misorientation_z_top_deg": 35.438178428749396,
+   "mean_grain_volume_cells": 579.0038652678079,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-04",
+   "ranks": 1,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5494632720947266,
+   "top_layer_grains": 28,
+   "mean_misorientation_z_deg": 26.971628968652336,
+   "mean_misorientation_z_top_deg": 35.59917569408222,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-05",
+   "ranks": 1,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5483083724975586,
+   "top_layer_grains": 28,
+   "mean_misorientation_z_deg": 26.961264417744175,
+   "mean_misorientation_z_top_deg": 35.51339167332904,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-06",
+   "ranks": 4,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3621,
+   "n_epitaxial": 3601,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5490059852600098,
+   "top_layer_grains": 30,
+   "mean_misorientation_z_deg": 26.989964848594397,
+   "mean_misorientation_z_top_deg": 35.501558010919624,
+   "mean_grain_volume_cells": 579.1637669152168,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-07",
+   "ranks": 4,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3621,
+   "n_epitaxial": 3601,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5491423606872559,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.972919337631936,
+   "mean_misorientation_z_top_deg": 35.47095537467389,
+   "mean_grain_volume_cells": 579.1637669152168,
+   "unsolidified_cells": 0
+  },
+  {
+   "tag": "cal-08 (reference)",
+   "ranks": 1,
+   "seed": 0,
+   "case": "dirsolid smoke 128x128x128, nucleation density 10",
+   "date": "2026-09-10",
+   "time_step_of_output": 7000,
+   "n_grains": 3612,
+   "n_epitaxial": 3592,
+   "n_nucleated": 20,
+   "vol_fraction_nucleated": 0.5495171546936035,
+   "top_layer_grains": 29,
+   "mean_misorientation_z_deg": 26.98837624961747,
+   "mean_misorientation_z_top_deg": 35.58406703154213,
+   "mean_grain_volume_cells": 580.6068660022148,
+   "unsolidified_cells": 0
+  }
+ ],
+ "summary": {
+  "n_grains": {
+   "min": 3612,
+   "max": 3622,
+   "range": 10,
+   "mean": 3615.75,
+   "population_sd": 4.380353866983808,
+   "n": 8
+  },
+  "n_epitaxial": {
+   "min": 3592,
+   "max": 3602,
+   "range": 10,
+   "mean": 3595.75,
+   "population_sd": 4.380353866983808,
+   "n": 8
+  },
+  "n_nucleated": {
+   "min": 20,
+   "max": 20,
+   "range": 0,
+   "mean": 20,
+   "population_sd": 0.0,
+   "n": 8
+  },
+  "vol_fraction_nucleated": {
+   "min": 0.5483083724975586,
+   "max": 0.5495171546936035,
+   "range": 0.0012087821960449219,
+   "mean": 0.5490941405296326,
+   "population_sd": 0.0003661850487277234,
+   "n": 8
+  },
+  "top_layer_grains": {
+   "min": 28,
+   "max": 30,
+   "range": 2,
+   "mean": 29,
+   "population_sd": 0.7071067811865476,
+   "n": 8
+  },
+  "mean_misorientation_z_deg": {
+   "min": 26.956660188148213,
+   "max": 26.989964848594397,
+   "range": 0.03330466044618419,
+   "mean": 26.97491816665852,
+   "population_sd": 0.011808897885072485,
+   "n": 8
+  },
+  "mean_misorientation_z_top_deg": {
+   "min": 35.438178428749396,
+   "max": 35.664298124976355,
+   "range": 0.22611969622695938,
+   "mean": 35.55249083008587,
+   "population_sd": 0.07801882317837082,
+   "n": 8
+  },
+  "mean_grain_volume_cells": {
+   "min": 579.0038652678079,
+   "max": 580.6068660022148,
+   "range": 1.603000734406919,
+   "mean": 580.0055524096936,
+   "population_sd": 0.7022550302313674,
+   "n": 8
+  },
+  "unsolidified_cells": {
+   "min": 0,
+   "max": 0,
+   "range": 0,
+   "mean": 0,
+   "population_sd": 0.0,
+   "n": 8
+  }
+ },
+ "derived_tolerances_v2": {
+  "unsolidified_cells": 0,
+  "vol_fraction_nucleated": 0.01,
+  "n_grains_rel": 0.01,
+  "n_nucleated_rel": 0.05,
+  "top_layer_grains_rel": 0.25,
+  "mean_misorientation_z_deg": 0.25,
+  "mean_misorientation_z_top_deg": 0.7,
+  "mean_grain_volume_cells_rel": 0.01
+ },
+ "singlegrain_probe": {
+  "case": "upstream examples/Inp_SmallEquiaxedGrain.json (SimulationType SingleGrain, one grain at the domain centre, uniform 10 K undercooling) enlarged to 64x64x64, run directly through the launcher (not part of the benchmark)",
+  "date": "2026-09-11",
+  "runs": [
+   {
+    "tag": "a1",
+    "ranks": 1,
+    "captured_cells": 61664,
+    "cycles": 16505
+   },
+   {
+    "tag": "b1",
+    "ranks": 1,
+    "captured_cells": 61667,
+    "cycles": 16505
+   },
+   {
+    "tag": "a2",
+    "ranks": 2,
+    "captured_cells": 61675,
+    "cycles": 16506
+   },
+   {
+    "tag": "a4",
+    "ranks": 4,
+    "captured_cells": 61675,
+    "cycles": 16506
+   },
+   {
+    "tag": "b4",
+    "ranks": 4,
+    "captured_cells": 61675,
+    "cycles": 16506
+   }
+  ],
+  "bitwise": {
+   "a1_vs_b1": "DIFFERENT (3 cells, 0.0011 %)",
+   "a1_vs_a2": "DIFFERENT (11 cells)",
+   "a1_vs_a4": "DIFFERENT (11 cells)",
+   "a4_vs_b4": "IDENTICAL"
+  },
+  "conclusion": "even a single growing grain (no grain competition) is not bitwise reproducible on 1 GPU (3 edge cells) and its termination cycle depends on the rank count (16505 vs 16506); the differences are confined to the growth front at the final cycle. Not usable as a bitwise oracle; recorded as evidence that the non-determinism is at the cell-capture level, consistent with the atomic capture path."
+ }
+}

@@ -1,0 +1,24 @@
+src	https://github.com/GEOS-DEV/GEOS.git	develop @ 2026-09-04	b7a0f13305277c3d825ee93f34946ac4e8c94fee
+src/src/cmake/blt	https://github.com/LLNL/blt.git	BLT 0.6.2	9ff77344f0b2a6ee345e452bddd6bfd46cbbfa35
+src/src/coreComponents/LvArray	https://github.com/GEOS-DEV/LvArray.git	develop	b8bc3ef762bf0236d7f94965b3fbbd458e6d537d
+src/src/coreComponents/LvArray/cmake/blt	https://github.com/LLNL/blt.git	pinned	5a792c1775e7a7628d84dcde31652a689f1df7b5
+src/src/coreComponents/constitutive/HPCReact	https://github.com/GEOS-DEV/HPCReact.git	main	7423e3e2cd55e959d9a823ab8241351f8b1087df
+src/src/coreComponents/constitutive/HPCReact/cmake/blt	https://github.com/LLNL/blt.git	pinned	fe075e596c5fde30acbe4e05f40baaf0a258ff54
+src/src/coreComponents/fileIO/coupling/hdf5_interface	https://github.com/GEOS-DEV/hdf5_interface.git	master	efe82a8ed0f8ac4995b8859bff9f0bf5bf0b6ef4
+deps/thirdPartyLibs	https://github.com/GEOS-DEV/thirdPartyLibs.git	TPL tag 361-1070	9b55672f6f8a73d02fd632396eb0410e58c9b120
+deps/thirdPartyLibs/cmake/blt	https://github.com/LLNL/blt.git	pinned	f08f95e0f49b1d53db8be2dd577d1cdbfd9e9f90
+deps/tpl-dist/chai/chai-v2026.07.0.tar.gz	https://github.com/LLNL/CHAI/releases/download/v2026.07.0/chai-v2026.07.0.tar.gz	2026.07.0	sha256:a03616ab5488d9d816d2ef007559c2ad7da988f82c0b7d7ddf9f8931518d99d8
+deps/tpl-dist/conduit/conduit-v0.9.5-src-with-blt.tar.gz	https://github.com/LLNL/conduit/releases/download/v0.9.5/conduit-v0.9.5-src-with-blt.tar.gz	0.9.5	sha256:d93294efbf0936da5a27941e13486aa1a04a74a59285786a2303eed19a24265a
+deps/tpl-dist/fmt/12.1.0.tar.gz	https://github.com/fmtlib/fmt/archive/refs/tags/12.1.0.tar.gz	12.1.0	sha256:ea7de4299689e12b6dddd392f9896f08fb0777ac7168897a244a6d6085043fea
+deps/tpl-dist/hdf5/hdf5-1_12_1.tar.gz	https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz	1.12.1	sha256:e6dde173c2d243551922d23a0387a79961205b018502e6a742acb30b61bc2d5f
+deps/tpl-dist/hypre/f1374fb6182c9e730abaa82f865a87b36f9ad50a.tar.gz	see deps/thirdPartyLibs/CMakeLists.txt (HYPRE_URL, commit f1374fb6)	f1374fb6	sha256:8b3c9176e9a4e3bc3e526d497aa52e5adbfbdff8810b90e9cc7413e898de6524
+deps/tpl-dist/parmetis/parmetis-4.0.3.tar.gz	https://ftp.mcs.anl.gov/pub/pdetools/spack-pkgs/parmetis-4.0.3.tar.gz	4.0.3	sha256:f2d9a231b7cf97f1fee6e8c9663113ebf6c240d407d3c118c55b3633d6be6e5f
+deps/tpl-dist/pugixml/v1.13.tar.gz	https://github.com/zeux/pugixml/archive/refs/tags/v1.13.tar.gz	1.13	sha256:5c5ad5d7caeb791420408042a7d88c2c6180781bf218feca259fd9d840a888e1
+deps/tpl-dist/raja/RAJA-v2026.07.0.tar.gz	https://github.com/LLNL/RAJA/releases/download/v2026.07.0/RAJA-v2026.07.0.tar.gz	2026.07.0	sha256:2774a569f19a7d8e37d1e166d197c828c6b614e7f8ef6d16ccbfb144b8284d02
+deps/tpl-dist/scotch/scotch-v7.0.8.tar.gz	see deps/thirdPartyLibs/CMakeLists.txt (SCOTCH_URL)	7.0.8	sha256:21f48ac85c7991a5eb5fae9232dd68584556ccc500f85e2ebd6b5b275617e11a
+deps/tpl-dist/silo/silo-4.11.1-bsd.tar.xz	https://github.com/LLNL/Silo/releases/download/4.11.1/silo-4.11.1-bsd.tar.xz	4.11.1	sha256:51ccfdf3c09dfc98c7858a0a6f08cc3b2a07ee3c4142ee6482ba7b24e314c2aa
+deps/tpl-dist/suitesparse/v5.10.1.tar.gz	see deps/thirdPartyLibs/CMakeLists.txt (SUITESPARSE_URL)	5.10.1	sha256:acb4d1045f48a237e70294b950153e48dce5b5f9ca8190e86c2b8c54ce00a7ee
+deps/tpl-dist/superlu_dist/0f6efc3.tar.gz	see deps/thirdPartyLibs/CMakeLists.txt (SUPERLU_URL, commit 0f6efc3)	0f6efc3	sha256:49cd47da22fe72a37011e8dfaf94bd63ad8d61cc8144eac7a571bcbd0a2edf58
+deps/tpl-dist/uncrustify/401a409.zip	https://github.com/uncrustify/uncrustify/archive/401a409.zip	401a409	sha256:3d948d9d9047a7749632946f323313b9603f026302c37fb932c8414dfc714207
+deps/tpl-dist/vtk/VTK-9.7.0.tar.gz	see deps/thirdPartyLibs/CMakeLists.txt (VTK_URL)	9.7.0	sha256:affdb7a15ec34ee0174407f911ab70b646c7af01161818bbab4e1160b7eff720
+deps/openblas/OpenBLAS-0.3.30.tar.gz	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz	0.3.30	sha256:27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d

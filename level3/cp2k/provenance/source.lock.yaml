@@ -1,0 +1,384 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: cp2k
+  level: 3
+  application: CP2K
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/cp2k/cp2k.git
+  tag: v2026.2
+  commit: 67b5da876dd6a76b8b021d5a04d1c81ba79a4c50
+artifact:
+  filename: cp2k-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 210932689
+  sha256: d6776dd4fa3107d4323d6f75144d047f28776bb9e87adc03597bd69a5dcc02b2
+  source_tree_sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
+  uncompressed_size: 519383421
+  tar_entries: 9725
+  file_count: 9006
+  symlink_count: 3
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/cp2k-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2
+  algorithm: hpcperf-tree-1
+  entries: 9009
+  layout:
+  - src/
+  - deps/
+patches:
+- path: patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch
+  sha256: 7fa17badfbe47c80c94a82a5f8da2c1ab7237823ed1d6487391b013b4b590afa
+  category: B
+  upstream_reference: cp2k/cp2k commit 378b2fab (B200 GPU_ARCH_NUMBER 100 for DBCSR, parameters_H100 reused)
+  component: src
+  files:
+  - src/tools/toolchain/install_cp2k_toolchain.sh
+  - src/tools/toolchain/scripts/stage9/install_dbcsr.sh
+dependencies:
+  bundled: []
+  benchmark_specific:
+  - path: deps/cp2k-toolchain-dist/OpenBLAS-0.3.33.tar.gz
+    project: OpenBLAS
+    version: 0.3.33
+    url: https://www.cp2k.org/static/downloads/OpenBLAS-0.3.33.tar.gz
+    commit: null
+    sha256: 6761af1d9f5d353ab4f0b7497be2643313b36c8f31caec0144bfef198e71e6ab
+    license: BSD-3-Clause
+  - path: deps/cp2k-toolchain-dist/dbcsr-2.10.0.tar.gz
+    project: DBCSR
+    version: 2.10.0
+    url: https://www.cp2k.org/static/downloads/dbcsr-2.10.0.tar.gz
+    commit: null
+    sha256: 3d897220fbb4498215331efad6905eb7744881b4cf04eb5c5fb4db7c48a56ef9
+    license: GPL-2.0-or-later
+  - path: deps/cp2k-toolchain-dist/scalapack-2.2.3.tar.gz
+    project: ScaLAPACK
+    version: 2.2.3
+    url: https://www.cp2k.org/static/downloads/scalapack-2.2.3.tar.gz
+    commit: null
+    sha256: 5d93701eca663925e98010dd8d0f45fd79b2191d74e5afa5711d587370a8b9dd
+    license: BSD-3-Clause (modified)
+  - path: deps/cp2k-toolchain-dist/fftw-3.3.11.tar.gz
+    project: FFTW
+    version: 3.3.11
+    url: https://www.cp2k.org/static/downloads/fftw-3.3.11.tar.gz
+    commit: null
+    sha256: 5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1
+    license: GPL-2.0-or-later
+  - path: deps/cp2k-toolchain-dist/libint-v2.13.1-cp2k-lmax-5.tar.xz
+    project: Libint (CP2K lmax-5 generated library)
+    version: 2.13.1
+    url: https://www.cp2k.org/static/downloads/libint-v2.13.1-cp2k-lmax-5.tar.xz
+    commit: null
+    sha256: 527000f915bea9879391273b96689a8c2b98beeec37cb64637e3c11dd421a5e8
+    license: LGPL-3.0-only (library) / GPL-3.0 (generator)
+  - path: deps/cp2k-toolchain-dist/libxc-7.0.0.tar.bz2
+    project: libxc
+    version: 7.0.0
+    url: https://www.cp2k.org/static/downloads/libxc-7.0.0.tar.bz2
+    commit: null
+    sha256: e9ae69f8966d8de6b7585abd9fab588794ada1fab8f689337959a35abbf9527d
+    license: MPL-2.0
+  - path: deps/cp2k-toolchain-dist/libxsmm-2.0.0.tar.gz
+    project: LIBXSMM
+    version: 2.0.0
+    url: https://www.cp2k.org/static/downloads/libxsmm-2.0.0.tar.gz
+    commit: null
+    sha256: 7e532dc5520f864ce6d7f44f3fd50365e3edb23da97dbdc54fd53845d86a290b
+    license: BSD-3-Clause
+  - path: deps/cp2k-toolchain-dist/libxs-1.0.0.tar.gz
+    project: LIBXS
+    version: 1.0.0
+    url: https://www.cp2k.org/static/downloads/libxs-1.0.0.tar.gz
+    commit: null
+    sha256: de26f50cb986a2f0e4f92c0eb489d40a44f7e4c5acd22751a6cfa2829dabd04d
+    license: BSD-3-Clause
+  - path: deps/cp2k-toolchain-dist/spglib-2.7.0.tar.gz
+    project: spglib
+    version: 2.7.0
+    url: https://www.cp2k.org/static/downloads/spglib-2.7.0.tar.gz
+    commit: null
+    sha256: b22fc9abae9716c574fbc6d55cfc53ed654a714fccc5657a26ff5d18114bd8bd
+    license: BSD-3-Clause
+  - path: deps/cp2k-toolchain-dist/eigen-5.0.1.tar.gz
+    project: Eigen
+    version: 5.0.1
+    url: https://www.cp2k.org/static/downloads/eigen-5.0.1.tar.gz
+    commit: null
+    sha256: e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec
+    license: MPL-2.0
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: system GCC / g++ / gfortran
+    version: 14.2.1
+    provided_by: node
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env (wrappers redirected to the system GCC)
+  - name: CMake / Ninja / Python
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/cp2k/cp2k.git
+  ref: v2026.2
+  commit: 67b5da876dd6a76b8b021d5a04d1c81ba79a4c50
+  sha256: null
+  checkout: _upstream/level3/cp2k
+  submodules: []
+  excluded: []
+  license:
+    spdx: GPL-2.0-or-later
+    files:
+    - LICENSE
+- dest: deps/cp2k-toolchain-dist/OpenBLAS-0.3.33.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/OpenBLAS-0.3.33.tar.gz
+  ref: null
+  commit: null
+  sha256: 6761af1d9f5d353ab4f0b7497be2643313b36c8f31caec0144bfef198e71e6ab
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+- dest: deps/cp2k-toolchain-dist/dbcsr-2.10.0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/dbcsr-2.10.0.tar.gz
+  ref: null
+  commit: null
+  sha256: 3d897220fbb4498215331efad6905eb7744881b4cf04eb5c5fb4db7c48a56ef9
+  checkout: null
+  submodules: []
+  excluded: []
+  license: GPL-2.0-or-later
+- dest: deps/cp2k-toolchain-dist/scalapack-2.2.3.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/scalapack-2.2.3.tar.gz
+  ref: null
+  commit: null
+  sha256: 5d93701eca663925e98010dd8d0f45fd79b2191d74e5afa5711d587370a8b9dd
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause (modified)
+- dest: deps/cp2k-toolchain-dist/fftw-3.3.11.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/fftw-3.3.11.tar.gz
+  ref: null
+  commit: null
+  sha256: 5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1
+  checkout: null
+  submodules: []
+  excluded: []
+  license: GPL-2.0-or-later
+- dest: deps/cp2k-toolchain-dist/libint-v2.13.1-cp2k-lmax-5.tar.xz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/libint-v2.13.1-cp2k-lmax-5.tar.xz
+  ref: null
+  commit: null
+  sha256: 527000f915bea9879391273b96689a8c2b98beeec37cb64637e3c11dd421a5e8
+  checkout: null
+  submodules: []
+  excluded: []
+  license: LGPL-3.0-only (library) / GPL-3.0 (generator)
+- dest: deps/cp2k-toolchain-dist/libxc-7.0.0.tar.bz2
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/libxc-7.0.0.tar.bz2
+  ref: null
+  commit: null
+  sha256: e9ae69f8966d8de6b7585abd9fab588794ada1fab8f689337959a35abbf9527d
+  checkout: null
+  submodules: []
+  excluded: []
+  license: MPL-2.0
+- dest: deps/cp2k-toolchain-dist/libxsmm-2.0.0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/libxsmm-2.0.0.tar.gz
+  ref: null
+  commit: null
+  sha256: 7e532dc5520f864ce6d7f44f3fd50365e3edb23da97dbdc54fd53845d86a290b
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+- dest: deps/cp2k-toolchain-dist/libxs-1.0.0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/libxs-1.0.0.tar.gz
+  ref: null
+  commit: null
+  sha256: de26f50cb986a2f0e4f92c0eb489d40a44f7e4c5acd22751a6cfa2829dabd04d
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+- dest: deps/cp2k-toolchain-dist/spglib-2.7.0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/spglib-2.7.0.tar.gz
+  ref: null
+  commit: null
+  sha256: b22fc9abae9716c574fbc6d55cfc53ed654a714fccc5657a26ff5d18114bd8bd
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+- dest: deps/cp2k-toolchain-dist/eigen-5.0.1.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://www.cp2k.org/static/downloads/eigen-5.0.1.tar.gz
+  ref: null
+  commit: null
+  sha256: e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec
+  checkout: null
+  submodules: []
+  excluded: []
+  license: MPL-2.0
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/cp2k
+  status: EQUIVALENT
+  summary:
+    identical: 8997
+    expected_patch_difference: 2
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 8999
+    validated_entries_considered: 8999
+- archive_path: src/tools/toolchain
+  validated_tree: <node-local-scratch>/cp2k-toolchain/cuda132-gcc142-ompi5010
+  status: EQUIVALENT
+  summary:
+    identical: 79
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 79
+    validated_entries_considered: 79
+licenses:
+- path: src
+  project: CP2K
+  license: GPL-2.0-or-later
+  url: https://github.com/cp2k/cp2k
+  commit: 67b5da876dd6a76b8b021d5a04d1c81ba79a4c50
+- path: deps/cp2k-toolchain-dist/OpenBLAS-0.3.33.tar.gz
+  project: OpenBLAS
+  license: BSD-3-Clause
+  version: 0.3.33
+- path: deps/cp2k-toolchain-dist/dbcsr-2.10.0.tar.gz
+  project: DBCSR
+  license: GPL-2.0-or-later
+  version: 2.10.0
+- path: deps/cp2k-toolchain-dist/scalapack-2.2.3.tar.gz
+  project: ScaLAPACK
+  license: BSD-3-Clause (modified)
+  version: 2.2.3
+- path: deps/cp2k-toolchain-dist/fftw-3.3.11.tar.gz
+  project: FFTW
+  license: GPL-2.0-or-later
+  version: 3.3.11
+- path: deps/cp2k-toolchain-dist/libint-v2.13.1-cp2k-lmax-5.tar.xz
+  project: Libint (CP2K build)
+  license: LGPL-3.0-only
+  version: 2.13.1
+- path: deps/cp2k-toolchain-dist/libxc-7.0.0.tar.bz2
+  project: libxc
+  license: MPL-2.0
+  version: 7.0.0
+- path: deps/cp2k-toolchain-dist/libxsmm-2.0.0.tar.gz
+  project: LIBXSMM
+  license: BSD-3-Clause
+  version: 2.0.0
+- path: deps/cp2k-toolchain-dist/libxs-1.0.0.tar.gz
+  project: LIBXS
+  license: BSD-3-Clause
+  version: 1.0.0
+- path: deps/cp2k-toolchain-dist/spglib-2.7.0.tar.gz
+  project: spglib
+  license: BSD-3-Clause
+  version: 2.7.0
+- path: deps/cp2k-toolchain-dist/eigen-5.0.1.tar.gz
+  project: Eigen
+  license: MPL-2.0
+  version: 5.0.1
+license_notes:
+- 'CP2K, DBCSR and FFTW are GPL-2.0-or-later: the bundle redistributes their complete, unmodified source (the toolchain scripts
+  of CP2K carry the class-B B200 back-port, recorded in provenance/original_vs_baseline.diff).'
+- The toolchain tarballs are the exact files CP2K's installer downloads from cp2k.org (same sha256 as recorded in tools/toolchain/scripts/*/install_*.sh);
+  they are redistributable under their own licenses (BSD/MPL/LGPL/GPL).
+- data/ (basis sets, potentials) and benchmarks/ are upstream repository content under the CP2K license.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/exts/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  exclude:
+  - src/data/*
+  - src/benchmarks/*
+  - src/docs/*
+  - src/tools/*
+  - src/.github/*
+  - src/cmake/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T08:08:52Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: v2026.2
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:54:37Z'
+  tool: migrate_from_lfs_bundle-1.0

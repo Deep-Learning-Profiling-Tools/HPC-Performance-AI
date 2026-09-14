@@ -1,0 +1,103 @@
+{
+ "benchmark": "nekrs",
+ "variant": "hypregpu",
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.hypregpu.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01",
+ "test_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "bundled_dependency_code_loc": {
+  "code": 2312092,
+  "files": 12821,
+  "languages": {
+   "C": 745586,
+   "Fortran 77": 689647,
+   "C++": 354529,
+   "C/C++ Header": 233643,
+   "Fortran 90": 48831,
+   "CMake": 45419,
+   "Bourne Shell": 39040,
+   "Markdown": 26621,
+   "XML": 23988,
+   "yacc": 18954,
+   "Python": 17340,
+   "reStructuredText": 12319,
+   "m4": 9358,
+   "make": 8835,
+   "CUDA": 7453,
+   "Perl": 7143,
+   "TeX": 7106,
+   "Text": 4809,
+   "YAML": 2928,
+   "Bourne Again Shell": 1471,
+   "lex": 1152,
+   "Julia": 909,
+   "Starlark": 713,
+   "JSON": 695,
+   "CSS": 633,
+   "Objective-C++": 546,
+   "MATLAB": 432,
+   "Dockerfile": 417,
+   "JavaScript": 330,
+   "DOS Batch": 290,
+   "HTML": 168,
+   "SCSS": 165,
+   "awk": 147,
+   "TOML": 102,
+   "PowerShell": 97,
+   "Lisp": 77,
+   "diff": 37,
+   "Korn Shell": 36,
+   "Lua": 36,
+   "SVG": 28,
+   "Bazel": 14,
+   "CSV": 14,
+   "OpenCL": 9,
+   "IDL": 8,
+   "INI": 6,
+   "Pascal": 6,
+   "Properties": 5
+  }
+ },
+ "application_owned_code_loc": {
+  "code": 53131,
+  "files": 342,
+  "languages": {
+   "C++": 35784,
+   "C/C++ Header": 12322,
+   "C": 3782,
+   "Fortran 77": 1104,
+   "CMake": 71,
+   "Markdown": 56,
+   "make": 12
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {},
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 899,
+  "files": 7,
+  "languages": {
+   "Markdown": 356,
+   "CMake": 322,
+   "YAML": 178,
+   "Bourne Shell": 43
+  }
+ },
+ "total_materialized_code_loc": 2366122,
+ "summary": {
+  "application_owned_code_loc": 53131,
+  "bundled_dependency_code_loc": 2312092,
+  "benchmark_specific_dependency_code_loc": 0,
+  "test_code_loc": 0,
+  "total_materialized_code_loc": 2366122,
+  "unclassified_code_loc": 899
+ }
+}

@@ -1,0 +1,84 @@
+{
+ "benchmark": "lammps",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48",
+ "test_code_loc": {
+  "code": 124684,
+  "files": 699,
+  "languages": {
+   "YAML": 55924,
+   "C++": 36289,
+   "Text": 24733,
+   "Fortran 90": 3315,
+   "Python": 2618,
+   "C/C++ Header": 873,
+   "CMake": 813,
+   "Metal": 89,
+   "Markdown": 17,
+   "C": 13
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 494133,
+  "files": 2628,
+  "languages": {
+   "C/C++ Header": 239163,
+   "C++": 208791,
+   "CUDA": 28574,
+   "CMake": 6408,
+   "Markdown": 2817,
+   "make": 2725,
+   "Bourne Again Shell": 2410,
+   "Python": 1145,
+   "C": 871,
+   "Windows Resource File": 425,
+   "Text": 234,
+   "Bourne Shell": 203,
+   "Fortran 77": 132,
+   "XML": 120,
+   "PHP": 90,
+   "diff": 21,
+   "YAML": 4
+  }
+ },
+ "application_owned_code_loc": {
+  "code": 852527,
+  "files": 3865,
+  "languages": {
+   "C++": 675895,
+   "C/C++ Header": 171353,
+   "Bourne Shell": 3091,
+   "Cython": 929,
+   "make": 572,
+   "C": 500,
+   "Markdown": 119,
+   "YAML": 65,
+   "Text": 3
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {},
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 58,
+  "files": 2,
+  "languages": {
+   "Markdown": 44,
+   "YAML": 14
+  }
+ },
+ "total_materialized_code_loc": 1471402,
+ "summary": {
+  "application_owned_code_loc": 852527,
+  "bundled_dependency_code_loc": 494133,
+  "benchmark_specific_dependency_code_loc": 0,
+  "test_code_loc": 124684,
+  "total_materialized_code_loc": 1471402,
+  "unclassified_code_loc": 58
+ }
+}

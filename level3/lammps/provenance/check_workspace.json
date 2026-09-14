@@ -1,0 +1,98 @@
+{
+ "benchmark_dir": "level3/lammps",
+ "variant": null,
+ "mode": "baseline",
+ "verdict": "PASS",
+ "results": [
+  {
+   "check": 1,
+   "name": "benchmark.yaml schema",
+   "status": "PASS",
+   "detail": "lammps level 3"
+  },
+  {
+   "check": 2,
+   "name": "src/ materialized",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 3,
+   "name": "deps/ present as required by the lock",
+   "status": "PASS",
+   "detail": "not required for this benchmark"
+  },
+  {
+   "check": 4,
+   "name": "source tree hash == canonical baseline",
+   "status": "PASS",
+   "detail": "d7549c2f6d1b5b6c... vs d7549c2f6d1b5b6c..."
+  },
+  {
+   "check": 5,
+   "name": "build/run/validate entries exist and are executable",
+   "status": "PASS",
+   "detail": "./build.sh, ./run.sh, ./validate.sh"
+  },
+  {
+   "check": 6,
+   "name": "scripts read no application source outside the benchmark directory",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 7,
+   "name": "no symlink escaping the benchmark directory",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 8,
+   "name": "provenance/source.lock.yaml valid (schema 2, complete, no node-private location)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 9,
+   "name": "benchmark.yaml identity == source lock; no scheme-2 fields",
+   "status": "PASS",
+   "detail": "identity fields agree"
+  },
+  {
+   "check": 10,
+   "name": "required inputs/references exist",
+   "status": "PASS",
+   "detail": "2 listed"
+  },
+  {
+   "check": 11,
+   "name": "no credential/env-dump/session/profiler files in src+deps",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 12,
+   "name": "no build output / binary artifacts in src+deps",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 13,
+   "name": "no _upstream dependency in the benchmark scripts (fetch.sh = freeze-time only)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "check": 14,
+   "name": "artifact publish status consistent, marker agrees with the lock, no LFS metadata",
+   "status": "PASS",
+   "detail": "publish status published (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/lammps-hpcperf-l3-v1.tar.zst); marker agrees with the lock"
+  },
+  {
+   "check": 15,
+   "name": "redistribution_status and suite_status declared (benchmark.yaml == lock)",
+   "status": "PASS",
+   "detail": "redistribution cleared, suite retained"
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: nekrs
+variant: hypregpu
+source_version: hpcperf-l3-v1
+artifact: nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-hypregpu-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.hypregpu.yaml (size, archive sha256, source_tree_sha256)
+size: 48167250
+archive_sha256: 83c721f69eb47bea9cfb53b2236dcf046c05b97864b066cce0f4d03adace85f2
+source_tree_sha256: 76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:42:36Z'

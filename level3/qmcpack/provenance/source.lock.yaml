@@ -1,0 +1,218 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: qmcpack
+  level: 3
+  application: QMCPACK
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/QMCPACK/qmcpack.git
+  tag: v4.4.0
+  commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
+artifact:
+  filename: qmcpack-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 225420139
+  sha256: 6c1585bd027f44f4d6c19324114a2c19112652d87bd37797f17c81b54959f3e3
+  source_tree_sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.6
+  uncompressed_size: 559170675
+  tar_entries: 9344
+  file_count: 8234
+  symlink_count: 110
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/qmcpack-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: f0dbdc83677ff4a69b5623c2d24c20b172099ddc53e49dc0581da09b1f5c5b8e
+  algorithm: hpcperf-tree-1
+  entries: 8344
+  layout:
+  - src/
+  - deps/
+patches: []
+dependencies:
+  bundled:
+  - path: external_codes
+    project: QMCPACK bundled external codes (boost_multi, mpi_wrapper, ...)
+    license: per external_codes/<name>
+    component: src
+  benchmark_specific:
+  - path: deps/hdf5/hdf5-1.14.5.tar.gz
+    project: HDF5
+    version: 1.14.5
+    url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.5/hdf5-1.14.5.tar.gz
+    commit: null
+    sha256: ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
+    license: BSD-3-Clause (HDF5 license)
+  - path: deps/boost/boost-1.90.0-b2-nodocs.tar.xz
+    project: Boost (headers only are used)
+    version: 1.90.0
+    url: https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.xz
+    commit: null
+    sha256: 9e6bee9ab529fb2b0733049692d57d10a72202af085e553539a05b4204211a6f
+    license: BSL-1.0
+  - path: deps/openblas/OpenBLAS-0.3.30.tar.gz
+    project: OpenBLAS
+    version: 0.3.30
+    url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+    commit: null
+    sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+    license: BSD-3-Clause
+  environment_provided:
+  - name: LLVM/Clang with NVPTX OpenMP offload runtime
+    version: 23.1.0
+    provided_by: private compiler toolchain (level3/qmcpack/toolchain/build_llvm.sh from llvm-project-23.1.0.src.tar.xz),
+      install .deps/level3/qmcpack/<profile>/install/llvm -- a compiler, hence environment, not benchmark source
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: FFTW3 (conda) and libxml2 (system)
+    provided_by: environment
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/QMCPACK/qmcpack.git
+  ref: v4.4.0
+  commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
+  sha256: null
+  checkout: _upstream/level3/qmcpack
+  submodules: []
+  excluded: []
+  license:
+    spdx: NCSA
+    files:
+    - LICENSE
+- dest: deps/hdf5/hdf5-1.14.5.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/HDFGroup/hdf5/releases/download/hdf5_1.14.5/hdf5-1.14.5.tar.gz
+  ref: null
+  commit: null
+  sha256: ec2e13c52e60f9a01491bb3158cb3778c985697131fc6a342262d32a26e58e44
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause (HDF5 license)
+- dest: deps/boost/boost-1.90.0-b2-nodocs.tar.xz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/boostorg/boost/releases/download/boost-1.90.0/boost-1.90.0-b2-nodocs.tar.xz
+  ref: null
+  commit: null
+  sha256: 9e6bee9ab529fb2b0733049692d57d10a72202af085e553539a05b4204211a6f
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSL-1.0
+- dest: deps/openblas/OpenBLAS-0.3.30.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz
+  ref: null
+  commit: null
+  sha256: 27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d
+  checkout: null
+  submodules: []
+  excluded: []
+  license: BSD-3-Clause
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/qmcpack
+  status: EQUIVALENT
+  summary:
+    identical: 8341
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 8341
+    validated_entries_considered: 8341
+licenses:
+- path: src
+  project: QMCPACK
+  license: NCSA (University of Illinois/NCSA Open Source)
+  url: https://github.com/QMCPACK/qmcpack
+  commit: 2601d62e353934f1526cab1f67f30b6672b7c76f
+- path: deps/hdf5
+  project: HDF5
+  license: BSD-3-Clause (HDF5)
+  url: https://github.com/HDFGroup/hdf5
+  version: 1.14.5
+- path: deps/boost
+  project: Boost
+  license: BSL-1.0
+  url: https://www.boost.org
+  version: 1.90.0
+- path: deps/openblas
+  project: OpenBLAS
+  license: BSD-3-Clause
+  url: https://github.com/OpenMathLib/OpenBLAS
+  version: 0.3.30
+license_notes:
+- QMCPACK (NCSA), HDF5, Boost and OpenBLAS permit redistribution of the source with their license texts, which are inside
+  the respective trees/tarballs.
+- The in-repository tests/ data (diamondC pseudopotentials, wavefunction h5) are upstream repository content; the NiO performance
+  datasets (external Box links) are NOT bundled.
+- LLVM 23.1.0 (Apache-2.0 WITH LLVM-exception) is an environment-provided compiler and not part of the bundle.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled:
+  - src/external_codes/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/tests/*
+  exclude:
+  - src/docs/*
+  - src/labs/*
+  - src/nexus/*
+  - src/utils/*
+  - src/config/*
+  - src/CMake/*
+  - src/.github/*
+  - src/examples/*
+scan_allow: []
+freeze:
+  tool_version: freeze-1.0
+  timestamp: '2026-09-08T07:47:37Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
+migration:
+  from_schema: hpcperf-source-lock-1
+  from_scheme: git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)
+  old_archive_path: archives/source_bundle.tar.zst
+  old_upstream_version_label: v4.4.0
+  archive_sha256_identical: true
+  migrated: '2026-09-10T20:53:53Z'
+  tool: migrate_from_lfs_bundle-1.0

@@ -1,0 +1,30 @@
+GEOS thirdPartyLibs 9b55672f6f8a73d02fd632396eb0410e58c9b120 (TPL tag 361-1070) -- hdf5 step: use the superbuild's generator and build/install commands
+
+Class: build-system compatibility fix (no source/algorithm change).
+Problem: every CMake-based ExternalProject step passes
+`CMAKE_GENERATOR ${TPL_GENERATOR}` and uses ${TPL_BUILD_COMMAND}/${TPL_INSTALL_COMMAND}
+(make / ninja, selected by ENABLE_NINJA, CMakeLists.txt lines 86-96) -- except
+hdf5, which passes no generator and hardcodes `make -j ${NUM_PROC}` / `make install`.
+When the superbuild itself is generated with Ninja (`scripts/config-build.py -n`,
+upstream's documented option) the hdf5 sub-build inherits the Ninja generator
+from the parent and its hardcoded make step fails with "make: *** No targets
+specified and no makefile found". Fix: give the hdf5 step the same generator and
+build/install commands as all other steps. Impact: none on the built HDF5 1.12.1
+(same configure options; only the generator/driver of its own build). Verified:
+TPL superbuild proceeds past hdf5 under a Ninja-generated superbuild. Applied by
+level3/geos/build.sh (git apply, idempotent); recorded in the profile fingerprint.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -259,8 +259,9 @@
+                      URL_HASH SHA256=${HDF5_URL_HASH}
+                      PREFIX ${PROJECT_BINARY_DIR}/hdf5
+                      INSTALL_DIR ${HDF5_DIR}
+-                     BUILD_COMMAND make -j ${NUM_PROC}
+-                     INSTALL_COMMAND make install
++                     BUILD_COMMAND ${TPL_BUILD_COMMAND}
++                     INSTALL_COMMAND ${TPL_INSTALL_COMMAND}
++                     CMAKE_GENERATOR ${TPL_GENERATOR}
+                      CMAKE_ARGS -D CMAKE_C_COMPILER:STRING=${HDF5_C_COMPILER}
+                                 -D CMAKE_CXX_COMPILER:STRING=${HDF5_CXX_COMPILER}
+                                 -D CMAKE_C_FLAGS:STRING=${C_FLAGS_NO_WARNINGS}

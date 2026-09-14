@@ -1,0 +1,17 @@
+schema: hpcperf-remote-artifact-verification-1
+benchmark: sparta
+variant: null
+source_version: hpcperf-l3-v1
+artifact: sparta-hpcperf-l3-v1.tar.zst
+url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/sparta-hpcperf-l3-v1.tar.zst
+url_source: reviewed release plan
+expected_identity_source: trusted lock source.lock.yaml (size, archive sha256, source_tree_sha256)
+size: 21330629
+archive_sha256: ea3be3032b3d6a41fa2130c08b0b3d49b1c7e223d87d45e93289d176130b3c09
+source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
+anonymous: true
+cache: fresh empty cache
+verdict: PASS
+note: plan-URL anonymous verification; the ordinary user entry (clone + prepare_benchmark.sh with the lock's own URL) is recorded
+  separately
+utc: '2026-09-12T07:41:49Z'

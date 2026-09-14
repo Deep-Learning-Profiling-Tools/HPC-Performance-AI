@@ -1,0 +1,121 @@
+{
+ "benchmark": "nyx",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
+ "test_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "bundled_dependency_code_loc": {
+  "code": 595317,
+  "files": 2140,
+  "languages": {
+   "C": 265796,
+   "Fortran 90": 134458,
+   "C++": 71305,
+   "reStructuredText": 27844,
+   "C/C++ Header": 26338,
+   "CMake": 17148,
+   "CUDA": 9222,
+   "TeX": 8337,
+   "JavaScript": 7824,
+   "Python": 7523,
+   "CSS": 6197,
+   "Markdown": 3755,
+   "Windows Module Definition": 3102,
+   "Bourne Shell": 2128,
+   "YAML": 1455,
+   "SWIG": 1272,
+   "Bourne Again Shell": 510,
+   "make": 233,
+   "Dockerfile": 166,
+   "HTML": 143,
+   "Text": 142,
+   "diff": 135,
+   "Perl": 124,
+   "CSV": 43,
+   "Groovy": 43,
+   "MATLAB": 42,
+   "Jupyter Notebook": 22,
+   "JSON": 10
+  }
+ },
+ "application_owned_code_loc": {
+  "code": 32330,
+  "files": 205,
+  "languages": {
+   "C++": 23362,
+   "C/C++ Header": 6696,
+   "make": 519,
+   "Python": 480,
+   "CMake": 414,
+   "Fortran 90": 405,
+   "YAML": 226,
+   "Bourne Shell": 70,
+   "DenizenScript": 57,
+   "Markdown": 57,
+   "Bourne Again Shell": 44
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 366200,
+  "files": 1782,
+  "languages": {
+   "C/C++ Header": 170983,
+   "C++": 137533,
+   "Fortran 90": 18910,
+   "reStructuredText": 10011,
+   "Markdown": 5839,
+   "CMake": 5722,
+   "YAML": 3115,
+   "Python": 2929,
+   "make": 2221,
+   "INI": 1537,
+   "CSS": 1462,
+   "SVG": 1163,
+   "Bourne Shell": 1027,
+   "yacc": 777,
+   "Fortran 77": 517,
+   "Perl": 394,
+   "MATLAB": 390,
+   "TeX": 367,
+   "lex": 344,
+   "Snakemake": 267,
+   "Text": 171,
+   "Org Mode": 136,
+   "JSON": 105,
+   "Modula3": 76,
+   "HTML": 49,
+   "TOML": 46,
+   "Korn Shell": 44,
+   "diff": 36,
+   "Haskell": 15,
+   "Logos": 12,
+   "Bourne Again Shell": 2
+  },
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 451,
+  "files": 10,
+  "languages": {
+   "Markdown": 264,
+   "CMake": 78,
+   "Text": 60,
+   "YAML": 29,
+   "Bourne Shell": 20
+  }
+ },
+ "total_materialized_code_loc": 994298,
+ "summary": {
+  "application_owned_code_loc": 32330,
+  "bundled_dependency_code_loc": 595317,
+  "benchmark_specific_dependency_code_loc": 366200,
+  "test_code_loc": 0,
+  "total_materialized_code_loc": 994298,
+  "unclassified_code_loc": 451
+ }
+}
