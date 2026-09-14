@@ -25,7 +25,6 @@ validate_exit_codes:
   1: FAIL
   3: STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (heat/cool)
   4: UNSUPPORTED_LAYOUT
-optimization_scope: ./optimization_scope.yaml
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper);
   profiles cuda132-gcc133-{adiabatic,heatcool}, cpu-gcc133-{adiabatic,heatcool}
 install_root: .deps/level3/nyx

@@ -1,6 +1,9 @@
 {
  "benchmark": "sparta",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c",
  "test_code_loc": {
   "code": 0,
   "files": 0,
@@ -51,26 +54,12 @@
    "Markdown": 153
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 131181,
-  "files": 554,
-  "languages": {
-   "C++": 104683,
-   "C/C++ Header": 25195,
-   "Bourne Shell": 435,
-   "C": 378,
-   "CMake": 206,
-   "make": 203,
-   "Text": 81
-  }
- },
  "total_materialized_code_loc": 354863,
  "summary": {
   "application_owned_code_loc": 131181,
   "bundled_dependency_code_loc": 223529,
   "benchmark_specific_dependency_code_loc": 0,
   "test_code_loc": 0,
-  "agent_modifiable_code_loc": 131181,
   "total_materialized_code_loc": 354863,
   "unclassified_code_loc": 153
  }

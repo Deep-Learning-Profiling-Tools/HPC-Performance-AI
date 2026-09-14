@@ -103,7 +103,8 @@ level3/<app>/
                 benchmark.yaml / provenance/source.lock*.yaml)
   provenance/   freeze_spec, source.lock (schema 2), upstream.lock, patch_series, original_vs_baseline.diff,
                 SOURCE_MANIFEST.json, LICENSES.md, equivalence.*, LOC.*, check_workspace.json
-  benchmark.yaml, optimization_scope.yaml   contract for optimization agents (what may be modified; inputs/references)
+  benchmark.yaml   machine-readable contract (entries, inputs, references, identity). No optimization-scope file:
+                the benchmark does not prescribe what an agent may modify; that is evaluation-protocol business
   fetch.sh      FREEZE-TIME ONLY: pinned upstream checkout into _upstream/ -- never called by build.sh
   build.sh      idempotent, stage-marked (.hpcperf-stage-done), per-profile, writes BUILD_INFO.txt + .hpcperf-l3-fingerprint;
                 reads $HERE/src, $HERE/deps only; applies NO patch (the bundle is the patched baseline); builds that
@@ -142,7 +143,7 @@ level3/<app>/
   run directories under `build/level3/<app>/<profile>/$L3_RUN_SUBDIR`).
 - Agent runs: `tools/create_agent_workspace.sh level3 <app> <run-id>
   [--link-prebuilt-deps]` -> `workspaces/<run-id>/level3/<app>/` (real copy of
-  src/deps, readonly ranges chmod'ed, harness copied to the workspace root,
+  src/deps writable, everything else protected by the trusted baseline hash (chmod is best effort), harness copied to the workspace root,
   environment symlinked); `tools/check_workspace.py` must PASS before iteration 0;
   never point an agent at the canonical `level3/<app>`; never symlink src/deps
   back to it. Build outputs of a workspace stay under `workspaces/<run-id>/`.

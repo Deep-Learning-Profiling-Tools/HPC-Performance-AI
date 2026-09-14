@@ -59,8 +59,8 @@ def section(app):
     lines += ["The application source is not in git and not read from `_upstream/`: `tools/prepare_benchmark.sh level3 " + app +
               "` materializes the frozen source artifact (`<app>[-<variant>]-<source_version>.tar.zst`, found in the local content-addressed cache `.artifacts/sha256/` or downloaded from the immutable URL recorded in `provenance/source.lock*.yaml` once published; `--artifact FILE` for a local copy) into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. "
               "Archive size + sha256 and `source_tree_sha256` are verified before anything is placed. Identity, patch series, licenses, redistribution status and the equivalence proof against the tree the results above were validated from are under `provenance/` "
-              "(`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `optimization_scope.yaml` says what an agent may modify; `benchmark.yaml` is the machine-readable contract. Remote status: see `level3/SOURCE_ARTIFACTS.md`.", ""]
-    lines += ["| variant | artifact | source version | compressed / uncompressed | entries | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | redistribution | equivalence | remote | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |",
+              "(`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `benchmark.yaml` is the machine-readable contract (entries, inputs, references, identity). The benchmark does not prescribe which part of the source an optimization agent may modify; the integrity layer only protects the harness and the validation assets. Remote status: see `level3/SOURCE_ARTIFACTS.md`.", ""]
+    lines += ["| variant | artifact | source version | compressed / uncompressed | entries | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | redistribution | equivalence | remote | LOC app-owned / bundled deps / benchmark deps / tests / total |",
               "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for v, by, lock, ident, loc in rows:
         eq = lock.get("equivalence", [])
@@ -70,23 +70,28 @@ def section(app):
         c, u = ident.get("size"), ident.get("uncompressed_size")
         prim = (lock.get("artifact") or {}).get("primary") or {}
         lines.append(f"| {v or '-'} | `{ident.get('filename', '-')}` | {ident.get('source_version', '-')} | {hs.human(c) if c else '-'} / {hs.human(u) if u else '-'} | {ident.get('file_count', '-')} | `{str(ident.get('source_tree_sha256', '-'))}` | `{str(ident.get('archive_sha256', '-'))}` | {up.get('tag', '')} `{str(up.get('commit', ''))[:12]}` | {pats} | {lock.get('redistribution_status', '-')} | {eqs} | {'REMOTE_FETCH_VERIFIED' if prim.get('status') == 'published' else 'REMOTE_ARTIFACT_UNPUBLISHED'} | "
-                     f"{loc.get('application_owned_code_loc', '-')} / {loc.get('agent_modifiable_code_loc', '-')} / {loc.get('bundled_dependency_code_loc', '-')} / {loc.get('benchmark_specific_dependency_code_loc', '-')} / {loc.get('test_code_loc', '-')} / {loc.get('total_materialized_code_loc', '-')} |")
-    lines += ["", "LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). "
+                     f"{loc.get('application_owned_code_loc', '-')} / {loc.get('bundled_dependency_code_loc', '-')} / {loc.get('benchmark_specific_dependency_code_loc', '-')} / {loc.get('test_code_loc', '-')} / {loc.get('total_materialized_code_loc', '-')} |")
+    lines += ["", "LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); source-ownership categories from `provenance/source.lock*.yaml` (`source_scope`, descriptive metadata written at freeze time). Dependencies are counted per benchmark, so totals overlap across benchmarks that ship the same dependency. "
               "The validated results recorded above were produced from trees proven content-equivalent to this artifact (`provenance/equivalence*.md`); they are not re-run by the migration."]
     return "\n".join(lines)
 
 
 def audit_table():
-    lines = ["## Materialized source LOC per application (frozen source artifacts, 2026-09-10)", "",
-             "cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, build output excluded) of the frozen source artifacts "
-             "(`level3/<app>/provenance/LOC*.json`, categories from `optimization_scope.yaml`). This replaces the whole-checkout `wc -l` figures: "
-             "the +9,972 lines of the integration PR are the harness, not application code. Suite status: retained = default suite; "
-             "retired = GEOS (not counted in the suite totals); candidate = ExaCA (admission pending).", "",
-             "| Application | variant | suite | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_loc | total_materialized_code_loc | agent_modifiable_code_loc |",
-             "|---|---|---|---|---|---|---|---|---|"]
+    lines = ["## Materialized source LOC per application (frozen source artifacts hpcperf-l3-v1)", "",
+             "cloc 2.06 **code** lines (no blank or comment lines; documentation, examples/data and build output excluded) of the frozen source "
+             "artifacts, from `level3/<app>/provenance/LOC*.json`. The source-ownership categories are the `source_scope` block of each "
+             "`provenance/source.lock*.yaml` (descriptive freeze metadata): application_owned = the application's own code; bundled = "
+             "third-party source shipped inside the upstream tree; benchmark_specific = dependencies under `deps/`; test = the application's "
+             "test code. total_materialized = everything the artifact unpacks that is code, so it **includes dependencies and overlaps across "
+             "benchmarks** that ship the same dependency (AMReX in WarpX and Nyx). These are benchmark-size and ownership figures; they do "
+             "not say which part of the source an optimization agent may modify -- the benchmark does not define that. Whole-checkout "
+             "`wc -l` figures and the line count of the integration PR are not benchmark LOC. Suite status: retained = default suite; "
+             "retired = GEOS (not counted in suite totals).", "",
+             "| Application | variant | suite | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_code_loc | total_materialized_code_loc |",
+             "|---|---|---|---|---|---|---|---|"]
     for app in APPS:
         for v, by, lock, ident, loc in app_data(app):
-            lines.append(f"| {by.get('application', app)} | {v or '-'} | {by.get('suite_status', '-')} | {loc.get('application_owned_code_loc', '-')} | {loc.get('bundled_dependency_code_loc', '-')} | {loc.get('benchmark_specific_dependency_code_loc', '-')} | {loc.get('test_code_loc', '-')} | {loc.get('total_materialized_code_loc', '-')} | {loc.get('agent_modifiable_code_loc', '-')} |")
+            lines.append(f"| {by.get('application', app)} | {v or '-'} | {by.get('suite_status', '-')} | {loc.get('application_owned_code_loc', '-')} | {loc.get('bundled_dependency_code_loc', '-')} | {loc.get('benchmark_specific_dependency_code_loc', '-')} | {loc.get('test_code_loc', '-')} | {loc.get('total_materialized_code_loc', '-')} |")
     return "\n".join(lines)
 
 

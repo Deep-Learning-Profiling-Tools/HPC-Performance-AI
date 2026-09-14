@@ -1,6 +1,9 @@
 {
  "benchmark": "cp2k",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2",
  "test_code_loc": {
   "code": 38960,
   "files": 559,
@@ -116,29 +119,12 @@
    "Dockerfile": 72
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 1085842,
-  "files": 1508,
-  "languages": {
-   "Fortran 77": 1015193,
-   "C": 58310,
-   "C/C++ Header": 6482,
-   "CMake": 1962,
-   "CUDA": 1572,
-   "C++": 1341,
-   "Markdown": 373,
-   "OpenCL": 311,
-   "make": 256,
-   "Fortran 90": 42
-  }
- },
  "total_materialized_code_loc": 21479099,
  "summary": {
   "application_owned_code_loc": 1085842,
   "bundled_dependency_code_loc": 0,
   "benchmark_specific_dependency_code_loc": 20350978,
   "test_code_loc": 38960,
-  "agent_modifiable_code_loc": 1085842,
   "total_materialized_code_loc": 21479099,
   "unclassified_code_loc": 3319
  }

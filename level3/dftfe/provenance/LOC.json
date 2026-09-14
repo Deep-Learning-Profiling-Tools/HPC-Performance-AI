@@ -1,6 +1,9 @@
 {
  "benchmark": "dftfe",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "54bea98826f91a4ce298fd247da5f5168f595bef5b5ddac629b74bdc82ffea30",
  "test_code_loc": {
   "code": 314,
   "files": 18,
@@ -100,23 +103,12 @@
    "Markdown": 45
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 107718,
-  "files": 358,
-  "languages": {
-   "C++": 86410,
-   "C/C++ Header": 21187,
-   "Windows Module Definition": 104,
-   "Markdown": 17
-  }
- },
  "total_materialized_code_loc": 12896192,
  "summary": {
   "application_owned_code_loc": 107718,
   "bundled_dependency_code_loc": 0,
   "benchmark_specific_dependency_code_loc": 12784642,
   "test_code_loc": 314,
-  "agent_modifiable_code_loc": 107718,
   "total_materialized_code_loc": 12896192,
   "unclassified_code_loc": 3518
  }

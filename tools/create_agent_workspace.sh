@@ -10,9 +10,9 @@
 #        environment (compilers, MPI, CUDA activation; Level 2 prefixes) -- environment dependencies,
 #        not application source
 #   level3/<app>/  copy of the canonical benchmark directory: src/, deps/, build.sh, run.sh,
-#        validate.sh, benchmark.yaml, optimization_scope.yaml, inputs/, references/, configs/,
-#        provenance/, patches/, checkers -- src/deps are REAL copies (cp --reflink=auto; never
-#        symlinks back to the canonical tree). The agent's cwd is this directory.
+#        validate.sh, benchmark.yaml, inputs/, references/, configs/, provenance/, patches/,
+#        checkers -- src/deps are REAL copies (cp --reflink=auto; never symlinks back to the
+#        canonical tree). The agent's cwd is this directory.
 #   build/, .deps/level3/<app>/  created by the workspace's own build.sh (run-id private: no build,
 #        install or result is shared between runs/models/iterations)
 #   workspace.yaml               run_id, benchmark, source_version, canonical/initial tree hashes, timestamp
@@ -24,9 +24,13 @@
 #   canonical tree, a symlink is placed in the workspace so build.sh skips that dependency stage
 #   (environment-provided prebuilt dependency; recorded in workspace.yaml). The application itself is
 #   always rebuilt inside the workspace.
-# Readonly ranges of optimization_scope.yaml and the harness copies are made non-writable (chmod a-w); the
-# baseline check (tools/check_workspace.py) must PASS before the workspace is used. These are file-hash and
-# permission controls checked by the trusted harness, NOT an operating-system sandbox.
+# Integrity model: the source tree (src/, deps/) stays writable -- the benchmark does not prescribe which part
+# of it an optimization agent may modify. Everything else in the benchmark copy (build.sh, run.sh, validate.sh,
+# benchmark.yaml, inputs/, references/, provenance/, metadata), the files benchmark.yaml declares as inputs/
+# references even when they live under src/, and the harness copies are protected: chmod a-w as a best-effort
+# convenience, and -- what actually counts -- hashed into the trusted baseline that tools/check_workspace.py
+# --agent-mode compares against on every iteration. The baseline check must PASS before the workspace is used.
+# File hashes and permissions are integrity checks by the trusted harness, NOT an operating-system sandbox.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/.." && pwd)"
@@ -80,18 +84,36 @@ PY
 fi
 WS_TREE="$(python3 "$HERE/hpcperf_source.py" "$WAPP" --subdir src $( [ -d "$WAPP/deps" ] && echo --subdir deps ) | sed -n 's/^source_tree_sha256=\([0-9a-f]*\).*/\1/p')"
 [ "$WS_TREE" = "$CANON_TREE" ] || { echo "create_agent_workspace: copied tree hash $WS_TREE != canonical $CANON_TREE" >&2; exit 4; }
-# readonly ranges from the optimization scope (best effort on this filesystem; the check enforces the rest)
-python3 - "$WAPP" <<'PY'
-import glob, os, sys, yaml
-W = sys.argv[1]; sc = yaml.safe_load(open(os.path.join(W, "optimization_scope.yaml"))) or {}
+# protected files: everything outside src/ and deps/, plus the declared inputs/references (best effort on this
+# filesystem; the trusted-baseline hash check enforces the rest)
+HPCPERF_TOOLS_DIR="$HERE" python3 - "$WAPP" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["HPCPERF_TOOLS_DIR"])
+import hpcperf_source as hs
+W = sys.argv[1]; by = hs.load_yaml(os.path.join(W, "benchmark.yaml")) or {}
+assets = [str(p).strip().lstrip("./").rstrip("/") for p in (by.get("inputs") or []) + (by.get("references") or [])]
 n = 0
-for pat in (sc.get("readonly", []) or []) + (sc.get("excluded", []) or []):
-    for p in glob.glob(os.path.join(W, pat), recursive=True):
-        try:
-            os.chmod(p, os.stat(p).st_mode & ~0o222); n += 1
-        except OSError:
-            pass
-print(f"create_agent_workspace: {n} readonly entries protected (chmod a-w)")
+def protect(p):
+    global n
+    try:
+        os.chmod(p, os.stat(p).st_mode & ~0o222); n += 1
+    except OSError:
+        pass
+for root, dirs, files in os.walk(W):
+    rel = os.path.relpath(root, W)
+    if rel == ".":
+        dirs[:] = [d for d in dirs if d not in ("src", "deps")]
+    for f in files:
+        protect(os.path.join(root, f))
+for a in assets:
+    p = os.path.join(W, a)
+    if os.path.isdir(p):
+        for root, _, files in os.walk(p):
+            for f in files:
+                protect(os.path.join(root, f))
+    elif os.path.exists(p):
+        protect(p)
+print(f"create_agent_workspace: {n} protected entries made non-writable (chmod a-w; the trusted baseline hash is the real check)")
 PY
 STAMP="$(date -u +%FT%TZ)"
 cat > "$WAPP/workspace.yaml" <<EOF

@@ -1,6 +1,9 @@
 {
  "benchmark": "nyx",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
  "test_code_loc": {
   "code": 0,
   "files": 0,
@@ -106,23 +109,12 @@
    "Bourne Shell": 20
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 21644,
-  "files": 97,
-  "languages": {
-   "C++": 15696,
-   "C/C++ Header": 5611,
-   "CMake": 318,
-   "make": 19
-  }
- },
  "total_materialized_code_loc": 994298,
  "summary": {
   "application_owned_code_loc": 32330,
   "bundled_dependency_code_loc": 595317,
   "benchmark_specific_dependency_code_loc": 366200,
   "test_code_loc": 0,
-  "agent_modifiable_code_loc": 21644,
   "total_materialized_code_loc": 994298,
   "unclassified_code_loc": 451
  }

@@ -1,6 +1,9 @@
 {
  "benchmark": "nekrs",
+ "variant": "hypregpu",
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.hypregpu.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "76e6ad3cdd624a90c5057d07674219004155ef17d8078553d9b0c587bb6a8b01",
  "test_code_loc": {
   "code": 0,
   "files": 0,
@@ -88,26 +91,12 @@
    "Bourne Shell": 43
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 53131,
-  "files": 342,
-  "languages": {
-   "C++": 35784,
-   "C/C++ Header": 12322,
-   "C": 3782,
-   "Fortran 77": 1104,
-   "CMake": 71,
-   "Markdown": 56,
-   "make": 12
-  }
- },
  "total_materialized_code_loc": 2366122,
  "summary": {
   "application_owned_code_loc": 53131,
   "bundled_dependency_code_loc": 2312092,
   "benchmark_specific_dependency_code_loc": 0,
   "test_code_loc": 0,
-  "agent_modifiable_code_loc": 53131,
   "total_materialized_code_loc": 2366122,
   "unclassified_code_loc": 899
  }

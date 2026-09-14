@@ -1,6 +1,9 @@
 {
  "benchmark": "nekrs",
+ "variant": "cpucoarse",
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.cpucoarse.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e",
  "test_code_loc": {
   "code": 0,
   "files": 0,
@@ -88,26 +91,12 @@
    "Bourne Shell": 43
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 53131,
-  "files": 342,
-  "languages": {
-   "C++": 35784,
-   "C/C++ Header": 12322,
-   "C": 3782,
-   "Fortran 77": 1104,
-   "CMake": 71,
-   "Markdown": 56,
-   "make": 12
-  }
- },
  "total_materialized_code_loc": 2366118,
  "summary": {
   "application_owned_code_loc": 53131,
   "bundled_dependency_code_loc": 2312088,
   "benchmark_specific_dependency_code_loc": 0,
   "test_code_loc": 0,
-  "agent_modifiable_code_loc": 53131,
   "total_materialized_code_loc": 2366118,
   "unclassified_code_loc": 899
  }

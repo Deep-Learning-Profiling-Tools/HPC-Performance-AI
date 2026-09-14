@@ -1,6 +1,9 @@
 {
  "benchmark": "exaca",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44",
  "test_code_loc": {
   "code": 2760,
   "files": 24,
@@ -59,22 +62,12 @@
    "CMake": 5
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 6368,
-  "files": 27,
-  "languages": {
-   "C/C++ Header": 5976,
-   "C++": 336,
-   "CMake": 56
-  }
- },
  "total_materialized_code_loc": 287697,
  "summary": {
   "application_owned_code_loc": 6512,
   "bundled_dependency_code_loc": 0,
   "benchmark_specific_dependency_code_loc": 278336,
   "test_code_loc": 2760,
-  "agent_modifiable_code_loc": 6368,
   "total_materialized_code_loc": 287697,
   "unclassified_code_loc": 89
  }

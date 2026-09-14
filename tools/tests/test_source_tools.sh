@@ -98,17 +98,10 @@ equivalence:
     excluded: ['doc/*']
 licenses:
   - {path: src, project: MiniApp, license: GPL-2.0-only, url: https://example.invalid/miniapp.git, commit: $SHA}
+source_scope: {application_owned: ['src/src/*'], bundled: ['src/lib/*'], benchmark_specific: ['deps/*'], test: [], exclude: []}
 EOF
 mkdir -p "$RT/.deps/level3/miniapp/downloads"; ( cd "$TMP" && mkdir -p tp && echo 'int t;' > tp/t.c && tar -czf "$RT/.deps/level3/miniapp/downloads/tp.tar.gz" tp )
 TPSHA="$(sha256sum "$RT/.deps/level3/miniapp/downloads/tp.tar.gz" | cut -d' ' -f1)"; sed -i "s/__TPSHA__/$TPSHA/" "$B/provenance/freeze_spec.yaml"
-cat > "$B/optimization_scope.yaml" <<'EOF'
-schema: hpcperf-optimization-scope-1
-benchmark: miniapp
-modifiable: ['src/src/*']
-readonly: [build.sh, run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml, 'provenance/*', 'src/bench/*', 'src/lib/*', 'deps/*']
-excluded: []
-loc_categories: {application_owned: ['src/src/*'], bundled_dependency: ['src/lib/*'], benchmark_specific_dependency: ['deps/*'], test: [], exclude: []}
-EOF
 cat > "$B/benchmark.yaml" <<'EOF'
 name: miniapp
 level: 3
@@ -120,7 +113,6 @@ default_scale_mode: smoke
 build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
-optimization_scope: ./optimization_scope.yaml
 environment_profile: none
 install_root: .deps/level3/miniapp
 dependency_installs: []
@@ -323,17 +315,17 @@ PY
 
 # --- 7. check_workspace (baseline mode) ----------------------------------------------------------------------
 out="$(cap python3 tools/check_workspace.py level3/miniapp --json "$B/provenance/check_workspace.json")"; rc=$?
-[ $rc -eq 0 ] && echo "$out" | /usr/bin/grep -q 'check_workspace: PASS (17/17' && ok "7a: canonical benchmark passes all 17 checks" || bad "7a: rc=$rc: $(echo "$out" | /usr/bin/grep FAIL)"
+[ $rc -eq 0 ] && echo "$out" | /usr/bin/grep -q 'check_workspace: PASS (15/15' && ok "7a: canonical benchmark passes all 15 checks" || bad "7a: rc=$rc: $(echo "$out" | /usr/bin/grep FAIL)"
 echo 'SRC2="$R/_upstream/level3/miniapp"' >> "$B/build.sh"; out="$(cap python3 tools/check_workspace.py level3/miniapp)"
-echo "$out" | /usr/bin/grep -qE 'FAIL +7:' && echo "$out" | /usr/bin/grep -qE 'FAIL +15:' && ok "7b: _upstream reference in build.sh fails checks 7 and 15" || bad "7b: $(echo "$out" | /usr/bin/grep FAIL)"
+echo "$out" | /usr/bin/grep -qE 'FAIL +6:' && echo "$out" | /usr/bin/grep -qE 'FAIL +13:' && ok "7b: _upstream reference in build.sh fails checks 6 and 13" || bad "7b: $(echo "$out" | /usr/bin/grep FAIL)"
 sed -i '$d' "$B/build.sh"
 touch "$B/src/src/main.o"; out="$(cap python3 tools/check_workspace.py level3/miniapp)"
-echo "$out" | /usr/bin/grep -qE 'FAIL +5:' && echo "$out" | /usr/bin/grep -qE 'FAIL +14:' && ok "7c: build output inside src fails the identity (5) and artifact (14) checks" || bad "7c"
+echo "$out" | /usr/bin/grep -qE 'FAIL +4:' && echo "$out" | /usr/bin/grep -qE 'FAIL +12:' && ok "7c: build output inside src fails the identity (4) and artifact (12) checks" || bad "7c"
 rm -f "$B/src/src/main.o"
 ln -s /etc/hosts "$B/src/src/esc"; out="$(cap python3 tools/check_workspace.py level3/miniapp)"
-echo "$out" | /usr/bin/grep -qE 'FAIL +8:' && ok "7d: escaping symlink fails check 8" || bad "7d"
+echo "$out" | /usr/bin/grep -qE 'FAIL +7:' && ok "7d: escaping symlink fails check 7" || bad "7d"
 rm -f "$B/src/src/esc"
-mkdir -p "$B/archives"; out="$(cap python3 tools/check_workspace.py level3/miniapp)"; echo "$out" | /usr/bin/grep -qE 'FAIL +10:' && ok "7e: a leftover archives/ directory (scheme 2) fails check 10" || bad "7e"; rmdir "$B/archives"
+mkdir -p "$B/archives"; out="$(cap python3 tools/check_workspace.py level3/miniapp)"; echo "$out" | /usr/bin/grep -qE 'FAIL +9:' && ok "7e: a leftover archives/ directory (scheme 2) fails check 9" || bad "7e"; rmdir "$B/archives"
 python3 tools/check_workspace.py level3/miniapp > /dev/null 2>&1 && ok "7f: clean again -> PASS" || bad "7f"
 
 # --- 8. agent workspace: isolation, baseline, agent-mode checks, trusted validation ---------------------------
@@ -342,7 +334,7 @@ W="$RT/workspaces/run-001/level3/miniapp"
 [ $rc -eq 0 ] && [ -f "$W/src/src/main.cpp" ] && [ ! -L "$W/src" ] && [ ! -L "$W/deps" ] && ok "8a: workspace created with real src/deps copies (no symlink back to the canonical tree)" || bad "8a: rc=$rc: $(echo "$out" | tail -3)"
 /usr/bin/grep -q "canonical_source_tree_sha256: $TREE" "$W/workspace.yaml" && /usr/bin/grep -q "workspace_initial_tree_sha256: $TREE" "$W/workspace.yaml" && /usr/bin/grep -q 'source_version: hpcperf-l3-v1' "$W/workspace.yaml" && /usr/bin/grep -q 'creation_timestamp:' "$W/workspace.yaml" && ok "8b: workspace.yaml records run id, source version, canonical + initial tree hashes, timestamp" || bad "8b"
 [ -f "$RT/workspaces/run-001/workspace_baseline.json" ] && [ ! -w "$RT/workspaces/run-001/workspace_baseline.json" ] && [ -f "$RT/.hpcperf/workspace_baselines/run-001.json" ] && ok "8c: trusted baseline written read-only outside the agent cwd and mirrored under the repository" || bad "8c"
-[ -w "$W/src/src/main.cpp" ] && [ ! -w "$W/validate.sh" ] && [ ! -w "$W/src/bench/in.lj" ] && ok "8d: modifiable src writable, readonly ranges protected" || bad "8d"
+[ -w "$W/src/src/main.cpp" ] && [ ! -w "$W/validate.sh" ] && [ ! -w "$W/src/bench/in.lj" ] && ok "8d: source tree writable; validator and the declared input (under src/) non-writable" || bad "8d"
 out="$(cap bash tools/create_agent_workspace.sh level3 miniapp run-001)"; rc=$?; [ $rc -ne 0 ] && ok "8e: an existing run id is refused" || bad "8e"
 out="$(cap bash tools/create_agent_workspace.sh level3 miniapp run-002 --dest "$TMP/outside/run-002")"; rc=$?
 W2="$TMP/outside/run-002/level3/miniapp"
@@ -350,27 +342,52 @@ W2="$TMP/outside/run-002/level3/miniapp"
 echo '// agent edit' >> "$W/src/src/main.cpp"
 python3 tools/check_workspace.py "$W" > /dev/null 2>&1; rc=$?; [ $rc -ne 0 ] && ok "8g: baseline mode: a modified workspace no longer equals the canonical baseline (iteration 0 contract)" || bad "8g"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 1 --report "$TMP/r1.json" --diff "$TMP/r1.diff")"; rc=$?
-[ $rc -eq 0 ] && /usr/bin/grep -q '"modified_files": \[' "$TMP/r1.json" && /usr/bin/grep -q 'src/src/main.cpp' "$TMP/r1.json" && /usr/bin/grep -q 'agent edit' "$TMP/r1.diff" && ok "8h: agent mode: a change inside the modifiable scope passes and is recorded (file list + diff + hashes)" || bad "8h: rc=$rc $(echo "$out" | /usr/bin/grep FAIL)"
+[ $rc -eq 0 ] && /usr/bin/grep -q '"modified_files": \[' "$TMP/r1.json" && /usr/bin/grep -q 'src/src/main.cpp' "$TMP/r1.json" && /usr/bin/grep -q 'agent edit' "$TMP/r1.diff" && ok "8h: agent mode: a source-tree change passes and is recorded (file list + diff + hashes)" || bad "8h: rc=$rc $(echo "$out" | /usr/bin/grep FAIL)"
 python3 - "$TMP/r1.json" "$TREE" <<'PY' && ok "8i: report carries initial_source_hash == canonical and a different current_source_hash" || bad "8i"
 import json, sys; r = json.load(open(sys.argv[1])); assert r["initial_source_hash"] == sys.argv[2] and r["current_source_hash"] != sys.argv[2] and r["iteration"] == 1
 PY
 ! /usr/bin/grep -q 'agent edit' "$B/src/src/main.cpp" && ! /usr/bin/grep -q 'agent edit' "$W2/src/src/main.cpp" && python3 tools/check_workspace.py level3/miniapp > /dev/null 2>&1 && ok "8j: the canonical tree and the other workspace are untouched (isolation)" || bad "8j"
 chmod u+w "$W/validate.sh"; echo '# tampered' >> "$W/validate.sh"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 2)"; rc=$?
-[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'READONLY TAMPERING' && echo "$out" | /usr/bin/grep -q 'validate.sh' && ok "8k: agent mode: a modified validator is readonly tampering (check 5 FAIL)" || bad "8k: rc=$rc"
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'PROTECTED FILE TAMPERING' && echo "$out" | /usr/bin/grep -q 'validate.sh' && ok "8k: agent mode: a modified validator is protected-file tampering (check 4 FAIL)" || bad "8k: rc=$rc"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 2)"; rc=$?
 [ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'REFUSED' && /usr/bin/grep -q 'layer: integrity' "$RT/workspaces/run-001/reports/iter-2.verdict.yaml" && /usr/bin/grep -q 'verdict: REFUSED' "$RT/workspaces/run-001/reports/iter-2.verdict.yaml" && ok "8l: trusted validation REFUSES a workspace with a tampered validator (integrity layer, exit 6, no run)" || bad "8l: rc=$rc"
 sed -i '$d' "$W/validate.sh"; chmod a-w "$W/validate.sh"
 chmod u+w "$W/src/bench/log.ref"; echo 'x' >> "$W/src/bench/log.ref"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 3)"; rc=$?
-[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'log.ref' && ok "8m: a modified reference file is refused too (exit 6)" || bad "8m: rc=$rc"
+[ $rc -eq 6 ] && echo "$out" | /usr/bin/grep -q 'log.ref' && ok "8m: a modified reference file declared in benchmark.yaml is refused even though it lives under src/ (exit 6)" || bad "8m: rc=$rc"
 printf 'ref\n' > "$W/src/bench/log.ref"; chmod a-w "$W/src/bench/log.ref"
-chmod u+w "$W/optimization_scope.yaml"; echo "modifiable: ['*']" >> "$W/optimization_scope.yaml"
+# source tree explicitly mutable: bundled dependency source inside src/, a source build script, deps/, new and deleted source files
+echo '// dep edit' >> "$W/src/lib/thirdparty/tp.c"; echo '# build config edit' >> "$W/src/src/gen.sh"
+printf 'x' >> "$W/deps/tp/tp.tar.gz"; echo 'int n;' > "$W/src/src/new_kernel.cu"; rm -f "$W/src/src/kernel.cu"
+out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4 --report "$TMP/r4.json")"; rc=$?
+python3 - "$TMP/r4.json" <<'PY' && [ $rc -eq 0 ] && ok "8n: src/** (incl. bundled dependency source and build scripts) and deps/** may be modified, added and deleted; every change is recorded" || bad "8n: rc=$rc $(echo "$out" | /usr/bin/grep FAIL)"
+import json, sys; r = json.load(open(sys.argv[1]))
+assert set(r["modified_files"]) >= {"src/lib/thirdparty/tp.c", "src/src/gen.sh", "deps/tp/tp.tar.gz"}, r["modified_files"]
+assert r["added_files"] == ["src/src/new_kernel.cu"] and r["deleted_files"] == ["src/src/kernel.cu"], (r["added_files"], r["deleted_files"])
+assert r["protected_violations"] == [] and r["source_surface"] == ["src/**", "deps/**"] and "src/bench/in.lj" in r["protected_inside_source"]
+PY
+rm -f "$W/src/src/new_kernel.cu"; cp -p "$B/src/src/kernel.cu" "$W/src/src/kernel.cu"; cp -p "$B/src/lib/thirdparty/tp.c" "$W/src/lib/thirdparty/tp.c"; cp -p "$B/src/src/gen.sh" "$W/src/src/gen.sh"; cp -p "$B/deps/tp/tp.tar.gz" "$W/deps/tp/tp.tar.gz"
+# protected by default: declared input under src/, benchmark.yaml, a new file outside src/deps, a scope-like file dropped into the workspace
+chmod u+w "$W/src/bench/in.lj"; echo 'run 1' >> "$W/src/bench/in.lj"
 out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4)"; rc=$?
-[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'optimization_scope.yaml' && ok "8n: widening optimization_scope.yaml inside the workspace is detected as tampering" || bad "8n: rc=$rc"
-sed -i '$d' "$W/optimization_scope.yaml"; chmod a-w "$W/optimization_scope.yaml"
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'in.lj' && ok "8n2: a modified input declared in benchmark.yaml is refused although it lives under src/" || bad "8n2: rc=$rc"
+printf 'run 100\n' > "$W/src/bench/in.lj"; chmod a-w "$W/src/bench/in.lj"
+chmod u+w "$W/benchmark.yaml"; echo 'references: []' >> "$W/benchmark.yaml"
+out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'benchmark.yaml' && ok "8n3: a modified benchmark.yaml (the contract that names inputs/references) is refused" || bad "8n3: rc=$rc"
+sed -i '$d' "$W/benchmark.yaml"; chmod a-w "$W/benchmark.yaml"
+echo 'echo hi' > "$W/helper.sh"
+out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'helper.sh (added)' && ok "8n4: a new file outside src/ and deps/ is a protected-surface violation (protected by default)" || bad "8n4: rc=$rc"
+rm -f "$W/helper.sh"
+printf "modifiable: ['*']\n" > "$W/optimization_scope.yaml"
+out="$(cap python3 tools/check_workspace.py "$W" --agent-mode --iteration 4)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | /usr/bin/grep -q 'optimization_scope.yaml (added)' && ok "8n5: an optimization_scope.yaml dropped into the workspace is neither read nor tolerated (no active dependency on the removed file)" || bad "8n5: rc=$rc"
+rm -f "$W/optimization_scope.yaml"
+python3 tools/check_workspace.py "$W" --agent-mode --iteration 4 > /dev/null 2>&1 && /usr/bin/grep -q 'agent edit' "$W/src/src/main.cpp" && ok "8n6: after the protected-file probes the workspace passes again and the agent's own source edit is still in place (nothing re-materialized it)" || bad "8n6"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 5)"; rc=$?
-[ $rc -eq 0 ] && /usr/bin/grep -q 'layer: numerical' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'verdict: PASS' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'src/src/main.cpp' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'baseline_origin: repository' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && ok "8o: trusted validation runs build + validate on a workspace with only modifiable changes; numerical-layer verdict, modified files and repository baseline recorded" || bad "8o: rc=$rc $(echo "$out" | tail -3)"
+[ $rc -eq 0 ] && /usr/bin/grep -q 'layer: numerical' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'verdict: PASS' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'src/src/main.cpp' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && /usr/bin/grep -q 'baseline_origin: repository' "$RT/workspaces/run-001/reports/iter-5.verdict.yaml" && ok "8o: trusted validation runs build + validate on a workspace with only source-tree changes; numerical-layer verdict, modified files and repository baseline recorded" || bad "8o: rc=$rc $(echo "$out" | tail -3)"
 # harness tampering (outside the agent cwd, inside the workspace root)
 chmod u+w "$RT/workspaces/run-001/level3/tools/l3_common.sh"; echo '# tampered harness' >> "$RT/workspaces/run-001/level3/tools/l3_common.sh"
 out="$(cap bash tools/validate_workspace.sh level3 miniapp "$W" --iteration 51)"; rc=$?

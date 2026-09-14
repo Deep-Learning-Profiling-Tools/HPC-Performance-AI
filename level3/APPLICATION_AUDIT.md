@@ -485,22 +485,22 @@ candidates have an officially supported native CUDA path.
    above is multi-node capable per upstream, none is verified beyond one node.
 
 <!-- hpcperf:loc-table:begin -->
-## Materialized source LOC per application (frozen source artifacts, 2026-09-10)
+## Materialized source LOC per application (frozen source artifacts hpcperf-l3-v1)
 
-cloc 2.06 code lines (no blank/comment lines; documentation, examples/data, build output excluded) of the frozen source artifacts (`level3/<app>/provenance/LOC*.json`, categories from `optimization_scope.yaml`). This replaces the whole-checkout `wc -l` figures: the +9,972 lines of the integration PR are the harness, not application code. Suite status: retained = default suite; retired = GEOS (not counted in the suite totals); candidate = ExaCA (admission pending).
+cloc 2.06 **code** lines (no blank or comment lines; documentation, examples/data and build output excluded) of the frozen source artifacts, from `level3/<app>/provenance/LOC*.json`. The source-ownership categories are the `source_scope` block of each `provenance/source.lock*.yaml` (descriptive freeze metadata): application_owned = the application's own code; bundled = third-party source shipped inside the upstream tree; benchmark_specific = dependencies under `deps/`; test = the application's test code. total_materialized = everything the artifact unpacks that is code, so it **includes dependencies and overlaps across benchmarks** that ship the same dependency (AMReX in WarpX and Nyx). These are benchmark-size and ownership figures; they do not say which part of the source an optimization agent may modify -- the benchmark does not define that. Whole-checkout `wc -l` figures and the line count of the integration PR are not benchmark LOC. Suite status: retained = default suite; retired = GEOS (not counted in suite totals).
 
-| Application | variant | suite | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_loc | total_materialized_code_loc | agent_modifiable_code_loc |
-|---|---|---|---|---|---|---|---|---|
-| LAMMPS | - | retained | 852527 | 494133 | 0 | 124684 | 1471402 | 852527 |
-| SPARTA | - | retained | 131181 | 223529 | 0 | 0 | 354863 | 131181 |
-| WarpX | - | retained | 112459 | 0 | 366200 | 11058 | 492389 | 112459 |
-| SPECFEM3D Cartesian | - | retained | 142516 | 147593 | 0 | 1027 | 307549 | 142516 |
-| nekRS | hypregpu | retained | 53131 | 2312092 | 0 | 0 | 2366122 | 53131 |
-| nekRS | cpucoarse | retained | 53131 | 2312088 | 0 | 0 | 2366118 | 53131 |
-| Nyx | - | retained | 32330 | 595317 | 366200 | 0 | 994298 | 21644 |
-| CP2K | - | retained | 1085842 | 0 | 20350978 | 38960 | 21479099 | 1085842 |
-| QMCPACK | - | retained | 337840 | 294128 | 10949914 | 538165 | 12122677 | 337840 |
-| DFT-FE | - | retained | 107718 | 0 | 12784642 | 314 | 12896192 | 107718 |
-| GEOS | - | retired | 406925 | 330939 | 14602640 | 46778 | 15395169 | 406859 |
-| ExaCA | - | retained | 6512 | 0 | 278336 | 2760 | 287697 | 6368 |
+| Application | variant | suite | application_owned_code_loc | bundled_dependency_code_loc | benchmark_specific_dependency_code_loc | test_code_loc | total_materialized_code_loc |
+|---|---|---|---|---|---|---|---|
+| LAMMPS | - | retained | 852527 | 494133 | 0 | 124684 | 1471402 |
+| SPARTA | - | retained | 131181 | 223529 | 0 | 0 | 354863 |
+| WarpX | - | retained | 112459 | 0 | 366200 | 11058 | 492389 |
+| SPECFEM3D Cartesian | - | retained | 142516 | 147593 | 0 | 1027 | 307549 |
+| nekRS | hypregpu | retained | 53131 | 2312092 | 0 | 0 | 2366122 |
+| nekRS | cpucoarse | retained | 53131 | 2312088 | 0 | 0 | 2366118 |
+| Nyx | - | retained | 32330 | 595317 | 366200 | 0 | 994298 |
+| CP2K | - | retained | 1085842 | 0 | 20350978 | 38960 | 21479099 |
+| QMCPACK | - | retained | 337840 | 294128 | 10949914 | 538165 | 12122677 |
+| DFT-FE | - | retained | 107718 | 0 | 12784642 | 314 | 12896192 |
+| GEOS | - | retired | 406925 | 330939 | 14602640 | 46778 | 15395169 |
+| ExaCA | - | retained | 6512 | 0 | 278336 | 2760 | 287697 |
 <!-- hpcperf:loc-table:end -->

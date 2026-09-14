@@ -1,6 +1,9 @@
 {
  "benchmark": "geos",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "208e8f98027e5a5f674ad3676272f9a4762d8aad59168da87821e8494563d741",
  "test_code_loc": {
   "code": 46778,
   "files": 265,
@@ -184,31 +187,12 @@
    "Text": 4
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 406859,
-  "files": 1715,
-  "languages": {
-   "C++": 143094,
-   "C/C++ Header": 137717,
-   "SVG": 104361,
-   "XML": 6003,
-   "XSD": 5425,
-   "reStructuredText": 4191,
-   "CMake": 2818,
-   "CSV": 2004,
-   "JSON": 645,
-   "PlantUML": 303,
-   "Python": 276,
-   "Text": 22
-  }
- },
  "total_materialized_code_loc": 15395169,
  "summary": {
   "application_owned_code_loc": 406925,
   "bundled_dependency_code_loc": 330939,
   "benchmark_specific_dependency_code_loc": 14602640,
   "test_code_loc": 46778,
-  "agent_modifiable_code_loc": 406859,
   "total_materialized_code_loc": 15395169,
   "unclassified_code_loc": 7887
  }

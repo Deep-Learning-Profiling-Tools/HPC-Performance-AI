@@ -1,6 +1,6 @@
 {
  "schema": "hpcperf-release-manifest-1",
- "generated": "2026-09-11T23:38:34Z",
+ "generated": "2026-09-14T03:34:48Z",
  "suite": "level3-default",
  "source_version": "hpcperf-l3-v1",
  "release": {
@@ -38,7 +38,7 @@
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
     "AGENT_WORKSPACE_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -56,8 +56,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/lammps-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -67,11 +67,10 @@
     "bundled_dependency_code_loc": 494133,
     "benchmark_specific_dependency_code_loc": 0,
     "test_code_loc": 124684,
-    "agent_modifiable_code_loc": 852527,
     "total_materialized_code_loc": 1471402,
     "unclassified_code_loc": 58
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -85,7 +84,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -103,8 +102,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/sparta-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -114,11 +113,10 @@
     "bundled_dependency_code_loc": 223529,
     "benchmark_specific_dependency_code_loc": 0,
     "test_code_loc": 0,
-    "agent_modifiable_code_loc": 131181,
     "total_materialized_code_loc": 354863,
     "unclassified_code_loc": 153
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -132,7 +130,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -150,8 +148,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/warpx-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -161,11 +159,10 @@
     "bundled_dependency_code_loc": 0,
     "benchmark_specific_dependency_code_loc": 366200,
     "test_code_loc": 11058,
-    "agent_modifiable_code_loc": 112459,
     "total_materialized_code_loc": 492389,
     "unclassified_code_loc": 2672
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -179,7 +176,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -197,8 +194,8 @@
    "patches": 2,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/specfem3d-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -208,11 +205,10 @@
     "bundled_dependency_code_loc": 147593,
     "benchmark_specific_dependency_code_loc": 0,
     "test_code_loc": 1027,
-    "agent_modifiable_code_loc": 142516,
     "total_materialized_code_loc": 307549,
     "unclassified_code_loc": 16413
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -226,7 +222,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -244,8 +240,8 @@
    "patches": 3,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-hypregpu-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -255,11 +251,10 @@
     "bundled_dependency_code_loc": 2312092,
     "benchmark_specific_dependency_code_loc": 0,
     "test_code_loc": 0,
-    "agent_modifiable_code_loc": 53131,
     "total_materialized_code_loc": 2366122,
     "unclassified_code_loc": 899
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -273,7 +268,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -291,8 +286,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nekrs-cpucoarse-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -302,11 +297,10 @@
     "bundled_dependency_code_loc": 2312088,
     "benchmark_specific_dependency_code_loc": 0,
     "test_code_loc": 0,
-    "agent_modifiable_code_loc": 53131,
     "total_materialized_code_loc": 2366118,
     "unclassified_code_loc": 899
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": false,
    "check_workspace": "PASS"
@@ -320,7 +314,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -338,8 +332,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/nyx-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -349,11 +343,10 @@
     "bundled_dependency_code_loc": 595317,
     "benchmark_specific_dependency_code_loc": 366200,
     "test_code_loc": 0,
-    "agent_modifiable_code_loc": 21644,
     "total_materialized_code_loc": 994298,
     "unclassified_code_loc": 451
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -367,7 +360,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -385,8 +378,8 @@
    "patches": 1,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/cp2k-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -396,11 +389,10 @@
     "bundled_dependency_code_loc": 0,
     "benchmark_specific_dependency_code_loc": 20350978,
     "test_code_loc": 38960,
-    "agent_modifiable_code_loc": 1085842,
     "total_materialized_code_loc": 21479099,
     "unclassified_code_loc": 3319
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -414,7 +406,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -432,8 +424,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/qmcpack-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -443,11 +435,10 @@
     "bundled_dependency_code_loc": 294128,
     "benchmark_specific_dependency_code_loc": 10949914,
     "test_code_loc": 538165,
-    "agent_modifiable_code_loc": 337840,
     "total_materialized_code_loc": 12122677,
     "unclassified_code_loc": 2630
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -461,7 +452,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -479,8 +470,8 @@
    "patches": 1,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/dftfe-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -490,11 +481,10 @@
     "bundled_dependency_code_loc": 0,
     "benchmark_specific_dependency_code_loc": 12784642,
     "test_code_loc": 314,
-    "agent_modifiable_code_loc": 107718,
     "total_materialized_code_loc": 12896192,
     "unclassified_code_loc": 3518
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
@@ -539,7 +529,6 @@
     "bundled_dependency_code_loc": 330939,
     "benchmark_specific_dependency_code_loc": 14602640,
     "test_code_loc": 46778,
-    "agent_modifiable_code_loc": 406859,
     "total_materialized_code_loc": 15395169,
     "unclassified_code_loc": 7887
    },
@@ -557,7 +546,7 @@
     "FROZEN",
     "LOCAL_ARTIFACT_VERIFIED",
     "LOCAL_MATERIALIZATION_VERIFIED",
-    "REMOTE_ARTIFACT_UNPUBLISHED"
+    "REMOTE_FETCH_VERIFIED"
    ],
    "notes": [],
    "source_version": "hpcperf-l3-v1",
@@ -575,8 +564,8 @@
    "patches": 0,
    "redistribution_status": "cleared",
    "primary": {
-    "url": null,
-    "status": "unpublished"
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-rc1/exaca-hpcperf-l3-v1.tar.zst",
+    "status": "published"
    },
    "mirrors": [],
    "lock_problems": [],
@@ -586,11 +575,10 @@
     "bundled_dependency_code_loc": 0,
     "benchmark_specific_dependency_code_loc": 278336,
     "test_code_loc": 2760,
-    "agent_modifiable_code_loc": 6368,
     "total_materialized_code_loc": 287697,
     "unclassified_code_loc": 89
    },
-   "local_staging": "LOCAL_ARTIFACT_VERIFIED (2026-09-10)",
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"

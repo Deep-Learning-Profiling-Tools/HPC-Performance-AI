@@ -30,7 +30,7 @@ below.
 | not bundled | Finch (optional coupled heat transport; not used, no coupled workflow is claimed), GoogleTest (unit tests not built), ExaCA-Data (external temperature-history data for `FromFile` problems; the benchmark uses the analytic `Directional` problem) |
 | patches | none (modification class A: build flags only) |
 | source artifact | `exaca-hpcperf-l3-v1.tar.zst` (see the source-distribution section at the end; identity in `provenance/source.lock.yaml`) |
-| LOC (cloc code lines, `provenance/LOC.md`) | application-owned 6,512 (29 files: 5,976 header lines, 473 C++, 63 CMake), agent-modifiable 6,368, tests 2,760, benchmark-specific dependency source (Kokkos) 278,336, total materialized 287,697 |
+| LOC (cloc code lines, `provenance/LOC.md`) | application-owned 6,512 (29 files: 5,976 header lines, 473 C++, 63 CMake), tests 2,760, benchmark-specific dependency source (Kokkos) 278,336, total materialized 287,697 |
 
 Kokkos version choice: the first freeze used Kokkos 4.6.02; its `bin/nvcc_wrapper` still defaults to
 `-arch=sm_70`, which CUDA 13.2 rejects in CMake's compiler test ("Unsupported gpu architecture 'sm_70'").
@@ -214,12 +214,12 @@ Launcher audit of every executed run: "N verified, 0 mismatch, 0 unverified".
 | 12 | strong / weak definition | fixed 67.1 M-cell box / 33.5 M cells per rank |
 | 13 | 40/80 GPU dry-run only | yes |
 | 14 | multi-node not claimed | UNVERIFIED |
-| 15 | scheme-3 source artifact | `exaca-hpcperf-l3-v1.tar.zst`, LOCAL_ARTIFACT_VERIFIED, REMOTE_ARTIFACT_UNPUBLISHED |
+| 15 | scheme-3 source artifact | `exaca-hpcperf-l3-v1.tar.zst`, LOCAL_ARTIFACT_VERIFIED, REMOTE_FETCH_VERIFIED (published 2026-09-12) |
 | 16 | benchmark.yaml | yes |
-| 17 | optimization_scope.yaml | yes (modifiable: `src/src/*`, `src/bin/*`, `src/analysis/src/*`) |
+| 17 | source ownership recorded | `source_scope` in `provenance/source.lock.yaml`: application_owned `src/src/*`, `src/bin/*`, `src/analysis/src/*`, `src/analysis/bin/*`; benchmark deps under `deps/` (Kokkos, nlohmann_json); tests separate. Descriptive metadata only: the benchmark does not prescribe what an optimization agent may modify |
 | 18 | provenance/source.lock.yaml | schema 2, redistribution cleared |
 | 19 | application-owned LOC | 6,512 |
-| 20 | agent-modifiable LOC | 6,368 |
+| 20 | total materialized code LOC | 287,697 (includes the 278,336 Kokkos + nlohmann_json lines under `deps/`) |
 
 Not claimed: Finch-ExaCA coupled workflow, `FromFile`/multilayer problem types, ExaCA unit tests (not
 built), any performance optimization.
@@ -227,11 +227,11 @@ built), any performance optimization.
 <!-- hpcperf:source-section:begin -->
 ## Source distribution (frozen source artifact, scheme 3, 2026-09-10)
 
-The application source is not in git and not read from `_upstream/`: `tools/prepare_benchmark.sh level3 exaca` materializes the frozen source artifact (`<app>[-<variant>]-<source_version>.tar.zst`, found in the local content-addressed cache `.artifacts/sha256/` or downloaded from the immutable URL recorded in `provenance/source.lock*.yaml` once published; `--artifact FILE` for a local copy) into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Archive size + sha256 and `source_tree_sha256` are verified before anything is placed. Identity, patch series, licenses, redistribution status and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `optimization_scope.yaml` says what an agent may modify; `benchmark.yaml` is the machine-readable contract. Remote status: see `level3/SOURCE_ARTIFACTS.md`.
+The application source is not in git and not read from `_upstream/`: `tools/prepare_benchmark.sh level3 exaca` materializes the frozen source artifact (`<app>[-<variant>]-<source_version>.tar.zst`, found in the local content-addressed cache `.artifacts/sha256/` or downloaded from the immutable URL recorded in `provenance/source.lock*.yaml` once published; `--artifact FILE` for a local copy) into `src/` (+ `deps/`), the only source `build.sh`/`run.sh`/`validate.sh` use. Archive size + sha256 and `source_tree_sha256` are verified before anything is placed. Identity, patch series, licenses, redistribution status and the equivalence proof against the tree the results above were validated from are under `provenance/` (`source.lock*.yaml`, `patch_series*.txt`, `original_vs_baseline*.diff`, `LICENSES*.md`, `equivalence*.md`, `LOC*.md`); `benchmark.yaml` is the machine-readable contract (entries, inputs, references, identity). The benchmark does not prescribe which part of the source an optimization agent may modify; the integrity layer only protects the harness and the validation assets. Remote status: see `level3/SOURCE_ARTIFACTS.md`.
 
-| variant | artifact | source version | compressed / uncompressed | entries | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | redistribution | equivalence | remote | LOC app-owned / agent-modifiable / bundled deps / benchmark deps / tests / total |
+| variant | artifact | source version | compressed / uncompressed | entries | source_tree_sha256 | archive sha256 | upstream | patches (pre-applied) | redistribution | equivalence | remote | LOC app-owned / bundled deps / benchmark deps / tests / total |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| - | `exaca-hpcperf-l3-v1.tar.zst` | hpcperf-l3-v1 | 2.6 MB / 15.3 MB | 1579 | `b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44` | `3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316` | 2.1.0 `d26e59cd51e2` | none | cleared | src: EQUIVALENT, deps/kokkos: EQUIVALENT | REMOTE_ARTIFACT_UNPUBLISHED | 6512 / 6368 / 0 / 278336 / 2760 / 287697 |
+| - | `exaca-hpcperf-l3-v1.tar.zst` | hpcperf-l3-v1 | 2.6 MB / 15.3 MB | 1579 | `b88e84b74db34b8adb58bc9924ec1e0f3c7d416c58577c5b16bcfbda11f81f44` | `3de419c92222c0a76e6afdb621bb46f6d7b530dc1d064fcee34393f88c9fe316` | 2.1.0 `d26e59cd51e2` | none | cleared | src: EQUIVALENT, deps/kokkos: EQUIVALENT | REMOTE_FETCH_VERIFIED | 6512 / 0 / 278336 / 2760 / 287697 |
 
-LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); categories from `optimization_scope.yaml` (`loc_categories`). The validated results recorded above were produced from trees proven content-equivalent to this artifact (`provenance/equivalence*.md`); they are not re-run by the migration.
+LOC = cloc 2.06 code lines of the materialized tree (no blank/comment lines, documentation and data excluded); source-ownership categories from `provenance/source.lock*.yaml` (`source_scope`, descriptive metadata written at freeze time). Dependencies are counted per benchmark, so totals overlap across benchmarks that ship the same dependency. The validated results recorded above were produced from trees proven content-equivalent to this artifact (`provenance/equivalence*.md`); they are not re-run by the migration.
 <!-- hpcperf:source-section:end -->

@@ -216,11 +216,30 @@ def portable_location(s):
     return s
 
 
-def source_scope_from_optimization_scope(app_dir):
-    sp = os.path.join(app_dir, "optimization_scope.yaml")
-    sc = (hs.load_yaml(sp) or {}).get("loc_categories", {}) if os.path.isfile(sp) else {}
-    return {"application_owned": sc.get("application_owned", []), "bundled": sc.get("bundled_dependency", []),
-            "benchmark_specific": sc.get("benchmark_specific_dependency", []), "test": sc.get("test", []), "exclude": sc.get("exclude", [])}
+SOURCE_SCOPE_KEYS = ("application_owned", "bundled", "benchmark_specific", "test", "exclude")
+DEFAULT_SOURCE_SCOPE = {"application_owned": ["src/*"], "bundled": [], "benchmark_specific": ["deps/*"], "test": [], "exclude": []}
+# accepted spellings in freeze_spec.yaml `source_scope`
+_SOURCE_SCOPE_ALIASES = {"bundled_dependency": "bundled", "benchmark_specific_dependency": "benchmark_specific", "tests": "test", "excluded": "exclude"}
+
+
+def source_scope_from_spec(spec, previous_lock=None):
+    """Descriptive source-ownership classification recorded in the lock as `source_scope`: which globs of the
+    materialized tree are the application's own code, upstream-bundled third-party code, benchmark-specific
+    dependencies under deps/, test code, and what is never counted (documentation, examples, data). It drives
+    the LOC report (tools/loc_report.py) and nothing else: it is NOT an optimization policy, and no workspace
+    check derives permissions from it. Precedence: freeze_spec.yaml `source_scope` > the previous lock's
+    `source_scope` (re-freeze of the same benchmark) > DEFAULT_SOURCE_SCOPE."""
+    raw = (spec or {}).get("source_scope")
+    if not raw and previous_lock:
+        raw = previous_lock.get("source_scope")
+    if not raw:
+        return {k: list(v) for k, v in DEFAULT_SOURCE_SCOPE.items()}
+    out = {k: [] for k in SOURCE_SCOPE_KEYS}
+    for k, v in raw.items():
+        key = _SOURCE_SCOPE_ALIASES.get(k, k)
+        if key in out:
+            out[key] = list(v or [])
+    return out
 
 
 def staging_entry(staging, app, source_version):

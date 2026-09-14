@@ -14,12 +14,12 @@ the artifacts and their status in [SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md).
 | `tools/freeze_benchmark_source.py` | freeze from `provenance/freeze_spec*.yaml` -- output redirected to the local artifact staging; writes the schema-2 lock |
 | `tools/compare_source_trees.py` | equivalence proof of the frozen tree vs the validated tree (unchanged) |
 | `tools/hpcperf_materialize.py` / `tools/prepare_benchmark.sh` | materialization logic (tree check, DIRTY refusal, safety checks, atomic rename) kept; artifact resolution now = `--artifact` > cache > immutable URL |
-| `tools/check_workspace.py` | contract checks kept and extended (17 checks, agent mode) |
+| `tools/check_workspace.py` | contract checks kept and extended (17 checks at migration time; 15 since the 2026-09-13 removal of the optimization-scope checks -- the `17/17` figures in this document are the tool of that date) |
 | `tools/create_agent_workspace.sh` | workspace copy logic kept; trusted baseline + `--dest` added |
 | `tools/loc_report.py`, `tools/readme_source_section.py` | LOC by ownership, README/audit sections (updated to the schema-2 fields) |
 | `level3/<app>/provenance/{freeze_spec*.yaml, upstream*.lock, patch_series*.txt, original_vs_baseline*.diff, SOURCE_MANIFEST*.json, LICENSES*.md, equivalence*.{json,md}, LOC*.{json,md}}` | unchanged provenance (the freezes were not repeated; the archives' content is identical) |
 | `level3/<app>/provenance/source.lock*.yaml` | kept, rewritten from schema `hpcperf-source-lock-1` to `hpcperf-source-lock-2` (all provenance fields preserved; a `migration` block records the old archive path and that the sha256 is identical) |
-| `level3/<app>/benchmark.yaml`, `optimization_scope.yaml` | kept; the identity block `source_bundle` (archive path) became `source_artifact` (filename, sizes, hashes, publish status) |
+| `level3/<app>/benchmark.yaml` | kept; the identity block `source_bundle` (archive path) became `source_artifact` (filename, sizes, hashes, publish status). The per-app `optimization_scope.yaml` that existed at migration time was removed on 2026-09-13 as premature design (optimization policy is evaluation-protocol business); its LOC categories live on as `source_scope` in the lock |
 | `level3/tools/l3_common.sh` lock queries, `l3_require_materialized` | kept (read the schema-2 fields) |
 | `tools/tests/test_source_tools.sh` | kept and rewritten for scheme 3 (62 checks) |
 

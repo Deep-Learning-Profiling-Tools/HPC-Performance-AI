@@ -53,10 +53,13 @@ is actually run and validated**, which is a small part of what each application 
 | [DFT-FE](dftfe/) | `1.2.0` | Finite-element DFT: 32-atom Al Born-Oppenheimer MD regression deck vs upstream's GPU reference. | 107,718 | [README](dftfe/README.md) |
 | [ExaCA](exaca/) | `2.1.0` | Cellular-automaton solidification / grain growth: directional-solidification case. Finch coupling is **not** exercised. | 6,512 | [README](exaca/README.md) |
 
-LOC = `cloc` code lines of the materialized application-owned source (no blank or comment lines), from each
-benchmark's `provenance/LOC.json`; it is not a diff size. Bundled-dependency, benchmark-dependency and
-agent-modifiable line counts are in [APPLICATION_AUDIT.md](APPLICATION_AUDIT.md) and the per-application
-`provenance/LOC.md`.
+LOC = `cloc` **code** lines of the frozen application-owned source (no blank or comment lines; documentation,
+examples and data not counted), from each benchmark's `provenance/LOC.json`. The full breakdown (bundled
+dependencies, benchmark-specific dependencies, tests, total materialized) is in
+[APPLICATION_AUDIT.md](APPLICATION_AUDIT.md) and the per-application `provenance/LOC.md`. Total materialized
+counts include dependencies and therefore overlap across benchmarks that ship the same one (AMReX in WarpX and
+Nyx). Neither figure is a diff size: the line count of the integration PR is harness, not benchmark LOC, and
+none of these numbers says what an optimization agent may modify.
 
 **Retired:** [GEOS](geos/) was removed from the default suite (a third-party dependency, ParMETIS 4.0.3, may
 not be redistributed, and the application was replaced by ExaCA). Its code, provenance and historical results
@@ -190,6 +193,12 @@ Status and per-artifact numbers: [SOURCE_ARTIFACTS.md](SOURCE_ARTIFACTS.md). Des
 
 ## LLM optimization workspace
 
+HPC-Performance-AI packages complete frozen source workspaces. The benchmark itself does not prescribe which
+subset of source an optimization agent may modify. Application-only, dependency-aware, hotspot-only, or
+whole-stack optimization policies belong to the downstream evaluation protocol and can be applied to the same
+frozen benchmark. What the harness does guarantee is integrity: the judge (validator, references, inputs,
+build/run entry points, provenance) cannot be changed by the run being judged.
+
 The canonical `level3/<app>` tree is never handed to an agent. Each optimization run gets its own copy:
 
 ```bash
@@ -213,20 +222,24 @@ workspaces/<run-id>/                     workspace root -- hand over this whole 
 ├── build/, .deps/level3/<app>/          created by this run's build; private to the run
 ├── reports/                             iteration records written by the trusted harness
 └── level3/<app>/                        <- the agent's working directory
-    ├── src/, deps/                      materialized source; the agent edits only what the scope allows
-    ├── build.sh, run.sh, validate.sh, benchmark.yaml, optimization_scope.yaml
-    └── inputs/, references/, provenance/
+    ├── src/, deps/                      materialized source tree -- the mutable part
+    ├── build.sh, run.sh, validate.sh, benchmark.yaml      protected (benchmark harness and contract)
+    └── inputs/, references/, provenance/                  protected (validation assets, identity)
 ```
 
 The **trusted baseline** used to detect tampering lives outside the workspace, in
 `.hpcperf/workspace_baselines/<run-id>.json` of this repository; the copy inside the workspace is
 informational. Rules:
 
-* iteration 0 must match the frozen source hash; later iterations may differ **only** inside the
-  `modifiable` ranges of `optimization_scope.yaml`;
-* inputs, references, validators, provenance, dependency source and the harness copies are read-only and are
-  checked against the trusted baseline at every iteration; a change there is refused before anything is built
-  or run;
+* iteration 0 must match the frozen source hash; in later iterations the **source tree** (`src/**`, `deps/**`)
+  may be modified, extended or pruned, and every change is recorded (file lists, diff, source hash);
+* everything else is **protected by default**: `build.sh`, `run.sh`, `validate.sh`, `benchmark.yaml`,
+  `inputs/`, `references/`, `provenance/`, the workspace metadata, the files `benchmark.yaml` declares as
+  inputs or references even when they live under `src/`, and the harness copies. They are compared with the
+  trusted baseline at every iteration; a change there is refused before anything is built or run;
+* the benchmark integrity layer protects the benchmark harness and validation assets; **optimization policy over
+  the source tree is intentionally left to the evaluation protocol.** Workspace integrity is not an
+  optimization policy, and it is not an OS sandbox;
 * a build compiles the workspace's current source; nothing re-materializes the baseline behind the agent's back;
 * file permissions and hashes are integrity checks, **not** an operating-system sandbox;
 * the environment symlinks (and `--link-prebuilt-deps`, if used) mean the workspace is self-contained with
@@ -246,7 +259,7 @@ It is not evidence for the other applications.
 
 | Evidence | Where it stands |
 |---|---|
-| Source equivalence + materialization | All 11 artifacts: verified (extracted tree hash equals the frozen hash, 17/17 contract checks). |
+| Source equivalence + materialization | All 11 artifacts: verified (extracted tree hash equals the frozen hash; 15/15 contract checks, re-run 2026-09-13 after the scope-file removal). |
 | Current workspace build | LAMMPS: verified. ExaCA: canonical build from the artifact verified. All others: historical builds only. |
 | Agent edit takes effect | LAMMPS: verified (changed binary hash, rebuilt and revalidated). All others: not run. |
 | Scientific validation | See the per-application README for the criterion and the date; several results are historical runs on trees proven content-equivalent to the artifacts. |
@@ -257,8 +270,8 @@ It is not evidence for the other applications.
 Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
 
 This repository's own regression suite (`level3/tools/tests/run_all.sh`, CPU only, no GPU) currently reports
-**242/242 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
-comparator 33, verdict classes 18, ExaCA validator 19, source-distribution tools 76, release publication and
+**247/247 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
+comparator 33, verdict classes 18, ExaCA validator 19, source-distribution tools 81, release publication and
 anonymous-fetch API mock 45. These are **this project's** harness, validator and publisher tests. They are a
 different thing from an application's own upstream test suite: ExaCA's upstream unit-test result (30/52 as
 upstream runs them) is **not** part of that number and never counted as a pass here.
@@ -351,7 +364,7 @@ passes and never enter a performance summary.
 | Fingerprint mismatch at build time | The recorded install was built with a different toolchain/configuration; remove that install or restore the configuration. |
 | Rank count refused | The case cannot be decomposed that way, or the allocation is smaller than requested. |
 | Multi-node hang or launch failure | The site transport is unverified for multi-node here. |
-| `REFUSED` (exit 6) | Workspace integrity: readonly/harness files changed or the baseline is untrusted. Restore them; do not weaken the check. |
+| `REFUSED` (exit 6) | Workspace integrity: a protected file (harness, validator, inputs, references, provenance, metadata) changed or the baseline is untrusted. Restore it; do not weaken the check. |
 | `PENDING` (exit 3) | A scientific result that is explicitly incomplete (Nyx `I_R`). It is not a pass and must not be converted into one. |
 
 Forcing a rematerialization, loosening a tolerance or lowering precision are **not** general remedies; they

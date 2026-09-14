@@ -317,7 +317,7 @@ def main():
                          "sha256": c.get("sha256"), "checkout": c.get("checkout"), "submodules": c.get("submodules", []),
                          "excluded": c.get("exclude", []), "license": c.get("license")} for c in comps],
             equivalence=eq_records, licenses=spec.get("licenses", []), license_notes=spec.get("license_notes", []),
-            redistribution_status=redistribution, source_scope=hl.source_scope_from_optimization_scope(app_dir),
+            redistribution_status=redistribution, source_scope=hl.source_scope_from_spec(spec, hs.load_yaml(os.path.join(prov, f"source.lock{suffix}.yaml")) if os.path.isfile(os.path.join(prov, f"source.lock{suffix}.yaml")) else None),
             scan_allow=spec.get("scan_allow", []), freeze_tool_version=TOOL_VERSION, freeze_timestamp=now,
             primary=spec.get("primary"), mirrors=spec.get("mirrors"))
         tmp_lock = os.path.join(prov, f"source.lock{suffix}.yaml.freezing")

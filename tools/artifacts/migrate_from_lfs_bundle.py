@@ -47,13 +47,6 @@ def portable(s):
     return s
 
 
-def source_scope(app_dir):
-    sp = os.path.join(app_dir, "optimization_scope.yaml")
-    sc = (hs.load_yaml(sp) or {}).get("loc_categories", {}) if os.path.isfile(sp) else {}
-    return {"application_owned": sc.get("application_owned", []), "bundled": sc.get("bundled_dependency", []),
-            "benchmark_specific": sc.get("benchmark_specific_dependency", []), "test": sc.get("test", []), "exclude": sc.get("exclude", [])}
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("app_dir"); ap.add_argument("--variant"); ap.add_argument("--staging", required=True)
@@ -121,7 +114,7 @@ def main():
                         tree_sha=tree, entries=old["materialized_tree"]["entries"], layout=old["materialized_tree"]["layout"],
                         patches=patches, dependencies=old.get("dependencies", {}), components=comps, equivalence=eq,
                         licenses=old.get("licenses", []), license_notes=spec.get("license_notes", []), redistribution_status=a.redistribution_status,
-                        source_scope=source_scope(app_dir), scan_allow=spec.get("scan_allow", []),
+                        source_scope=hl.source_scope_from_spec(spec, old), scan_allow=spec.get("scan_allow", []),
                         freeze_tool_version=old.get("freeze_tool_version", "freeze-1.0"), freeze_timestamp=old.get("freeze_timestamp"),
                         migration={"from_schema": "hpcperf-source-lock-1", "from_scheme": "git-lfs source bundle (design abandoned 2026-09-10, never committed, never pushed)",
                                    "old_archive_path": old_arch_rel, "old_upstream_version_label": old.get("benchmark_source_version"),

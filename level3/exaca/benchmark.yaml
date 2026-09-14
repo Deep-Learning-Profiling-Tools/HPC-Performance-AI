@@ -23,7 +23,6 @@ gpu_40_80: DRY-RUN only (HPCPERF_DRY_RUN=1 HPCPERF_NODES=10|20), never executed
 build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
-optimization_scope: ./optimization_scope.yaml
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler behind nvcc_wrapper, CUDA 13.2.78, Open MPI 5.0.10, site
   profile gmu-hopper)
 install_root: .deps/level3/exaca

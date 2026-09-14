@@ -14,7 +14,7 @@ PROJECT-CONTROLLED EXTERNAL SOURCE ARTIFACTS  +  AUTOMATIC MATERIALIZATION  +  S
 |---|---|---|---|
 | A freeze | exact upstream source (committed blobs of a pinned checkout) + approved compatibility patches (pre-applied) + benchmark-specific source dependencies (pinned git trees / sha256-pinned release tarballs) -> deterministic `<app>[-<variant>]-<source_version>.tar.zst` | maintainer's local artifact staging (`$HPCPERF_ARTIFACT_STAGING/level3/<app>/<source_version>/`, outside the git worktree) | `tools/freeze_benchmark_source.py` (spec `level3/<app>/provenance/freeze_spec*.yaml`) |
 | B publish | **provider decided 2026-09-11: GitHub Release assets of this repository** (no mirror, bucket or paid service); first release name `level3-source-hpcperf-l3-v1-rc1` (a source-artifact prerelease, not a scientific acceptance statement); the lock records the immutable asset URL only after the published asset was re-downloaded anonymously and verified | GitHub Release assets | `tools/artifacts/release_plan.py` (plan, nothing uploaded), `tools/artifacts/github_release_upload.sh` (gated adapter, UNTESTED, needs `HPCPERF_CONFIRM_UPLOAD=yes` = explicit maintainer authorization), `tools/artifacts/remote_fetch_check.sh` (anonymous fetch test) |
-| C git | harness + contract + provenance only: `README.md benchmark.yaml optimization_scope.yaml build.sh run.sh validate.sh inputs/ references/ configs/ provenance/{source.lock.yaml, SOURCE_MANIFEST.json, upstream.lock, patch_series.txt, original_vs_baseline.diff, LICENSES.md, equivalence.md, LOC.md}` -- never `src/`, `deps/`, an archive or an LFS pointer | GitHub repository | -- |
+| C git | harness + contract + provenance only: `README.md benchmark.yaml build.sh run.sh validate.sh inputs/ references/ configs/ provenance/{source.lock.yaml, SOURCE_MANIFEST.json, upstream.lock, patch_series.txt, original_vs_baseline.diff, LICENSES.md, equivalence.md, LOC.md}` -- never `src/`, `deps/`, an archive or an LFS pointer | GitHub repository | -- |
 | D materialize | `tools/prepare_benchmark.sh level3 <app>`: source.lock -> local content-addressed cache -> (cache miss) immutable URL -> size + sha256 -> restricted extraction outside the benchmark directory -> `source_tree_sha256` -> safety scan -> atomic `level3/<app>/{src,deps}` | user clone | `tools/prepare_benchmark.sh` / `tools/hpcperf_materialize.py` |
 | E optimize | `tools/create_agent_workspace.sh level3 <app> <run-id>` -> `workspaces/<run-id>/level3/<app>/` (real copies, never symlinks to the canonical tree); the agent's cwd; iteration 0 must pass `tools/check_workspace.py`; later iterations are checked in agent mode and validated by `tools/validate_workspace.sh` (trusted harness) | per run | `tools/create_agent_workspace.sh`, `tools/check_workspace.py`, `tools/validate_workspace.sh` |
 
@@ -58,7 +58,7 @@ patches: [{path, sha256, category, upstream_reference, component, files}]
 dependencies: {bundled, benchmark_specific, environment_provided}
 components, equivalence, licenses, license_notes
 redistribution_status: cleared | blocked | review     (+ redistribution_notes)
-source_scope: {application_owned, bundled, benchmark_specific, test, exclude}   (from optimization_scope.yaml)
+source_scope: {application_owned, bundled, benchmark_specific, test, exclude}   (descriptive source ownership for the LOC report; from freeze_spec `source_scope`, else the previous lock, else defaults -- not an optimization policy)
 scan_allow, freeze: {tool_version, timestamp}, migration (for locks migrated from scheme 2)
 ```
 `tools/hpcperf_lock.py:validate_lock` rejects: a non-40-hex commit, a filename outside the convention, a URL
@@ -124,19 +124,23 @@ staging unavailable after prepare" by design: build/run/validate never touch the
 - `tools/create_agent_workspace.sh level3 <app> <run-id> [--dest DIR] [--variant V] [--link-prebuilt-deps]`:
   a self-contained root (`hpcperf_env.sh`, `level2/tools`, `level3/tools` copies; `.conda_env`, `.tools`,
   `.deps/install` environment symlinks) with `level3/<app>/` as a REAL copy (`cp --reflink=auto`, else copy)
-  of `src/ deps/ build.sh run.sh validate.sh benchmark.yaml optimization_scope.yaml inputs/ references/
+  of `src/ deps/ build.sh run.sh validate.sh benchmark.yaml inputs/ references/
   configs/ provenance/`; never `src -> ../../canonical/src`. Builds, installs and results are private to the
   run (`<root>/build/`, `<root>/.deps/level3/<app>/`); different models/runs/iterations share nothing writable.
   Recorded: `workspace.yaml` (run_id, benchmark, variant, source_version, canonical_source_tree_sha256,
   workspace_initial_tree_sha256, creation_timestamp, iteration 0) and `workspace_baseline.json` (sha256 of every
   file of the benchmark copy; read-only, outside the agent's cwd, mirrored to `<repo>/.hpcperf/workspace_baselines/`).
 - PRE-AGENT (iteration 0): `check_workspace.py` baseline mode -- the source hash must equal the canonical
-  `source_tree_sha256` (17 checks, all PASS).
-- POST-AGENT: `check_workspace.py --agent-mode --iteration N`: files inside `optimization_scope.yaml:modifiable`
-  may differ (modified/added/deleted lists, `initial_source_hash`, `current_source_hash`, diff recorded);
-  every readonly/excluded/unclassified file (`validate.sh`, `run.sh`, `build.sh`, `benchmark.yaml`,
-  `optimization_scope.yaml`, `provenance/**`, `inputs/**`, `references/**`, dependency source) must still equal
-  the trusted baseline -> otherwise READONLY TAMPERING. Neither "one changed line blocks every build" nor
+  `source_tree_sha256` (15 checks, all PASS).
+- POST-AGENT: `check_workspace.py --agent-mode --iteration N` -- protected by default, source tree explicitly
+  mutable: `src/**` and `deps/**` may be modified/added/deleted (lists, `initial_source_hash`,
+  `current_source_hash`, diff recorded); every other file of the benchmark directory (`validate.sh`, `run.sh`,
+  `build.sh`, `benchmark.yaml`, `provenance/**`, `inputs/**`, `references/**`, metadata), the files
+  `benchmark.yaml` declares as inputs/references even under `src/`, and the harness copies must still equal the
+  trusted baseline -> otherwise PROTECTED FILE / HARNESS TAMPERING and the iteration is REFUSED. The benchmark
+  does not prescribe which subset of the source an optimization agent may modify (application-only,
+  dependency-aware, hotspot-only, whole-stack): that policy belongs to the downstream evaluation protocol and
+  can be applied to the same frozen benchmark. Neither "one changed line blocks every build" nor
   "prepare runs before build and overwrites the agent's edit" can happen: build.sh never calls prepare, and the
   agent-mode check is the gate the harness uses.
 - `tools/validate_workspace.sh level3 <app> <workspace-benchmark-dir> [--iteration N] [--skip-build] [-- args]`

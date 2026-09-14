@@ -20,7 +20,6 @@ gpu_40_80: DRY-RUN only (HYPOTHETICAL), never executed
 build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
-optimization_scope: ./optimization_scope.yaml
 environment_profile: hpcperf_env.sh + private LLVM 23.1.0 offload toolchain (toolchain/build_llvm.sh; HPCPERF_QMCPACK_LLVM
   overrides its location), CUDA 13.2.78, Open MPI 5.0.10, FFTW3 (conda), libxml2 (system)
 install_root: .deps/level3/qmcpack/clang231-cuda132-offload

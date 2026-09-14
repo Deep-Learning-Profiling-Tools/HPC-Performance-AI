@@ -1,6 +1,9 @@
 {
  "benchmark": "lammps",
+ "variant": null,
  "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48",
  "test_code_loc": {
   "code": 124684,
   "files": 699,
@@ -69,28 +72,12 @@
    "YAML": 14
   }
  },
- "agent_modifiable_code_loc": {
-  "code": 852527,
-  "files": 3865,
-  "languages": {
-   "C++": 675895,
-   "C/C++ Header": 171353,
-   "Bourne Shell": 3091,
-   "Cython": 929,
-   "make": 572,
-   "C": 500,
-   "Markdown": 119,
-   "YAML": 65,
-   "Text": 3
-  }
- },
  "total_materialized_code_loc": 1471402,
  "summary": {
   "application_owned_code_loc": 852527,
   "bundled_dependency_code_loc": 494133,
   "benchmark_specific_dependency_code_loc": 0,
   "test_code_loc": 124684,
-  "agent_modifiable_code_loc": 852527,
   "total_materialized_code_loc": 1471402,
   "unclassified_code_loc": 58
  }

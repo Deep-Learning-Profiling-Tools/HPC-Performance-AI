@@ -6,10 +6,12 @@
 #
 # 1. check_workspace.py --agent-mode against the TRUSTED baseline: the repository copy
 #    <repo>/.hpcperf/workspace_baselines/<run-id>.json or an explicit --baseline outside the workspace (the copy
-#    inside the workspace is never trusted here): any change outside the modifiable scope -- validate.sh, run.sh,
-#    build.sh, benchmark.yaml, optimization_scope.yaml, provenance/**, inputs/**, references/**, dependency
-#    source, the harness copies of the workspace root -- is tampering: the validation is REFUSED (exit 6),
-#    nothing is built or run, and the result never enters a scientific or performance summary.
+#    inside the workspace is never trusted here): the source tree (src/, deps/) may differ from iteration 0 and
+#    every change is recorded; any change to a protected file -- validate.sh, run.sh, build.sh, benchmark.yaml,
+#    provenance/**, inputs/**, references/** (also when declared under src/), workspace metadata, the harness
+#    copies of the workspace root -- is tampering: the validation is REFUSED (exit 6), nothing is built or run,
+#    and the result never enters a scientific or performance summary. Which part of the source an agent should
+#    modify is not decided here (evaluation-protocol business), only that the judge stays intact.
 # 2. build inside the workspace (its own build.sh -> workspace-private build/ and .deps/) for the SAME backend
 #    and variant that step 3 validates; a failed build is BUILD_FAIL (exit 7). Every successful build appends a
 #    trusted build record (source hash, backend, variant, sha256 of the produced executables) to
@@ -75,7 +77,7 @@ echo "validate_workspace: run $RUN_ID iteration $ITER backend $BACKEND${VARIANT:
 case "$BASE" in "$WS"|"$WS"/*) refuse "--baseline must lie outside the workspace root";; esac
 BARG=(); [ -n "$BASE" ] && BARG=(--baseline "$BASE")
 if ! python3 "$HERE/check_workspace.py" "$WAPP" --agent-mode --iteration "$ITER" "${BARG[@]}" --report "$REP/iter-$ITER.check.json" --diff "$REP/iter-$ITER.diff" --json "$REP/iter-$ITER.check_workspace.json" --quick; then
-    refuse "check_workspace agent-mode FAIL (readonly/harness tampering, untrusted baseline or broken layout; see iter-$ITER.check.json)"
+    refuse "check_workspace agent-mode FAIL (protected-file/harness tampering, untrusted baseline or broken layout; see iter-$ITER.check.json)"
 fi
 SRC_HASH="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["current_source_hash"])' "$REP/iter-$ITER.check.json")"
 # manifest snapshot BEFORE the run: (path, sha256) of every existing run manifest under this workspace

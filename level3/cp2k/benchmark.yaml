@@ -19,7 +19,6 @@ gpu_40_80: DRY-RUN only (strong planned; weak 40/80 REFUSED -- no upstream deck)
 build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
-optimization_scope: ./optimization_scope.yaml
 environment_profile: hpcperf_env.sh with system GCC/g++/gfortran 14.2.1 (OMPI_* redirection), CUDA 13.2.78, Open MPI 5.0.10;
   toolchain build directory on local scratch (HPCPERF_CP2K_TOOLCHAIN_SCRATCH)
 install_root: .deps/level3/cp2k/cuda132-gcc142-ompi5010
