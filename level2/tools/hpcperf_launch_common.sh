@@ -25,7 +25,13 @@ hpcperf_ranks() {
     n="${HPCPERF_GPUS:-${HPCPERF_NP:-1}}"
     if [ "$n" = all ]; then
         gpn="${SLURM_GPUS_ON_NODE:-}"
-        [ -n "$gpn" ] || gpn="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
+        if [ -z "$gpn" ]; then
+            if [ "${HPCPERF_GPU_BACKEND:-CUDA}" = HIP ] || [ "${HPCPERF_GPU_BACKEND:-CUDA}" = hip ]; then
+                gpn="$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]/{n++} END{print n+0}')"
+            else
+                gpn="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
+            fi
+        fi
         n=$(( ${SLURM_JOB_NUM_NODES:-1} * ${gpn:-0} ))
         if [ "$n" -lt 1 ]; then echo "$app/run.sh: HPCPERF_GPUS=all but no GPUs detected" >&2; return 2; fi
     fi

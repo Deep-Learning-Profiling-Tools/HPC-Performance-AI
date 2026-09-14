@@ -1,8 +1,9 @@
 # Level 2 scale-out audit (CUDA)
 
-Date: 2026-09-04. Scope: every Level 2 mini-app, audited from its `build.sh` /
+Date: 2026-09-04; updated 2026-09-14 for four ECP native CUDA/HIP additions.
+Scope: every Level 2 mini-app, audited from its `build.sh` /
 `run.sh` / `validate.sh` / README, its sources under `level2/<app>/`, and the
-upstream clone under `_upstream/level2/`. Goal: selectable GPU count
+vendored upstream source (and historical clones under `_upstream/level2/`). Goal: selectable GPU count
 (2/4/8/40/80/`all`), one MPI rank per GPU, multi-node capability, and per-app
 problem decomposition -- not the frozen single-GPU decks. HIP is out of scope
 for this round (nothing HIP is claimed verified).
@@ -39,6 +40,10 @@ app is sharded-EP (unimplemented until a driver exists).
 | tealeaf | native-mpi | wrapper needed (same) | yes | optional (same) | none (auto chunk factorization) | any N; weak grids need new tea.problems rows | **keep-in-core** |
 | kripke | native-mpi | wrapper needed (no binding code) | yes | optional (build flag exists) | `--procs x,y,z` (product == NP) | product == NP; zones divisible per dim; groups%gset, quad%dset | **keep-in-core** |
 | branson | native-mpi (replicated work-split + Allreduce; PARTICLE_PASS = true domain decomposition, unvalidated) | in-app (`set_device_ID(rank%ndev)` -- GLOBAL rank: needs block mapping) | yes (caveat above) | no (host-buffer MPI only) | none (REPLICATED); deck `<mesh_decomposition>` for PARTICLE_PASS | any N | **keep-in-core** (replicated); PARTICLE_PASS = later extension |
+| comb | native-mpi (3-D structured halo exchange) | wrapper (local rank; CUDA/HIP visibility) | yes | **required** by selected device-buffer mode | `-divide px_py_pz` (product == NP) | any factorable N | **keep-in-core**; 2+ GPU runtime pending hardware |
+| quicksilver | native-mpi (spatial particle transport) | wrapper (local rank; CUDA/HIP visibility) | yes | no (host particle buffers) | `-I/-J/-K` (product == NP) | any factorable N; mesh dimensions grow with topology | **keep-in-core**; 2+ GPU runtime pending hardware |
+| sw4lite | native-mpi (2-D horizontal spatial decomposition) | wrapper (local rank; CUDA/HIP visibility) | yes | optional; default uses host staging | internal Cartesian grid | N must not exceed horizontal cell decomposition | **keep-in-core**; 2+ GPU runtime pending hardware |
+| gamess_ri_mp2 | sharded-EP (orbital-pair partition + energy reduction) | wrapper (local rank; CUDA/HIP visibility) | yes | no (host scalar reductions) | upstream trapezoidal partition | N <= active orbitals (120 for default) | **keep-in-core after 2+ GPU validation** |
 | hipbone | native-mpi | in-app (hostname local-rank in OCCA props) | yes | optional (`-ga`) | `-px -py -pz` (product == NP; without them NP must be a cube) | any factorable N once -px/-py/-pz standardized in run.sh | **keep-in-core** (add -px/py/pz decks) |
 | miniweather | native-mpi (1D x-split) | wrapper needed (no binding code) | yes | optional (`-DGPU_AWARE_MPI` compile flag) | none (1D x-split only) | N <= nx_glob; problem size is COMPILE-TIME (`MINIWEATHER_NX`) | **keep-in-core with limitations** (multi-GPU capable; compile-time size and 1D split are limitations to document, not disqualifiers) |
 | p3_heat3d | naturally-shardable; upstream sibling `heat3d_mpi` is native-mpi | sibling: in-app `cudaSetDevice(rank%n)` (global rank) | yes | **required** by sibling (device Views to MPI) | sibling: `--px --py --pz` (product == NP) | any factorable N; strong needs divisibility | **implement-distributed-extension** (adopt upstream heat3d_mpi) |
@@ -57,6 +62,16 @@ documented limitations (12 native-mpi motifs). Distributed extensions to adopt:
 **p3_heat3d, p3_vlp4d** (upstream MPI siblings). Sharded-EP candidates
 (drivers to write): **xsbench, minibude, exacmech**. Rewrite-cost shardable:
 **cabanapic, shaw**. Pending: **miniem**.
+
+The 2026-09-14 additions provide three further native-MPI implementations
+(Comb, Quicksilver, SW4lite) and one implemented sharded-EP MPI reduction
+(GAMESS RI-MP2).  Their CUDA single-GPU paths and correctness gates pass, and
+their selectable-N launch/decomposition paths are integrated, but the
+allocation exposed one NVIDIA GPU.  They are therefore not added to the
+"validated single-node multi-GPU" count until a 2+ GPU CUDA run is available;
+that status is `NOT-TESTED-HARDWARE-UNAVAILABLE`, not a simulated pass.  Their
+authoritative HIP paths are `INTEGRATED-NOT-LOCALLY-VALIDATED` and no HIP
+runtime is claimed.
 
 ## Completion criteria (unchanged target: ~20 distinct distributed motifs)
 
@@ -140,6 +155,23 @@ blockers) were collected per app; the load-bearing facts are:
   N; mesh memory replicated (fine at 591k cells). PARTICLE_PASS (METIS
   domain decomposition, upstream `3D_hohlraum_multi_node.xml`) exists but is
   unvalidated here. Binding uses GLOBAL rank -> needs block rank mapping.
+- **comb**: global dimensions are local-size times the selected factorable
+  process grid; every rank owns a 128 cubed default block.  Native CUDA/HIP
+  kernels pack and unpack periodic halos and the selected mode passes device
+  buffers to MPI.  Upstream coordinate-derived assertions validate every
+  received halo element.
+- **quicksilver**: `-I/-J/-K` exactly match the MPI topology; global cells and
+  particles are constructed from fixed per-rank controls.  Particles crossing
+  a facet enter the upstream asynchronous MPI exchange.  All four CORAL-2
+  transport checks are required.
+- **sw4lite**: MPI partitions the horizontal wave-propagation grid and
+  exchanges boundary planes while native GPU kernels update each local field.
+  The selected default keeps upstream host staging; GPU-aware MPI is optional.
+  The point-source analytical norms are the cross-rank correctness criterion.
+- **gamess_ri_mp2**: upstream `RIMP2_TRAPE_DEC` partitions one active-orbital
+  pair domain and `MPI_REDUCE` forms one correlation energy.  Ranks above
+  `NACT` would be idle upstream, so `run.sh` rejects them (default N <= 120).
+  This is a sharded global workload, not molecule replicas.
 - **hipbone**: `-nx/-ny/-nz` are PER-RANK elements ("weak-scale" by design);
   without `-px/-py/-pz` the rank count must be a perfect cube -- the frozen
   run.sh lacks them, which is the only blocker. FOM is already per-rank
