@@ -51,6 +51,14 @@ if built "$R/build/level2/laghos/cuda/laghos"; then
     out="$(HPCPERF_GPUS=4096 HPCPERF_LAGHOS_RS=2 "$R/level2/laghos/run.sh" CUDA 2>&1)"; rc=$?; out="$(noise <<<"$out")"
     [ "$rc" -eq 2 ] && grep -q 'only 512 elements' <<<"$out" && ok "laghos: elements < ranks rejected before launch" || bad "laghos: element check (rc=$rc): $(head -2 <<<"$out")"
 else skip=$((skip+1)); fi
+if built "$R/build/level2/miniem/cuda/PanzerMiniEM_BlockPrec"; then
+    out="$("$R/level2/miniem/run.sh" CUDA --x-elements=4 2>&1)"; rc=$?; out="$(noise <<<"$out")"
+    [ "$rc" -eq 2 ] && grep -q 'would override' <<<"$out" && ok "miniem: extra --x-elements rejected" || bad "miniem: --x-elements not rejected (rc=$rc)"
+    out="$("$R/level2/miniem/run.sh" CUDA --inputFile=maxwell.xml 2>&1)"; rc=$?; out="$(noise <<<"$out")"
+    [ "$rc" -eq 2 ] && grep -q 'would override' <<<"$out" && ok "miniem: extra --inputFile rejected (deck only via HPCPERF_MINIEM_DECK)" || bad "miniem: --inputFile not rejected (rc=$rc)"
+    out="$(HPCPERF_SCALE_MODE=bogus "$R/level2/miniem/run.sh" CUDA 2>&1)"; rc=$?; out="$(noise <<<"$out")"
+    [ "$rc" -eq 2 ] && grep -q 'smoke|strong|weak' <<<"$out" && ok "miniem: unknown HPCPERF_SCALE_MODE rejected" || bad "miniem: bogus mode not rejected (rc=$rc)"
+else skip=$((skip+1)); fi
 
 echo "test_run_guards: $pass passed, $failn failed, $skip skipped"
 [ "$failn" -eq 0 ]

@@ -247,7 +247,7 @@ constraints: legal rank counts.
 | exacmech | PASS | PASS | sharded-EP possible (split points + Allreduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | minibude | PASS | PASS | sharded-EP possible (split poses + reduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | xsbench | PASS | PASS | sharded-EP possible (split lookups + reduce), not implemented; upstream MPI mode = full-input replicas | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
-| miniem | -- | -- | native-mpi (upstream) | -- | -- | -- | -- | -- | -- | -- | any N | pending Trilinos decision |
+| miniem | PASS | PASS | native-mpi (Tpetra/Kokkos; inline mesh decomposed by the mesh factory) | yes (launcher; smoke/strong/weak) | validated (1, 2, 4: analytic L2 error consistent) | BLOCKED (site) | yes (fixed global elements, `HPCPERF_MINIEM_GLOBAL`) | yes (fixed elements/rank, `HPCPERF_MINIEM_N` x topology) | PASS | untested | any N | Trilinos develop efbab105 dependency (Kokkos 5.2.1); needs binding wrapper |
 
 ### Per-app interface support
 
@@ -294,9 +294,9 @@ honour is an error (exit 2), never a silent 1-rank run.
 | [shaw](shaw/) | Pressio/SHAW | Kokkos + K.Kernels | yes | K.Kernels signed ordinal; ROM host path |
 | [tealeaf](tealeaf/) | UoB-HPC/TeaLeaf | C++ + cuda/hip | yes | no upstream LICENSE; binding wrapper |
 | [xsbench](xsbench/) | ANL-CESAR/XSBench | CUDA / HIP | yes | -std=c++17 (CCCL) |
-| miniem | Trilinos (Panzer) | Kokkos / Tpetra | -- | pending: full Trilinos build |
+| [miniem](miniem/) | trilinos/Trilinos (packages/panzer/mini-em) | Kokkos / Tpetra (Panzer, MueLu RefMaxwell) | yes | Trilinos built as a Level 2 dependency (develop commit, Kokkos 5.2.1); stand-alone CMake for the driver; netCDF + gtest TPLs from conda |
 
-Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup. MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app.
+Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup. MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app; **miniem** implicit first-order Maxwell (E edge / B face elements) time stepping with a Teko block preconditioner and MueLu RefMaxwell algebraic multigrid on Tpetra; unstructured FE assembly + AMG setup/solve.
 
 Notes:
 - Kokkos, RAJA, OCCA and YAKL codes have one source tree for both variants, so
@@ -306,10 +306,15 @@ Notes:
   entirely inside hypre.
 - TeaLeaf ships no license file upstream (its README says it replicates the
   UK-MAC TeaLeaf code); nothing was copied as `LICENSE` there.
-- MiniEM is a Trilinos (Panzer) mini-app and cannot be built stand-alone: it
-  needs a Trilinos build with Tpetra, Panzer, MueLu, Intrepid2 and Kokkos
-  enabled (a multi-hour source build that adds Trilinos to
-  `setup_level2_deps.sh`). It is held until that dependency is approved.
+- MiniEM is a Trilinos (Panzer) mini-app and cannot be built stand-alone: since
+  2026-09-14 `setup_level2_deps.sh trilinos` builds the Trilinos package set it
+  needs (Panzer + STK adapters, MueLu, Teko, Belos, Ifpack2, Amesos2, Tpetra,
+  bundled Kokkos 5.2.1, SEACAS Exodus/Ioss; CUDA + Serial) from the pinned
+  develop commit efbab105 -- 26 top-level packages, 2716 Ninja targets, about
+  30 minutes at 48 jobs on this node, 3.9 GB build tree, 2.1 GB install. The
+  driver in `level2/miniem` is then a minutes-long build against that install.
+  Two conda packages were added for it (`libnetcdf` for Exodus, `gtest` because
+  the STK packages declare it as a required TPL even with tests off).
 - Blackwell (sm_100) + CUDA 13.2 compile pathologies found while integrating
   the MFEM codes: the nvcc device front end (cicc) unrolls thread-strided
   loops into enormous PTX for some high-order kernels -- MFEM v4.10's
@@ -328,9 +333,9 @@ Notes:
   pending A/B validation`, to be compared against the vanilla build on a
   Hopper/sm_90 (or fixed-CUDA) machine later.
 
-Summary: 19/20 CUDA single-GPU Working (validated on one B200); 1 pending
-decision (MiniEM, needs Trilinos). 10 MPI apps (amg2023, branson, cloverleaf,
-examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf) are
+Summary: 20/20 CUDA single-GPU Working (validated on one B200; MiniEM added
+2026-09-14 on the Trilinos dependency). 11 MPI apps (amg2023, branson, cloverleaf,
+examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf, miniem) are
 **single-node multi-GPU correctness validated** at 4 ranks x 4 B200 -- NOT
 multi-node scale-out validated; multi-node is BLOCKED site-wide (transport).
 miniweather and hipbone have an MPI path but no verified multi-GPU deck yet;

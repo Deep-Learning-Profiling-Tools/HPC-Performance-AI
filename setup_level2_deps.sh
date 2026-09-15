@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HPC-Performance-AI: build the framework libraries that the Level 2 mini-apps
-# are written against (Kokkos, RAJA, hypre, MFEM, Cabana, heFFTe, ...).
+# are written against (Kokkos, RAJA, hypre, MFEM, Cabana, heFFTe, Trilinos for MiniEM, ...).
 #
 # Everything is built from pinned upstream release tags with the project
 # toolchain (conda GCC 13.3.0 + system CUDA from hpcperf_env.sh) and installed
@@ -40,7 +40,9 @@
 #   HPCPERF_DEPS_LIBMODE=1 source setup_level2_deps.sh   # functions only (tests)
 #
 # Prerequisites: ./setup_env.sh has been run and hpcperf_env.sh is sourced
-# (provides CC/CXX, nvcc, mpicxx, cmake, ninja, and the conda METIS/FFTW/HDF5).
+# (provides CC/CXX, nvcc, mpicxx, cmake, ninja, and the conda METIS/FFTW/HDF5/netCDF).
+# Pins are release tags, or a 40-hex commit (fetched by commit). HPCPERF_DEPS_SEED_DIR=<dir> lets fetch() clone
+# <dir>/<dep> from a local checkout instead of GitHub; the pin is still enforced.
 if [ "${HPCPERF_DEPS_LIBMODE:-0}" != 1 ]; then set -euo pipefail; fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -71,8 +73,12 @@ PINS=(
   "chai|https://github.com/LLNL/CHAI.git|v2026.07.0"
   "hypre|https://github.com/hypre-space/hypre.git|v3.2.0"
   "mfem|https://github.com/mfem/mfem.git|v4.10"
+  # Trilinos (MiniEM): pinned to a develop commit (2026-09-01) because the newest release, 16.2.2, still bundles
+  # Kokkos 4.7 while every other Level 2 dependency is built against Kokkos 5.2.1; this commit bundles 5.2.1.
+  # A 40-hex pin is fetched by commit (see fetch); MiniEM itself lives in level2/miniem and links the install.
+  "trilinos|https://github.com/trilinos/Trilinos.git|efbab1057fdf0dba7d97a8a417057a817d07ada1"
 )
-ORDER=(kokkos kokkos-kernels heffte cabana raja umpire chai hypre mfem)
+ORDER=(kokkos kokkos-kernels heffte cabana raja umpire chai hypre mfem trilinos)
 
 pin_field() { # $1=name $2=field(2=url,3=tag)
   local p; for p in "${PINS[@]}"; do
@@ -213,11 +219,27 @@ migrate_fingerprints() {
 
 # fetch <name>: check out the pinned tag into $SRC/<name>, record its commit.
 fetch() {
-  local name=$1 url tag
+  local name=$1 url tag seed
   url="$(pin_field "$name" 2)"; tag="$(pin_field "$name" 3)"
+  seed="${HPCPERF_DEPS_SEED_DIR:-}/$name"
   if [ ! -d "$SRC/$name/.git" ]; then
-    say "fetching $name @ $tag"
-    git clone --quiet --depth 1 --branch "$tag" "$url" "$SRC/$name"
+    if [ -n "${HPCPERF_DEPS_SEED_DIR:-}" ] && [ -d "$seed/.git" ]; then
+      # local seed: clone from an existing checkout on this machine, then move to the pin (checked below)
+      say "fetching $name @ $tag (seeded from $seed)"
+      git clone --quiet --no-hardlinks "$seed" "$SRC/$name"
+      git -C "$SRC/$name" remote set-url origin "$url"
+      git -C "$SRC/$name" checkout --quiet "$tag" 2>/dev/null || { git -C "$SRC/$name" fetch --quiet origin "$tag" && git -C "$SRC/$name" checkout --quiet FETCH_HEAD; }
+    elif [[ "$tag" =~ ^[0-9a-f]{40}$ ]]; then
+      say "fetching $name @ commit $tag"
+      mkdir -p "$SRC/$name"; git -C "$SRC/$name" init --quiet; git -C "$SRC/$name" remote add origin "$url"
+      git -C "$SRC/$name" fetch --quiet --depth 1 origin "$tag"; git -C "$SRC/$name" checkout --quiet FETCH_HEAD
+    else
+      say "fetching $name @ $tag"
+      git clone --quiet --depth 1 --branch "$tag" "$url" "$SRC/$name"
+    fi
+  fi
+  if [[ "$tag" =~ ^[0-9a-f]{40}$ ]]; then
+    [ "$(git -C "$SRC/$name" rev-parse HEAD)" = "$tag" ] || fail "$name: checkout is at $(git -C "$SRC/$name" rev-parse HEAD), pin is $tag"
   fi
   git -C "$SRC/$name" rev-parse HEAD > "$SRC/$name.commit"
   apply_patches "$name"
@@ -363,6 +385,49 @@ build_mfem() {
     -DMFEM_USE_MPI=ON -DMFEM_USE_CUDA=ON -DMFEM_USE_METIS=ON -DMFEM_USE_METIS_5=ON \
     -DHYPRE_DIR="$INST/hypre" -DMETIS_DIR="$CONDA" \
     -DMFEM_ENABLE_EXAMPLES=OFF -DMFEM_ENABLE_MINIAPPS=OFF -DMFEM_ENABLE_TESTING=OFF
+}
+
+# Trilinos for MiniEM (level2/miniem): the package set MiniEM's library needs (Panzer with the STK adapters,
+# MueLu, Teko, Belos, Ifpack2, Amesos2 and what they require: Tpetra, Kokkos/KokkosKernels, Intrepid2, Sacado,
+# Phalanx, Thyra, Stratimikos, Piro, NOX, Zoltan, STK, SEACAS Ioss/Exodus), CUDA + Serial Kokkos back ends,
+# no tests/examples/Fortran/Epetra. Zoltan2 is required: MueLu RefMaxwell repartitions the coarse problems
+# whenever more than one rank runs (upstream's solver decks enable it), and that path throws
+# "Zoltan2 interface is not available" without it. Kokkos is Trilinos' bundled copy (same 5.2.1 as
+# .deps/install/kokkos).
+# Compiled through Trilinos' own nvcc_wrapper (OMPI_CXX), the recipe Trilinos documents for CUDA builds.
+# TPLs from the conda env: MPI, OpenBLAS (BLAS/LAPACK), parallel netCDF + HDF5 (+ PnetCDF when netCDF was
+# built with it) for Exodus, and GoogleTest (the STK packages declare gtest as a required TPL even with
+# tests off; a pinned conda package rather than a configure-time download). The MiniEM driver (level2/miniem/src) is built separately against this install.
+build_trilinos() {
+  local nvw="$SRC/trilinos/packages/kokkos/bin/nvcc_wrapper" ncargs=()
+  if "$CONDA/bin/nc-config" --has-pnetcdf 2>/dev/null | grep -qi yes; then
+    ncargs=(-DTPL_ENABLE_Pnetcdf=ON -DTPL_Pnetcdf_INCLUDE_DIRS="$CONDA/include" -DTPL_Pnetcdf_LIBRARIES="$CONDA/lib/libpnetcdf.so" -DTPL_Netcdf_Enables_PNetcdf=ON)
+  fi
+  OMPI_CXX="$nvw" NVCC_WRAPPER_DEFAULT_COMPILER="$CXX" \
+  cmake_build trilinos . \
+    -DCMAKE_C_COMPILER="$CONDA/bin/mpicc" -DCMAKE_CXX_COMPILER="$CONDA/bin/mpicxx" \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DTrilinos_ENABLE_ALL_PACKAGES=OFF -DTrilinos_ENABLE_ALL_OPTIONAL_PACKAGES=OFF \
+    -DTrilinos_ENABLE_SECONDARY_TESTED_CODE=OFF -DTrilinos_ENABLE_TESTS=OFF -DTrilinos_ENABLE_EXAMPLES=OFF \
+    -DTrilinos_ENABLE_Fortran=OFF -DTrilinos_ENABLE_OpenMP=OFF -DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON \
+    -DTrilinos_ENABLE_Epetra=OFF -DTrilinos_ENABLE_ML=OFF -DTrilinos_ENABLE_Gtest=OFF \
+    -DTrilinos_ENABLE_PanzerMiniEM=ON -DTrilinos_ENABLE_PanzerAdaptersSTK=ON \
+    -DTrilinos_ENABLE_MueLu=ON -DTrilinos_ENABLE_Teko=ON -DTrilinos_ENABLE_Belos=ON \
+    -DTrilinos_ENABLE_Ifpack2=ON -DTrilinos_ENABLE_Amesos2=ON -DTrilinos_ENABLE_Stratimikos=ON \
+    -DTrilinos_ENABLE_Zoltan2=ON -DMueLu_ENABLE_Zoltan2=ON \
+    -DTrilinos_ENABLE_SEACASIoss=ON -DTrilinos_ENABLE_SEACASExodus=ON \
+    -DTPL_ENABLE_MPI=ON -DMPI_BASE_DIR="$CONDA" -DMPI_EXEC="$CONDA/bin/mpirun" \
+    -DTPL_ENABLE_BLAS=ON -DTPL_BLAS_LIBRARIES="$CONDA/lib/libopenblas.so" \
+    -DTPL_ENABLE_LAPACK=ON -DTPL_LAPACK_LIBRARIES="$CONDA/lib/libopenblas.so" \
+    -DTPL_ENABLE_HDF5=ON -DTPL_HDF5_INCLUDE_DIRS="$CONDA/include" -DTPL_HDF5_LIBRARIES="$CONDA/lib/libhdf5_hl.so;$CONDA/lib/libhdf5.so" \
+    -DTPL_ENABLE_Netcdf=ON -DTPL_Netcdf_INCLUDE_DIRS="$CONDA/include" -DTPL_Netcdf_LIBRARIES="$CONDA/lib/libnetcdf.so" \
+    -DTPL_Netcdf_Enables_Netcdf4=ON "${ncargs[@]}" \
+    -DTPL_ENABLE_gtest=ON -DGTest_ROOT="$CONDA" \
+    -DTPL_ENABLE_CUDA=ON -DTPL_ENABLE_CUBLAS=ON -DTPL_ENABLE_CUSPARSE=ON \
+    -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON "-DKokkos_ARCH_${KOKKOS_ARCH}=ON" \
+    -DKokkos_ENABLE_CUDA_LAMBDA=ON -DKokkos_ENABLE_CUDA_CONSTEXPR=ON \
+    -DTpetra_INST_CUDA=ON -DTpetra_INST_SERIAL=ON -DTpetra_INST_DOUBLE=ON \
+    -DTrilinos_ENABLE_COMPLEX=OFF -DTrilinos_ENABLE_FLOAT=OFF
 }
 
 # Library mode: functions only (tests source this file with HPCPERF_DEPS_LIBMODE=1).
