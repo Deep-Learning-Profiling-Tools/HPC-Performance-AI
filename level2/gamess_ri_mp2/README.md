@@ -164,14 +164,16 @@ generated first:
 ```bash
 SDK=/opt/sw/other/apps/nvidia/hpc_sdk/Linux_x86_64/25.7
 mkdir -p "$HOME/.nvlocalrc" && "$SDK/compilers/bin/makelocalrc" -gcc /usr/bin/gcc -gpp /usr/bin/g++ -g77 /usr/bin/gfortran -x -d "$HOME/.nvlocalrc"
-NVLOCALRC="$HOME/.nvlocalrc/localrc" NVFORTRAN="$SDK/compilers/bin/nvfortran" HPCPERF_CUDA_ARCH=100 ./build.sh CUDA
+NVLOCALRC="$HOME/.nvlocalrc/localrc" NVFORTRAN="$SDK/compilers/bin/nvfortran" ./build.sh CUDA   # arch from nvidia-smi (cc100 here); HPCPERF_CUDA_ARCH overrides
 HPCPERF_GPUS=1 ./validate.sh CUDA
 ```
 
 Result: build 7 s (two deprecation warnings about `USE_DEVICE_PTR`); the binary links the project CUDA 13.2
 cuBLAS/cudart and the conda Open MPI, `libnvf` from the SDK (RPATH embedded); validation PASS, relative
-error of the MP2 correlation energy 4.4e-14, launcher binding audit 1 verified / 0 mismatch. `nvfortran`
-25.7 accepted `-gpu=cc100`; the SDK's bundled CUDA 12.9 is not used at run time.
+error of the MP2 correlation energy 4.4e-14, launcher binding audit 1 verified / 0 mismatch. The build was
+repeated with `HPCPERF_CUDA_ARCH` and `CUDA_ARCH` unset: `build.sh` detected cc100 through nvidia-smi and
+the binary carries sm_100 device code; validation PASS again. `nvfortran` 25.7 accepted `-gpu=cc100`; the
+SDK's bundled CUDA 12.9 is not used at run time.
 CUDA Toolkit 13.2 (nvcc 13.2.78, `/usr/local/cuda`) | NVIDIA B200 (sm_100)
 Open MPI 5.0.10 | Slurm allocation with one visible GPU
 HIP/ROCm/hipfort: authoritative source and build/run configuration present,
