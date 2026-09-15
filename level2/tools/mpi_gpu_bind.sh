@@ -29,6 +29,11 @@
 #      is looked up through nvidia-smi's own index/uuid table, never by
 #      treating a CUDA ordinal as a physical index blindly.
 #
+# Set HPCPERF_GPU_BACKEND=HIP for AMD runs. The same selection policy is then
+# applied to ROCR_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES (with
+# CUDA_VISIBLE_DEVICES accepted as a portability alias). HIP placement is
+# reported but not observed with the NVIDIA-only process sampler.
+#
 # Audit (unless HPCPERF_BIND_QUIET=1): one line per rank to stderr, and
 # appended to $HPCPERF_BIND_LOG if set:
 #   hpcperf-bind: host= grank= lrank= pid= mode=<bound|app-managed|scheduler>
@@ -42,6 +47,29 @@ lr="${OMPI_COMM_WORLD_LOCAL_RANK:-${SLURM_LOCALID:-}}"
 gr="${OMPI_COMM_WORLD_RANK:-${SLURM_PROCID:-$lr}}"
 if [ -z "$lr" ]; then
     exec "$@"
+fi
+
+gpu_backend="${HPCPERF_GPU_BACKEND:-CUDA}"
+gpu_backend="${gpu_backend^^}"
+case "$gpu_backend" in CUDA|HIP) ;; *) echo "mpi_gpu_bind.sh: ERROR: HPCPERF_GPU_BACKEND must be CUDA or HIP" >&2; exit 2;; esac
+
+# Reuse the established CUDA selection logic with the authoritative HIP
+# visibility variables projected into its input. Explicitly empty visibility
+# remains empty and therefore fails rather than exposing an unallocated GPU.
+if [ "$gpu_backend" = HIP ]; then
+    if [ "${ROCR_VISIBLE_DEVICES+set}" = set ]; then
+        export CUDA_VISIBLE_DEVICES="$ROCR_VISIBLE_DEVICES"
+    elif [ "${HIP_VISIBLE_DEVICES+set}" = set ]; then
+        export CUDA_VISIBLE_DEVICES="$HIP_VISIBLE_DEVICES"
+    elif [ "${CUDA_VISIBLE_DEVICES+set}" != set ]; then
+        _hip_n="${SLURM_GPUS_ON_NODE:-}"
+        [ -n "$_hip_n" ] || _hip_n="$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]/{n++} END{print n+0}')"
+        if [ "${_hip_n:-0}" -gt 0 ] 2>/dev/null; then
+            _hip_list=0
+            for (( _hip_i=1; _hip_i<_hip_n; _hip_i++ )); do _hip_list="$_hip_list,$_hip_i"; done
+            export CUDA_VISIBLE_DEVICES="$_hip_list"
+        fi
+    fi
 fi
 
 oversub_warn() {
@@ -89,9 +117,13 @@ elif [ "${CUDA_VISIBLE_DEVICES+set}" = "set" ]; then
         [ "$_mode" = bound ] && export CUDA_VISIBLE_DEVICES="$_sel"
     fi
 else
-    _n="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
+    if [ "$gpu_backend" = HIP ]; then
+        _n="$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]/{n++} END{print n+0}')"
+    else
+        _n="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
+    fi
     if [ "${_n:-0}" -le 0 ]; then
-        fail_nogpu "nvidia-smi lists no GPUs and CUDA_VISIBLE_DEVICES is unset"
+        fail_nogpu "$gpu_backend device discovery found no GPUs and no visibility variable is set"
         _sel="<none>"
     else
         if [ "$lr" -ge "$_n" ]; then
@@ -106,19 +138,25 @@ else
     fi
 fi
 
+if [ "$gpu_backend" = HIP ] && [ "$_mode" != app-managed ] && [ "$_sel" != '<none>' ]; then
+    export ROCR_VISIBLE_DEVICES="$_sel"
+    export HIP_VISIBLE_DEVICES="$_sel"
+fi
+
 if [ "${HPCPERF_BIND_QUIET:-0}" != "1" ]; then
     # Expected UUID: a UUID entry is itself; a numeric entry is an ordinal in
     # PCI-bus order (CUDA_DEVICE_ORDER=PCI_BUS_ID above) -> nvidia-smi's own
     # index column, which is also PCI-ordered over the same visible set.
-    case "$_sel" in
-        GPU-*|MIG-*) _uuid="$_sel" ;;
-        ''|*[!0-9]*) _uuid="unknown" ;;
+    case "$gpu_backend:$_sel" in
+        HIP:*) _uuid="unavailable" ;;
+        CUDA:GPU-*|CUDA:MIG-*) _uuid="$_sel" ;;
+        CUDA:|CUDA:*[!0-9]*) _uuid="unknown" ;;
         *) _uuid="$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader 2>/dev/null \
                     | tr -d ' ' | awk -F, -v i="$_sel" '$1==i {print $2; exit}')"
            _uuid="${_uuid:-unknown}" ;;
     esac
     _cpus="$(sed -n 's/^Cpus_allowed_list:[[:space:]]*//p' /proc/self/status 2>/dev/null)"
-    _line="hpcperf-bind: host=$(hostname -s) grank=$gr lrank=$lr pid=$$ mode=$_mode expected_gpu=$_sel expected_uuid=$_uuid observed=unverified cpus=${_cpus:-unknown}"
+    _line="hpcperf-bind: backend=$gpu_backend host=$(hostname -s) grank=$gr lrank=$lr pid=$$ mode=$_mode expected_gpu=$_sel expected_uuid=$_uuid observed=unverified cpus=${_cpus:-unknown}"
     echo "$_line" >&2
     [ -n "${HPCPERF_BIND_LOG:-}" ] && echo "$_line" >> "$HPCPERF_BIND_LOG"
 fi

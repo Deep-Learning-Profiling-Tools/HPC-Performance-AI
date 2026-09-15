@@ -13,9 +13,12 @@ SITE_LAUNCHER_DEFAULT="mpirun"
 SITE_MULTINODE_STATUS="blocked"
 SITE_MULTINODE_MSG="multi-node MPI is BLOCKED/UNVERIFIED on gmu-hopper (validated transport self,sm,smcuda is single-node only; site UCX hangs on CUDA device buffers)"
 
-# site_mpi_args <nnodes>: extra launcher arguments for the transport.
+# site_mpi_args <nnodes> <CUDA|HIP>: extra launcher arguments for transport.
 site_mpi_args() {
-    if [ "$1" -le 1 ]; then
+    if [ "${2:-CUDA}" = HIP ]; then
+        # smcuda is an NVIDIA-only BTL; never inject it into an AMD launch.
+        echo ""
+    elif [ "$1" -le 1 ]; then
         # Validated single-node profile: shared-memory + CUDA IPC. The site
         # default (UCX) passes host traffic but hangs on CUDA device buffers.
         echo "--mca pml ob1 --mca btl self,sm,smcuda"

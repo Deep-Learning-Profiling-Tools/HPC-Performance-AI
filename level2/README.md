@@ -1,6 +1,6 @@
 # Level 2: Proxy Applications / Mini-Apps
 
-20 selected GPU mini-apps / proxy applications, each copied from its upstream
+24 selected GPU mini-apps / proxy applications, each copied from its upstream
 repository into `level2/<name>/` together with the input decks it needs and
 made to build and run with the pinned Level 1 toolchain (conda GCC 13.3.0,
 CMake 3.28.4, system CUDA 13.2) plus the Level 2 additions below. Unlike
@@ -45,6 +45,7 @@ Everything below is installed inside the clone, next to the Level 1 toolchain
 | FFTW (openmpi) | 3.3.11 | conda |
 | HDF5 (parallel, openmpi) | 2.2.0 | conda |
 | PnetCDF (openmpi) | 1.15.0 | conda |
+| NVIDIA HPC SDK Fortran (GAMESS RI-MP2 CUDA) | 25.9 validated | system/module (`nvfortran`) |
 | Kokkos / Kokkos Kernels | 5.2.1 | `setup_level2_deps.sh` -> `.deps/install/kokkos{,-kernels}` |
 | Cabana | 0.8.0 | `setup_level2_deps.sh` -> `.deps/install/cabana` |
 | heFFTe | 2.4.1 | `setup_level2_deps.sh` -> `.deps/install/heffte` |
@@ -110,7 +111,7 @@ an observation. GPU mode with no usable GPU fails (exit 13).
 `HPCPERF_GPUS` when both are set. Process grids for topology-parameterised
 apps come from `level2/tools/hpcperf_topology.py`, which fails with nearby
 feasible rank counts rather than silently changing N. The full scale-out
-audit of all 20 candidates lives in [SCALEOUT_AUDIT.md](SCALEOUT_AUDIT.md).
+audit of all 24 candidates lives in [SCALEOUT_AUDIT.md](SCALEOUT_AUDIT.md).
 
 **CUDA-aware MPI capability.** The conda Open MPI is a CUDA-aware build, but
 its `openmpi-mca-params.conf` ships `opal_cuda_support = 0`; `hpcperf_env.sh`
@@ -163,7 +164,8 @@ multi-node allocation.
   Kokkos/Cabana apps (ExaMiniMD, ExaMPM, HACCabanaPM) by local rank; Branson
   via `set_device_ID(rank, n_ranks)`.
 - *Needs an explicit wrapper* -- every rank otherwise lands on GPU 0: the MFEM
-  apps (Laghos, Remhos) and the flag-selected backends (CloverLeaf, TeaLeaf).
+  apps (Laghos, Remhos), the flag-selected backends (CloverLeaf, TeaLeaf), and
+  Comb, Quicksilver, SW4lite, and GAMESS RI-MP2.
   Use the scheduler-safe wrapper `level2/tools/mpi_gpu_bind.sh`:
 
   ```bash
@@ -191,15 +193,17 @@ Instead of a single "Working" flag, each mini-app is scored on independent
 axes:
 
 - **CUDA 1-GPU** -- configure + build + run + correctness validation on one
-  B200 (CUDA 13.2, GCC 13.3.0). `PASS` for all 19 integrated apps.
+  B200 (CUDA 13.2, GCC 13.3.0). `PASS` for all 23 integrated apps.
 - **CUDA 4-GPU / MPI** -- ran correctly across 4 B200s with one GPU per rank,
   MPI communication path exercised, a conserved/reference quantity checked
   (2026-09-03). `PASS` = verified; `single-GPU` = the app has no MPI
   communication path in its frozen benchmark (runs one process), so 4-GPU is
   not applicable; `not yet` = has an MPI path but a 4-GPU run is not verified
   yet. This axis is **correctness/communication only, never a scaling claim**.
-- **HIP** -- `untested` for every app: a HIP build configuration exists but
-  there is no AMD GPU / ROCm on the development machine.
+- **HIP** -- runtime remains untested because there is no AMD GPU / ROCm on
+  the development machine.  Comb, Quicksilver, SW4lite, and GAMESS RI-MP2
+  have pinned authoritative native HIP sources and complete build/run paths;
+  their integration status is `INTEGRATED-NOT-LOCALLY-VALIDATED`.
 - **Source mod** -- `yes` if any upstream source file was changed (always for
   a documented compatibility reason, listed in that app's README "Changes from
   upstream"); `no` if only build glue / wrappers were added.
@@ -238,6 +242,10 @@ constraints: legal rank counts.
 | tealeaf | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (same deck) | manual (+tea.problems rows) | PASS | untested | any N (auto chunks) | needs binding wrapper |
 | kripke | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (2,2,1) | BLOCKED (site) | manual (--zones div) | manual (32^3/rank) | PASS | untested | product=N; zones divisible; groups%gset | needs binding wrapper |
 | branson | PASS | PASS | native-mpi (replicated split) | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (photons/N auto) | manual (--photons*N) | PASS | untested | any N | PARTICLE_PASS mode = later extension |
+| comb | PASS | PASS | native-mpi (halo exchange) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | manual | yes (128^3/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | any factorable N | native CUDA/HIP-aware MPI |
+| quicksilver | PASS | PASS | native-mpi (particle transport) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | manual | yes (mesh+particles/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | product=N | native LLNL CUDA/AMD-HIP |
+| sw4lite | PASS | PASS | native-mpi (spatial domain) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | yes (same deck) | manual | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= horizontal cells | native geodynamics/AMD-ECP paths |
+| gamess_ri_mp2 | PASS | PASS | sharded-EP + MPI reduction | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | yes (same molecule) | manual (larger input) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= active orbitals | native cuBLAS/hipBLAS |
 | hipbone | PASS | PASS | native-mpi | yes (launcher; no scale modes) | not yet | BLOCKED (site) | manual (divide global) | native (-nx per rank) | PASS | untested | cube N unless -px/-py/-pz given | add -px/py/pz decks |
 | miniweather | PASS | PASS | native-mpi (1D x-split; compile-time size = limitations, not a disqualifier) | yes (launcher; no scale modes) | not yet | BLOCKED (site) | rebuild per size | rebuild per size | PASS | untested | N<=nx_glob | multi-GPU capable; limitations: compile-time nx, x-only split |
 | p3_heat3d | PASS | PASS | shardable (upstream heat3d_mpi ready) | n/a today | n/a | n/a | (sibling) | (sibling: nx/rank) | PASS | untested | sibling: product=N | adopt heat3d_mpi (extension) |
@@ -267,6 +275,10 @@ honour is an error (exit 2), never a silent 1-rank run.
 | tealeaf | yes | rejected | wrapper | `--device`, `-d` | MPI build required for N > 1 |
 | kripke | yes (also `KRIPKE_NP`) | rejected | wrapper | -- | N > 1 needs `--procs` with product N; zones divisible |
 | branson | yes | rejected | wrapper | -- | -- |
+| comb | yes | rejected | wrapper | `-divide -periodic -ghost -vars -cycles -comm -exec -memory` and GPU-aware flags | positive local size/cycles/variables; topology product equals N |
+| quicksilver | yes | rejected | wrapper | input, mesh, particles, steps, and topology flags | positive per-rank sizes; topology product equals N |
+| sw4lite | yes | rejected | wrapper | -- | input must exist |
+| gamess_ri_mp2 | yes | rejected | wrapper | -- | positive NQVV; N <= input active orbitals |
 | hipbone | yes (also `HIPBONE_NP`) | rejected | app (own local rank) | -- | N > 1 needs `-px -py -pz` (product N) or a cube N |
 | miniweather | yes | rejected | wrapper | any argument | -- |
 | cabanapic, exacmech, minibude, p3_heat3d, p3_vlp4d, shaw, xsbench | n/a (single process) | n/a | -- | -- | -- |
@@ -279,9 +291,11 @@ honour is an error (exit 2), never a silent 1-rank run.
 | [branson](branson/) | lanl/branson | CUDA/HIP C++ | yes | CUDA_ARCHITECTURES ordering fix |
 | [cabanapic](cabanapic/) | ECP-copa/CabanaPIC | Kokkos + Cabana | yes | REAL_TYPE=double; NFS run dir |
 | [cloverleaf](cloverleaf/) | UoB-HPC/CloverLeaf | C++ + cuda/hip | no | binding wrapper (flag-selected device) |
+| [comb](comb/) | LLNL/Comb | native CUDA / HIP + MPI | yes | CUDA 13 API guards; GPU-aware MPI |
 | [exacmech](exacmech/) | LLNL/ExaCMech | RAJA + CHAI | yes | RAJA/Umpire/CHAI 2026.07 (dep); C++20 |
 | [examinimd](examinimd/) | ECP-copa/ExaMiniMD | Kokkos + K.Kernels | yes | Kokkos 5 / K.Kernels; CUDA-aware MPI |
 | [exampm](exampm/) | ECP-copa/ExaMPM | Kokkos + Cabana | yes | Cabana 0.8 API; CUDA-aware MPI |
+| [gamess_ri_mp2](gamess_ri_mp2/) | jkwack/GAMESS_RI-MP2_MiniApp | Fortran + cuBLAS / hipBLAS | yes | NVFORTRAN/Open MPI 5 interface guard; hipfort |
 | [haccabanapm](haccabanapm/) | ECP-copa/HACCabana | Kokkos+Cabana+heFFTe | yes | Random123 nvcc guard; CUDA-aware MPI |
 | [hipbone](hipbone/) | paranumal/hipBone | OCCA (run-time) | yes | OCCA CUDA-13 API patch; OMP threads |
 | [kripke](kripke/) | LLNL/Kripke | RAJA | no | bundled RAJA/CHAI CUDA-13 guard (dep) |
@@ -290,18 +304,22 @@ honour is an error (exit 2), never a silent 1-rank run.
 | [miniweather](miniweather/) | mrnorman/miniWeather | YAKL (C++) | no | gfortran detection; PnetCDF |
 | [p3_heat3d](p3_heat3d/) | yasahi-hpc/P3-miniapps | Thrust + mdspan | yes | mdspan bundled |
 | [p3_vlp4d](p3_vlp4d/) | yasahi-hpc/P3-miniapps | Thrust+mdspan+cuFFT | yes | cuFFT; mdspan bundled |
+| [quicksilver](quicksilver/) | LLNL/Quicksilver | native CUDA / AMD-HIP + MPI | yes | fixed-width integer includes |
 | [remhos](remhos/) | CEED/Remhos | MFEM (device PA) | no | makefile route; MFEM+patch (dep); binding wrapper |
 | [shaw](shaw/) | Pressio/SHAW | Kokkos + K.Kernels | yes | K.Kernels signed ordinal; ROM host path |
+| [sw4lite](sw4lite/) | geodynamics/sw4lite + AMD/ECP HIP port | native CUDA / HIP + MPI | yes | archived HIP revision; build-path fixes |
 | [tealeaf](tealeaf/) | UoB-HPC/TeaLeaf | C++ + cuda/hip | yes | no upstream LICENSE; binding wrapper |
 | [xsbench](xsbench/) | ANL-CESAR/XSBench | CUDA / HIP | yes | -std=c++17 (CCCL) |
 | [miniem](miniem/) | trilinos/Trilinos (packages/panzer/mini-em) | Kokkos / Tpetra (Panzer, MueLu RefMaxwell) | yes | Trilinos built as a Level 2 dependency (develop commit, Kokkos 5.2.1); stand-alone CMake for the driver; netCDF + gtest TPLs from conda |
 
-Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup. MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app; **miniem** implicit first-order Maxwell (E edge / B face elements) time stepping with a Teko block preconditioner and MueLu RefMaxwell algebraic multigrid on Tpetra; unstructured FE assembly + AMG setup/solve.
+Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **comb** native-GPU structured-grid halo packing and GPU-aware MPI; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **gamess_ri_mp2** RI-MP2 energy evaluation with distributed orbital-pair work and vendor BLAS; **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **quicksilver** dynamic Monte Carlo particle transport with divergent native GPU kernels; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **sw4lite** MPI-decomposed seismic finite differences with an analytical point-source check; **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup. MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app.
 
 Notes:
 - Kokkos, RAJA, OCCA and YAKL codes have one source tree for both variants, so
   the CUDA and HIP counts are the same; only CloverLeaf, TeaLeaf, miniBUDE,
-  XSBench and the P3 mini-apps have separate CUDA and HIP backend directories.
+  XSBench, Quicksilver, SW4lite and the P3 mini-apps have separate CUDA and HIP
+  backend directories. Comb and GAMESS RI-MP2 select native vendor paths in a
+  shared authoritative source tree.
 - AMG2023 has no device code of its own (`amg.c` is plain C); the GPU work is
   entirely inside hypre.
 - TeaLeaf ships no license file upstream (its README says it replicates the
@@ -333,11 +351,16 @@ Notes:
   pending A/B validation`, to be compared against the vanilla build on a
   Hopper/sm_90 (or fixed-CUDA) machine later.
 
-Summary: 20/20 CUDA single-GPU Working (validated on one B200; MiniEM added
-2026-09-14 on the Trilinos dependency). 11 MPI apps (amg2023, branson, cloverleaf,
-examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf, miniem) are
+Summary: 23/24 CUDA single-GPU Working (validated on one B200); 1 pending
+decision (MiniEM, needs Trilinos). 10 MPI apps (amg2023, branson, cloverleaf,
+examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf) are
 **single-node multi-GPU correctness validated** at 4 ranks x 4 B200 -- NOT
 multi-node scale-out validated; multi-node is BLOCKED site-wide (transport).
-miniweather and hipbone have an MPI path but no verified multi-GPU deck yet;
-the remaining apps have no MPI communication path (see SCALEOUT_AUDIT.md for
-the honest classification). Every HIP variant is untested (no AMD GPU here).
+Comb, Quicksilver, SW4lite and GAMESS RI-MP2 have a selectable coupled/sharded
+MPI GPU path, but their multi-GPU runtime is
+`NOT-TESTED-HARDWARE-UNAVAILABLE` because their validation allocation exposed
+one NVIDIA GPU. miniweather and hipbone also have an MPI path but no verified
+multi-GPU deck yet; the remaining apps have no MPI communication path (see
+SCALEOUT_AUDIT.md for the honest classification). The four new authoritative
+HIP integrations are `INTEGRATED-NOT-LOCALLY-VALIDATED`; no HIP runtime is
+claimed because no AMD GPU/ROCm was available.
