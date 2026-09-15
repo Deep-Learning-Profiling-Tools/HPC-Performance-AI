@@ -35,6 +35,13 @@ lines, essentially all `nvcc_wrapper: multiple optimization flags` (conda
 (fingerprinted: upstream commit, Kokkos 4.6.2, compiler, CUDA 13.2.78, MPI,
 CMake options, GPU-aware setting).
 
+Layout since 2026-09-15 (backend/profile isolation): profile `cuda` (or `hip`; override `HPCPERF_LAMMPS_PROFILE`,
+must name the backend); build tree `build/level3/lammps/<profile>/`, install/logs
+`.deps/level3/lammps/<profile>/{install,logs}` with the fingerprint in the profile's install; results under
+`build/level3/lammps/<profile>/run*/`. The results recorded above were produced with the pre-profile layout
+(`.deps/level3/lammps/install`, `build/level3/lammps/cuda`), which is kept as historical state and is never read by
+the current scripts.
+
 Why not the others: upstream does not recommend Spack for GPU builds (the
 Spack `lammps` package exists but the local Spack checkout is 2025-05 and
 lacks `cuda_arch=100`); no Apptainer on the node and a container would not

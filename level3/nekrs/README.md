@@ -27,7 +27,7 @@ wrapper with interactive prompts): `CC=mpicc CXX=mpicxx FC=mpif90 cmake -G
 "Unix Makefiles" -DOCCA_ENABLE_CUDA=ON -DOCCA_ENABLE_HIP=OFF
 -DOCCA_ENABLE_DPCPP=OFF -DENABLE_HYPRE_GPU=ON -DENABLE_ADIOS=OFF
 -DENABLE_CVODE=OFF -DNEKRS_BUILD_FLOAT=OFF`, install = `NEKRS_HOME` =
-`.deps/level3/nekrs/install` (with `nekrs.conf` recording the JIT toolchain:
+`.deps/level3/nekrs/<variant>.<backend>/install` (with `nekrs.conf` recording the JIT toolchain:
 `OCCA_CXX` = conda g++ 13.3.0, `OCCA_CUDA_COMPILER_FLAGS = -w -O3 -lineinfo
 --use_fast_math`, `NEKRS_GPU_MPI = 0`). Toolchain: conda GCC 13.3.0 through the
 conda Open MPI 5.0.10 wrappers for C/C++, system gfortran 14.2.1 through
@@ -75,8 +75,8 @@ amo64/fetch"); `run.sh` sets `OMPI_MCA_osc=^ucx`, the one-sided counterpart of
 the site profile's `pml ob1 / btl self,sm,smcuda`, and 4 ranks then pass
 (candidate for the gmu-hopper site profile). Rank count is unconstrained
 (parRSB graph partitioning). The first run of a new kernel set JIT-compiles
-OKL kernels with nvcc into `build/level3/nekrs/cuda/cache` (minutes; shared by
-later runs), and the case's `.usr` file is compiled with `mpif90` at run time.
+OKL kernels with nvcc into the profile's JIT cache `.deps/level3/nekrs/<variant>.<backend>/cache` (minutes; shared by
+later runs of that profile only), and the case's `.usr` file is compiled with `mpif90` at run time.
 
 ## Inputs (`HPCPERF_SCALE_MODE`, case `examples/ethier`)
 
@@ -112,12 +112,19 @@ Two build variants exist (isolated src/build/install/JIT-cache; select with
 | `hypregpu` (default) | ON | 0001+0002+0003 | built + **verified** (cimode 3, 1/4 GPU, 9/9, coarse=DEVICE) | verified 1/2/4 |
 | `cpucoarse` (candidate) | OFF | none | not built; a DEVICE request is **explicitly rejected** by nekRS (`HYPRE+DEVICE not enabled!`, exit 1), no silent fallback | verified 1/2/4 (candidate, 0 patches, 113 s build) |
 
-Build/run isolation per variant: `hypregpu` keeps the legacy paths
-(`.deps/level3/nekrs/{src,install}`, `build/level3/nekrs/cuda`); other variants
-use `.deps/level3/nekrs/<variant>/{src,install}` and `build/level3/nekrs/<variant>.<backend>`
-with their own OCCA/nekRS JIT cache. The source-copy cache key is the upstream
-SHA plus the ordered patch-content hash, so the two variants never share a
-patched/unpatched tree.
+Build/run isolation per variant x backend (since 2026-09-15): the profile is
+`<variant>.<backend>` -- `hypregpu.cuda` and `cpucoarse.cuda` are validated,
+`cpucoarse.hip` is a defined but untested configuration, and `hypregpu.hip` does not
+exist (the hypregpu tree carries the HYPRE CUDA-13 device patches, so build.sh,
+run.sh and validate.sh refuse it explicitly). Every profile owns
+`.deps/level3/nekrs/<profile>/{src,install,logs,cache}` (build-side copy, install
+= `NEKRS_HOME`, logs, OCCA JIT cache) and `build/level3/nekrs/<profile>/`; nothing
+is shared between variants or backends. The source-copy cache key is the upstream
+SHA plus the frozen tree hash, so the two variants never share a patched/unpatched
+tree. The results above were produced with the pre-2026-09-15 layout (`hypregpu` at
+`.deps/level3/nekrs/{src,install}` + `build/level3/nekrs/cuda`, `cpucoarse` at
+`.deps/level3/nekrs/cpucoarse/` + `build/level3/nekrs/cpucoarse.cuda`); that state is
+historical and is never read by the current scripts.
 
 Which to make default is a decision for review: `cpucoarse` is minimal (no
 patches, fast build) and covers the current CPU-coarse workload; `hypregpu` is
