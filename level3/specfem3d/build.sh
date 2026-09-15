@@ -63,6 +63,7 @@ export OMPI_FC="$SYS_FC"
 # the two back-ports are part of the frozen baseline (provenance/patch_series.txt); their names stay in the
 # fingerprint so that the identity of the validated install (same upstream SHA + same series) is unchanged
 PATCHNAMES=($(l3_lock_patches "$HERE"))
+PATCHFILES=(); for p in "${PATCHNAMES[@]}"; do PATCHFILES+=("$HERE/patches/$p"); done   # the fingerprint hashes the patch FILES (recorded by basename)
 
 case "$BACKEND" in
     CUDA)
@@ -80,7 +81,7 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="configure: FC=$SYS_FC CC=$CC MPIFC=mpif90(OMPI_FC=$SYS_FC) --with-mpi ${CONF_GPU[*]} USE_BUNDLED_SCOTCH=1; make GENCODE=${GENCODE:-default}"
-FP="$(l3_fingerprint_text specfem3d "$SHA" "$MODEL" "scotch=5.1.12b (bundled)" "$CMAKE_OPTS" "no (host-staged halo exchange in v4.1.1)" "${PATCHNAMES[@]}")"
+FP="$(l3_fingerprint_text specfem3d "$SHA" "$MODEL" "scotch=5.1.12b (bundled)" "$CMAKE_OPTS" "no (host-staged halo exchange in v4.1.1)" "${PATCHFILES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
 echo "# SPECFEM3D $BACKEND profile=$PROFILE: upstream $SHA (v4.1.1, frozen source tree $TREE_SHA, patches pre-applied: ${PATCHNAMES[*]}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), FC $($SYS_FC --version | head -1), CC $($CC --version | head -1), build-side copy $L3_SRC, install=$L3_INSTALL"

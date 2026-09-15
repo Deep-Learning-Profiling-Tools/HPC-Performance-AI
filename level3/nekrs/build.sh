@@ -104,6 +104,7 @@ unset AR
 # The patch series is part of the frozen variant tree (provenance/patch_series.<variant>.txt); only its
 # names enter the fingerprint here (same identity as the validated installs).
 PATCHNAMES=($(l3_lock_patches "$HERE" "$VARIANT"))
+PATCHFILES=(); for p in "${PATCHNAMES[@]}"; do PATCHFILES+=("$HERE/patches/$p"); done   # the fingerprint hashes the patch FILES (recorded by basename)
 if [ "$HYPRE_GPU" = ON ]; then [ "${#PATCHNAMES[@]}" -eq 3 ] || { echo "build.sh: hypregpu tree must carry the 3 HYPRE patches, lock lists: ${PATCHNAMES[*]:-none}" >&2; exit 3; }
 else [ "${#PATCHNAMES[@]}" -eq 0 ] || { echo "build.sh: cpucoarse tree must be unpatched, lock lists: ${PATCHNAMES[*]}" >&2; exit 3; }; fi
 
@@ -115,7 +116,7 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="variant=$VARIANT ${OCCA_FLAGS[*]} ENABLE_HYPRE_GPU=$HYPRE_GPU ENABLE_ADIOS=OFF ENABLE_CVODE=OFF NEKRS_BUILD_FLOAT=OFF NEKRS_GPU_MPI=OFF(default; runtime NEKRS_GPU_MPI) CC=mpicc CXX=mpicxx FC=mpif90(OMPI_FC=$SYS_FC)"
-FP="$(l3_fingerprint_text nekrs "$SHA" "$MODEL" "vendored: occa=2.0.0-dev hypre=2.32.0 gslib nek5000 lapack (in-tree)" "$CMAKE_OPTS" "runtime(NEKRS_GPU_MPI, default 0)" "${PATCHNAMES[@]}")"
+FP="$(l3_fingerprint_text nekrs "$SHA" "$MODEL" "vendored: occa=2.0.0-dev hypre=2.32.0 gslib nek5000 lapack (in-tree)" "$CMAKE_OPTS" "runtime(NEKRS_GPU_MPI, default 0)" "${PATCHFILES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
 echo "# nekRS $BACKEND profile=$PROFILE: variant=$VARIANT ENABLE_HYPRE_GPU=$HYPRE_GPU patches(pre-applied)=${#PATCHNAMES[@]} upstream $SHA (v26.0), frozen source tree $TREE_SHA, arch $ARCHNOTE, build-side copy $L3_SRC, install=$L3_INSTALL"
