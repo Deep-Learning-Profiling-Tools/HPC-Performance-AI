@@ -5,6 +5,10 @@
 _upstream/
 .deps/
 build/
+# vendored upstream source directories that happen to be named build/ (Level 2 byte-identical copies);
+# a clean clone cannot build hipBone / miniWeather without them
+!level2/hipbone/occa/scripts/build/
+!level2/miniweather/cpp/build/
 cmake-build-*/
 results/
 
