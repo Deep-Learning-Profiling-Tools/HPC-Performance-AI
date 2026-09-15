@@ -247,7 +247,7 @@ locations shared by name are legacy local state. **Backend separation applies to
 source duplication.**
 Migration record and per-application matrix: [PROFILE_ISOLATION.md](PROFILE_ISOLATION.md) (2026-09-15).
 
-Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream
+Installs carry `.hpcperf-l3-fingerprint` (schema `l3-2`: application, upstream
 commit, dependency versions, compiler, Fortran compiler, CUDA/ROCm, GPU arch,
 MPI, CMake/configure options, GPU-aware-MPI setting, patch list, site profile,
 Spack lock hash, container image hash, build time). A recorded fingerprint
