@@ -73,17 +73,19 @@ command -v python3 >/dev/null 2>&1 || fail "python3 not on PATH"
 # GPU checks (hpcperf_mpi_launch.sh, --map-by :OVERSUBSCRIBE). The same relaxation is applied here, for the
 # ctest step only, and only when the allocation actually has fewer slots than the tests need (2 CPU ranks on
 # one node; no GPU sharing is involved).
+# The relaxation is a command-local environment of the ctest invocation only (never exported, so the caller's
+# environment and the later 1-rank GPU run (B) are untouched).
 SLOTS="${SLURM_TASKS_PER_NODE:-}"; SLOTS="${SLOTS%%[^0-9]*}"
+CTEST_ENV=()
 if [ -n "${SLURM_JOB_ID:-}" ] && [ -n "$SLOTS" ] && [ "$SLOTS" -lt 2 ]; then
-    export PRTE_MCA_rmaps_default_mapping_policy=":OVERSUBSCRIBE"
-    echo "== note: Slurm allocation has $SLOTS task slot(s)/node; PRRTE mapping relaxed for the 2-rank unit tests (ctest step only)"
+    CTEST_ENV=(env PRTE_MCA_rmaps_default_mapping_policy=":OVERSUBSCRIBE")
+    echo "== note: Slurm allocation has $SLOTS task slot(s)/node; PRRTE mapping relaxed for the 2-rank unit tests (ctest command only)"
 fi
 echo "== (A) upstream ctest in $BUILD (test_input_1pe excluded, see header)"
-if ! ctest --test-dir "$BUILD" -E test_input_1pe --output-on-failure > "$BUILD/validate_ctest.log" 2>&1; then
+if ! "${CTEST_ENV[@]}" ctest --test-dir "$BUILD" -E test_input_1pe --output-on-failure > "$BUILD/validate_ctest.log" 2>&1; then
     tail -30 "$BUILD/validate_ctest.log"
     fail "ctest failed (log: $BUILD/validate_ctest.log)"
 fi
-unset PRTE_MCA_rmaps_default_mapping_policy      # the relaxation was for the unit tests only; (B) is a 1-rank launch
 CTEST_LINE="$(grep -E '^[0-9]+% tests passed' "$BUILD/validate_ctest.log" | tail -1)"
 echo "   $CTEST_LINE"
 case "$CTEST_LINE" in
