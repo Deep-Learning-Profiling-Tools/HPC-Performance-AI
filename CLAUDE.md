@@ -117,10 +117,22 @@ level3/<app>/
   README.md     provenance, versions, node adaptations, cases, criteria, RESULTS with dates
 ```
 
-- Profiles: `.deps/level3/<app>/<profile>/{src,build,install,logs,cache}` via
-  `l3_paths_profile` (`level3/tools/l3_common.sh`); app build trees under
-  `build/level3/<app>/<profile>/`, runs under `.../run/<case>.<mode>.np<N>[.t<T>]/`,
-  dry-runs under `.../run/.dryrun/` (never touch real results).
+- Profiles (every application since 2026-09-15): ONE frozen source tree
+  `level3/<app>/{src,deps}` (never copied per backend) and ALL generated state per
+  backend/profile, `.deps/level3/<app>/<profile>/{src,build,install,logs,cache}` +
+  `build/level3/<app>/<profile>/`, via `l3_paths_profile <app> <profile> <backend>`
+  (`level3/tools/l3_common.sh`; the legacy shared `l3_paths` no longer exists). A
+  profile must name its backend (`cuda`, `hip`, `hypregpu.cuda`,
+  `cuda132-gcc142-ompi5010`, ...); derive it with `l3_backend_profile <APP> <backend>
+  [variant]` identically in build/run/validate; `HPCPERF_<APP>_PROFILE` overrides; a
+  profile/BACKEND conflict is refused before any directory is created; run.sh gates on
+  the profile's own fingerprint (`l3_fingerprint_expect_backend`); never read
+  `.deps/level3/<app>/install` (pre-migration state). Scratch that must live outside
+  the worktree (CP2K toolchain, QMCPACK LLVM) comes from `l3_local_scratch_dir
+  <component> <source sha> <profile>` (workspace-root hash / source / profile under
+  `${TMPDIR:-/tmp}/hpcperf-l3-scratch/`), never from a name shared across worktrees. Runs under
+  `.../run/<case>.<mode>.np<N>[.t<T>]/`, dry-runs under `.../run/.dryrun/` (never
+  touch real results). See `level3/PROFILE_ISOLATION.md`.
 - `l3_common.sh` helpers you should reuse rather than reinvent:
   `l3_isolate_build_env` (strip Level 2 prefixes), `l3_clean_conda_build_env`
   (clear conda CFLAGS/LDFLAGS/AR/CMAKE_GENERATOR and `C_INCLUDE_PATH`/`LIBRARY_PATH`

@@ -32,7 +32,7 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shi
 [ "$BACKEND" = CUDA ] || { echo "run.sh: only CUDA is built for DFT-FE here" >&2; exit 2; }
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_DFTFE_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-l3_paths_profile dftfe "$PROFILE"
+l3_paths_profile dftfe "$PROFILE" cuda || exit 2
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"; T="$SRC/testsGPU/pseudopotential/real"; INST="$L3_INSTALL"   # decks, pseudopotentials and references come from the frozen bundle
 EXE="$INST/bin/dftfe_real"

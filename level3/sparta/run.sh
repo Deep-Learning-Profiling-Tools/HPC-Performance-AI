@@ -36,9 +36,12 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-BUILD_DIR="$R/build/level3/sparta/$MODEL"
+PROFILE="$(l3_backend_profile SPARTA "$MODEL")"
+l3_paths_profile sparta "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: binary, install and run tree of ONE profile
+BUILD_DIR="$L3_BUILD"
 EXE="$(find "$BUILD_DIR" -maxdepth 2 -name "spa_kokkos_$MODEL" -type f 2>/dev/null | head -1)"
-[ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: spa_kokkos_$MODEL not found under $BUILD_DIR -- run ./build.sh $BACKEND first" >&2; exit 1; }
+[ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: spa_kokkos_$MODEL not found under $BUILD_DIR -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"      # frozen source bundle (the deck bench/in.collide and its species files live inside it)
 
@@ -61,7 +64,7 @@ RUN_DIR="$BUILD_DIR/$L3_RUN_SUBDIR"
 mkdir -p "$RUN_DIR"
 LOG="$RUN_DIR/log.$MODE.np$N_RANKS.sparta"
 rm -f "$LOG"      # validate only against THIS run's output; never a stale log
-echo "# SPARTA $BACKEND: mode=$MODE ranks=$N_RANKS grid=${X}x${Y}x${Z} = $CELLS cells, $PARTS particles ($((PARTS / N_RANKS))/rank), gpu-aware=$GAM, log=$LOG"
+echo "# SPARTA $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS grid=${X}x${Y}x${Z} = $CELLS cells, $PARTS particles ($((PARTS / N_RANKS))/rank), gpu-aware=$GAM, log=$LOG"
 cd "$SRC/bench"   # ar.species / ar.vss are referenced relative to the deck
 RUN_ID="$(l3_run_id)"
 rc=0
@@ -69,9 +72,11 @@ rc=0
     "$EXE" -k on g 1 -sf kk -pk kokkos gpu/aware "$GAM" \
     -in in.collide -var x "$X" -var y "$Y" -var z "$Z" -log "$LOG" -echo none "$@" || rc=$?
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=sparta" "backend=$BACKEND" "mode=$MODE" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=sparta" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" \
         "ranks=$N_RANKS" "cells=$CELLS" "particles=$PARTS" "gpu_aware=$GAM" "exit_code=$rc" \
         "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$SRC/bench/in.collide" \
-        "input_sha256=$(l3_sha_file "$SRC/bench/in.collide")" "log=$LOG" "utc=$(date -u +%FT%TZ)"
+        "input_sha256=$(l3_sha_file "$SRC/bench/in.collide")" \
+        "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
+        "log=$LOG" "utc=$(date -u +%FT%TZ)"
 fi
 exit "$rc"

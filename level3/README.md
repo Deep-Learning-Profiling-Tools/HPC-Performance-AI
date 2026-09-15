@@ -137,6 +137,28 @@ level3/nekrs/build.sh CUDA
 HPCPERF_GPUS=2 level3/nekrs/validate.sh CUDA
 ```
 
+## Layout: one source tree, generated state per backend/profile
+
+Each benchmark has exactly one frozen source tree, `level3/<app>/src/` (+ `deps/`), materialized from its
+artifact and independent of the GPU backend -- it is never copied per backend. Everything a build or run
+generates belongs to one backend/profile and is never shared between profiles:
+
+```
+level3/lammps/src/                                 the ONE frozen source tree (backend-independent)
+build/level3/lammps/cuda/                          CUDA application build tree + run*/ result directories
+.deps/level3/lammps/cuda/{install,logs,build,src,cache}   CUDA install (+ .hpcperf-l3-fingerprint), logs, dependency
+                                                   builds, build-side source copy (in-tree builds), caches
+build/level3/lammps/hip/, .deps/level3/lammps/hip/ the same for a HIP build (path present; HIP is untested here)
+.deps/level3/cp2k/cuda132-gcc142-ompi5010/         a toolchain-identity profile (second batch); nekRS uses
+                                                   <variant>.<backend>: .deps/level3/nekrs/hypregpu.cuda/
+```
+
+The profile always names its backend; `HPCPERF_<APP>_PROFILE` may rename it but a name that contradicts the
+requested backend is refused. `run.sh` uses only the binary and fingerprint of the profile it derives
+itself (the same derivation as `build.sh`); there is no fallback to another install. Backend separation
+applies to generated state, not to source duplication -- the same principle Level 2 follows with
+`build/level2/<app>/<cuda|hip>`. Details and the per-application matrix: [PROFILE_ISOLATION.md](PROFILE_ISOLATION.md).
+
 ## GPU selection and workload sizes
 
 | Variable | Meaning |
@@ -222,7 +244,7 @@ workspaces/<run-id>/                     workspace root -- hand over this whole 
 ├── level2/tools/, level3/tools/         copies of the launcher and Level 3 helpers (read-only)
 ├── .conda_env, .tools, .deps/install    symlinks to the environment (must stay reachable)
 ├── workspace.yaml, workspace_baseline.json
-├── build/, .deps/level3/<app>/          created by this run's build; private to the run
+├── build/level3/<app>/<profile>/, .deps/level3/<app>/<profile>/   created by this run's build; private to the run and profile
 ├── reports/                             iteration records written by the trusted harness
 └── level3/<app>/                        <- the agent's working directory
     ├── src/, deps/                      materialized source tree -- the mutable part

@@ -50,18 +50,20 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-l3_paths specfem3d
+PROFILE="$(l3_backend_profile SPECFEM3D "$MODEL")"
+l3_paths_profile specfem3d "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: install and run tree of ONE profile
 BIN="$L3_INSTALL/bin"
 for x in xdecompose_mesh xmeshfem3D xgenerate_databases xspecfem3D; do
-    [ -x "$BIN/$x" ] || { echo "run.sh: $BIN/$x missing -- run ./build.sh $BACKEND first" >&2; exit 1; }
+    [ -x "$BIN/$x" ] || { echo "run.sh: $BIN/$x missing -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
 done
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 EX="$HERE/src/EXAMPLES/applications/homogeneous_halfspace"     # frozen source bundle: the upstream case (mesh, DATA, REF_SEIS)
 [ -f "$EX/DATA/Par_file" ] || { echo "run.sh: $EX missing (run tools/prepare_benchmark.sh level3 specfem3d)" >&2; exit 1; }
 
 N_RANKS="$(hpcperf_ranks specfem3d yes)" || exit 2
 MODE="$(l3_scale_mode specfem3d)" || exit 2
-BUILD_DIR="$R/build/level3/specfem3d/$MODEL"
+BUILD_DIR="$L3_BUILD"
 # l3_rundir: dry-run gets a throwaway dir (the old code rm -rf'd the real run dir before the
 # per-stage dry-run checks, deleting real seismograms/databases when only a plan was requested).
 RUN_DIR="$(l3_rundir "$BUILD_DIR/$L3_RUN_SUBDIR/$MODE.np$N_RANKS")" || exit 2
@@ -105,7 +107,7 @@ else
     ELEMS=20736
 fi
 
-echo "# SPECFEM3D $BACKEND: mode=$MODE ranks=$N_RANKS elements=$ELEMS (~$((ELEMS / N_RANKS))/rank) NSTEP=$STEPS DT=$DT mesh: $DESC run_dir=$RUN_DIR"
+echo "# SPECFEM3D $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS elements=$ELEMS (~$((ELEMS / N_RANKS))/rank) NSTEP=$STEPS DT=$DT mesh: $DESC run_dir=$RUN_DIR"
 cd "$RUN_DIR"
 LAUNCH=("$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper --)
 if [ "$MODE" = smoke ]; then
@@ -136,7 +138,8 @@ grep -E 'hpcperf-launch|Error|ERROR|GPU|Time loop|Elapsed|End of' OUTPUT_FILES/o
 WALL=$(( $(date +%s)-t0 ))
 echo "# solver wall time $WALL s; $(grep -E 'Total elapsed time in seconds|Time loop finished' OUTPUT_FILES/output_solver.txt 2>/dev/null | tr -s ' ' | tr '\n' ';')"
 echo "# seismograms: $(ls OUTPUT_FILES/*.semd 2>/dev/null | wc -l) files in $RUN_DIR/OUTPUT_FILES"
-l3_manifest "$RUN_DIR" "run_id=$(l3_run_id)" "app=specfem3d" "backend=$BACKEND" "mode=$MODE" \
+l3_manifest "$RUN_DIR" "run_id=$(l3_run_id)" "app=specfem3d" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" \
     "ranks=$N_RANKS" "elements=$ELEMS" "nstep=$STEPS" "dt=$DT" "solver_exit_code=$rc" \
     "solver_wall_s=$WALL" "binary=$BIN/xspecfem3D" "binary_sha256=$(l3_sha_file "$BIN/xspecfem3D")" \
+    "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
     "par_file_sha256=$(l3_sha_file "$PAR")" "seismograms=$(ls OUTPUT_FILES/*.semd 2>/dev/null | wc -l)" "utc=$(date -u +%FT%TZ)"

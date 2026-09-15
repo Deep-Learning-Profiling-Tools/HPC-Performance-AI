@@ -31,7 +31,7 @@ BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 N="${HPCPERF_GPUS:-1}"; T="${HPCPERF_CPUS_PER_RANK:-8}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-3600}"
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
-l3_paths_profile qmcpack "$PROFILE"
+l3_paths_profile qmcpack "$PROFILE" cuda || exit 2
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"; RUNS="$L3_BUILD/$L3_RUN_SUBDIR"; BLD="$L3_BUILD/real"   # check_scalars.py comes from the frozen bundle
 REF_LE="-21.844975 0.02"   # upstream DIAMOND2_DMC_SCALARS totenergy (mean sigma) for qmc_short_vmcbatch_dmcbatch, series 1

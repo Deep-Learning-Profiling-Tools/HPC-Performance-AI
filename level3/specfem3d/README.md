@@ -24,7 +24,7 @@ MPI halo assembly, absorbing boundaries, seismogram output).
 
 ## Build strategy: NATIVE (upstream autotools + bundled SCOTCH)
 
-`build.sh CUDA` copies the sources into `.deps/level3/specfem3d/src`
+`build.sh CUDA` copies the sources into the profile's build-side tree `.deps/level3/specfem3d/<profile>/src`
 (autotools builds in-tree), applies the two patches below and runs upstream's
 recipe: `./configure --with-mpi --with-cuda=cuda12 FC=/usr/bin/gfortran
 CC=<conda gcc 13.3> MPIFC=mpif90 MPI_INC=<conda mpi.h dir> CUDA_INC/CUDA_LIB
@@ -37,6 +37,13 @@ gfortran 14.2.1 for Fortran (the conda env has no gfortran), conda Open MPI
 warning lines. 24 executables installed under `.deps/level3/specfem3d/install/bin`
 with the fingerprint (upstream commit, SCOTCH 5.1.12b, compilers, CUDA
 13.2.78, MPI, configure/make options, patch list).
+
+Layout since 2026-09-15 (backend/profile isolation): profile `cuda` (or `hip`; override `HPCPERF_SPECFEM3D_PROFILE`,
+must name the backend); build tree `build/level3/specfem3d/<profile>/`, install/logs
+`.deps/level3/specfem3d/<profile>/{install,logs}` with the fingerprint in the profile's install; results under
+`build/level3/specfem3d/<profile>/run*/`. The results recorded above were produced with the pre-profile layout
+(`.deps/level3/specfem3d/install`, `build/level3/specfem3d/cuda`), which is kept as historical state and is never read by
+the current scripts. The build-side source copy is per profile as well (`.deps/level3/specfem3d/<profile>/src`).
 
 Why not the others: no Spack package exists for SPECFEM3D Cartesian (only
 `specfem3d-globe`); no Apptainer on the node and no upstream image; site

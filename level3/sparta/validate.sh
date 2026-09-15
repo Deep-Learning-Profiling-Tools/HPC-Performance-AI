@@ -28,12 +28,14 @@ MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
 l3_require_materialized "$HERE" || exit 3
 REF="$HERE/src/bench/log.7Jul14.collide.icc.10K.1"     # upstream reference log, part of the frozen source bundle
-RUN_DIR="$R/build/level3/sparta/$MODEL/$L3_RUN_SUBDIR"
+PROFILE="$(l3_backend_profile SPARTA "$MODEL")"
+l3_paths_profile sparta "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
+RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"
 [ -f "$REF" ] || { echo "validate.sh: reference log $REF missing (run tools/prepare_benchmark.sh level3 sparta)" >&2; exit 1; }
 
 export HPCPERF_GPUS="$N"
-echo "validate.sh: SPARTA $BACKEND smoke (bench/in.collide 10x10x10, 10,000 particles) on $N GPU(s)"
+echo "validate.sh: SPARTA $BACKEND smoke (bench/in.collide 10x10x10, 10,000 particles) on $N GPU(s) [profile $PROFILE]"
 run_once() { local ng=$1 out=$2 rc=0; HPCPERF_GPUS="$ng" HPCPERF_SCALE_MODE=smoke timeout "$TIMEOUT" "$HERE/run.sh" "$BACKEND" > "$out" 2>&1 || rc=$?; return $rc; }
 mkdir -p "$RUN_DIR"
 VOUT="$RUN_DIR/validate.smoke.np$N.stdout"

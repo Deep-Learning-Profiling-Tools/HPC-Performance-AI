@@ -26,7 +26,9 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
-RUNS="$R/build/level3/warpx/$MODEL/$L3_RUN_SUBDIR"
+PROFILE="$(l3_backend_profile WARPX "$MODEL")"
+l3_paths_profile warpx "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
+RUNS="$L3_BUILD/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-1800}"
 python3 -c 'import numpy' 2>/dev/null || { echo "validate.sh: python3 with numpy required for the plotfile analysis" >&2; exit 1; }
 export HPCPERF_GPUS="$N"
@@ -34,7 +36,7 @@ ok=1
 
 run_case() { local case=$1 mode=$2 out=$3 rc=0; HPCPERF_WARPX_CASE="$case" HPCPERF_SCALE_MODE="$mode" timeout "$TIMEOUT" "$HERE/run.sh" "$BACKEND" > "$out" 2>&1 || rc=$?; return $rc; }
 
-echo "validate.sh: [1] WarpX $BACKEND langmuir_multi (64^3, 40 steps, analytic solution) on $N GPU(s)"
+echo "validate.sh: [1] WarpX $BACKEND langmuir_multi (64^3, 40 steps, analytic solution) on $N GPU(s) [profile $PROFILE]"
 mkdir -p "$RUNS"; L1="$RUNS/validate.langmuir.np$N.stdout"
 rc=0; run_case langmuir validate "$L1" || rc=$?
 grep -aE '^#|hpcperf-launch: audit summary|Total Time|ERROR|abort' "$L1" || true

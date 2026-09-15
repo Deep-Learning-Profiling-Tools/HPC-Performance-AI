@@ -30,9 +30,10 @@
 #
 # The case directory (re2/usr/udf/oudf/par) is copied into the build tree;
 # strong/weak write a derived ethier.par from upstream's ethierRefine.par with
-# only `hrefine` and `numSteps` changed (class A). The OCCA JIT cache is shared
-# per build (NEKRS_CACHE_DIR) -- the first run of a new kernel set compiles OKL
-# kernels with nvcc, which takes minutes and is not part of the solve time.
+# only `hrefine` and `numSteps` changed (class A). The OCCA JIT cache is private
+# to the profile (NEKRS_CACHE_DIR = .deps/level3/nekrs/<profile>/cache) -- the
+# first run of a new kernel set compiles OKL kernels with nvcc, which takes
+# minutes and is not part of the solve time.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
@@ -43,19 +44,17 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-l3_paths nekrs
-# variant selection must match build.sh: the default 'hypregpu' uses the legacy layout; any other
-# variant (e.g. cpucoarse = ENABLE_HYPRE_GPU=OFF) has its own install and JIT cache.
+# variant and profile selection must match build.sh exactly: profile = <variant>.<backend>, one
+# install / build tree / JIT cache per profile (hypregpu.cuda, cpucoarse.cuda, ...); hypregpu is CUDA-only.
 VARIANT="${HPCPERF_NEKRS_VARIANT:-$([ "${HPCPERF_NEKRS_HYPRE_GPU:-ON}" = ON ] && echo hypregpu || echo cpucoarse)}"
-if [ "$VARIANT" = hypregpu ]; then
-    BUILD_DIR="$R/build/level3/nekrs/$MODEL"
-else
-    L3_INSTALL="$L3_R/.deps/level3/nekrs/$VARIANT/install"
-    BUILD_DIR="$R/build/level3/nekrs/$VARIANT.$MODEL"
-fi
+PROFILE="$(l3_backend_profile NEKRS "$MODEL" "$VARIANT")"
+if [ "$VARIANT" = hypregpu ] && [ "$MODEL" != cuda ]; then echo "run.sh: variant hypregpu is CUDA-only; backend $BACKEND is not defined for it (see build.sh)" >&2; exit 2; fi
+l3_paths_profile nekrs "$PROFILE" "$MODEL" || exit 2
+BUILD_DIR="$L3_BUILD"
 export NEKRS_HOME="$L3_INSTALL"
 EXE="$NEKRS_HOME/bin/nekrs"
-[ -x "$EXE" ] || { echo "run.sh: $EXE not found for variant '$VARIANT' -- run HPCPERF_NEKRS_VARIANT=$VARIANT ./build.sh $BACKEND first" >&2; exit 1; }
+[ -x "$EXE" ] || { echo "run.sh: $EXE not found for profile '$PROFILE' -- run HPCPERF_NEKRS_VARIANT=$VARIANT ./build.sh $BACKEND first" >&2; exit 1; }
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 MATERIALIZED="$(l3_materialized_variant "$HERE")"
 [ "$MATERIALIZED" = "$VARIANT" ] || { echo "run.sh: materialized source is variant '${MATERIALIZED:-unknown}', requested '$VARIANT' (tools/prepare_benchmark.sh level3 nekrs --variant $VARIANT)" >&2; exit 3; }
@@ -83,7 +82,7 @@ else
     # derived from upstream ethierRefine.par: hrefine and numSteps only
     sed -e "s/^hrefine *=.*/hrefine = $H/" -e "s/^numSteps *=.*/numSteps = $STEPS/" "$CASE_SRC/ethierRefine.par" > "$RUN_DIR/ethier.par"
 fi
-export NEKRS_CACHE_DIR="$BUILD_DIR/cache"; mkdir -p "$NEKRS_CACHE_DIR"
+export NEKRS_CACHE_DIR="$L3_CACHE"; mkdir -p "$NEKRS_CACHE_DIR"     # OCCA JIT cache of THIS profile only
 export NEKRS_GPU_MPI="${HPCPERF_NEKRS_GPU_MPI:-0}"
 # nekRS uses MPI one-sided operations (MPI_Win_lock); Open MPI's default one-sided component on this
 # node is `osc ucx`, which goes through UCX/InfiniBand even on one node and aborts in uct_ib with 4 ranks
@@ -98,15 +97,16 @@ export CUDA_CACHE_DISABLE=1
 # cases segfault in useric. Applies to mpirun's children (inherited rlimit). Class C.
 ulimit -s unlimited 2>/dev/null || ulimit -s "$(ulimit -H -s)"
 
-echo "# nekRS $BACKEND: mode=$MODE ranks=$N_RANKS case=ethier hrefine=$H elements=$ELEMS (~$((ELEMS / N_RANKS))/rank) N=$ORDER points=$POINTS steps=$STEPS gpu_mpi=$NEKRS_GPU_MPI run_dir=$RUN_DIR"
+echo "# nekRS $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS case=ethier hrefine=$H elements=$ELEMS (~$((ELEMS / N_RANKS))/rank) N=$ORDER points=$POINTS steps=$STEPS gpu_mpi=$NEKRS_GPU_MPI run_dir=$RUN_DIR"
 cd "$RUN_DIR"
 RUN_ID="$(l3_run_id)"
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- "$EXE" --setup ethier --backend "$BACKEND" --device-id 0 "$@" 2>&1 | tee "$RUN_DIR/stdout.log"
 rc=${PIPESTATUS[0]}
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=nekrs" "variant=$VARIANT" "backend=$BACKEND" "mode=$MODE" "ranks=$N_RANKS" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=nekrs" "variant=$VARIANT" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" "ranks=$N_RANKS" \
         "elements=$ELEMS" "order=$ORDER" "points=$POINTS" "steps=$STEPS" "gpu_mpi=$NEKRS_GPU_MPI" \
         "osc=$OMPI_MCA_osc" "extra_args=$*" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
+        "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" "jit_cache=$NEKRS_CACHE_DIR" \
         "par_sha256=$(l3_sha_file "$RUN_DIR/ethier.par")" "stdout=$RUN_DIR/stdout.log" "utc=$(date -u +%FT%TZ)"
 fi
 exit "$rc"

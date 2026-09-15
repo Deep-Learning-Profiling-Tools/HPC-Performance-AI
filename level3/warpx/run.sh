@@ -52,9 +52,12 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-BUILD_DIR="$R/build/level3/warpx/$MODEL"
+PROFILE="$(l3_backend_profile WARPX "$MODEL")"
+l3_paths_profile warpx "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: binary, install and run tree of ONE profile
+BUILD_DIR="$L3_BUILD"
 EXE="$(find "$BUILD_DIR/bin" -maxdepth 1 -name 'warpx.3d*' -type f 2>/dev/null | head -1)"
-[ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: warpx.3d* not found under $BUILD_DIR/bin -- run ./build.sh $BACKEND first" >&2; exit 1; }
+[ -n "$EXE" ] && [ -x "$EXE" ] || { echo "run.sh: warpx.3d* not found under $BUILD_DIR/bin -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"      # frozen source bundle: the upstream example decks live inside it
 CASE="${HPCPERF_WARPX_CASE:-uniform_plasma}"
@@ -122,15 +125,16 @@ IN="$RUN_DIR/inputs"
     [ -n "${HPCPERF_WARPX_GPU_AWARE:-}" ] && echo "amrex.use_gpu_aware_mpi = $HPCPERF_WARPX_GPU_AWARE"
 } > "$IN"
 
-echo "# WarpX $BACKEND: case=$CASE mode=$MODE ranks=$N_RANKS grid=${NX}x${NY}x${NZ} ($CELLS cells, $PARTS particles, $((PARTS / N_RANKS))/rank) numprocs=${PX}x${PY}x${PZ} box=${BX}x${BY}x${BZ} steps=$STEPS run_dir=$RUN_DIR"
+echo "# WarpX $BACKEND profile=$PROFILE: case=$CASE mode=$MODE ranks=$N_RANKS grid=${NX}x${NY}x${NZ} ($CELLS cells, $PARTS particles, $((PARTS / N_RANKS))/rank) numprocs=${PX}x${PY}x${PZ} box=${BX}x${BY}x${BZ} steps=$STEPS run_dir=$RUN_DIR"
 cd "$RUN_DIR"
 RUN_ID="$(l3_run_id)"
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- "$EXE" "$IN" "$@" 2>&1 | tee "$RUN_DIR/stdout.log"
 rc=${PIPESTATUS[0]}
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=warpx" "backend=$BACKEND" "case=$CASE" "mode=$MODE" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=warpx" "backend=$BACKEND" "profile=$PROFILE" "case=$CASE" "mode=$MODE" \
         "ranks=$N_RANKS" "grid=${NX}x${NY}x${NZ}" "numprocs=${PX}x${PY}x${PZ}" "particles=$PARTS" "steps=$STEPS" \
         "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
+        "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
         "stdout=$RUN_DIR/stdout.log" "utc=$(date -u +%FT%TZ)"
 fi
 exit "$rc"

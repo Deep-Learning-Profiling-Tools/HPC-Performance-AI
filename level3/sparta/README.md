@@ -33,6 +33,13 @@ MPI 5.0.10, CUDA-aware), `SPARTA_MACHINE=kokkos_cuda`. Build time on dgx003:
 install prefix `.deps/level3/sparta/install` with fingerprint (upstream
 commit, Kokkos 5.0.2, compiler, CUDA 13.2.78, MPI, CMake options).
 
+Layout since 2026-09-15 (backend/profile isolation): profile `cuda` (or `hip`; override `HPCPERF_SPARTA_PROFILE`,
+must name the backend); build tree `build/level3/sparta/<profile>/`, install/logs
+`.deps/level3/sparta/<profile>/{install,logs}` with the fingerprint in the profile's install; results under
+`build/level3/sparta/<profile>/run*/`. The results recorded above were produced with the pre-profile layout
+(`.deps/level3/sparta/install`, `build/level3/sparta/cuda`), which is kept as historical state and is never read by
+the current scripts.
+
 Why not the others: **there is no Spack package for this SPARTA** -- the
 `sparta` recipe in Spack (local and upstream) is the unrelated bioinformatics
 tool sPARTA; upstream documents only CMake presets. No Apptainer on the node

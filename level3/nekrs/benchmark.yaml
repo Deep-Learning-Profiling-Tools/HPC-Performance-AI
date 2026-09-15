@@ -22,7 +22,11 @@ run_entry: ./run.sh
 validate_entry: ./validate.sh
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 C/C++ via the MPI wrappers, system gfortran 14.2.1 via OMPI_FC, CUDA
   13.2.78, Open MPI 5.0.10, OMPI_MCA_osc=^ucx)
-install_root: .deps/level3/nekrs
+install_root: .deps/level3/nekrs/hypregpu.cuda
+profile_scheme: '<variant>.<backend> (hypregpu.cuda, cpucoarse.cuda validated; cpucoarse.hip defined but untested; hypregpu.hip does not exist -- refused); override HPCPERF_NEKRS_PROFILE must name the backend; generated state .deps/level3/nekrs/<profile>/ and build/level3/nekrs/<profile>/'
+backend_support:
+  hypregpu: {cuda: validated, hip: unavailable}   # frozen tree carries the HYPRE CUDA-13 device patches (ENABLE_HYPRE_GPU=ON); build.sh refuses HIP
+  cpucoarse: {cuda: validated, hip: untested}     # host HYPRE + OCCA HIP is a defined configuration; never built (no ROCm here)
 dependency_installs: []
 variant_env: HPCPERF_NEKRS_VARIANT
 default_variant: hypregpu
