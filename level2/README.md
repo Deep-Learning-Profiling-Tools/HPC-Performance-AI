@@ -45,7 +45,7 @@ Everything below is installed inside the clone, next to the Level 1 toolchain
 | FFTW (openmpi) | 3.3.11 | conda |
 | HDF5 (parallel, openmpi) | 2.2.0 | conda |
 | PnetCDF (openmpi) | 1.15.0 | conda |
-| NVIDIA HPC SDK Fortran (GAMESS RI-MP2 CUDA) | 25.9 validated | system/module (`nvfortran`) |
+| NVIDIA HPC SDK Fortran (GAMESS RI-MP2 CUDA) | 25.9 (contributor); 25.7 validated on dgx003 | environment-provided, not in the conda env: `NVFORTRAN=<sdk>/compilers/bin/nvfortran`; on dgx003 `/opt/sw/other/apps/nvidia/hpc_sdk/Linux_x86_64/25.7` whose shipped `localrc` targets a GCC 8 that the RHEL 10 node no longer has -- generate a per-user one (`makelocalrc -gcc /usr/bin/gcc -gpp /usr/bin/g++ -g77 /usr/bin/gfortran -x -d <dir>`, `NVLOCALRC=<dir>/localrc`); the CUDA arch is detected with nvidia-smi (cc100 on B200; `HPCPERF_CUDA_ARCH` is an optional override) |
 | Kokkos / Kokkos Kernels | 5.2.1 | `setup_level2_deps.sh` -> `.deps/install/kokkos{,-kernels}` |
 | Cabana | 0.8.0 | `setup_level2_deps.sh` -> `.deps/install/cabana` |
 | heFFTe | 2.4.1 | `setup_level2_deps.sh` -> `.deps/install/heffte` |
@@ -242,10 +242,10 @@ constraints: legal rank counts.
 | tealeaf | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (same deck) | manual (+tea.problems rows) | PASS | untested | any N (auto chunks) | needs binding wrapper |
 | kripke | PASS | PASS | native-mpi | yes (launcher; no scale modes) | validated (2,2,1) | BLOCKED (site) | manual (--zones div) | manual (32^3/rank) | PASS | untested | product=N; zones divisible; groups%gset | needs binding wrapper |
 | branson | PASS | PASS | native-mpi (replicated split) | yes (launcher; no scale modes) | validated (4) | BLOCKED (site) | yes (photons/N auto) | manual (--photons*N) | PASS | untested | any N | PARTICLE_PASS mode = later extension |
-| comb | PASS | PASS | native-mpi (halo exchange) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | manual | yes (128^3/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | any factorable N | native CUDA/HIP-aware MPI |
-| quicksilver | PASS | PASS | native-mpi (particle transport) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | manual | yes (mesh+particles/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | product=N | native LLNL CUDA/AMD-HIP |
-| sw4lite | PASS | PASS | native-mpi (spatial domain) | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | yes (same deck) | manual | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= horizontal cells | native geodynamics/AMD-ECP paths |
-| gamess_ri_mp2 | PASS | PASS | sharded-EP + MPI reduction | yes (launcher; no scale modes) | NOT-TESTED-HARDWARE-UNAVAILABLE (1 GPU) | BLOCKED (site) | yes (same molecule) | manual (larger input) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= active orbitals | native cuBLAS/hipBLAS |
+| comb | PASS | PASS | native-mpi (halo exchange) | yes (launcher; no scale modes) | not yet (1-GPU validation only) | BLOCKED (site) | manual | yes (128^3/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | any factorable N | native CUDA/HIP-aware MPI; CUDA build + validate re-run from a clean clone of main 4604377 on dgx003 (1 B200, launcher binding 1 verified, 2026-09-15) |
+| quicksilver | PASS | PASS | native-mpi (particle transport) | yes (launcher; no scale modes) | not yet (1-GPU validation only) | BLOCKED (site) | manual | yes (mesh+particles/rank) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | product=N | native LLNL CUDA/AMD-HIP; CUDA build + validate re-run from a clean clone of main 4604377 on dgx003 (1 B200, binding 1 verified, 2026-09-15) |
+| sw4lite | PASS | PASS | native-mpi (spatial domain) | yes (launcher; no scale modes) | not yet (1-GPU validation only) | BLOCKED (site) | yes (same deck) | manual | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= horizontal cells | native geodynamics/AMD-ECP paths; CUDA build + validate re-run from a clean clone of main 4604377 on dgx003 (1 B200, binding 1 verified, 2026-09-15) |
+| gamess_ri_mp2 | PASS | PASS | sharded-EP + MPI reduction | yes (launcher; no scale modes) | not yet (1-GPU validation only) | BLOCKED (site) | yes (same molecule) | manual (larger input) | PASS | INTEGRATED-NOT-LOCALLY-VALIDATED | N <= active orbitals | native cuBLAS/hipBLAS; CUDA build + validate re-run from a clean clone of main 4604377 on dgx003 (1 B200, binding 1 verified, rel. error 4.4e-14, 2026-09-15) with the environment-provided NVIDIA HPC SDK 25.7 (`NVFORTRAN=`, per-user `NVLOCALRC` for GCC 14; arch auto-detected as cc100; see its README) |
 | hipbone | PASS | PASS | native-mpi | yes (launcher; no scale modes) | not yet | BLOCKED (site) | manual (divide global) | native (-nx per rank) | PASS | untested | cube N unless -px/-py/-pz given | add -px/py/pz decks |
 | miniweather | PASS | PASS | native-mpi (1D x-split; compile-time size = limitations, not a disqualifier) | yes (launcher; no scale modes) | not yet | BLOCKED (site) | rebuild per size | rebuild per size | PASS | untested | N<=nx_glob | multi-GPU capable; limitations: compile-time nx, x-only split |
 | p3_heat3d | PASS | PASS | shardable (upstream heat3d_mpi ready) | n/a today | n/a | n/a | (sibling) | (sibling: nx/rank) | PASS | untested | sibling: product=N | adopt heat3d_mpi (extension) |
@@ -351,15 +351,20 @@ Notes:
   pending A/B validation`, to be compared against the vanilla build on a
   Hopper/sm_90 (or fixed-CUDA) machine later.
 
-Summary: 23/24 CUDA single-GPU Working (validated on one B200); 1 pending
-decision (MiniEM, needs Trilinos). 10 MPI apps (amg2023, branson, cloverleaf,
-examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf) are
-**single-node multi-GPU correctness validated** at 4 ranks x 4 B200 -- NOT
-multi-node scale-out validated; multi-node is BLOCKED site-wide (transport).
-Comb, Quicksilver, SW4lite and GAMESS RI-MP2 have a selectable coupled/sharded
-MPI GPU path, but their multi-GPU runtime is
-`NOT-TESTED-HARDWARE-UNAVAILABLE` because their validation allocation exposed
-one NVIDIA GPU. miniweather and hipbone also have an MPI path but no verified
+Summary: 24/24 CUDA single-GPU Working (validated on one B200; MiniEM
+validated 2026-09-14 on the Trilinos dependency; Comb, Quicksilver, SW4lite and
+GAMESS RI-MP2 re-validated from a clean clone of main 4604377 on 2026-09-15 --
+GAMESS RI-MP2 with the environment-provided NVIDIA HPC SDK, see the dependency
+table; GAMESS RI-MP2's `nvfortran` is an environment-provided compiler, not a
+conda dependency, so Level 2 is not buildable from the conda environment alone).
+11 MPI apps (amg2023, branson, cloverleaf, examinimd, exampm, haccabanapm,
+kripke, laghos, remhos, tealeaf, miniem) are **single-node multi-GPU
+correctness validated at 4 ranks x 4 B200** -- NOT multi-node scale-out
+validated; multi-node is BLOCKED site-wide (transport). Comb, Quicksilver,
+SW4lite and GAMESS RI-MP2 also have MPI execution paths (coupled/sharded, via
+the shared launcher) but are validated at 1 GPU only so far (`not yet` in the
+multi-GPU column; dgx003 has four B200, the 4-rank run has simply not been done
+for them). miniweather and hipbone also have an MPI path but no verified
 multi-GPU deck yet; the remaining apps have no MPI communication path (see
 SCALEOUT_AUDIT.md for the honest classification). The four new authoritative
 HIP integrations are `INTEGRATED-NOT-LOCALLY-VALIDATED`; no HIP runtime is
