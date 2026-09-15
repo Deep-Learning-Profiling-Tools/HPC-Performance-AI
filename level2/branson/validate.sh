@@ -67,11 +67,23 @@ command -v mpirun >/dev/null 2>&1 || fail "mpirun not on PATH (source $R/hpcperf
 command -v python3 >/dev/null 2>&1 || fail "python3 not on PATH"
 
 # ---------------------------------------------------------------- (A) ctest
+# Upstream's 2-rank unit tests (test_imc_state_2pe, test_photon_2pe) are launched by ctest with a bare
+# `mpirun -np 2`. Inside a Slurm allocation made with one task slot per node (SLURM_TASKS_PER_NODE=1) PRRTE
+# refuses that launch ("not enough slots"); the project launcher relaxes the same limit per launch after its
+# GPU checks (hpcperf_mpi_launch.sh, --map-by :OVERSUBSCRIBE). The same relaxation is applied here, for the
+# ctest step only, and only when the allocation actually has fewer slots than the tests need (2 CPU ranks on
+# one node; no GPU sharing is involved).
+SLOTS="${SLURM_TASKS_PER_NODE:-}"; SLOTS="${SLOTS%%[^0-9]*}"
+if [ -n "${SLURM_JOB_ID:-}" ] && [ -n "$SLOTS" ] && [ "$SLOTS" -lt 2 ]; then
+    export PRTE_MCA_rmaps_default_mapping_policy=":OVERSUBSCRIBE"
+    echo "== note: Slurm allocation has $SLOTS task slot(s)/node; PRRTE mapping relaxed for the 2-rank unit tests (ctest step only)"
+fi
 echo "== (A) upstream ctest in $BUILD (test_input_1pe excluded, see header)"
 if ! ctest --test-dir "$BUILD" -E test_input_1pe --output-on-failure > "$BUILD/validate_ctest.log" 2>&1; then
     tail -30 "$BUILD/validate_ctest.log"
     fail "ctest failed (log: $BUILD/validate_ctest.log)"
 fi
+unset PRTE_MCA_rmaps_default_mapping_policy      # the relaxation was for the unit tests only; (B) is a 1-rank launch
 CTEST_LINE="$(grep -E '^[0-9]+% tests passed' "$BUILD/validate_ctest.log" | tail -1)"
 echo "   $CTEST_LINE"
 case "$CTEST_LINE" in
