@@ -137,5 +137,33 @@ else
     bad "F: stamp_existing"; cat "$INST/legacy/.hpcperf-fingerprint" 2>/dev/null
 fi
 
+# ---- case G: a 40-hex commit pin is fetched by commit and enforced (Trilinos is pinned this way)
+mkdir -p "$T/fakeup" && ( cd "$T/fakeup" && git init -q && git config user.email t@t && git config user.name t \
+  && echo one > f && git add f && git commit -qm one && echo two > f && git commit -qam two ) >/dev/null 2>&1
+SHA_OLD="$(git -C "$T/fakeup" rev-parse HEAD~1)"; SHA_NEW="$(git -C "$T/fakeup" rev-parse HEAD)"
+PINS+=("fakedep|$T/fakeup|$SHA_OLD")
+( set -e; fetch fakedep ) >/dev/null 2>"$T/g.err"; rc=$?
+if [ "$rc" -eq 0 ] && [ "$(git -C "$SRC/fakedep" rev-parse HEAD)" = "$SHA_OLD" ] && [ "$(cat "$SRC/fakedep.commit")" = "$SHA_OLD" ]; then
+    ok "G: a commit pin is fetched by commit (not a tag) and recorded in <dep>.commit"
+else
+    bad "G: commit-pin fetch (rc=$rc)"; cat "$T/g.err"
+fi
+# the checkout drifted (someone moved it): the pin is enforced, not silently accepted
+( cd "$SRC/fakedep" && git fetch -q origin "$SHA_NEW" && git checkout -q FETCH_HEAD ) 2>/dev/null
+( set -e; fetch fakedep ) >/dev/null 2>"$T/g2.err"; rc=$?
+if [ "$rc" -ne 0 ] && grep -q 'pin is' "$T/g2.err"; then
+    ok "G2: a checkout that is not at the pinned commit fails fast"
+else
+    bad "G2: drifted checkout accepted (rc=$rc)"; cat "$T/g2.err"
+fi
+# seeded fetch: HPCPERF_DEPS_SEED_DIR/<dep> is cloned locally and moved to the pin
+rm -rf "$SRC/fakedep" "$SRC/fakedep.commit"; mkdir -p "$T/seed"; ln -s "$T/fakeup" "$T/seed/fakedep"
+( set -e; HPCPERF_DEPS_SEED_DIR="$T/seed" fetch fakedep ) >"$T/g3.err" 2>&1; rc=$?
+if [ "$rc" -eq 0 ] && [ "$(git -C "$SRC/fakedep" rev-parse HEAD)" = "$SHA_OLD" ] && grep -q 'seeded from' "$T/g3.err"; then
+    ok "G3: a local seed checkout is used when offered and still lands on the pinned commit"
+else
+    bad "G3: seeded fetch (rc=$rc)"; cat "$T/g3.err"
+fi
+
 echo "test_deps_markers: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]

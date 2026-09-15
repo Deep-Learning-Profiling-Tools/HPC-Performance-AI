@@ -53,15 +53,15 @@ app is sharded-EP (unimplemented until a driver exists).
 | exacmech | sharded-EP possible (global point set split + 6-double Allreduce), NOT implemented; replica-only as shipped | n/a | n/a | n/a | none | n/a | **keep-as-supplemental** until a sharded driver exists (then a weakly-coupled global workload) |
 | minibude | sharded-EP possible (global pose batch split + reduce), NOT implemented; replica-only as shipped | per-process `--device` flag | n/a | n/a | none | n/a | **keep-as-supplemental** until a sharded driver exists |
 | xsbench | sharded-EP possible (global lookup batch split + reduce), NOT implemented; upstream's own MPI mode is full-input replicas ("no decomposition ... all ranks accomplish the same work") | none (no cudaSetDevice) | n/a | no | none | n/a | **keep-as-supplemental** until a sharded driver exists |
-| miniem | native-mpi upstream (Trilinos/Panzer + Tpetra) | Tpetra/Kokkos local rank | yes | optional | Tpetra maps | any N | **pending** (blocked on the Trilinos dependency decision) |
+| miniem | native-mpi upstream (Trilinos/Panzer + Tpetra) | Tpetra/Kokkos; launcher binding wrapper (one GPU per rank) | yes | optional | Tpetra maps (inline mesh factory decomposes the element grid) | any N | **core** (validated 1/2/4 ranks 2026-09-14: analytic L2 error 0.0566793 / 0.0566793 / 0.0566793) |
 
 Current distributed core (native-mpi, validated single-node multi-GPU):
 **amg2023, laghos, remhos, examinimd, exampm, haccabanapm, cloverleaf,
-tealeaf, kripke, branson, hipbone** (11), plus **miniweather** as core with
-documented limitations (12 native-mpi motifs). Distributed extensions to adopt:
+tealeaf, kripke, branson, hipbone, miniem** (12), plus **miniweather** as core with
+documented limitations (13 native-mpi motifs). Distributed extensions to adopt:
 **p3_heat3d, p3_vlp4d** (upstream MPI siblings). Sharded-EP candidates
 (drivers to write): **xsbench, minibude, exacmech**. Rewrite-cost shardable:
-**cabanapic, shaw**. Pending: **miniem**.
+**cabanapic, shaw**. MiniEM joined the native-mpi core on 2026-09-14.
 
 The 2026-09-14 additions provide three further native-MPI implementations
 (Comb, Quicksilver, SW4lite) and one implemented sharded-EP MPI reduction
@@ -85,7 +85,7 @@ finish line. Path to the target and what may be counted:
 | -- | p3_heat3d, p3_vlp4d (adopt upstream heat3d_mpi / vlp4d_mpi) | integrated, built, validated at > 1 rank |
 | -- | xsbench, minibude, exacmech (sharded-EP drivers: split the global batch, reduce) | driver exists and is validated -- a sharded run, not N replicas |
 | -- | cabanapic, shaw (distributed extensions, rewrite cost) | same |
-| -- | miniem (Trilinos/Panzer) | dependency decision + build |
+| miniem (native-mpi, validated 1/2/4 ranks) | -- | done 2026-09-14 |
 
 Nothing in the right two columns is counted as done; unimplemented distributed
 paths remain unimplemented in every table of this repository.
