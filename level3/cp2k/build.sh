@@ -59,7 +59,7 @@ OMPI_V="$(mpirun --version 2>/dev/null | head -1 | /usr/bin/grep -oE '[0-9]+\.[0
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ "$ARCH" = 100 ] || { echo "build.sh: this profile is defined for sm_100 (B200); detected sm_$ARCH -- set HPCPERF_CUDA_ARCH deliberately if you mean it" >&2; exit 1; }
 GPUVER=B200
 PROFILE="${HPCPERF_CP2K_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-l3_paths_profile cp2k "$PROFILE"
+l3_paths_profile cp2k "$PROFILE" cuda || exit 2
 JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 # The toolchain's private source/build copy lives on the node's LOCAL disk, outside any git
 # work tree: DBCSR 2.10.0's cmake/GetGitRevisionDescription.cmake walks up from its source
@@ -67,8 +67,17 @@ JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 # absolute gitdir it points to as a relative path -> "file failed to open for reading" and
 # a configure abort. Everything the later stages need (install prefix, setup/toolchain.conf,
 # logs) stays under the profile tree; $L3_SRC/toolchain is a symlink to the scratch copy.
-TC_SCRATCH="${HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/$PROFILE}"
-mkdir -p "$(dirname "$TC_SCRATCH")"; [ -L "$L3_SRC/toolchain" ] || { rm -rf "$L3_SRC/toolchain"; ln -sfn "$TC_SCRATCH" "$L3_SRC/toolchain"; }
+# The scratch is still isolated per WORKSPACE x frozen SOURCE x PROFILE (l3_local_scratch_dir:
+# <base>/hpcperf-l3-scratch/cp2k-toolchain/<hash of the workspace root>/<source_tree_sha256 prefix>/<profile>),
+# so two worktrees or agent workspaces with the same profile never share mutable toolchain state;
+# HPCPERF_CP2K_TOOLCHAIN_SCRATCH=/explicit/path overrides it. The pre-2026-09-15 location
+# /tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/<profile> (shared by profile name only) is legacy local
+# state and is never read.
+TC_SCRATCH="${HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-$(l3_local_scratch_dir cp2k-toolchain "$TREE_SHA" "$PROFILE")}"
+mkdir -p "$(dirname "$TC_SCRATCH")"
+# the profile's src/toolchain points at THIS scratch (a symlink left by another scratch location is replaced)
+[ -e "$L3_SRC/toolchain" ] && [ ! -L "$L3_SRC/toolchain" ] && rm -rf "$L3_SRC/toolchain"; ln -sfn "$TC_SCRATCH" "$L3_SRC/toolchain"
+echo "# toolchain scratch (outside the worktree, workspace/source/profile-specific): $TC_SCRATCH"
 TC_SRC="$TC_SCRATCH"; TC_INSTALL="$L3_INSTALL/toolchain"; CP2K_PREFIX="$L3_INSTALL/cp2k"
 PATCHES=("$HERE/patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch")   # already applied in the frozen src/tools/toolchain; content hash kept in the fingerprint
 [ "$(l3_lock_patches "$HERE")" = "$(basename "${PATCHES[0]}")" ] || { echo "build.sh: the lock's patch series ($(l3_lock_patches "$HERE")) differs from the expected $(basename "${PATCHES[0]}")" >&2; exit 3; }
@@ -81,7 +90,7 @@ TC_OPTS=(--install-dir="$TC_INSTALL" --mpi-mode=openmpi --math-mode=openblas --w
          --with-deepmd=no --with-ace=no --with-greenx=no --with-trexio=no --with-libfci=no --with-mcl=no --with-libgint=no --with-cusolvermp=no)
 
 echo "# CP2K $BACKEND profile=$PROFILE: cp2k $SHA (v2026.2, frozen source tree $TREE_SHA), gcc $(/usr/bin/gcc -dumpfullversion), gfortran $(/usr/bin/gfortran -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
-echo "# resources: toolchain ~1.5-3 h (libint lmax 5 dominates), DBCSR tests ~10 min, CP2K ~40-90 min; disk ~10-15 GB under $L3_DEPS"
+echo "# resources (dgx003, 64 cores, empty scratch, 2026-09-15): toolchain ~8 min (460 s; libint lmax 5 = 84 s with the installer's parallel compile), DBCSR tests ~4 min, CP2K ~6 min at -j32; ~3 GB scratch + ~2 GB under $L3_DEPS. Earlier 1.5-3 h figures came from attempts with the scratch on NFS."
 t0=$(date +%s)
 
 # [A] toolchain (build-side copy of the frozen src/tools/toolchain, which already carries the B200 back-port;

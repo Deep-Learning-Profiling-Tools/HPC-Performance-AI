@@ -5,14 +5,17 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): frozen source bundle level3/specfem3d/src (v4.1.1
-# with the two devel back-ports ALREADY applied; materialized by
-# tools/prepare_benchmark.sh, identity in provenance/); the autotools build is
-# in-tree, so it runs in a private build-side copy .deps/level3/specfem3d/src
-# (obj/ and bin/ live there, the frozen tree stays pristine); install
-# .deps/level3/specfem3d/install/bin; logs .deps/level3/specfem3d/logs. Only
-# dependency besides MPI/CUDA is SCOTCH, bundled (external_libs/scotch_5.1.12b)
-# and built by the same make. Nothing is fetched or patched by this script.
+# Layout (one frozen source tree, generated state isolated per backend profile):
+# frozen source bundle level3/specfem3d/src (v4.1.1 with the two devel back-ports
+# ALREADY applied; materialized by tools/prepare_benchmark.sh, identity in
+# provenance/; backend-independent); profile <cuda|hip> (override
+# HPCPERF_SPECFEM3D_PROFILE; must name the backend). The autotools build is
+# in-tree, so it runs in a private build-side copy PER PROFILE,
+# .deps/level3/specfem3d/<profile>/src (obj/ and bin/ live there, the frozen tree
+# stays pristine); install .deps/level3/specfem3d/<profile>/install/bin; logs
+# .deps/level3/specfem3d/<profile>/logs. Only dependency besides MPI/CUDA is
+# SCOTCH, bundled (external_libs/scotch_5.1.12b) and built by the same make.
+# Nothing is fetched or patched by this script.
 #
 # Toolchain: CC = conda GCC 13.3.0 (also nvcc's host compiler, first `gcc` on
 # PATH as upstream's Makefile expects), FC = system gfortran 14.2.1 (the conda
@@ -51,7 +54,8 @@ l3_require_materialized "$HERE" || exit 3
 UP="$HERE/src"
 [ -f "$UP/configure" ] || { echo "build.sh: $UP is not a SPECFEM3D tree -- run tools/prepare_benchmark.sh level3 specfem3d" >&2; exit 3; }
 SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
-l3_paths specfem3d
+PROFILE="$(l3_backend_profile SPECFEM3D "$MODEL")"
+l3_paths_profile specfem3d "$PROFILE" "$MODEL" || exit 2
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 SYS_FC="${HPCPERF_SYSTEM_GFORTRAN:-/usr/bin/gfortran}"
 [ -x "$SYS_FC" ] || { echo "build.sh: no gfortran at $SYS_FC (set HPCPERF_SYSTEM_GFORTRAN); the conda env has none" >&2; exit 1; }
@@ -59,6 +63,7 @@ export OMPI_FC="$SYS_FC"
 # the two back-ports are part of the frozen baseline (provenance/patch_series.txt); their names stay in the
 # fingerprint so that the identity of the validated install (same upstream SHA + same series) is unchanged
 PATCHNAMES=($(l3_lock_patches "$HERE"))
+PATCHFILES=(); for p in "${PATCHNAMES[@]}"; do PATCHFILES+=("$HERE/patches/$p"); done   # the fingerprint hashes the patch FILES (recorded by basename)
 
 case "$BACKEND" in
     CUDA)
@@ -72,14 +77,15 @@ case "$BACKEND" in
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
         # v4.1.1 knows --with-hip=MI8..MI250 (gfx803..gfx90a) only; devel added MI300/MI350 (gfx942/gfx950)
-        CONF_GPU=(--with-hip=MI250); GENCODE=""; ARCHNOTE="gfx950 (UNTESTED; v4.1.1 has no MI350 option)" ;;
+        CONF_GPU=(--with-hip=MI250); GENCODE=""; ARCHNOTE="gfx950 (UNTESTED; v4.1.1 has no MI350 option)"
+        L3_FP_ARCH="MI250" ;;     # what configure actually receives (v4.1.1's --with-hip option), recorded in the fingerprint
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="configure: FC=$SYS_FC CC=$CC MPIFC=mpif90(OMPI_FC=$SYS_FC) --with-mpi ${CONF_GPU[*]} USE_BUNDLED_SCOTCH=1; make GENCODE=${GENCODE:-default}"
-FP="$(l3_fingerprint_text specfem3d "$SHA" "$MODEL" "scotch=5.1.12b (bundled)" "$CMAKE_OPTS" "no (host-staged halo exchange in v4.1.1)" "${PATCHNAMES[@]}")"
+FP="$(l3_fingerprint_text specfem3d "$SHA" "$MODEL" "scotch=5.1.12b (bundled)" "$CMAKE_OPTS" "no (host-staged halo exchange in v4.1.1)" "${PATCHFILES[@]}")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# SPECFEM3D $BACKEND: upstream $SHA (v4.1.1, frozen source tree $TREE_SHA, patches pre-applied: ${PATCHNAMES[*]}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), FC $($SYS_FC --version | head -1), CC $($CC --version | head -1)"
+echo "# SPECFEM3D $BACKEND profile=$PROFILE: upstream $SHA (v4.1.1, frozen source tree $TREE_SHA, patches pre-applied: ${PATCHNAMES[*]}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), FC $($SYS_FC --version | head -1), CC $($CC --version | head -1), build-side copy $L3_SRC, install=$L3_INSTALL"
 rm -rf "$L3_SRC"; mkdir -p "$L3_SRC"
 # build-side copy of the frozen tree (autotools builds in-tree; configure needs the top-level DATA/ defaults,
 # which point into EXAMPLES/). No patch is applied here: the frozen tree already is the patched baseline.

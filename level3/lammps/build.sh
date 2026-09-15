@@ -4,12 +4,14 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 dependency isolation, nothing shared with Level 2):
-#   source    level3/lammps/src              (frozen source bundle materialized by tools/prepare_benchmark.sh;
-#                                            the app owns its Kokkos in src/lib/kokkos; identity in provenance/)
-#   build     build/level3/lammps/<cuda|hip>
-#   install   .deps/level3/lammps/install    (+ .hpcperf-l3-fingerprint)
-#   logs      .deps/level3/lammps/logs
+# Layout (one frozen source tree; generated state isolated per backend profile; nothing shared with Level 2):
+#   source    level3/lammps/src                         (frozen source bundle materialized by tools/prepare_benchmark.sh;
+#                                                       the app owns its Kokkos in src/lib/kokkos; identity in provenance/;
+#                                                       backend-independent -- never copied per backend)
+#   profile   <cuda|hip>   (override HPCPERF_LAMMPS_PROFILE; a profile must name its backend)
+#   build     build/level3/lammps/<profile>
+#   install   .deps/level3/lammps/<profile>/install     (+ .hpcperf-l3-fingerprint)
+#   logs      .deps/level3/lammps/<profile>/logs
 # This script reads application source ONLY from $HERE/src; it never fetches, clones or patches.
 #
 # Toolchain: conda GCC 13.3.0 as nvcc_wrapper host compiler (LAMMPS documents
@@ -40,8 +42,9 @@ SRC="$HERE/src"
 [ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a LAMMPS source tree -- run tools/prepare_benchmark.sh level3 lammps" >&2; exit 3; }
 SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$SRC/lib/kokkos/CMakeLists.txt" | paste -sd.)"
-l3_paths lammps
-BUILD_DIR="$R/build/level3/lammps/$MODEL"
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2
+BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 PKGS=(-DPKG_KOKKOS=yes -DPKG_MOLECULE=yes -DPKG_KSPACE=yes -DPKG_MANYBODY=yes -DPKG_RIGID=yes -DPKG_GRANULAR=yes)
 
@@ -58,7 +61,7 @@ case "$BACKEND" in
         ARCHNOTE="sm_$ARCH ($KARCH)" ;;
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-        KARCH="${HPCPERF_HIP_ARCH:-AMD_GFX950}"
+        KARCH="${HPCPERF_HIP_ARCH:-AMD_GFX950}"; L3_FP_ARCH="$KARCH"     # the arch this build configures goes into the fingerprint
         GPU_FLAGS=(-DCMAKE_CXX_COMPILER=hipcc -DKokkos_ENABLE_HIP=yes "-DKokkos_ARCH_$KARCH=yes" -DFFT_KOKKOS=HIPFFT)
         ARCHNOTE="$KARCH" ;;
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
@@ -70,7 +73,7 @@ CMAKE_OPTS="BUILD_MPI=yes BUILD_OMP=yes CXX_STANDARD=17 Kokkos_ENABLE_${BACKEND}
 FP="$(l3_fingerprint_text lammps "$SHA" "$MODEL" "kokkos(bundled)=$KOKKOS_VER" "$CMAKE_OPTS" "runtime(-pk kokkos gpu/aware)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# LAMMPS $BACKEND: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# LAMMPS $BACKEND profile=$PROFILE: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), install=$L3_INSTALL"
 mkdir -p "$BUILD_DIR"
 cmake -S "$SRC/cmake" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$L3_INSTALL" \

@@ -59,7 +59,7 @@ ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ -n "$ARCH" ] || { echo "build.sh:
 ELPA_GPU="$(echo "${HPCPERF_DFTFE_ELPA_GPU:-ON}" | tr '[:lower:]' '[:upper:]')"
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 PROFILE="${HPCPERF_DFTFE_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)$( [ "$ELPA_GPU" = OFF ] && echo -elpacpu || true)}"
-l3_paths_profile dftfe "$PROFILE"
+l3_paths_profile dftfe "$PROFILE" cuda || exit 2
 JOBS="${HPCPERF_BUILD_JOBS:-16}"; INST="$L3_INSTALL"; BLD="$L3_BUILD_DEPS"; SRCD="$L3_SRC"
 CUDA_ROOT="${CUDA_HOME:-/usr/local/cuda}"
 DEPS_DESC="dftfe_patches[$DFTFE_PATCH_SHA] openblas=0.3.30 scalapack=2.2.2 libxc=7.0.0 spglib=02159eef alglib=4.06.0 p4est=2.8.7 kokkos=4.6.00(serial) dealii=$DEALII_VER elpa=2026.02.001(nvidia-gpu-kernels=$ELPA_GPU sm_$ARCH) gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V bundle_tree=$(echo "$TREE_SHA" | cut -c1-16) profile=$PROFILE"

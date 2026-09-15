@@ -72,11 +72,12 @@ cache; see `level3/nekrs/COMPATIBILITY.md`):
 
 ## Per-application dependency isolation
 
-Every Level 3 application owns `.deps/level3/<app>/{src,build,install,logs}`
-(private copy of patched sources where a build must be in-tree or patched,
-private dependency builds, install prefix, logs) plus the fingerprint
-`.deps/level3/<app>/install/.hpcperf-l3-fingerprint` written by
-`level3/tools/l3_common.sh` (schema `l3-1`: upstream commit, backend/arch,
+Every Level 3 application owns, per backend/profile,
+`.deps/level3/<app>/<profile>/{src,build,install,logs,cache}` (build-side copy of
+the frozen sources where a build must be in-tree, private dependency builds,
+install prefix, logs, JIT caches) plus the fingerprint
+`.deps/level3/<app>/<profile>/install/.hpcperf-l3-fingerprint` written by
+`level3/tools/l3_common.sh` (schema `l3-2`: upstream commit, backend/arch,
 dependency versions, compiler, Fortran compiler, CUDA/ROCm, MPI, CMake options,
 GPU-aware MPI setting, site profile, Spack lock SHA-256, container SHA-256,
 patch list, build time). A fingerprint mismatch makes `build.sh` fail fast with
@@ -148,7 +149,7 @@ Every Level 3 `build.sh` builds from the materialized frozen source artifact and
   for a workspace created with `--link-prebuilt-deps` -- a stage-complete dependency install prefix of the
   canonical tree (never the application itself, which is always rebuilt in the workspace).
 - builds that write into their source tree (SPECFEM3D autotools, nekRS, DFT-FE `git_info.h`, GEOS LvArray
-  docs, the CP2K toolchain) copy `src/` to a build-side tree under `.deps/level3/<app>/` first; the
+  docs, the CP2K toolchain) copy `src/` to a build-side tree under `.deps/level3/<app>/<profile>/src` first; the
   materialized `src/` stays byte-identical to the artifact (its hash is re-checked by `check_workspace.py`).
 - dependency tarballs that upstream build systems would download (GEOS TPL superbuild, CP2K toolchain,
   ExaCA's nlohmann_json) are pre-seeded from `$HERE/deps` into the build tree; the upstream sha256 check
@@ -211,20 +212,42 @@ tolerance 5e-5 (upstream's value for that deck) was adopted after a first run at
 the adiabatic 2e-10 had FAILED, and the `I_R` field of that deck is not accepted
 by any tolerance (PENDING), see `nyx/README.md`.
 
-### Dependency isolation
+### Dependency and backend/profile isolation
 
-Every application owns a private tree -- no shared Level 3 install root:
+One frozen source tree per benchmark; ALL generated state belongs to exactly one backend/profile (no shared
+Level 3 install root; nothing writable is shared between CUDA and HIP):
 
 ```
-level3/<app>/{src,deps}                        materialized frozen source artifact (the ONLY application source input)
-.deps/level3/<app>/{src,build,install,logs}     build-side copies (in-tree-writing builds), dependency builds, install, logs
-_upstream/level3/<Name>                        freeze-time checkout (fetch.sh; input of the freeze only)
-.artifacts/sha256/<archive_sha256>.tar.zst     content-addressed local artifact cache (prepare_benchmark.sh)
-build/level3/<app>/<cuda|hip>                  application build tree (+ run/ directories of run.sh)
-workspaces/<run-id>/                           per-run agent workspace (real copy; own build/ and .deps/)
+level3/<app>/{src,deps}                                       materialized frozen source artifact (the ONLY application
+                                                              source input; backend-independent, never duplicated per backend)
+.deps/level3/<app>/<profile>/{src,build,install,logs,cache}   build-side source copy (in-tree-writing builds only), dependency
+                                                              builds, install prefix + fingerprint, logs, JIT caches
+build/level3/<app>/<profile>/                                 application build tree (+ run directories of run.sh/validate.sh)
+_upstream/level3/<Name>                                       freeze-time checkout (fetch.sh; input of the freeze only)
+.artifacts/sha256/<archive_sha256>.tar.zst                    content-addressed local artifact cache (prepare_benchmark.sh)
+workspaces/<run-id>/                                          per-run agent workspace (real copy; own build/ and .deps/)
 ```
 
-Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream
+A profile uniquely identifies a configuration whose binaries and installs are not interchangeable, and it
+always names its backend: `cuda` / `hip` where only the accelerator backend differs (LAMMPS, SPARTA, WarpX,
+SPECFEM3D, ExaCA); `<variant>.<backend>` for nekRS (`hypregpu.cuda`, `cpucoarse.cuda`; `cpucoarse.hip` is
+defined but untested; `hypregpu.hip` does not exist and is refused); toolchain identities for the second
+batch (`cuda132-gcc142-ompi5010`, `clang231-cuda132-offload`, `cuda132-gcc133-adiabatic|heatcool`).
+`HPCPERF_<APP>_PROFILE` overrides the name but must still name the backend; a profile that names another
+backend than the one requested is refused before any directory is created
+(`l3_paths_profile <app> <profile> <backend>`). build.sh, run.sh and validate.sh derive the profile through
+the same helper (`l3_backend_profile`), run.sh accepts only the profile's own fingerprint with the matching
+backend (`l3_fingerprint_expect_backend`), and a pre-migration shared install (`.deps/level3/<app>/install`)
+is reported and never read. Build scratch that must live outside the worktree (the CP2K toolchain copy, the
+QMCPACK LLVM build tree; both break on a git worktree's `.git` file over NFS) follows the same rule through
+`l3_local_scratch_dir`: `${TMPDIR:-/tmp}/hpcperf-l3-scratch/<component>/<hash of the workspace root>/<source
+identity prefix>/<profile>` -- private to the worktree/workspace, the frozen source and the profile (explicit
+overrides `HPCPERF_CP2K_TOOLCHAIN_SCRATCH`, `HPCPERF_LLVM_SCRATCH`); the earlier `/tmp/hpcperf-l3-b2-scratch/`
+locations shared by name are legacy local state. **Backend separation applies to generated state, not to
+source duplication.**
+Migration record and per-application matrix: [PROFILE_ISOLATION.md](PROFILE_ISOLATION.md) (2026-09-15).
+
+Installs carry `.hpcperf-l3-fingerprint` (schema `l3-2`: application, upstream
 commit, dependency versions, compiler, Fortran compiler, CUDA/ROCm, GPU arch,
 MPI, CMake/configure options, GPU-aware-MPI setting, patch list, site profile,
 Spack lock hash, container image hash, build time). A recorded fingerprint
@@ -262,7 +285,7 @@ level3/<app>/
 ├── README.md        provenance, version/commit, license, LOC, build strategy, changes (A-D), execution model,
 │                    inputs (smoke/strong/weak), validation, 1/2/4-GPU results, dry-runs, limitations
 ├── fetch.sh         shallow clone at the recorded tag/commit (no source trees committed)
-├── build.sh         native build into .deps/level3/<app>, fingerprinted; HIP branch present, untested
+├── build.sh         native build into .deps/level3/<app>/<profile>/ + build/level3/<app>/<profile>/, fingerprinted per profile; HIP branch present, untested
 ├── run.sh           HPCPERF_GPUS + HPCPERF_SCALE_MODE aware, launched via the common launcher
 ├── validate.sh      upstream correctness mechanism, PASS/FAIL line, exit code
 └── patches/         compatibility patches (classified, documented; SPECFEM3D, nekRS)

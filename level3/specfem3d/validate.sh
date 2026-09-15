@@ -27,15 +27,17 @@ l3_require_materialized "$HERE" || exit 3
 UP="$HERE/src"      # frozen source bundle: reference seismograms and upstream's comparison script
 REF="$UP/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS"
 CMP="$UP/utils/scripts/compare_seismogram_correlations.py"
-RUN_DIR="$R/build/level3/specfem3d/$MODEL/$L3_RUN_SUBDIR/smoke.np$N"
+PROFILE="$(l3_backend_profile SPECFEM3D "$MODEL")"
+l3_paths_profile specfem3d "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
+RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR/smoke.np$N"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-1800}"
 [ -d "$REF" ] && [ -f "$CMP" ] || { echo "validate.sh: $REF or $CMP missing (run tools/prepare_benchmark.sh level3 specfem3d)" >&2; exit 1; }
 NREF="$(ls "$REF"/*.semd 2>/dev/null | wc -l)"
 [ "$NREF" -ge 1 ] || { echo "validate.sh: no reference traces in $REF" >&2; exit 1; }
 
 export HPCPERF_GPUS="$N"
-echo "validate.sh: SPECFEM3D $BACKEND homogeneous_halfspace (20,736 elements, 5000 steps) on $N GPU(s); $NREF reference traces"
-VOUT="$R/build/level3/specfem3d/$MODEL/$L3_RUN_SUBDIR/validate.smoke.np$N.stdout"; mkdir -p "$(dirname "$VOUT")"
+echo "validate.sh: SPECFEM3D $BACKEND homogeneous_halfspace (20,736 elements, 5000 steps) on $N GPU(s); $NREF reference traces [profile $PROFILE]"
+VOUT="$L3_BUILD/$L3_RUN_SUBDIR/validate.smoke.np$N.stdout"; mkdir -p "$(dirname "$VOUT")"
 rc=0; HPCPERF_SCALE_MODE=smoke timeout "$TIMEOUT" "$HERE/run.sh" "$BACKEND" > "$VOUT" 2>&1 || rc=$?
 grep -aE '^#|hpcperf-launch: audit summary|Time loop|Elapsed time|End of the simulation|Error|ERROR' "$VOUT" || true
 if [ "$rc" -eq 124 ]; then echo "validate.sh: FAIL -- run timed out after ${TIMEOUT}s"; exit 1; fi

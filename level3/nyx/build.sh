@@ -62,7 +62,7 @@ case "$BACKEND" in
         PROFILE_DEFAULT="cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-${VARIANT}" ;;
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"; MODEL=hip; ARCHNOTE="$ARCH"; AMREX_GPU=HIP
+        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"; MODEL=hip; ARCHNOTE="$ARCH"; AMREX_GPU=HIP; L3_FP_ARCH="$ARCH"     # configured arch -> fingerprint
         ARCH_FLAGS=("-DAMReX_AMD_ARCH=$ARCH" -DCMAKE_CXX_COMPILER=hipcc)
         PROFILE_DEFAULT="hip-${ARCH}-${VARIANT}" ;;
     CPU|NONE)
@@ -71,7 +71,7 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP|CPU]" >&2; exit 2 ;;
 esac
 PROFILE="${HPCPERF_NYX_PROFILE:-$PROFILE_DEFAULT}"
-l3_paths_profile nyx "$PROFILE"
+l3_paths_profile nyx "$PROFILE" "$MODEL" || exit 2
 BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 AMREX_PREFIX="$L3_INSTALL/amrex"; SUND_PREFIX="$L3_INSTALL/sundials"

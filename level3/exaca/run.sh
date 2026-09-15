@@ -34,9 +34,11 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-l3_paths exaca
-EXE="$L3_INSTALL/exaca-$MODEL/bin/ExaCA"
-[ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first" >&2; exit 1; }
+PROFILE="$(l3_backend_profile EXACA "$MODEL")"
+l3_paths_profile exaca "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: install and run tree of ONE profile
+EXE="$L3_INSTALL/exaca/bin/ExaCA"
+[ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 TEMPLATE="$HERE/inputs/dirsolid.template.json"
 [ -f "$TEMPLATE" ] || { echo "run.sh: $TEMPLATE missing" >&2; exit 1; }
@@ -54,7 +56,7 @@ if [ "$MODE" = weak ]; then NY=$(( ${HPCPERF_EXACA_NY:-128} * N_RANKS )); else N
 [ "$NY" -ge $(( 2 * N_RANKS )) ] || { echo "run.sh: Ny=$NY cannot be decomposed over $N_RANKS ranks (needs >= 2 cells per rank) -- refused" >&2; exit 2; }
 SEED="${HPCPERF_EXACA_SEED:-0}"
 CELLS=$(( NX * NY * NZ ))
-RUN_DIR="$(l3_rundir "$R/build/level3/exaca/$MODEL/$L3_RUN_SUBDIR/dirsolid.$MODE.np$N_RANKS")"
+RUN_DIR="$(l3_rundir "$L3_BUILD/$L3_RUN_SUBDIR/dirsolid.$MODE.np$N_RANKS")"
 OUT="dirsolid_${MODE}_np${N_RANKS}"
 IN="$RUN_DIR/dirsolid.$MODE.json"
 PRINT_FIELD=$([ "$MODE" = smoke ] || [ -n "${HPCPERF_EXACA_PRINT:-}" ] && echo 1 || echo 0)
@@ -71,14 +73,15 @@ json.dump(d, open(out, "w"), indent=3)
 PY
 LOG="$RUN_DIR/stdout.log"
 
-echo "# ExaCA $BACKEND: mode=$MODE ranks=$N_RANKS box=${NX}x${NY}x${NZ} cells = $CELLS ($((CELLS / N_RANKS))/rank), seed=$SEED, field=$([ "$PRINT_FIELD" = 1 ] && echo GrainID || echo none), out=$RUN_DIR/$OUT.{vtk,json}"
+echo "# ExaCA $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS box=${NX}x${NY}x${NZ} cells = $CELLS ($((CELLS / N_RANKS))/rank), seed=$SEED, field=$([ "$PRINT_FIELD" = 1 ] && echo GrainID || echo none), out=$RUN_DIR/$OUT.{vtk,json}"
 RUN_ID="$(l3_run_id)"
 rc=0
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- "$EXE" "$IN" "$@" 2>&1 | tee "$LOG" || rc=${PIPESTATUS[0]}
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=exaca" "backend=$BACKEND" "mode=$MODE" "case=dirsolid" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=exaca" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" "case=dirsolid" \
         "ranks=$N_RANKS" "nx=$NX" "ny=$NY" "nz=$NZ" "cells=$CELLS" "seed=$SEED" "exit_code=$rc" \
         "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
+        "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
         "template_sha256=$(l3_sha_file "$TEMPLATE")" "grainid_field=$PRINT_FIELD" "output_vtk=$RUN_DIR/$OUT.vtk" "output_log=$RUN_DIR/$OUT.json" "utc=$(date -u +%FT%TZ)"
 fi
 exit "$rc"
