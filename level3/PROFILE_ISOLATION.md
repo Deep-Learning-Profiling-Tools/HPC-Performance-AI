@@ -100,6 +100,33 @@ SPECFEM3D's and nekRS' `build.sh` took the patch series from the lock as basenam
 fingerprint, which hashes the patch files -- the first rebuild aborted with "patch file not found". They now
 resolve `level3/<app>/patches/<name>`; the fingerprint still records the basenames.
 
+## CUDA smoke regression on the new layout (dgx003, 2026-09-15, code `c225562`)
+
+Fresh worktree of this branch, sources materialized from the local artifact cache (`prepare_benchmark.sh`
+READY with the recorded `source_tree_sha256` for every tree), **no legacy `.deps/level3/<app>/install` present**,
+every application built into its profile root by the migrated `build.sh`, then validated with
+`HPCPERF_L3_RUN_SUBDIR=run.backend-profile-c225562` (a new run tree; no historical run directory was touched).
+The run manifests record `profile=` and the sha256 of the profile's own fingerprint; the binaries come from
+`build/level3/<app>/<profile>/` or `.deps/level3/<app>/<profile>/install/`, never from another location.
+
+| Application | Profile built (fingerprint: schema `l3-2`, `backend=cuda`, patches hashed) | Build | Validation (run tree `run.backend-profile-c225562`) | Binary recorded in `run_manifest.txt` |
+|---|---|---|---|---|
+| ExaCA | `cuda` (`install/{kokkos,json,exaca}`) | 99 s (8 jobs) | 1 GPU: **PASS** (dirsolid smoke 128^3 vs reference statistics) | `.deps/level3/exaca/cuda/install/exaca/bin/ExaCA` |
+| LAMMPS | `cuda` | 415 s (16 jobs) | 1 GPU **PASS**, 2 GPU **PASS** (bench/in.lj vs upstream log; rank-count independence) | `build/level3/lammps/cuda/lmp_kokkos_cuda` |
+| SPARTA | `cuda` | 626 s (16 jobs) | 1 GPU: **PASS** (bench/in.collide vs upstream log) | `build/level3/sparta/cuda/src/spa_kokkos_cuda` |
+| SPECFEM3D | `cuda` (build-side copy `.deps/level3/specfem3d/cuda/src`; 2 patch files hashed) | 166 s (8 jobs) | 1 GPU: **PASS** (homogeneous_halfspace vs REF_SEIS, 12/12 traces) | `.deps/level3/specfem3d/cuda/install/bin/xspecfem3D` |
+| WarpX | `cuda` | 1473 s (16 jobs) | 1 GPU: **PASS** (langmuir_multi analytic + charge conservation; uniform_plasma particle conservation) | `build/level3/warpx/cuda/bin/warpx.3d.MPI.CUDA.DP.PDP.EB` |
+| nekRS `hypregpu` | `hypregpu.cuda` (3 HYPRE patch files hashed; JIT cache `.deps/level3/nekrs/hypregpu.cuda/cache`, 259 MB) | 834 s (16 jobs) | 1 GPU cimode 2: **PASS** (9/9, coarse=CPU); cimode 3: **PASS** (9/9, coarse=DEVICE -- the GPU-HYPRE install of this profile is the one running) | `.deps/level3/nekrs/hypregpu.cuda/install/bin/nekrs` |
+| nekRS `cpucoarse` | `cpucoarse.cuda` (0 patches; own JIT cache, 257 MB) after re-materializing the cpucoarse tree (`6bde0318...`) | 402 s (32 jobs) | 1 GPU cimode 2: **PASS** (9/9, coarse=CPU) | `.deps/level3/nekrs/cpucoarse.cuda/install/bin/nekrs` |
+
+Refusal paths exercised on the same worktree: `level3/nekrs/build.sh HIP` (variant hypregpu) exits 2 with
+"variant hypregpu is CUDA-only" and creates no `hypregpu.hip` directory; `HPCPERF_LAMMPS_PROFILE=cuda
+level3/lammps/build.sh HIP` exits 2 with the profile/BACKEND conflict and creates nothing; `run.sh CUDA` before
+`build.sh` exits 1 naming the missing profile binary (no fallback); `level3/lammps/build.sh HIP` reaches the
+hipcc check ("HIP build is UNTESTED on this machine") -- HIP was **not** built anywhere. Strong/weak modes and
+the 1/2/4 matrix were not re-run (out of scope; unchanged physics and validation policy). Nyx, CP2K, QMCPACK
+and DFT-FE keep their paths and were not rebuilt for this change.
+
 ## Tests (CPU-only, `level3/tools/tests/run_all.sh`)
 
 `test_l3_infra.sh` section 9 (19 checks): CUDA and HIP profiles share no src-copy/dependency-build/install/
