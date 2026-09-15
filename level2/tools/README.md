@@ -41,7 +41,15 @@ logged. Transport and mpirun-vs-srun come from the site profile
 (`site/<profile>.sh`; `gmu-hopper` = mpirun + single-node `self,sm,smcuda`,
 multi-node BLOCKED/UNVERIFIED). Environment defaults: `HPCPERF_GPUS`,
 `HPCPERF_LAUNCHER`, `HPCPERF_CPUS_PER_RANK`, `HPCPERF_SITE_PROFILE`,
-`HPCPERF_DRY_RUN=1`, `HPCPERF_BIND_OBSERVE=0` (skip sampling).
+`HPCPERF_DRY_RUN=1`, `HPCPERF_BIND_OBSERVE=0` (skip sampling). CUDA remains
+the default. Native HIP integrations set `HPCPERF_GPU_BACKEND=HIP`
+internally; the launcher then counts ROCm agents and maps local ranks through
+`ROCR_VISIBLE_DEVICES` and `HIP_VISIBLE_DEVICES`. HIP placement has no
+NVIDIA process-sampler audit, so the expected mapping remains unverified
+until it is tested on AMD hardware. CUDA-only transport settings such as the
+`gmu-hopper` profile's `smcuda` BTL are never injected into HIP launches.
+The CUDA-only `OMPI_MCA_opal_cuda_support` setting from `hpcperf_env.sh` is
+also removed from a native HIP launch; ROCm-aware MPI remains site-provided.
 
 **GPU binding audit.** Each rank prints (via `mpi_gpu_bind.sh`)
 `hpcperf-bind: host= grank= lrank= pid= mode= expected_gpu= expected_uuid=
@@ -72,6 +80,12 @@ same device to CUDA and to nvidia-smi; the expected UUID comes from
 nvidia-smi's index/uuid table (a UUID entry is used as is). Apps that bind by
 themselves (hypre, Kokkos/Cabana, hipBone) use `HPCPERF_BIND_REPORT_ONLY=1`
 (audit line only, no narrowing).
+
+For `HPCPERF_GPU_BACKEND=HIP`, the identical policy uses
+`ROCR_VISIBLE_DEVICES` / `HIP_VISIBLE_DEVICES`; an existing
+`CUDA_VISIBLE_DEVICES` is accepted as a HIP portability alias. If the
+scheduler provided no visibility list, ROCm agents reported by `rocminfo` are
+mapped by local rank. No GPU identifier is hard-coded.
 
 ## `hpcperf_topology.py` — balanced process grids
 

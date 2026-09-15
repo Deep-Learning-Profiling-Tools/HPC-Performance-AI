@@ -8,7 +8,7 @@
 #   --launcher auto|mpirun|srun                               (HPCPERF_LAUNCHER)
 #   --cpus-per-rank C     CPUs bound per rank                 (HPCPERF_CPUS_PER_RANK)
 #   --bind wrapper|app|none  GPU binding mode (default wrapper):
-#                           wrapper = narrow CUDA_VISIBLE_DEVICES per rank
+#                           wrapper = narrow backend visibility per rank
 #                           app     = app binds itself; wrapper only audits
 #                           none    = no wrapper at all (no audit possible)
 #   --dry-run             print the resource plan and command, do not execute
@@ -50,6 +50,14 @@
 #     observation). Set HPCPERF_BIND_OBSERVE=0 to skip sampling.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+GPU_BACKEND="${HPCPERF_GPU_BACKEND:-CUDA}"
+GPU_BACKEND="${GPU_BACKEND^^}"
+case "$GPU_BACKEND" in CUDA|HIP) ;; *) echo "hpcperf_mpi_launch: HPCPERF_GPU_BACKEND must be CUDA or HIP" >&2; exit 2;; esac
+# hpcperf_env.sh enables Open MPI's CUDA buffer hook for the CUDA suite.  That
+# CUDA-only MCA request must not leak into native ROCm/HIP jobs; the AMD site's
+# MPI configuration remains authoritative for its own device-buffer support.
+[ "$GPU_BACKEND" = HIP ] && unset OMPI_MCA_opal_cuda_support
 
 GPUS="${HPCPERF_GPUS:-}"; GPUS_GIVEN=0; [ -n "$GPUS" ] && GPUS_GIVEN=1
 LAUNCHER="${HPCPERF_LAUNCHER:-auto}"
@@ -113,8 +121,13 @@ else
     A_NODELIST=("$(hostname -s)")
     A_SLOTS=""   # not slot-limited outside Slurm
     A_CPUS="$(nproc 2>/dev/null || echo 1)"
-    A_GPN="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
-    _gpn_src="nvidia-smi"
+    if [ "$GPU_BACKEND" = HIP ]; then
+        A_GPN="$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]/{n++} END{print n+0}')"
+        _gpn_src="rocminfo"
+    else
+        A_GPN="$(nvidia-smi -L 2>/dev/null | grep -c '^GPU ')"
+        _gpn_src="nvidia-smi"
+    fi
     ALLOC_KIND="local node (no scheduler)"
 fi
 is_int "$A_GPN" || A_GPN=0
@@ -215,8 +228,8 @@ if [ -z "$BIND_LOG" ] && [ "$BIND" != none ]; then
 fi
 WRAP=()
 case "$BIND" in
-    wrapper) WRAP=(env "HPCPERF_BIND_LOG=$BIND_LOG" "$HERE/mpi_gpu_bind.sh") ;;
-    app)     WRAP=(env "HPCPERF_BIND_LOG=$BIND_LOG" HPCPERF_BIND_REPORT_ONLY=1 "$HERE/mpi_gpu_bind.sh") ;;
+    wrapper) WRAP=(env "HPCPERF_BIND_LOG=$BIND_LOG" "HPCPERF_GPU_BACKEND=$GPU_BACKEND" "$HERE/mpi_gpu_bind.sh") ;;
+    app)     WRAP=(env "HPCPERF_BIND_LOG=$BIND_LOG" "HPCPERF_GPU_BACKEND=$GPU_BACKEND" HPCPERF_BIND_REPORT_ONLY=1 "$HERE/mpi_gpu_bind.sh") ;;
     none)    WRAP=() ;;
     *) die "--bind must be wrapper|app|none" ;;
 esac
@@ -233,7 +246,7 @@ if [ "$LAUNCHER" = mpirun ]; then
     HOSTSPEC=()
     for h in "${HOSTS[@]}"; do HOSTSPEC+=("$h:$RPN"); done
     # shellcheck disable=SC2207
-    SITE_ARGS=($(site_mpi_args "$NODES_USED"))
+    SITE_ARGS=($(site_mpi_args "$NODES_USED" "$GPU_BACKEND"))
     CMD=(mpirun -np "$N" --host "$(IFS=,; echo "${HOSTSPEC[*]}")" --map-by "$MAP")
     [ -n "$CPUS_PER_RANK" ] && CMD+=(--bind-to core)
     CMD+=("${SITE_ARGS[@]}")
@@ -252,7 +265,7 @@ if [ "$HYPO" = 1 ]; then
 else
     say "requested: nodes=$R_NODES gpus/node=$R_GPN (subset of the allocation)"
 fi
-say "launch:    site=$PROFILE launcher=$LAUNCHER ranks=$N (one per GPU) on $NODES_USED node(s) [$HOSTLIST], ranks/node=$RPN, gpu-bind=$BIND, cpu: $CPU_NOTE"
+say "launch:    backend=$GPU_BACKEND site=$PROFILE launcher=$LAUNCHER ranks=$N (one per GPU) on $NODES_USED node(s) [$HOSTLIST], ranks/node=$RPN, gpu-bind=$BIND, cpu: $CPU_NOTE"
 say "command:   ${CMD[*]}"
 if [ "$DRYRUN" = 1 ]; then
     say "dry-run: not executing"
@@ -260,7 +273,7 @@ if [ "$DRYRUN" = 1 ]; then
 fi
 
 # ------------------------------------------------- run + observe GPU binding
-if [ "$BIND" = none ] || [ "$OBSERVE" != 1 ] || ! command -v nvidia-smi >/dev/null 2>&1; then
+if [ "$GPU_BACKEND" != CUDA ] || [ "$BIND" = none ] || [ "$OBSERVE" != 1 ] || ! command -v nvidia-smi >/dev/null 2>&1; then
     exec "${CMD[@]}"
 fi
 OBS_LOG="$(mktemp "${HPCPERF_RUN_TMPDIR:-${TMPDIR:-/tmp}}/hpcperf-obs.XXXXXX")"
