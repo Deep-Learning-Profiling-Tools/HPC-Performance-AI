@@ -14,5 +14,6 @@ run "deps markers"         bash "$HERE/test_deps_markers.sh"
 run "env dep profiles"     bash "$HERE/test_env_profiles.sh"
 run "launcher dry-run"     bash "$HERE/test_launcher_dryrun.sh"
 run "run.sh guards"        bash "$HERE/test_run_guards.sh"
+run "vendored completeness" bash "$HERE/test_vendored_completeness.sh"
 [ $rc -eq 0 ] && echo "ALL TEST GROUPS PASSED" || echo "SOME TEST GROUPS FAILED"
 exit $rc
