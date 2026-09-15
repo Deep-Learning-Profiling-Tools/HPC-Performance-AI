@@ -238,7 +238,13 @@ backend than the one requested is refused before any directory is created
 (`l3_paths_profile <app> <profile> <backend>`). build.sh, run.sh and validate.sh derive the profile through
 the same helper (`l3_backend_profile`), run.sh accepts only the profile's own fingerprint with the matching
 backend (`l3_fingerprint_expect_backend`), and a pre-migration shared install (`.deps/level3/<app>/install`)
-is reported and never read. **Backend separation applies to generated state, not to source duplication.**
+is reported and never read. Build scratch that must live outside the worktree (the CP2K toolchain copy, the
+QMCPACK LLVM build tree; both break on a git worktree's `.git` file over NFS) follows the same rule through
+`l3_local_scratch_dir`: `${TMPDIR:-/tmp}/hpcperf-l3-scratch/<component>/<hash of the workspace root>/<source
+identity prefix>/<profile>` -- private to the worktree/workspace, the frozen source and the profile (explicit
+overrides `HPCPERF_CP2K_TOOLCHAIN_SCRATCH`, `HPCPERF_LLVM_SCRATCH`); the earlier `/tmp/hpcperf-l3-b2-scratch/`
+locations shared by name are legacy local state. **Backend separation applies to generated state, not to
+source duplication.**
 Migration record and per-application matrix: [PROFILE_ISOLATION.md](PROFILE_ISOLATION.md) (2026-09-15).
 
 Installs carry `.hpcperf-l3-fingerprint` (schema `l3-1`: application, upstream

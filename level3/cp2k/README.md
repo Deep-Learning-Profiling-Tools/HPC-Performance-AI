@@ -34,7 +34,10 @@ H100 set reused, not B200-tuned** (upstream's own approach for GB10 and B200).
 - DBCSR 2.10.0's `cmake/GetGitRevisionDescription.cmake` aborts when its source
   lives inside a git *worktree* (it treats the absolute gitdir in the `.git` file
   as relative): the toolchain's private copy therefore lives on local scratch
-  (`/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/<profile>`, symlinked from
+  (since 2026-09-15 `${TMPDIR:-/tmp}/hpcperf-l3-scratch/cp2k-toolchain/<workspace-root hash>/<source_tree_sha256 prefix>/<profile>`,
+  i.e. private to the worktree/workspace, the frozen source and the profile -- `HPCPERF_CP2K_TOOLCHAIN_SCRATCH`
+  overrides; the earlier `/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/<profile>` was shared by profile name and is
+  legacy local state), symlinked from
   `.deps/level3/cp2k/<profile>/src/toolchain`); the install prefix, `setup`,
   `toolchain.conf` and all logs stay under the profile tree.
 - DBCSR's own ctest suite launches `mpiexec -n 4` itself; under this 1-task-slot

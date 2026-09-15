@@ -27,14 +27,16 @@ R="$(cd "$HERE/../../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
-l3_paths_profile qmcpack "$PROFILE"
+l3_paths_profile qmcpack "$PROFILE" cuda || exit 2
 VER=23.1.0; TARBALL="$R/.deps/level3/qmcpack/downloads/llvm-project-$VER.src.tar.xz"
 EXPECT_SHA=ab1f0e3ec52448c33e8782eaf0422504b87c7b016b22514653ee0d8fcee479ff
 PREFIX="$L3_INSTALL/llvm"
 # Source + build trees on the node's LOCAL disk (the project filesystem is NFS and
 # extracting/compiling the ~150k-file LLVM tree there took >1 h just to unpack); the
-# install, logs and BUILD_INFO go to the profile tree on the project filesystem.
-SCRATCH="${HPCPERF_LLVM_SCRATCH:-/tmp/hpcperf-l3-b2-scratch/qmcpack-llvm}"; mkdir -p "$SCRATCH"
+# install, logs and BUILD_INFO go to the profile tree on the project filesystem. The scratch is
+# workspace x tarball x profile specific (l3_local_scratch_dir; HPCPERF_LLVM_SCRATCH overrides);
+# the pre-2026-09-15 shared /tmp/hpcperf-l3-b2-scratch/qmcpack-llvm is legacy local state, never read.
+SCRATCH="${HPCPERF_LLVM_SCRATCH:-$(l3_local_scratch_dir qmcpack-llvm "$EXPECT_SHA" "$PROFILE")}"; mkdir -p "$SCRATCH"
 SRC="$SCRATCH/llvm-project-$VER.src"; BUILD="$SCRATCH/build"
 echo "$SCRATCH" > "$L3_SRC/LLVM_SCRATCH_LOCATION.txt"
 JOBS="${HPCPERF_BUILD_JOBS:-24}"

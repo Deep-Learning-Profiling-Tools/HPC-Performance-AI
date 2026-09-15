@@ -127,7 +127,10 @@ level3/<app>/
   [variant]` identically in build/run/validate; `HPCPERF_<APP>_PROFILE` overrides; a
   profile/BACKEND conflict is refused before any directory is created; run.sh gates on
   the profile's own fingerprint (`l3_fingerprint_expect_backend`); never read
-  `.deps/level3/<app>/install` (pre-migration state). Runs under
+  `.deps/level3/<app>/install` (pre-migration state). Scratch that must live outside
+  the worktree (CP2K toolchain, QMCPACK LLVM) comes from `l3_local_scratch_dir
+  <component> <source sha> <profile>` (workspace-root hash / source / profile under
+  `${TMPDIR:-/tmp}/hpcperf-l3-scratch/`), never from a name shared across worktrees. Runs under
   `.../run/<case>.<mode>.np<N>[.t<T>]/`, dry-runs under `.../run/.dryrun/` (never
   touch real results). See `level3/PROFILE_ISOLATION.md`.
 - `l3_common.sh` helpers you should reuse rather than reinvent:

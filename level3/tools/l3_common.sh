@@ -111,6 +111,26 @@ l3_paths_profile() {
     fi
 }
 
+# l3_local_scratch_dir <component> <source-identity-sha256> <profile>
+#   Location for build scratch that MUST live outside the git worktree (CP2K's toolchain installer and the
+#   QMCPACK LLVM build break on a worktree's `.git` file over NFS), yet stays isolated like every other piece
+#   of generated state: the path names the WORKSPACE (sha256 of the realpath of the repository/workspace root,
+#   12 hex -- a local namespace only, never written into git provenance), the frozen SOURCE identity
+#   (source_tree_sha256 or tarball sha256 prefix) and the PROFILE:
+#     ${HPCPERF_L3_SCRATCH_BASE:-${TMPDIR:-/tmp}}/hpcperf-l3-scratch/<component>/<root12>/<source12>/<profile>
+#   Two worktrees with the same profile get different directories; the same root/source/profile always
+#   yields the same one; a different source identity or profile yields a different one. Callers keep an
+#   explicit override variable (HPCPERF_CP2K_TOOLCHAIN_SCRATCH, HPCPERF_LLVM_SCRATCH) for advanced use.
+#   The pre-2026-09-15 shared location /tmp/hpcperf-l3-b2-scratch/<component>[/<profile>] is legacy local
+#   state: never read, never migrated.
+l3_local_scratch_dir() {
+    local comp=$1 src=$2 profile=$3 root
+    [ -n "$comp" ] && [ -n "$src" ] && [ -n "$profile" ] || { echo "l3_local_scratch_dir: component, source identity and profile are required" >&2; return 2; }
+    case "$comp$profile" in *" "*|*/*) echo "l3_local_scratch_dir: component/profile must be plain names ('$comp', '$profile')" >&2; return 2;; esac
+    root="$(printf '%s' "$(realpath "$L3_R")" | sha256sum | cut -c1-12)"
+    printf '%s\n' "${HPCPERF_L3_SCRATCH_BASE:-${TMPDIR:-/tmp}}/hpcperf-l3-scratch/$comp/$root/${src:0:12}/$profile"
+}
+
 # l3_clean_conda_build_env: the project conda env exports its own compiler-driving
 # variables (CFLAGS/CXXFLAGS/LDFLAGS with -march=nocona -mtune=haswell and conda
 # -isystem/-rpath paths, AR/RANLIB/NM/LD = conda binutils, CMAKE_ARGS, ...). They are

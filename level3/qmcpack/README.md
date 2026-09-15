@@ -33,7 +33,7 @@ compiler with NVPTX offload ("For NVIDIA GPUs, LLVM clang", upstream docs).
   clang failed with "no library 'libomptarget-nvptx.bc' found". Reconfigured with
   the GPU runtimes target: `lib/nvptx64-nvidia-cuda/libompdevice.a` +
   `libomptarget-nvptx.bc` (62 s incremental). Build time host part: 573 s at -j24
-  on local scratch (`/tmp/hpcperf-l3-b2-scratch/qmcpack-llvm`; extracting the
+  on local scratch (`/tmp/hpcperf-l3-b2-scratch/qmcpack-llvm` at the time; since 2026-09-15 `${TMPDIR:-/tmp}/hpcperf-l3-scratch/qmcpack-llvm/<workspace-root hash>/<tarball sha256 prefix>/<profile>`, `HPCPERF_LLVM_SCRATCH` overrides; extracting the
   150k-file tree on the project NFS alone took >1 h and was abandoned).
 
 ### Offload probe (toolchain/probe_offload.sh) -- PASS before any QMCPACK build

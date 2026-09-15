@@ -179,6 +179,28 @@ nk=0; for s in build run validate; do /usr/bin/grep -q 'hypregpu is CUDA-only' "
 src=0; for a in lammps sparta warpx specfem3d nekrs exaca; do /usr/bin/grep -q 'l3_require_materialized "\$HERE"' "$L3D/$a/build.sh" || src=1; done
 [ "$src" -eq 0 ] && ok "9s: the migrated build scripts still read application source from the ONE materialized level3/<app>/src (not a per-backend copy)" || bad "9s: a build.sh no longer requires the materialized tree"
 
+# 10. local scratch outside the worktree (CP2K toolchain, QMCPACK LLVM) is still workspace x source x profile specific
+W1="$TMP/ws-one"; W2="$TMP/ws-two"; mkdir -p "$W1" "$W2"; TREE_A="d877d2d4de4643ce90c1ced68b0cc5d18e389f5055efbf3309cbeba059ef6fa2"; TREE_B="6bde03184c09b236179b2ff4c8200e8489666ed68aebbbdc11462bfb050b1c0e"
+sd() { ( L3_R="$1"; l3_local_scratch_dir "$2" "$3" "$4" ); }
+s1="$(sd "$W1" cp2k-toolchain "$TREE_A" cuda132-gcc142-ompi5010)"; s2="$(sd "$W2" cp2k-toolchain "$TREE_A" cuda132-gcc142-ompi5010)"
+[ -n "$s1" ] && [ "$s1" != "$s2" ] && ok "10a: two worktrees, same source and profile -> different scratch directories" || bad "10a: $s1 vs $s2"
+[ "$(sd "$W1" cp2k-toolchain "$TREE_A" cuda132-gcc142-ompi5010)" = "$s1" ] && ok "10b: same worktree/source/profile -> the same directory every time" || bad "10b: unstable"
+[ "$(sd "$W1" cp2k-toolchain "$TREE_B" cuda132-gcc142-ompi5010)" != "$s1" ] && ok "10c: a different frozen source tree -> a different directory" || bad "10c"
+[ "$(sd "$W1" cp2k-toolchain "$TREE_A" cuda132-gcc133-ompi5010)" != "$s1" ] && ok "10d: a different profile -> a different directory" || bad "10d"
+case "$s1" in "${TMPDIR:-/tmp}/hpcperf-l3-scratch/cp2k-toolchain/"*"/${TREE_A:0:12}/cuda132-gcc142-ompi5010") ok "10e: layout <base>/hpcperf-l3-scratch/<component>/<root12>/<source12>/<profile>";; *) bad "10e: $s1";; esac
+case "$s1" in *"$W1"*|*"ws-one"*) bad "10f: the workspace path leaks into the scratch path";; *) ok "10f: only a hash of the workspace root appears in the path";; esac
+[ "$(HPCPERF_L3_SCRATCH_BASE="$TMP/base" sd "$W1" cp2k-toolchain "$TREE_A" p-cuda)" = "$TMP/base/hpcperf-l3-scratch/cp2k-toolchain/$(printf '%s' "$(realpath "$W1")" | sha256sum | cut -c1-12)/${TREE_A:0:12}/p-cuda" ] && ok "10g: HPCPERF_L3_SCRATCH_BASE relocates the base; root hash = sha256(realpath root)[:12]" || bad "10g"
+rc=0; sd "$W1" cp2k-toolchain "" cuda >/dev/null 2>&1 || rc=$?; [ "$rc" -ne 0 ] && ok "10h: a missing source identity is refused" || bad "10h"
+/usr/bin/grep -q 'l3_local_scratch_dir cp2k-toolchain "\$TREE_SHA" "\$PROFILE"' "$R/level3/cp2k/build.sh" && /usr/bin/grep -q 'HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-' "$R/level3/cp2k/build.sh" \
+    && ok "10i: cp2k/build.sh derives its toolchain scratch from the helper and keeps the explicit override" || bad "10i"
+/usr/bin/grep -q 'l3_local_scratch_dir qmcpack-llvm "\$EXPECT_SHA" "\$PROFILE"' "$R/level3/qmcpack/toolchain/build_llvm.sh" && /usr/bin/grep -q 'HPCPERF_LLVM_SCRATCH:-' "$R/level3/qmcpack/toolchain/build_llvm.sh" \
+    && ok "10j: qmcpack/toolchain/build_llvm.sh derives its scratch from the helper and keeps the explicit override" || bad "10j"
+leg="$(/usr/bin/grep -l 'hpcperf-l3-b2-scratch' "$R"/level3/*/build.sh "$R"/level3/*/run.sh "$R"/level3/*/validate.sh "$R"/level3/*/toolchain/*.sh "$R"/level3/tools/*.sh 2>/dev/null | /usr/bin/grep -v -E ':[0-9]+:#' || true)"
+if [ -z "$leg" ]; then ok "10k: no active script still uses the shared /tmp/hpcperf-l3-b2-scratch location as a default"; else
+    # comments describing the legacy location are fine; a code line is not
+    code="$(/usr/bin/grep -n 'hpcperf-l3-b2-scratch' $leg | /usr/bin/grep -v -E ':[0-9]+:\s*#' || true)"
+    [ -z "$code" ] && ok "10k: the shared /tmp/hpcperf-l3-b2-scratch location survives only in comments (legacy note)" || bad "10k: code still uses the shared scratch: $code"; fi
+
 echo
 echo "test_l3_infra: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]

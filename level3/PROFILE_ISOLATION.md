@@ -67,6 +67,35 @@ carried `<cuda|hip>`. A HIP build would have shared the install prefix and finge
 SPECFEM3D and nekRS the build-side source copy as well. The second batch (2026-09-05/06) introduced
 `l3_paths_profile`; this change extends it to every application and removes `l3_paths`.
 
+## Local scratch outside the worktree (CP2K toolchain, QMCPACK LLVM)
+
+Two builds keep a source/build copy on the node's local disk because they break inside a git worktree on
+NFS (DBCSR's git-revision CMake module misreads a worktree's `.git` file; the 150k-file LLVM tree is too slow
+to unpack on the project filesystem). Until 2026-09-15 those scratch directories were
+`/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/<profile>` and `/tmp/hpcperf-l3-b2-scratch/qmcpack-llvm` -- shared
+by name between every worktree and agent workspace on the node, which contradicts the rule above (and is why
+the 2026-09-15 CP2K rebuild in a fresh worktree reused old intermediate build trees: toolchain stage 472 s
+instead of the documented 1.5-3 h; recorded as such in PR #10).
+
+`l3_local_scratch_dir <component> <source identity sha256> <profile>` now derives the default:
+
+```
+${HPCPERF_L3_SCRATCH_BASE:-${TMPDIR:-/tmp}}/hpcperf-l3-scratch/<component>/<root12>/<source12>/<profile>
+   root12   = sha256 of the realpath of the repository / workspace root, 12 hex (a local namespace only;
+              the absolute path itself is never written into git provenance)
+   source12 = source_tree_sha256 (CP2K) or tarball sha256 (LLVM) prefix
+```
+
+Two worktrees with the same profile get different scratch directories (e.g. this branch's worktree
+`.../cp2k-toolchain/181d2454f815/d877d2d4de46/cuda132-gcc142-ompi5010` vs a sibling worktree
+`.../cp2k-toolchain/014a4d8719c2/d877d2d4de46/cuda132-gcc142-ompi5010`); the same root, source and profile
+always yield the same directory; a different source tree or profile yields a different one.
+`HPCPERF_CP2K_TOOLCHAIN_SCRATCH` / `HPCPERF_LLVM_SCRATCH` remain explicit overrides. The old shared
+directories are legacy local state: not read, not migrated, not re-labelled. Covered by `test_l3_infra.sh`
+section 10.
+
+**Empty-scratch CP2K verification:** see the entry at the end of this document.
+
 ## What did not change
 
 - `level3/<app>/src`, `level3/<app>/deps`, `provenance/source.lock*.yaml` (source identity, archive sha256,
