@@ -62,7 +62,7 @@ case "$BACKEND" in
         PROFILE_DEFAULT="cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-${VARIANT}" ;;
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"; MODEL=hip; ARCHNOTE="$ARCH"; AMREX_GPU=HIP
+        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"; MODEL=hip; ARCHNOTE="$ARCH"; AMREX_GPU=HIP; L3_FP_ARCH="$ARCH"     # configured arch -> fingerprint
         ARCH_FLAGS=("-DAMReX_AMD_ARCH=$ARCH" -DCMAKE_CXX_COMPILER=hipcc)
         PROFILE_DEFAULT="hip-${ARCH}-${VARIANT}" ;;
     CPU|NONE)

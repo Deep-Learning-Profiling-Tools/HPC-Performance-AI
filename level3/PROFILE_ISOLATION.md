@@ -67,6 +67,26 @@ carried `<cuda|hip>`. A HIP build would have shared the install prefix and finge
 SPECFEM3D and nekRS the build-side source copy as well. The second batch (2026-09-05/06) introduced
 `l3_paths_profile`; this change extends it to every application and removes `l3_paths`.
 
+## Fingerprint backend semantics (schema `l3-2`, unchanged name)
+
+`l3_fingerprint_text` used to print `backend=<b> arch=sm_$(nvidia-smi ...)`, `cuda=<nvcc version>` and
+`rocm=${ROCM_VERSION:-none}` for every backend. It is backend-aware now:
+
+| backend | `backend=... arch=...` | `cuda=` | `rocm=` |
+|---|---|---|---|
+| `cuda` | `backend=cuda arch=sm_<compute capability of GPU 0>` | `<nvcc version>` | `none` |
+| `hip` | `backend=hip arch=<the arch the build configured>`: `L3_FP_ARCH` set by build.sh (Kokkos `AMD_GFX950`, AMReX `gfx950`, SPECFEM3D `MI250`, nekRS `jit-runtime`), else `HPCPERF_HIP_ARCH`, else `unknown` -- never from nvidia-smi | `none` | `hipconfig --version`, else the `HIP version:` line of `hipcc --version`, else `$ROCM_PATH/.info/version`, else `none` (nothing invented) |
+| `cpu` | `backend=cpu arch=cpu` | `none` | `none` |
+
+The CUDA text is byte-identical to the previous output on this node (`rocm=none` was already what an unset
+`ROCM_VERSION` produced), so every validated CUDA install keeps its fingerprint -- verified by re-running
+`level3/lammps/build.sh CUDA` against the existing `cuda` profile install (fingerprint check passed, 6 s
+incremental build) and by the CP2K empty-scratch install (`backend=cuda arch=sm_100`, `cuda=13.2.78`,
+`rocm=none`). The CPU text changes (previously a CPU profile recorded the node's `sm_100` and CUDA version):
+an existing Nyx `cpu-gcc133-*` install therefore fails the fingerprint check on its next `build.sh CPU` and has
+to be rebuilt (13-83 s), which is the intended fail-fast, not a silent reuse. HIP fingerprints are covered by
+mock tests only (`test_l3_infra.sh` section 11); no HIP build exists and HIP stays **UNTESTED**.
+
 ## Local scratch outside the worktree (CP2K toolchain, QMCPACK LLVM)
 
 Two builds keep a source/build copy on the node's local disk because they break inside a git worktree on
@@ -194,3 +214,17 @@ project filesystem; the build.sh banner now states the measured times. This run 
 scratch isolation of this branch by construction (new namespace, nothing pre-existing), in addition to the
 static tests of section 10. The warm-scratch rebuild recorded for PR #10 (toolchain 472 s) is superseded as
 evidence by this one; it remains an honest record of what that run was.
+
+## Final regression on current `main` (2026-09-15, main `4604377` = PR #7 + #9 + #10 merged)
+
+Branch merged with `origin/main` by a regular merge (no conflict; `level3/cp2k/build.sh` unchanged versus the
+pre-merge branch and carrying the PR #10 stage ordering, the `l3_paths_profile cp2k "$PROFILE" cuda` guard and
+the workspace/source/profile scratch). Level 3 CPU/static suite: 7 groups pass (infra 70 incl. sections 9-11);
+`git diff --check` clean. LAMMPS `build.sh CUDA` re-run: fingerprint of the existing `cuda` profile accepted,
+incremental rebuild; `validate.sh CUDA` 1 GPU **PASS** in run tree `run.final-main-4604377`, binary
+`build/level3/lammps/cuda/lmp_kokkos_cuda`, fingerprint `.deps/level3/lammps/cuda/install/.hpcperf-l3-fingerprint`,
+no legacy install present or read. Source artifacts, locks, `source_tree_sha256`, release assets and the tag
+(`level3-source-hpcperf-l3-v1-rc1` -> 16dcf18) are unchanged (`git diff origin/main -- 'level3/*/provenance' ...`
+empty; `prepare_benchmark.sh --status` READY for LAMMPS, CP2K, ExaCA). The other migrated applications
+(SPARTA, WarpX, SPECFEM3D, ExaCA, nekRS both variants) and the CP2K empty-scratch build were not re-run: the
+merge did not touch their scripts beyond the fingerprint change shown above to be text-neutral for CUDA.

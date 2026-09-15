@@ -201,6 +201,48 @@ if [ -z "$leg" ]; then ok "10k: no active script still uses the shared /tmp/hpcp
     code="$(/usr/bin/grep -n 'hpcperf-l3-b2-scratch' $leg | /usr/bin/grep -v -E ':[0-9]+:\s*#' || true)"
     [ -z "$code" ] && ok "10k: the shared /tmp/hpcperf-l3-b2-scratch location survives only in comments (legacy note)" || bad "10k: code still uses the shared scratch: $code"; fi
 
+# 11. backend-aware fingerprints (schema l3-2): CUDA text unchanged, HIP never derived from nvidia-smi, CPU neutral;
+#     fingerprints of different backends are not interchangeable; the run gate accepts only the profile's backend.
+MB="$TMP/mockbin"; mkdir -p "$MB"
+printf '#!/bin/sh\necho "9.9"\n' > "$MB/nvidia-smi"                                   # a CUDA GPU "9.9" -> sm_99 (must NOT appear in HIP/CPU text)
+printf '#!/bin/sh\necho "Cuda compilation tools, release 13.2, V13.2.78"\n' > "$MB/nvcc"
+printf '#!/bin/sh\necho "6.4.1-mock"\n' > "$MB/hipconfig"
+printf '#!/bin/sh\necho "HIP version: 6.4.1"\n' > "$MB/hipcc"
+chmod +x "$MB"/*
+fpt() { ( PATH="$MB:$PATH"; CXX=/bin/true FC=/bin/true; "$@" ); }
+fc="$(fpt l3_fingerprint_text app sha cuda deps opts gam)"
+echo "$fc" | /usr/bin/grep -qx 'backend=cuda arch=sm_99' && echo "$fc" | /usr/bin/grep -qx 'cuda=13.2.78' && echo "$fc" | /usr/bin/grep -qx 'rocm=none' && echo "$fc" | /usr/bin/grep -qx 'schema=l3-2' \
+    && ok "11a: CUDA fingerprint: backend=cuda arch=sm_<cc>, cuda=<nvcc version>, rocm=none, schema l3-2 (text format unchanged)" || bad "11a: $(echo "$fc" | head -12 | tr '\n' '|')"
+fh="$(fpt env HPCPERF_HIP_ARCH=gfx950 l3_fingerprint_text app sha hip deps opts gam 2>/dev/null || true)"; [ -n "$fh" ] || fh="$( ( PATH="$MB:$PATH"; CXX=/bin/true FC=/bin/true; HPCPERF_HIP_ARCH=gfx950 l3_fingerprint_text app sha hip deps opts gam ) )"
+echo "$fh" | /usr/bin/grep -qx 'backend=hip arch=gfx950' && echo "$fh" | /usr/bin/grep -qx 'cuda=none' && echo "$fh" | /usr/bin/grep -qx 'rocm=6.4.1-mock' && ! echo "$fh" | /usr/bin/grep -q 'sm_' \
+    && ok "11b: HIP fingerprint: backend=hip arch=<HPCPERF_HIP_ARCH>, cuda=none, rocm=<hipconfig version>, no sm_* from nvidia-smi" || bad "11b: $(echo "$fh" | /usr/bin/grep -E '^(backend|cuda|rocm)=' | tr '\n' '|')"
+fh2="$( ( PATH="$MB:$PATH"; CXX=/bin/true FC=/bin/true; L3_FP_ARCH=AMD_GFX950 HPCPERF_HIP_ARCH=gfx950 l3_fingerprint_text app sha hip deps opts gam ) )"
+echo "$fh2" | /usr/bin/grep -qx 'backend=hip arch=AMD_GFX950' && ok "11c: the arch the build configured (L3_FP_ARCH) takes precedence over HPCPERF_HIP_ARCH" || bad "11c"
+fh3="$( ( PATH="$MB:$PATH"; CXX=/bin/true FC=/bin/true; rm -f "$MB/hipconfig"; HPCPERF_HIP_ARCH=gfx950 l3_fingerprint_text app sha hip deps opts gam ) )"
+echo "$fh3" | /usr/bin/grep -qx 'rocm=6.4.1' && ok "11d: without hipconfig the ROCm version comes from hipcc --version ('HIP version:')" || bad "11d: $(echo "$fh3" | /usr/bin/grep '^rocm=')"
+fh4="$( ( PATH="$TMP/nowhere:/usr/bin:/bin"; CXX=/bin/true FC=/bin/true; ROCM_PATH="$TMP/no-rocm"; HPCPERF_HIP_ARCH=gfx950 l3_fingerprint_text app sha hip deps opts gam ) )"
+echo "$fh4" | /usr/bin/grep -qx 'rocm=none' && ok "11e: without any ROCm the HIP fingerprint says rocm=none (no invented version)" || bad "11e: $(echo "$fh4" | /usr/bin/grep '^rocm=')"
+fp_cpu="$(fpt l3_fingerprint_text app sha cpu deps opts gam)"
+echo "$fp_cpu" | /usr/bin/grep -qx 'backend=cpu arch=cpu' && echo "$fp_cpu" | /usr/bin/grep -qx 'cuda=none' && echo "$fp_cpu" | /usr/bin/grep -qx 'rocm=none' && ! echo "$fp_cpu" | /usr/bin/grep -q 'sm_' \
+    && ok "11f: CPU fingerprint: backend=cpu arch=cpu, cuda=none, rocm=none" || bad "11f: $(echo "$fp_cpu" | /usr/bin/grep -E '^(backend|cuda|rocm)=' | tr '\n' '|')"
+rc=0; fpt l3_fingerprint_text app sha sycl deps opts gam >/dev/null 2>&1 || rc=$?; [ "$rc" -ne 0 ] && ok "11g: an unknown backend is refused" || bad "11g"
+# D. conflicts still refused before any directory exists (hip and cpu profiles too)
+ISO2="$TMP/isoroot2"; mkdir -p "$ISO2"
+rc=0; ( L3_R="$ISO2"; l3_paths_profile app2 cpu-gcc133-adiabatic hip ) >/dev/null 2>&1 || rc=$?
+rc2=0; ( L3_R="$ISO2"; l3_paths_profile app2 hip-gfx950-adiabatic cpu ) >/dev/null 2>&1 || rc2=$?
+[ "$rc" -ne 0 ] && [ "$rc2" -ne 0 ] && [ ! -e "$ISO2/.deps" ] && [ ! -e "$ISO2/build" ] && ok "11h: cpu-profile x HIP and hip-profile x CPU are refused before any directory is created" || bad "11h: rc=$rc rc2=$rc2 $(ls "$ISO2")"
+# E/F. one install per backend profile; no cross-use on the build side (l3_fingerprint_check) or the run side (l3_fingerprint_expect_backend)
+for b in cuda hip cpu; do ( L3_R="$ISO2"; l3_paths_profile app3 "$b" "$b" >/dev/null 2>&1 ); done
+l3_fingerprint_write "$ISO2/.deps/level3/app3/cuda/install" "$fc"; l3_fingerprint_write "$ISO2/.deps/level3/app3/hip/install" "$fh"; l3_fingerprint_write "$ISO2/.deps/level3/app3/cpu/install" "$fp_cpu"
+cross=0; for want in cuda hip cpu; do for have in cuda hip cpu; do
+    r=0; l3_fingerprint_check "$ISO2/.deps/level3/app3/$have/install" "$(eval echo "\"\$$( [ $want = cuda ] && echo fc || { [ $want = hip ] && echo fh || echo fp_cpu; })\"")" >/dev/null 2>&1 || r=$?
+    if [ "$want" = "$have" ]; then [ $r -eq 0 ] || cross=1; else [ $r -ne 0 ] || cross=1; fi; done; done
+[ "$cross" -eq 0 ] && ok "11i: build-side check accepts each profile's own fingerprint and refuses every other backend's" || bad "11i: cross-acceptance"
+gate=0; for want in cuda hip cpu; do for have in cuda hip cpu; do
+    r=0; l3_fingerprint_expect_backend "$ISO2/.deps/level3/app3/$have/install" "$want" >/dev/null 2>&1 || r=$?
+    if [ "$want" = "$have" ]; then [ $r -eq 0 ] || gate=1; else [ $r -ne 0 ] || gate=1; fi; done; done
+[ "$gate" -eq 0 ] && ok "11j: run-side gate accepts only the profile whose fingerprint records the requested backend (cuda/hip/cpu)" || bad "11j: cross-acceptance"
+
 echo
 echo "test_l3_infra: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]

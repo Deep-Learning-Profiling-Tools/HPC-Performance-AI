@@ -77,7 +77,8 @@ case "$BACKEND" in
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
         # v4.1.1 knows --with-hip=MI8..MI250 (gfx803..gfx90a) only; devel added MI300/MI350 (gfx942/gfx950)
-        CONF_GPU=(--with-hip=MI250); GENCODE=""; ARCHNOTE="gfx950 (UNTESTED; v4.1.1 has no MI350 option)" ;;
+        CONF_GPU=(--with-hip=MI250); GENCODE=""; ARCHNOTE="gfx950 (UNTESTED; v4.1.1 has no MI350 option)"
+        L3_FP_ARCH="MI250" ;;     # what configure actually receives (v4.1.1's --with-hip option), recorded in the fingerprint
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="configure: FC=$SYS_FC CC=$CC MPIFC=mpif90(OMPI_FC=$SYS_FC) --with-mpi ${CONF_GPU[*]} USE_BUNDLED_SCOTCH=1; make GENCODE=${GENCODE:-default}"

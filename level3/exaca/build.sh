@@ -61,7 +61,7 @@ case "$BACKEND" in
         ARCHNOTE="sm_$ARCH ($KARCH)" ;;
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-        KARCH="${HPCPERF_HIP_ARCH:-AMD_GFX950}"; CXX_FOR_KOKKOS=hipcc
+        KARCH="${HPCPERF_HIP_ARCH:-AMD_GFX950}"; CXX_FOR_KOKKOS=hipcc; L3_FP_ARCH="$KARCH"     # configured arch -> fingerprint
         GPU_FLAGS=(-DKokkos_ENABLE_HIP=ON "-DKokkos_ARCH_$KARCH=ON")
         ARCHNOTE="$KARCH" ;;
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;

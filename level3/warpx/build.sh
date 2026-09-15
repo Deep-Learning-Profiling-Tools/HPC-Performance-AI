@@ -49,7 +49,7 @@ case "$BACKEND" in
         ARCHNOTE="sm_$ARCH" ;;
     HIP)
         command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"
+        ARCH="${HPCPERF_HIP_ARCH:-gfx950}"; L3_FP_ARCH="$ARCH"     # the arch this build configures goes into the fingerprint
         GPU_FLAGS=(-DWarpX_COMPUTE=HIP "-DAMReX_AMD_ARCH=$ARCH" -DCMAKE_CXX_COMPILER=hipcc)
         ARCHNOTE="$ARCH" ;;
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;

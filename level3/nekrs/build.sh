@@ -112,7 +112,8 @@ case "$BACKEND" in
     CUDA) command -v nvcc >/dev/null || { echo "build.sh: nvcc not on PATH" >&2; exit 1; }
           OCCA_FLAGS=(-DOCCA_ENABLE_CUDA=ON -DOCCA_ENABLE_HIP=OFF -DOCCA_ENABLE_DPCPP=OFF -DOCCA_ENABLE_OPENCL=OFF); ARCHNOTE="sm_$(l3_gpu_arch) (JIT at run time)" ;;
     HIP)  command -v hipcc >/dev/null 2>&1 || { echo "build.sh: HIP requested but hipcc not found -- HIP build is UNTESTED on this machine (no ROCm)" >&2; exit 1; }
-          OCCA_FLAGS=(-DOCCA_ENABLE_CUDA=OFF -DOCCA_ENABLE_HIP=ON -DOCCA_ENABLE_DPCPP=OFF -DOCCA_ENABLE_OPENCL=OFF); ARCHNOTE="gfx950 (JIT at run time)" ;;
+          OCCA_FLAGS=(-DOCCA_ENABLE_CUDA=OFF -DOCCA_ENABLE_HIP=ON -DOCCA_ENABLE_DPCPP=OFF -DOCCA_ENABLE_OPENCL=OFF); ARCHNOTE="gfx950 (JIT at run time)"
+          L3_FP_ARCH="${HPCPERF_HIP_ARCH:-jit-runtime}" ;;     # OCCA compiles kernels for the device at run time; no arch is fixed at build
     *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
 esac
 CMAKE_OPTS="variant=$VARIANT ${OCCA_FLAGS[*]} ENABLE_HYPRE_GPU=$HYPRE_GPU ENABLE_ADIOS=OFF ENABLE_CVODE=OFF NEKRS_BUILD_FLOAT=OFF NEKRS_GPU_MPI=OFF(default; runtime NEKRS_GPU_MPI) CC=mpicc CXX=mpicxx FC=mpif90(OMPI_FC=$SYS_FC)"

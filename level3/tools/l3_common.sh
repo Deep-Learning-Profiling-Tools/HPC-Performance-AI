@@ -173,9 +173,10 @@ l3_require_materialized() {
     [ -f "$d/benchmark.yaml" ] || { echo "$(basename "$d"): benchmark.yaml missing" >&2; return 3; }
     return 0
 }
-# l3_python_yaml: a python3 with PyYAML. The project conda env activated by hpcperf_env.sh ships no PyYAML,
-#   so inside build/run/validate scripts the first interpreter on PATH may lack it; the system interpreter
-#   (or HPCPERF_PYTHON_YAML) is used then. Only for reading the small provenance/lock YAML files.
+# l3_python_yaml: a python3 with PyYAML. The project conda env (environment.yml) pins PyYAML 6.0.3, so the
+#   interpreter hpcperf_env.sh puts first on PATH normally has it; the fallback chain covers shells where
+#   another python3 comes first, stripped workspaces and HPCPERF_PYTHON_YAML overrides. Only for reading the
+#   small provenance/lock YAML files.
 l3_python_yaml() {
     local p
     for p in "${HPCPERF_PYTHON_YAML:-}" python3 /usr/bin/python3 /usr/local/bin/python3; do
@@ -253,6 +254,16 @@ l3_isolate_build_env() {
 
 l3_first_line() { "$@" 2>/dev/null | head -n 1 || true; }
 l3_cuda_version() { nvcc --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release [^,]*, V\([0-9][0-9.]*\).*$/\1/p' | head -n 1; }
+# l3_rocm_version: the ROCm/HIP version of the toolchain a HIP build uses -- hipconfig --version, else the
+#   "HIP version:" line of hipcc --version, else the ROCm installation metadata ($ROCM_PATH|/opt/rocm)/.info/version.
+#   Prints the literal `none` when no ROCm is present (never a made-up version).
+l3_rocm_version() {
+    local v=""
+    command -v hipconfig >/dev/null 2>&1 && v="$(hipconfig --version 2>/dev/null | head -n 1 | tr -d '[:space:]')"
+    [ -n "$v" ] || { command -v hipcc >/dev/null 2>&1 && v="$(hipcc --version 2>/dev/null | sed -n 's/^HIP version: *\([0-9][0-9.]*\).*$/\1/p' | head -n 1)"; }
+    [ -n "$v" ] || { [ -f "${ROCM_PATH:-/opt/rocm}/.info/version" ] && v="$(head -n 1 "${ROCM_PATH:-/opt/rocm}/.info/version" | tr -d '[:space:]')"; }
+    printf '%s\n' "${v:-none}"
+}
 l3_gpu_arch() { # numeric compute capability of GPU 0, e.g. 100
     nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' .'
 }
@@ -262,7 +273,12 @@ l3_site_profile() {
 }
 
 # l3_fingerprint_text <app> <upstream_sha> <backend> "<deps versions>" "<cmake options>" <gpu_aware_mpi> [patch files...]
-#   Prints the fingerprint for the configuration about to be built. Patches are
+#   Prints the fingerprint for the configuration about to be built. Backend-aware (schema l3-2 unchanged):
+#     cuda: backend=cuda arch=sm_<compute capability of GPU 0>, cuda=<nvcc version>, rocm=none   (text as before)
+#     hip : backend=hip  arch=<the arch the build configured: $L3_FP_ARCH set by build.sh, else $HPCPERF_HIP_ARCH,
+#           else unknown -- never nvidia-smi>, cuda=none, rocm=<l3_rocm_version>
+#     cpu : backend=cpu  arch=cpu, cuda=none, rocm=none
+#   Any other backend is an error. Patches are
 #   recorded IN THE ORDER GIVEN with their content sha256 (the source-cache key
 #   depends on both the upstream SHA and this ordered patch-content hash, so a
 #   same-named patch whose bytes change invalidates the cache). A patch path
@@ -270,16 +286,22 @@ l3_site_profile() {
 #   fingerprint is never written with a silently-missing patch.
 l3_fingerprint_text() {
     local app=$1 sha=$2 backend=$3 deps=$4 cmakeopts=$5 gam=$6; shift 6
-    local p h
+    local p h arch cuda rocm
+    case "$backend" in
+        cuda) arch="sm_$(l3_gpu_arch)"; cuda="$(l3_cuda_version)"; rocm=none ;;
+        hip)  arch="${L3_FP_ARCH:-${HPCPERF_HIP_ARCH:-unknown}}"; cuda=none; rocm="$(l3_rocm_version)" ;;
+        cpu)  arch=cpu; cuda=none; rocm=none ;;
+        *) echo "l3: fingerprint backend must be cuda, hip or cpu (got '$backend')" >&2; return 1 ;;
+    esac
     echo "schema=l3-2"
     echo "application=$app"
     echo "upstream_commit=$sha"
-    echo "backend=$backend arch=sm_$(l3_gpu_arch)"
+    echo "backend=$backend arch=$arch"
     echo "dependencies=$deps"
     echo "compiler=${CXX:-c++} ($(l3_first_line "${CXX:-c++}" --version))"
     echo "fortran=${FC:-gfortran} ($(l3_first_line "${FC:-gfortran}" --version))"
-    echo "cuda=$(l3_cuda_version)"
-    echo "rocm=${ROCM_VERSION:-none}"
+    echo "cuda=$cuda"
+    echo "rocm=$rocm"
     echo "mpi=$(l3_first_line mpirun --version)"
     echo "cmake_options=$cmakeopts"
     echo "gpu_aware_mpi=$gam"
