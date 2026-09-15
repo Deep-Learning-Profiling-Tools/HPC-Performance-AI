@@ -8,7 +8,7 @@ on one node (dgx003: 4x NVIDIA B200 / sm_100, CUDA 13.2.78, RHEL 10, 64 CPUs,
 | Level | Content | Where the truth lives |
 |---|---|---|
 | `level1/` | 50 standalone GPU kernels (CMake, `-DBACKEND=CUDA\|HIP`, ctest validation) | `level1/README.md`, per-benchmark README |
-| `level2/` | 20 mini-apps with upstream build systems + `build.sh/run.sh/validate.sh` | `level2/README.md`, `level2/SCALEOUT_AUDIT.md`, `level2/tools/README.md` |
+| `level2/` | 24 mini-apps with upstream build systems + `build.sh/run.sh/validate.sh` | `level2/README.md`, `level2/SCALEOUT_AUDIT.md`, `level2/tools/README.md` |
 | `level3/` | full production applications, multi-GPU by design | `level3/README.md`, `level3/APPLICATION_AUDIT.md`, `level3/BUILD_STRATEGY.md`, `level3/CORRECTNESS_FIXES.md`, `level3/SECOND_BATCH_STATUS.md`, per-app README |
 
 Read the per-level status document before touching a level; they record what
@@ -89,10 +89,10 @@ Facts that differ from any "reference" you may read elsewhere:
 - One commit per application or infrastructure change, message = what/why with
   the measured facts. Branch names follow `CONTRIBUTING.md` (`level3/<app>`,
   `env/...`, `docs/...`).
-- Worktrees: the main checkout and `../HPC-Performance-AI-b2` (branch
-  `level3/source-freeze`, scheme-3 work) share one repository; `git worktree list`
-  before assuming which branch a path is on. `.deps/`, `build/`, `_upstream/`
-  are per-worktree.
+- Worktrees: feature branches are developed in sibling worktrees
+  (`../HPC-Performance-AI-b*`) of one repository; run `git worktree list` before
+  assuming which branch a path is on, and start new work from `main`. `.deps/`,
+  `build/`, `_upstream/` are per-worktree.
 
 ## Conventions per application (Level 2/3)
 
@@ -262,30 +262,45 @@ Build systems
   FAIL; WarpX 26.09 uses CODATA 2022; single-node smcuda GPU-aware MPI is 3x
   slower for WarpX but 2.5x faster for LAMMPS -- record, don't generalise.
 
-## Current state (2026-09-08)
+## Current state (2026-09-15)
 
-- Level 1: 50/50 validated. Level 2: 19/20 (MiniEM/Trilinos pending the user);
-  10 MPI apps verified at 4 ranks x 4 B200; scale-out launcher in place.
-- Level 3 (`level3/second-batch-bringup`, worktree `-b2`, contains the first
-  batch): LAMMPS, SPARTA, WarpX, SPECFEM3D, nekRS, Nyx (adiabatic decks), CP2K,
-  QMCPACK, DFT-FE, GEOS validated at 1/2/4 GPUs; Nyx heat/cool is
-  STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING (not a pass). Joint-HEAD regression
-  2026-09-07 at `fc4d2a1`: 27 validate calls = 24 PASS + 3 PENDING (first batch,
-  nekRS variants, Nyx); CP2K/QMCPACK/DFT-FE/GEOS not re-run on GPU since then
-  (historical 2026-09-05/06 results) -- never write "Level 3 fully accepted" or
-  "all tests PASS". Status: `level3/README.md`, `level3/SECOND_BATCH_STATUS.md`.
-- Remote (`origin`): `main` = PR #3 (`level3/apps`, Level 3 prep); branches
-  `level2/miniapps`, `level3/apps`, `infra/launcher-correctness` pushed;
-  `level3/second-batch-bringup` pushed on 2026-09-08 as a Draft PR against
-  `main` (not merged). The main worktree checkout stays on
-  `level3/full-apps-bringup` @ 366b72f.
+- Level 1: 50/50 CUDA validated (ctest per benchmark directory; the aggregate
+  `cmake -S level1` configure has no top-level `enable_testing()`).
+- Level 2: 24/24 CUDA single-GPU working/validated on dgx003 (clean-clone
+  protocol, 2026-09-15). 11 applications (amg2023, branson, cloverleaf,
+  examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf, miniem) are
+  the subset with verified 4-rank x 4-B200 single-node multi-GPU correctness.
+  Comb, Quicksilver, SW4lite and GAMESS RI-MP2 have MPI execution paths but
+  1-GPU validation only so far; hipBone and miniWeather have MPI paths without
+  a verified multi-GPU result yet. MiniEM is validated (Trilinos built by
+  `setup_level2_deps.sh trilinos`). GAMESS RI-MP2 needs an environment-provided
+  NVIDIA HPC SDK `nvfortran` (not in the conda env; on dgx003 the site 25.7
+  install with a per-user `makelocalrc` for GCC 14; CUDA arch auto-detected).
+  HIP: untested everywhere (no ROCm). Status: `level2/README.md`,
+  `level2/SCALEOUT_AUDIT.md`.
+- Level 3: 10 applications in `main` (PR #5 source freeze, PR #8 backend/
+  profile isolation of generated state); source artifacts published as
+  `level3-source-hpcperf-l3-v1-rc1` and anonymously verified;
+  `tools/prepare_benchmark.sh level3 <app>` materializes `src/` + `deps/`.
+  CUDA validated at 1/2/4 GPUs as documented per application in
+  `level3/README.md` / `benchmark.yaml`; Nyx heat/cool I_R remains PENDING
+  (rc 3, never a pass); GEOS retired; HIP UNTESTED; multi-node
+  BLOCKED/UNVERIFIED; 8/40/80 GPUs are dry-run plans only. Never write
+  "Level 3 fully accepted" or "all tests PASS".
+- Remote (`origin`): `main` contains PRs #3-#11 (a5d22a5 on 2026-09-15). The
+  bring-up branches (`level2/miniapps`, `level3/apps`,
+  `level3/full-apps-bringup`, `level3/second-batch-bringup`,
+  `level3/source-freeze`, ...) are development provenance, not entry points:
+  work from `main`.
 - Open items (follow-ups, none resolved): Nyx I_R (CPU-vs-CPU and GPU-vs-GPU
   repeats at the original configuration, independent tolerance comparison);
-  GEOS compositional-flow/well unit tests (modules UNVERIFIED); QMCPACK
-  per-walker device memory / cuSOLVER (<= 300 walkers/GPU); numerical acceptance
-  of strong/weak runs; multi-node and HIP; a GPU regression of CP2K/QMCPACK/
-  DFT-FE/GEOS under the run-directory logic; wrapping the run/profiler path in
-  the clean environment; MiniEM/Trilinos for Level 2.
+  GEOS compositional-flow/well unit tests (retired application; modules
+  UNVERIFIED); QMCPACK per-walker device memory / cuSOLVER (<= 300
+  walkers/GPU); numerical acceptance of strong/weak runs; multi-node and HIP;
+  2+/4-GPU validation of Comb/Quicksilver/SW4lite/GAMESS RI-MP2 and multi-GPU
+  decks for hipBone/miniWeather; wrapping the run/profiler path in the clean
+  environment; the site's device-buffer (smcuda) MPI path that hangs Tpetra
+  (MiniEM runs with `TPETRA_ASSUME_GPU_AWARE_MPI=0`).
 
 ## Reporting
 
