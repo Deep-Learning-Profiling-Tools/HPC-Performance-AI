@@ -71,7 +71,7 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP|CPU]" >&2; exit 2 ;;
 esac
 PROFILE="${HPCPERF_NYX_PROFILE:-$PROFILE_DEFAULT}"
-l3_paths_profile nyx "$PROFILE"
+l3_paths_profile nyx "$PROFILE" "$MODEL" || exit 2
 BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 AMREX_PREFIX="$L3_INSTALL/amrex"; SUND_PREFIX="$L3_INSTALL/sundials"

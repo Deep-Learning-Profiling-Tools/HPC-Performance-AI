@@ -22,7 +22,8 @@ run_entry: ./run.sh
 validate_entry: ./validate.sh
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 for C/nvcc host, system gfortran 14.2.1 via OMPI_FC, CUDA 13.2.78, Open
   MPI 5.0.10)
-install_root: .deps/level3/specfem3d
+install_root: .deps/level3/specfem3d/cuda
+profile_scheme: '<backend> (cuda validated; hip: build path present, untested -- no ROCm on the validation node); override HPCPERF_SPECFEM3D_PROFILE must name the backend; generated state .deps/level3/specfem3d/<profile>/ and build/level3/specfem3d/<profile>/'
 dependency_installs: []
 inputs:
 - src/EXAMPLES/applications/homogeneous_halfspace/DATA/Par_file

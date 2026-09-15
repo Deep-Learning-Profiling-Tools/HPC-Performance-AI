@@ -6,11 +6,13 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 dependency isolation, nothing shared with Level 2):
-#   source    level3/exaca/{src,deps}          (materialized by tools/prepare_benchmark.sh; identity in provenance/)
-#   build     build/level3/exaca/<cuda|hip>    (ExaCA) and .deps/level3/exaca/build/ (dependencies)
-#   install   .deps/level3/exaca/install/{kokkos,json,exaca}  (+ .hpcperf-l3-fingerprint, .hpcperf-stage-done)
-#   logs      .deps/level3/exaca/logs
+# Layout (one frozen source tree; generated state isolated per backend profile; nothing shared with Level 2):
+#   source    level3/exaca/{src,deps}                    (materialized by tools/prepare_benchmark.sh; identity in provenance/;
+#                                                        backend-independent -- never copied per backend)
+#   profile   <cuda|hip>   (override HPCPERF_EXACA_PROFILE; a profile must name its backend)
+#   build     build/level3/exaca/<profile>               (ExaCA) and .deps/level3/exaca/<profile>/build/ (dependencies)
+#   install   .deps/level3/exaca/<profile>/install/{kokkos,json,exaca}  (+ .hpcperf-l3-fingerprint, .hpcperf-stage-done)
+#   logs      .deps/level3/exaca/<profile>/logs
 # This script reads application source ONLY from $HERE/src and $HERE/deps; it never fetches, clones or patches.
 # ExaCA and its dependencies build out-of-source (nothing is written into src/ or deps/).
 #
@@ -39,10 +41,12 @@ JSON_TAR="$DEPS/json/json-3.12.0.tar.xz"
 [ -f "$JSON_TAR" ] || { echo "build.sh: $JSON_TAR missing" >&2; exit 3; }
 SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"; KOKKOS_SHA="$(l3_component_commit "$HERE" deps/kokkos)"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$DEPS/kokkos/CMakeLists.txt" | paste -sd.)"
-l3_paths exaca
-BUILD_DIR="$R/build/level3/exaca/$MODEL"
+PROFILE="$(l3_backend_profile EXACA "$MODEL")"
+l3_paths_profile exaca "$PROFILE" "$MODEL" || exit 2
+BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
-KINST="$L3_INSTALL/kokkos-$MODEL"; JINST="$L3_INSTALL/json"; EINST="$L3_INSTALL/exaca-$MODEL"
+# the profile root separates the backends; no per-backend suffix inside the install any more
+KINST="$L3_INSTALL/kokkos"; JINST="$L3_INSTALL/json"; EINST="$L3_INSTALL/exaca"
 
 case "$BACKEND" in
     CUDA)
@@ -65,12 +69,12 @@ esac
 CMAKE_OPTS="Kokkos_ENABLE_${BACKEND}=ON Kokkos_ARCH_${KARCH} Kokkos_ENABLE_SERIAL=ON ExaCA_REQUIRE_EXTERNAL_JSON=ON ExaCA_ENABLE_TESTING=OFF Finch=OFF CMAKE_BUILD_TYPE=Release"
 FP="$(l3_fingerprint_text exaca "$SHA" "$MODEL" "kokkos=$KOKKOS_VER@${KOKKOS_SHA:0:12} nlohmann_json=3.12.0 source_tree=$TREE_SHA" "$CMAKE_OPTS" "n/a (host-staged halo exchange)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
-echo "# ExaCA $BACKEND: upstream $SHA (frozen source tree $TREE_SHA), Kokkos $KOKKOS_VER (deps/kokkos @ ${KOKKOS_SHA:0:12}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# ExaCA $BACKEND profile=$PROFILE: upstream $SHA (frozen source tree $TREE_SHA), Kokkos $KOKKOS_VER (deps/kokkos @ ${KOKKOS_SHA:0:12}), arch $ARCHNOTE, MPI $(mpirun --version 2>/dev/null | head -1), install=$L3_INSTALL"
 t0=$(date +%s)
 
 # stage 1: Kokkos (from deps/kokkos, out-of-source)
 if [ ! -f "$KINST/.hpcperf-stage-done" ]; then
-    KB="$L3_BUILD_DEPS/kokkos-$MODEL"; mkdir -p "$KB"
+    KB="$L3_BUILD_DEPS/kokkos"; mkdir -p "$KB"
     cmake -S "$DEPS/kokkos" -B "$KB" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$KINST" \
         -DCMAKE_CXX_COMPILER="$CXX_FOR_KOKKOS" -DCMAKE_CXX_STANDARD=17 -DKokkos_ENABLE_SERIAL=ON "${GPU_FLAGS[@]}" > "$L3_LOGS/kokkos-configure-$MODEL.log" 2>&1 \
         || { tail -20 "$L3_LOGS/kokkos-configure-$MODEL.log"; echo "build.sh: Kokkos configure failed" >&2; exit 1; }

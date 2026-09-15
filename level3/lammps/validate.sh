@@ -34,13 +34,15 @@ MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
 l3_require_materialized "$HERE" || exit 3
 REF="$HERE/src/bench/log.15Jul25.lj.fixed.g++.1"     # upstream reference log, part of the frozen source bundle
-RUN_DIR="$R/build/level3/lammps/$MODEL/$L3_RUN_SUBDIR"
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
+RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"
 [ -f "$REF" ] || { echo "validate.sh: reference log $REF missing (run tools/prepare_benchmark.sh level3 lammps)" >&2; exit 1; }
 
 unset HPCPERF_SCALE_MODE
 export HPCPERF_GPUS="$N"
-echo "validate.sh: LAMMPS $BACKEND smoke (bench/in.lj, 32000 atoms, 100 steps) on $N GPU(s)"
+echo "validate.sh: LAMMPS $BACKEND smoke (bench/in.lj, 32000 atoms, 100 steps) on $N GPU(s) [profile $PROFILE]"
 
 # run once, on N GPUs, capturing the real exit code (no pipe swallows it)
 run_once() { # <ngpu> <stdout-file>

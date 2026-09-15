@@ -43,7 +43,7 @@ source "$R/level3/tools/l3_common.sh"
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 [ "$BACKEND" = CUDA ] || { echo "run.sh: only CUDA (OpenMP offload + CUDA) is built for QMCPACK here" >&2; exit 2; }
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
-l3_paths_profile qmcpack "$PROFILE"
+l3_paths_profile qmcpack "$PROFILE" cuda || exit 2
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"      # frozen source bundle: tests/solids/diamondC_2x1x1_pp (deck, pseudopotential, orbitals) lives inside it
 LLVM="${HPCPERF_QMCPACK_LLVM:-$L3_INSTALL/llvm}"

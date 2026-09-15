@@ -59,7 +59,7 @@ OMPI_V="$(mpirun --version 2>/dev/null | head -1 | /usr/bin/grep -oE '[0-9]+\.[0
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ "$ARCH" = 100 ] || { echo "build.sh: this profile is defined for sm_100 (B200); detected sm_$ARCH -- set HPCPERF_CUDA_ARCH deliberately if you mean it" >&2; exit 1; }
 GPUVER=B200
 PROFILE="${HPCPERF_CP2K_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-l3_paths_profile cp2k "$PROFILE"
+l3_paths_profile cp2k "$PROFILE" cuda || exit 2
 JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 # The toolchain's private source/build copy lives on the node's LOCAL disk, outside any git
 # work tree: DBCSR 2.10.0's cmake/GetGitRevisionDescription.cmake walks up from its source

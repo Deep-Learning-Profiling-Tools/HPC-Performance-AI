@@ -66,7 +66,7 @@ case "$BACKEND" in
     *) echo "usage: $0 [CUDA|HIP|CPU] [inputs overrides]" >&2; exit 2 ;;
 esac
 PROFILE="${HPCPERF_NYX_PROFILE:-$PROFILE_DEFAULT}"
-l3_paths_profile nyx "$PROFILE"
+l3_paths_profile nyx "$PROFILE" "$MODEL" || exit 2
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"      # frozen source bundle: the official decks and ICs (Exec/*) live inside it
 CASE="${HPCPERF_NYX_CASE:-minisb}"

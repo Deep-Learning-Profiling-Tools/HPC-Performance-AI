@@ -21,7 +21,8 @@ build_entry: ./build.sh
 run_entry: ./run.sh
 validate_entry: ./validate.sh
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper)
-install_root: .deps/level3/warpx
+install_root: .deps/level3/warpx/cuda
+profile_scheme: '<backend> (cuda validated; hip: build path present, untested -- no ROCm on the validation node); override HPCPERF_WARPX_PROFILE must name the backend; generated state .deps/level3/warpx/<profile>/ and build/level3/warpx/<profile>/'
 dependency_installs: []
 inputs:
 - src/Examples/Physics_applications/uniform_plasma/inputs_base_3d
