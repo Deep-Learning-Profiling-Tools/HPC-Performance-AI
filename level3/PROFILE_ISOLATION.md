@@ -94,7 +94,7 @@ always yield the same directory; a different source tree or profile yields a dif
 directories are legacy local state: not read, not migrated, not re-labelled. Covered by `test_l3_infra.sh`
 section 10.
 
-**Empty-scratch CP2K verification:** see the entry at the end of this document.
+**Empty-scratch CP2K verification:** see [Empty-scratch CP2K build](#empty-scratch-cp2k-build-2026-09-15) below.
 
 ## What did not change
 
@@ -170,3 +170,27 @@ definition nor caller, that no active wrapper hardcodes an unprofiled `.deps/lev
 that nekRS refuses `hypregpu x HIP`, and that the migrated build scripts still read the one materialized source
 tree. All seven Level 3 test groups pass (infra 49, Nyx validator 33, verdict 18, ExaCA validator 19, source
 tools 81, release mock 45).
+
+## Empty-scratch CP2K build (2026-09-15)
+
+The first CP2K build in this repository with nothing reused: worktree of this branch (merged with main
+`83c9e12`), CP2K materialized from the artifact cache (`source_tree_sha256 d877d2d4...`), **no `.deps/level3/cp2k`
+profile directory** and **no toolchain scratch directory before the build** (both checked and recorded as absent:
+`/tmp/hpcperf-l3-scratch/cp2k-toolchain/181d2454f815/d877d2d4de46/cuda132-gcc142-ompi5010`). The toolchain installer
+reported "Installing from scratch" for every package (OpenBLAS, FFTW, Eigen, libint lmax 5, libxc, LIBXSMM, LIBXS,
+ScaLAPACK, spglib, DBCSR), took its sources only from the frozen `deps/cp2k-toolchain-dist` tarballs (checksums
+verified by the installer), and left 12,792 object files (3.1 GB) in the new scratch.
+
+| Stage | Result |
+|---|---|
+| [A] toolchain (empty scratch, installer parallel compile) | 460 s; libint lmax 5 alone 84 s |
+| [B] DBCSR 2.10.0 official tests on the GPU (sm_100, MPI+OpenMP) | 217 s, all passed (build.sh refuses to continue otherwise) |
+| [C] CP2K configure/build/install (-j32) | 344 s -> `.deps/level3/cp2k/cuda132-gcc142-ompi5010/install/cp2k/bin/cp2k.psmp` |
+| whole `build.sh CUDA` | 1030 s, fingerprint schema `l3-2`, `backend=cuda` |
+| `validate.sh CUDA` (1 GPU x 8 threads, run tree `run.empty-scratch-2026-09-15`) | 71 s: `CP2K CUDA validation (1 GPU x 8 threads; upstream regtests [QS/regtest-gpw-1/Ar.inp QS/regtest-gpw-1/H2O-geoopt.inp QS/regtest-gpw-1/pyridine.inp QS/regtest-dm-ls-scf-1/H2-big-1.inp QS/regtest-dm-ls-scf-1/H2-big-5.inp] within upstream tolerances, H2O-64 MD complete/all MD-step SCFs converged/finite, GPU backends active): PASS` |
+
+The 1.5-3 h toolchain figure the script used to print came from earlier attempts with the scratch on the NFS
+project filesystem; the build.sh banner now states the measured times. This run verifies the workspace-level
+scratch isolation of this branch by construction (new namespace, nothing pre-existing), in addition to the
+static tests of section 10. The warm-scratch rebuild recorded for PR #10 (toolchain 472 s) is superseded as
+evidence by this one; it remains an honest record of what that run was.

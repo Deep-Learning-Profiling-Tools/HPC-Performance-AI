@@ -90,7 +90,7 @@ TC_OPTS=(--install-dir="$TC_INSTALL" --mpi-mode=openmpi --math-mode=openblas --w
          --with-deepmd=no --with-ace=no --with-greenx=no --with-trexio=no --with-libfci=no --with-mcl=no --with-libgint=no --with-cusolvermp=no)
 
 echo "# CP2K $BACKEND profile=$PROFILE: cp2k $SHA (v2026.2, frozen source tree $TREE_SHA), gcc $(/usr/bin/gcc -dumpfullversion), gfortran $(/usr/bin/gfortran -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
-echo "# resources: toolchain ~1.5-3 h (libint lmax 5 dominates), DBCSR tests ~10 min, CP2K ~40-90 min; disk ~10-15 GB under $L3_DEPS"
+echo "# resources (dgx003, 64 cores, empty scratch, 2026-09-15): toolchain ~8 min (460 s; libint lmax 5 = 84 s with the installer's parallel compile), DBCSR tests ~4 min, CP2K ~6 min at -j32; ~3 GB scratch + ~2 GB under $L3_DEPS. Earlier 1.5-3 h figures came from attempts with the scratch on NFS."
 t0=$(date +%s)
 
 # [A] toolchain (build-side copy of the frozen src/tools/toolchain, which already carries the B200 back-port;
