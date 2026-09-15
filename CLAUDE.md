@@ -287,11 +287,11 @@ Build systems
   (rc 3, never a pass); GEOS retired; HIP UNTESTED; multi-node
   BLOCKED/UNVERIFIED; 8/40/80 GPUs are dry-run plans only. Never write
   "Level 3 fully accepted" or "all tests PASS".
-- Remote (`origin`): `main` contains PRs #3-#11 (a5d22a5 on 2026-09-15). The
-  bring-up branches (`level2/miniapps`, `level3/apps`,
-  `level3/full-apps-bringup`, `level3/second-batch-bringup`,
-  `level3/source-freeze`, ...) are development provenance, not entry points:
-  work from `main`.
+- Remote (`origin`): `main` is the canonical entry point and contains the
+  completed Level 1/2/3 bring-up infrastructure. Historical bring-up branches
+  (`level2/miniapps`, `level3/apps`, `level3/full-apps-bringup`,
+  `level3/second-batch-bringup`, `level3/source-freeze`, ...) are development
+  provenance, not entry points: start new work from `main`.
 - Open items (follow-ups, none resolved): Nyx I_R (CPU-vs-CPU and GPU-vs-GPU
   repeats at the original configuration, independent tolerance comparison);
   GEOS compositional-flow/well unit tests (retired application; modules
