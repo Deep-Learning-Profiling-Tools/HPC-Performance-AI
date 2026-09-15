@@ -113,8 +113,9 @@ Comb initializes mesh and halo values from global coordinates. Its native
 `Comm mpi Mesh cuda` marker.
 
 CUDA clean build, one-GPU execution, correctness, meaningful GPU work, and
-rank-to-device mapping passed. The machine exposed one NVIDIA GPU, so the
-two-GPU runtime test is `NOT-TESTED-HARDWARE-UNAVAILABLE`.
+rank-to-device mapping passed. The recorded validations used one GPU (the contributor's allocation, and the 2026-09-15 clean-clone
+re-validation on dgx003, a node with four B200); a 2- or 4-GPU CUDA correctness run has not been performed
+yet, so the multi-GPU status is `not yet (1-GPU validation only)`.
 
 Future AMD validation:
 
@@ -153,10 +154,10 @@ Reproduce the common toolchain from the repository root with
 
 CUDA Build: PASS
 CUDA Single GPU: PASS
-CUDA Multi-GPU: NOT-TESTED-HARDWARE-UNAVAILABLE
+CUDA Multi-GPU: not yet (1-GPU validation only; dgx003 has four B200, the 2+/4-GPU CUDA correctness run has not been performed)
 CUDA Correctness: PASS
 HIP Integration: INTEGRATED-NOT-LOCALLY-VALIDATED
-HIP Build: NOT-TESTED-HARDWARE-UNAVAILABLE
-HIP Runtime: NOT-TESTED-HARDWARE-UNAVAILABLE
+HIP Build: UNTESTED (no ROCm on the validation node)
+HIP Runtime: UNTESTED (no AMD GPU on the validation node)
 
 HIP runtime was not validated locally because AMD GPU hardware is unavailable.
