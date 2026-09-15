@@ -6,11 +6,13 @@
 #
 #   ./build.sh [CUDA|HIP]        (default CUDA)
 #
-# Layout (Level 3 isolation): source level3/sparta/src (frozen source bundle
-# materialized by tools/prepare_benchmark.sh; identity in provenance/), build
-# build/level3/sparta/<cuda|hip>, install .deps/level3/sparta/install
-# (+ .hpcperf-l3-fingerprint), logs .deps/level3/sparta/logs. Application source
-# is read ONLY from $HERE/src; nothing is fetched, cloned or patched here.
+# Layout (one frozen source tree, generated state isolated per backend profile):
+# source level3/sparta/src (frozen source bundle materialized by
+# tools/prepare_benchmark.sh; identity in provenance/; backend-independent),
+# profile <cuda|hip> (override HPCPERF_SPARTA_PROFILE; must name the backend),
+# build build/level3/sparta/<profile>, install .deps/level3/sparta/<profile>/install
+# (+ .hpcperf-l3-fingerprint), logs .deps/level3/sparta/<profile>/logs. Application
+# source is read ONLY from $HERE/src; nothing is fetched, cloned or patched here.
 #
 # Recipe = upstream cmake/presets/kokkos_common.cmake (PKG_KOKKOS, BUILD_MPI,
 # -O3) loaded with -C, plus the settings of cmake/presets/kokkos_cuda.cmake
@@ -37,8 +39,9 @@ SRC="$HERE/src"
 [ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a SPARTA source tree -- run tools/prepare_benchmark.sh level3 sparta" >&2; exit 3; }
 SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$SRC/lib/kokkos/CMakeLists.txt" | paste -sd.)"
-l3_paths sparta
-BUILD_DIR="$R/build/level3/sparta/$MODEL"
+PROFILE="$(l3_backend_profile SPARTA "$MODEL")"
+l3_paths_profile sparta "$PROFILE" "$MODEL" || exit 2
+BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 
 case "$BACKEND" in
@@ -64,7 +67,7 @@ CMAKE_OPTS="preset=kokkos_common BUILD_MPI=ON PKG_KOKKOS=ON CXX_STANDARD=20 Kokk
 FP="$(l3_fingerprint_text sparta "$SHA" "$MODEL" "kokkos(bundled)=$KOKKOS_VER" "$CMAKE_OPTS" "runtime(-pk kokkos gpu/aware)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
-echo "# SPARTA $BACKEND: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $KARCH, MPI $(mpirun --version 2>/dev/null | head -1)"
+echo "# SPARTA $BACKEND profile=$PROFILE: upstream $SHA (frozen source tree $TREE_SHA), bundled Kokkos $KOKKOS_VER, arch $KARCH, MPI $(mpirun --version 2>/dev/null | head -1), install=$L3_INSTALL"
 mkdir -p "$BUILD_DIR"
 cmake -S "$SRC/cmake" -B "$BUILD_DIR" -G Ninja -C "$SRC/cmake/presets/kokkos_common.cmake" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$L3_INSTALL" -DCMAKE_CXX_STANDARD=20 \

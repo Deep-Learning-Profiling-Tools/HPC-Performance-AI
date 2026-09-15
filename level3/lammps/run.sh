@@ -40,8 +40,11 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-EXE="$R/build/level3/lammps/$MODEL/lmp_kokkos_$MODEL"
-[ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first" >&2; exit 1; }
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: binary, install and run tree of ONE profile
+EXE="$L3_BUILD/lmp_kokkos_$MODEL"
+[ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
+l3_fingerprint_expect_backend "$L3_INSTALL" "$MODEL" || exit 1
 l3_require_materialized "$HERE" || exit 3
 SRC="$HERE/src"      # frozen source bundle (decks bench/in.lj live inside it; never _upstream)
 
@@ -62,7 +65,7 @@ case "$MODE" in
             PROCS=(-var px "$PX" -var py "$PY" -var pz "$PZ") ;;
 esac
 ATOMS=$(( 4 * 20 * X * 20 * Y * 20 * Z ))
-RUN_DIR="$R/build/level3/lammps/$MODEL/$L3_RUN_SUBDIR"
+RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR"
 # A dry-run must never touch real results: it writes its derived deck and would-be
 # log into a throwaway .dryrun/ subdir instead of the real run directory.
 [ -n "${HPCPERF_DRY_RUN:-}" ] && RUN_DIR="$RUN_DIR/.dryrun"
@@ -82,7 +85,7 @@ IN="$RUN_DIR/in.lj.$MODE"
     fi
 } > "$IN"
 
-echo "# LAMMPS $BACKEND: mode=$MODE ranks=$N_RANKS box=$((20*X))x$((20*Y))x$((20*Z)) fcc cells = $ATOMS atoms ($((ATOMS / N_RANKS))/rank), $STEPS steps, gpu-aware=$GAM, log=$LOG"
+echo "# LAMMPS $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS box=$((20*X))x$((20*Y))x$((20*Z)) fcc cells = $ATOMS atoms ($((ATOMS / N_RANKS))/rank), $STEPS steps, gpu-aware=$GAM, log=$LOG"
 RUN_ID="$(l3_run_id)"
 rc=0
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
@@ -90,9 +93,10 @@ rc=0
     -in "$IN" -var x "$X" -var y "$Y" -var z "$Z" "${PROCS[@]}" -var steps "$STEPS" \
     -log "$LOG" -echo none "$@" || rc=$?
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=lammps" "backend=$BACKEND" "mode=$MODE" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=lammps" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" \
         "ranks=$N_RANKS" "atoms=$ATOMS" "steps=$STEPS" "gpu_aware=$GAM" "exit_code=$rc" \
         "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
+        "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
         "log=$LOG" "utc=$(date -u +%FT%TZ)"
 fi
 exit "$rc"

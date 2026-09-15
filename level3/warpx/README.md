@@ -40,6 +40,13 @@ superbuild), **0 compiler warning lines**; executable
 under `.deps/level3/warpx/install` with the fingerprint (upstream commit,
 AMReX commit, compiler, CUDA 13.2.78, MPI, CMake options).
 
+Layout since 2026-09-15 (backend/profile isolation): profile `cuda` (or `hip`; override `HPCPERF_WARPX_PROFILE`,
+must name the backend); build tree `build/level3/warpx/<profile>/`, install/logs
+`.deps/level3/warpx/<profile>/{install,logs}` with the fingerprint in the profile's install; results under
+`build/level3/warpx/<profile>/run*/`. The results recorded above were produced with the pre-profile layout
+(`.deps/level3/warpx/install`, `build/level3/warpx/cuda`), which is kept as historical state and is never read by
+the current scripts.
+
 Why not the others: the Spack `warpx` recipe stops at 26.08 and takes the
 architecture only through the legacy `^amrex cuda_arch=` path; the local Spack
 checkout is 2025-05 (warpx 25.04); no Apptainer on the node and the only

@@ -27,7 +27,7 @@ source "$R/level3/tools/l3_common.sh"
 l3_isolate_build_env
 l3_clean_conda_build_env
 PROFILE="${HPCPERF_QMCPACK_PROFILE:-clang231-cuda132-offload}"
-l3_paths_profile qmcpack "$PROFILE"
+l3_paths_profile qmcpack "$PROFILE" cuda || exit 2
 # Sources come ONLY from the frozen bundle materialized here (tools/prepare_benchmark.sh): src/ = QMCPACK
 # v4.4.0, deps/{hdf5,boost,openblas}/<tarball> = the pinned dependency sources. The private LLVM offload
 # toolchain is an environment-provided COMPILER (toolchain/build_llvm.sh), not benchmark source.

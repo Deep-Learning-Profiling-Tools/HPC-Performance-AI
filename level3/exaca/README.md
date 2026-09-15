@@ -42,10 +42,10 @@ unchanged; the artifact was re-frozen with it before any publication (same `sour
 
 Three out-of-source stages from the materialized artifact only (`$HERE/src`, `$HERE/deps`; no fetch, no
 patch): (1) Kokkos 4.7.04, CUDA backend, `Kokkos_ARCH_BLACKWELL100` (sm_100, detected), Serial host
-backend, `nvcc_wrapper` with the conda GCC 13.3.0 host compiler -> `.deps/level3/exaca/install/kokkos-cuda`;
+backend, `nvcc_wrapper` with the conda GCC 13.3.0 host compiler -> `.deps/level3/exaca/<profile>/install/kokkos`;
 (2) nlohmann_json 3.12.0 from the bundled tarball (header-only, `JSON_BuildTests=OFF`) ->
 `install/json`; (3) ExaCA with `ExaCA_REQUIRE_EXTERNAL_JSON=ON`, `ExaCA_ENABLE_TESTING=OFF`, no Finch ->
-`build/level3/exaca/cuda` and `install/exaca-cuda` (`bin/ExaCA`, `bin/ExaCA-GrainAnalysis`, material and
+`build/level3/exaca/<profile>` and `install/exaca` (`bin/ExaCA`, `bin/ExaCA-GrainAnalysis`, material and
 orientation data under `share/ExaCA`, which is where ExaCA resolves the file names of the deck). MPI: conda
 Open MPI 5.0.10 (CUDA-aware, not required: ExaCA stages its halos through host buffers). **Verified
 build time 109 s** at `-j32` (all three stages). HIP: the same script selects `hipcc` + `Kokkos_ENABLE_HIP`
@@ -81,8 +81,15 @@ because the 4 B/cell field write is not the CA work being measured).
 | 40 / 80 GPUs | strong box | 1.68 M / 0.84 M | -- | `HPCPERF_DRY_RUN=1 HPCPERF_NODES=10|20`: HYPOTHETICAL plan only, never executed (multi-node BLOCKED/UNVERIFIED on this site) |
 
 Overrides: `HPCPERF_EXACA_NX/NY/NZ` (Ny per rank in weak mode), `HPCPERF_EXACA_SEED`. A second positional
-deck on the command line is rejected. Results land in `build/level3/exaca/cuda/<run>/dirsolid.<mode>.np<N>/`
+deck on the command line is rejected. Results land in `build/level3/exaca/<profile>/<run>/dirsolid.<mode>.np<N>/`
 with `run_manifest.txt` (run id, binary sha256, deck sha256, sizes, exit code).
+
+Layout since 2026-09-15 (backend/profile isolation): profile `cuda` (or `hip`; override `HPCPERF_EXACA_PROFILE`,
+must name the backend); build tree `build/level3/exaca/<profile>/`, install/logs
+`.deps/level3/exaca/<profile>/{install,logs}` with the fingerprint in the profile's install; results under
+`build/level3/exaca/<profile>/run*/`. The results recorded above were produced with the pre-profile layout
+(`.deps/level3/exaca/install`, `build/level3/exaca/cuda`), which is kept as historical state and is never read by
+the current scripts. Until 2026-09-15 the install used per-backend suffixes inside a shared root (`install/kokkos-cuda`, `install/exaca-cuda`); the profile root (`.deps/level3/exaca/<profile>/install/{kokkos,json,exaca}`) replaces that scheme.
 
 ## Correctness criteria (`validate.sh` -> `exaca_check.py validate`, exit 0 PASS / 1 FAIL) -- protocol v2
 

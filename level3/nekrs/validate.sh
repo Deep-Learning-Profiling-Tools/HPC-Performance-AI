@@ -35,8 +35,10 @@ N="${HPCPERF_GPUS:-1}"
 CIMODE="${HPCPERF_NEKRS_CIMODE:-2}"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-2400}"
 VARIANT="${HPCPERF_NEKRS_VARIANT:-$([ "${HPCPERF_NEKRS_HYPRE_GPU:-ON}" = ON ] && echo hypregpu || echo cpucoarse)}"
-if [ "$VARIANT" = hypregpu ]; then VBD="$R/build/level3/nekrs/$MODEL"; else VBD="$R/build/level3/nekrs/$VARIANT.$MODEL"; fi
-OUT="$VBD/$L3_RUN_SUBDIR/validate.cimode$CIMODE.np$N.log"
+PROFILE="$(l3_backend_profile NEKRS "$MODEL" "$VARIANT")"     # same derivation as build.sh/run.sh: <variant>.<backend>
+if [ "$VARIANT" = hypregpu ] && [ "$MODEL" != cuda ]; then echo "validate.sh: variant hypregpu is CUDA-only; backend $BACKEND is not defined for it (see build.sh)" >&2; exit 2; fi
+l3_paths_profile nekrs "$PROFILE" "$MODEL" || exit 2
+OUT="$L3_BUILD/$L3_RUN_SUBDIR/validate.cimode$CIMODE.np$N.log"
 
 # complete CI-check counts and required coarse-solver location, per cimode
 case "$CIMODE" in
@@ -47,7 +49,7 @@ esac
 
 export HPCPERF_GPUS="$N"
 mkdir -p "$(dirname "$OUT")"
-echo "validate.sh: nekRS $BACKEND variant=$VARIANT ethier --cimode $CIMODE (upstream CI mode; expect $EXPECT_CHECKS checks, coarse=$WANT_COARSE) on $N GPU(s)"
+echo "validate.sh: nekRS $BACKEND variant=$VARIANT profile=$PROFILE ethier --cimode $CIMODE (upstream CI mode; expect $EXPECT_CHECKS checks, coarse=$WANT_COARSE) on $N GPU(s)"
 rc=0
 HPCPERF_SCALE_MODE=smoke timeout "$TIMEOUT" "$HERE/run.sh" "$BACKEND" --cimode "$CIMODE" > "$OUT" 2>&1 || rc=$?
 grep -aE '^#|hpcperf-launch: audit summary|CI test|L2 err|COARSE SOLVER LOCATION|COARSE SOLVER PRECISION|elapsedStepSum|ERROR|Abort|abort' "$OUT" | grep -aiv 'no error' | sed 's/^/  /' | tail -50

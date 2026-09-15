@@ -59,7 +59,7 @@ OMPI_V="$(mpirun --version 2>/dev/null | head -1 | /usr/bin/grep -oE '[0-9]+\.[0
 ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ "$ARCH" = 100 ] || { echo "build.sh: this profile is defined for sm_100 (B200); detected sm_$ARCH -- set HPCPERF_CUDA_ARCH deliberately if you mean it" >&2; exit 1; }
 GPUVER=B200
 PROFILE="${HPCPERF_CP2K_PROFILE:-cuda$(l3_version_mm "$(l3_cuda_version)")-gcc${GCC_MM}-ompi$(echo "$OMPI_V" | tr -d .)}"
-l3_paths_profile cp2k "$PROFILE"
+l3_paths_profile cp2k "$PROFILE" cuda || exit 2
 JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 # The toolchain's private source/build copy lives on the node's LOCAL disk, outside any git
 # work tree: DBCSR 2.10.0's cmake/GetGitRevisionDescription.cmake walks up from its source
@@ -67,8 +67,17 @@ JOBS="${HPCPERF_BUILD_JOBS:-32}"; export NPROCS_OVERWRITE="$JOBS"
 # absolute gitdir it points to as a relative path -> "file failed to open for reading" and
 # a configure abort. Everything the later stages need (install prefix, setup/toolchain.conf,
 # logs) stays under the profile tree; $L3_SRC/toolchain is a symlink to the scratch copy.
-TC_SCRATCH="${HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-/tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/$PROFILE}"
-mkdir -p "$(dirname "$TC_SCRATCH")"; [ -L "$L3_SRC/toolchain" ] || { rm -rf "$L3_SRC/toolchain"; ln -sfn "$TC_SCRATCH" "$L3_SRC/toolchain"; }
+# The scratch is still isolated per WORKSPACE x frozen SOURCE x PROFILE (l3_local_scratch_dir:
+# <base>/hpcperf-l3-scratch/cp2k-toolchain/<hash of the workspace root>/<source_tree_sha256 prefix>/<profile>),
+# so two worktrees or agent workspaces with the same profile never share mutable toolchain state;
+# HPCPERF_CP2K_TOOLCHAIN_SCRATCH=/explicit/path overrides it. The pre-2026-09-15 location
+# /tmp/hpcperf-l3-b2-scratch/cp2k-toolchain/<profile> (shared by profile name only) is legacy local
+# state and is never read.
+TC_SCRATCH="${HPCPERF_CP2K_TOOLCHAIN_SCRATCH:-$(l3_local_scratch_dir cp2k-toolchain "$TREE_SHA" "$PROFILE")}"
+mkdir -p "$(dirname "$TC_SCRATCH")"
+# the profile's src/toolchain points at THIS scratch (a symlink left by another scratch location is replaced)
+[ -e "$L3_SRC/toolchain" ] && [ ! -L "$L3_SRC/toolchain" ] && rm -rf "$L3_SRC/toolchain"; ln -sfn "$TC_SCRATCH" "$L3_SRC/toolchain"
+echo "# toolchain scratch (outside the worktree, workspace/source/profile-specific): $TC_SCRATCH"
 TC_SRC="$TC_SCRATCH"; TC_INSTALL="$L3_INSTALL/toolchain"; CP2K_PREFIX="$L3_INSTALL/cp2k"
 PATCHES=("$HERE/patches/0001-toolchain-b200-backport-cp2k-378b2fab.patch")   # already applied in the frozen src/tools/toolchain; content hash kept in the fingerprint
 [ "$(l3_lock_patches "$HERE")" = "$(basename "${PATCHES[0]}")" ] || { echo "build.sh: the lock's patch series ($(l3_lock_patches "$HERE")) differs from the expected $(basename "${PATCHES[0]}")" >&2; exit 3; }
@@ -79,34 +88,9 @@ TC_OPTS=(--install-dir="$TC_INSTALL" --mpi-mode=openmpi --math-mode=openblas --w
          --with-elpa=no --with-cosma=no --with-sirius=no --with-tblite=no --with-libvori=no --with-hdf5=no --with-plumed=no
          --with-libtorch=no --with-gsl=no --with-dftd4=no --with-spla=no --with-spfft=no --with-gauxc=no --with-libsmeagol=no
          --with-deepmd=no --with-ace=no --with-greenx=no --with-trexio=no --with-libfci=no --with-mcl=no --with-libgint=no --with-cusolvermp=no)
-# Installed binaries carry an RPATH to the toolchain library directories (and libcp2k.so) so that the BLAS/LAPACK,
-# ScaLAPACK, FFTW, libxc, ... actually used at run time are the toolchain's, independent of LD_LIBRARY_PATH ordering;
-# run.sh verifies the resolution with ldd before every run.
-TC_RPATH="$( { ls -d "$TC_INSTALL"/*/lib "$TC_INSTALL"/*/lib64 2>/dev/null || true; } | paste -sd';')"   # (ls exits 2 when no lib64 exists: keep set -e/pipefail quiet)
-# BLAS/LAPACK: the toolchain's static OpenBLAS (its own convention, MATH_LIBS="-l:libopenblas.a") through CP2K's CUSTOM
-# vendor -- a dynamic -lopenblas resolved at run time to whichever libopenblas.so.0 the loader met first (the conda MPI
-# wrapper puts its rpath before ours), which was the conda pthreads OpenBLAS in attempts 1 and 2.
-TC_OPENBLAS_A="$(ls "$TC_INSTALL"/openblas-*/lib/libopenblas.a 2>/dev/null | head -1)"
-[ -f "$TC_OPENBLAS_A" ] || { echo "build.sh: toolchain libopenblas.a not found under $TC_INSTALL" >&2; exit 1; }
-TC_RPATH_COLON="${TC_RPATH//;/:}"
-CP2K_CMAKE=(-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON "-DCMAKE_INSTALL_PREFIX=$CP2K_PREFIX" "-DCP2K_DATA_DIR=$SRC/data"
-            "-DCMAKE_INSTALL_RPATH=$CP2K_PREFIX/lib;$TC_RPATH" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
-            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON" "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON"
-            -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_Fortran_COMPILER=/usr/bin/gfortran
-            -DCP2K_USE_MPI=ON -DCP2K_USE_MPI_F08=ON -DCP2K_USE_FFTW3=ON -DCP2K_USE_LIBXC=ON -DCP2K_USE_LIBINT2=ON
-            -DCP2K_USE_LIBXS=ON -DCP2K_USE_LIBXSMM=ON -DCP2K_USE_SPGLIB=ON
-            -DCP2K_USE_ELPA=OFF -DCP2K_USE_COSMA=OFF -DCP2K_USE_SIRIUS=OFF -DCP2K_USE_TBLITE=OFF -DCP2K_USE_VORI=OFF -DCP2K_USE_DFTD4=OFF
-            -DCP2K_USE_HDF5=OFF -DCP2K_USE_PLUMED=OFF -DCP2K_USE_LIBTORCH=OFF -DCP2K_USE_GAUXC=OFF -DCP2K_USE_GREENX=OFF -DCP2K_USE_TREXIO=OFF
-            -DCP2K_USE_ACE=OFF -DCP2K_USE_DEEPMD=OFF -DCP2K_USE_LIBFCI=OFF -DCP2K_USE_MIMIC=OFF -DCP2K_USE_LIBSMEAGOL=OFF -DCP2K_USE_SPLA=OFF
-            -DCP2K_BLAS_VENDOR=CUSTOM "-DCP2K_BLAS_LINK_LIBRARIES=$TC_OPENBLAS_A" "-DCP2K_LAPACK_LINK_LIBRARIES=$TC_OPENBLAS_A" -DCP2K_SCALAPACK_VENDOR=GENERIC
-            -DCP2K_USE_ACCEL=CUDA "-DCMAKE_CUDA_ARCHITECTURES=$ARCH" -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++)
-CMAKE_OPTS="blas=CUSTOM:toolchain-libopenblas.a(static) install_rpath=toolchain-first ${CP2K_CMAKE[*]} | toolchain: ${TC_OPTS[*]}"
-DEPS="toolchain(install_cp2k_toolchain.sh v2026.2 + backport 378b2fab) dbcsr=2.10.0(sha256 3d897220fbb4498215331efad6905eb7744881b4cf04eb5c5fb4db7c48a56ef9; B200 entry=arch 100, libsmm_acc parameters=H100 reused) openblas/scalapack/fftw3/libint(lmax5)/libxc/libxsmm/libxs/spglib=toolchain pins gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V profile=$PROFILE dbcsr_tests=$( [ -n "${HPCPERF_CP2K_SKIP_DBCSR_TEST:-}" ] && echo SKIPPED || echo required)"
-FP="$(l3_fingerprint_text cp2k "$SHA" cuda "$DEPS" "$CMAKE_OPTS" "not-used(DBCSR/DBM communicate through host buffers)" "${PATCHES[@]}")"
-l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
 echo "# CP2K $BACKEND profile=$PROFILE: cp2k $SHA (v2026.2, frozen source tree $TREE_SHA), gcc $(/usr/bin/gcc -dumpfullversion), gfortran $(/usr/bin/gfortran -dumpfullversion), $(mpirun --version | head -1), CUDA $(l3_cuda_version) sm_$ARCH, -j$JOBS"
-echo "# resources: toolchain ~1.5-3 h (libint lmax 5 dominates), DBCSR tests ~10 min, CP2K ~40-90 min; disk ~10-15 GB under $L3_DEPS"
+echo "# resources (dgx003, 64 cores, empty scratch, 2026-09-15): toolchain ~8 min (460 s; libint lmax 5 = 84 s with the installer's parallel compile), DBCSR tests ~4 min, CP2K ~6 min at -j32; ~3 GB scratch + ~2 GB under $L3_DEPS. Earlier 1.5-3 h figures came from attempts with the scratch on NFS."
 t0=$(date +%s)
 
 # [A] toolchain (build-side copy of the frozen src/tools/toolchain, which already carries the B200 back-port;
@@ -132,6 +116,38 @@ set +u; # shellcheck disable=SC1091
 source "$TC_INSTALL/setup"; set -u
 # the toolchain's setup may re-point compilers; keep the system GCC and the conda MPI wrappers
 export CC=/usr/bin/gcc CXX=/usr/bin/g++ FC=/usr/bin/gfortran OMPI_CC=/usr/bin/gcc OMPI_CXX=/usr/bin/g++ OMPI_FC=/usr/bin/gfortran
+
+# The CP2K configure options, the CMAKE_OPTS text and the fingerprint depend on the toolchain install
+# layout (RPATH directories, the static OpenBLAS archive), so they are derived AFTER stage [A] has
+# produced (or already provides) that install. Until 2026-09-15 they were computed before stage [A],
+# which aborted a fresh build ("toolchain libopenblas.a not found") and could only ever re-run on top
+# of an existing toolchain. The text is identical for an existing toolchain, so the validated install
+# keeps its fingerprint identity. The fingerprint check still runs before stages [B] and [C].
+# Installed binaries carry an RPATH to the toolchain library directories (and libcp2k.so) so that the BLAS/LAPACK,
+# ScaLAPACK, FFTW, libxc, ... actually used at run time are the toolchain's, independent of LD_LIBRARY_PATH ordering;
+# run.sh verifies the resolution with ldd before every run.
+TC_RPATH="$( { ls -d "$TC_INSTALL"/*/lib "$TC_INSTALL"/*/lib64 2>/dev/null || true; } | paste -sd';')"   # (ls exits 2 when no lib64 exists: keep set -e/pipefail quiet)
+# BLAS/LAPACK: the toolchain's static OpenBLAS (its own convention, MATH_LIBS="-l:libopenblas.a") through CP2K's CUSTOM
+# vendor -- a dynamic -lopenblas resolved at run time to whichever libopenblas.so.0 the loader met first (the conda MPI
+# wrapper puts its rpath before ours), which was the conda pthreads OpenBLAS in attempts 1 and 2.
+TC_OPENBLAS_A="$(ls "$TC_INSTALL"/openblas-*/lib/libopenblas.a 2>/dev/null | head -1)"
+[ -f "$TC_OPENBLAS_A" ] || { echo "build.sh: toolchain libopenblas.a not found under $TC_INSTALL" >&2; exit 1; }
+TC_RPATH_COLON="${TC_RPATH//;/:}"
+CP2K_CMAKE=(-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON "-DCMAKE_INSTALL_PREFIX=$CP2K_PREFIX" "-DCP2K_DATA_DIR=$SRC/data"
+            "-DCMAKE_INSTALL_RPATH=$CP2K_PREFIX/lib;$TC_RPATH" -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
+            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON" "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,$CP2K_PREFIX/lib:$TC_RPATH_COLON"
+            -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_Fortran_COMPILER=/usr/bin/gfortran
+            -DCP2K_USE_MPI=ON -DCP2K_USE_MPI_F08=ON -DCP2K_USE_FFTW3=ON -DCP2K_USE_LIBXC=ON -DCP2K_USE_LIBINT2=ON
+            -DCP2K_USE_LIBXS=ON -DCP2K_USE_LIBXSMM=ON -DCP2K_USE_SPGLIB=ON
+            -DCP2K_USE_ELPA=OFF -DCP2K_USE_COSMA=OFF -DCP2K_USE_SIRIUS=OFF -DCP2K_USE_TBLITE=OFF -DCP2K_USE_VORI=OFF -DCP2K_USE_DFTD4=OFF
+            -DCP2K_USE_HDF5=OFF -DCP2K_USE_PLUMED=OFF -DCP2K_USE_LIBTORCH=OFF -DCP2K_USE_GAUXC=OFF -DCP2K_USE_GREENX=OFF -DCP2K_USE_TREXIO=OFF
+            -DCP2K_USE_ACE=OFF -DCP2K_USE_DEEPMD=OFF -DCP2K_USE_LIBFCI=OFF -DCP2K_USE_MIMIC=OFF -DCP2K_USE_LIBSMEAGOL=OFF -DCP2K_USE_SPLA=OFF
+            -DCP2K_BLAS_VENDOR=CUSTOM "-DCP2K_BLAS_LINK_LIBRARIES=$TC_OPENBLAS_A" "-DCP2K_LAPACK_LINK_LIBRARIES=$TC_OPENBLAS_A" -DCP2K_SCALAPACK_VENDOR=GENERIC
+            -DCP2K_USE_ACCEL=CUDA "-DCMAKE_CUDA_ARCHITECTURES=$ARCH" -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++)
+CMAKE_OPTS="blas=CUSTOM:toolchain-libopenblas.a(static) install_rpath=toolchain-first ${CP2K_CMAKE[*]} | toolchain: ${TC_OPTS[*]}"
+DEPS="toolchain(install_cp2k_toolchain.sh v2026.2 + backport 378b2fab) dbcsr=2.10.0(sha256 3d897220fbb4498215331efad6905eb7744881b4cf04eb5c5fb4db7c48a56ef9; B200 entry=arch 100, libsmm_acc parameters=H100 reused) openblas/scalapack/fftw3/libint(lmax5)/libxc/libxsmm/libxs/spglib=toolchain pins gcc=$(/usr/bin/gcc -dumpfullversion) openmpi=$OMPI_V profile=$PROFILE dbcsr_tests=$( [ -n "${HPCPERF_CP2K_SKIP_DBCSR_TEST:-}" ] && echo SKIPPED || echo required)"
+FP="$(l3_fingerprint_text cp2k "$SHA" cuda "$DEPS" "$CMAKE_OPTS" "not-used(DBCSR/DBM communicate through host buffers)" "${PATCHES[@]}")"
+l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 
 # [B] DBCSR official tests on the GPU (from the toolchain's patched DBCSR source)
 DB_SRC="$TC_SRC/build/dbcsr-2.10.0"; DB_TEST="$L3_BUILD_DEPS/dbcsr-test"

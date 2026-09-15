@@ -1,13 +1,19 @@
 #!/bin/bash
 # l3_common.sh -- shared helpers for Level 3 application wrappers. Source it.
 #
-# Dependency isolation: every Level 3 application owns a private tree
-#     $R/.deps/level3/<app>/{src,build,install,logs}
-# (never a shared install root, so Kokkos/AMReX/MPI/hypre versions of
-# different applications cannot pollute each other), plus its frozen source
-# artifact materialized under level3/<app>/{src,deps} by tools/prepare_benchmark.sh
-# (freeze-time input only: $R/_upstream/level3/<Name>) and its own build tree under
-# $R/build/level3/<app>/<backend>. Nothing here touches the Level 2 tree.
+# Layout: ONE frozen source tree per benchmark, level3/<app>/{src,deps} (materialized by
+# tools/prepare_benchmark.sh; backend-independent, never copied per backend), and ALL generated
+# state isolated per backend/profile (l3_paths_profile):
+#     $R/.deps/level3/<app>/<profile>/{src,build,install,logs,cache}   build-side source copy (only for
+#         in-tree builds), dependency builds, install prefix (+ fingerprint), logs, JIT/other caches
+#     $R/build/level3/<app>/<profile>/                                 application build tree (+ run dirs)
+# A profile uniquely identifies a configuration whose binaries/installs are not interchangeable and
+# ALWAYS names its backend (cuda|hip|cpu): plain "cuda"/"hip" for applications that differ only in the
+# accelerator backend, "<variant>.<backend>" for nekRS, "cuda132-gcc142-ompi5010"-style toolchain
+# identities for the second batch. CUDA and HIP never share writable generated state. No shared
+# install root exists, so Kokkos/AMReX/MPI/hypre of different applications (or backends) cannot
+# pollute each other. Backend separation applies to generated state, not to source duplication.
+# Nothing here touches the Level 2 tree.
 #
 # Fingerprint: an install is stamped with .hpcperf-l3-fingerprint recording
 # application, upstream commit, dependency versions, compiler, CUDA/ROCm, GPU
@@ -43,27 +49,86 @@ L3_TOPOLOGY="$HPCPERF_RUNTIME_DIR/hpcperf_topology.py"
 # shellcheck disable=SC1091
 source "$HPCPERF_RUNTIME_DIR/hpcperf_launch_common.sh"
 
-# l3_paths <app>: exports L3_APP, L3_UPSTREAM, L3_DEPS, L3_SRC, L3_BUILD_DEPS, L3_INSTALL, L3_LOGS
-l3_paths() {
-    L3_APP="$1"
-    L3_DEPS="$L3_R/.deps/level3/$L3_APP"
-    L3_SRC="$L3_DEPS/src"; L3_BUILD_DEPS="$L3_DEPS/build"; L3_INSTALL="$L3_DEPS/install"; L3_LOGS="$L3_DEPS/logs"
-    mkdir -p "$L3_SRC" "$L3_BUILD_DEPS" "$L3_INSTALL" "$L3_LOGS"
+# (The legacy `l3_paths <app>` helper -- ONE shared .deps/level3/<app>/{src,build,install,logs} for every
+# backend -- was removed on 2026-09-15; every application goes through l3_paths_profile. Pre-migration
+# installs may still exist at that legacy location: they are historical state and are never read.)
+
+L3_BACKENDS="cuda hip cpu"
+# l3_profile_backend_check <profile> <backend>
+#   A profile identity must name its backend: some '-'/'.'-separated component of the profile is the backend
+#   name itself or the backend name followed by a version (cuda, cuda132, hip, cpu), and no component names
+#   ANOTHER backend. "cuda", "hypregpu.cuda", "cuda132-gcc142-ompi5010", "clang231-cuda132-offload" are CUDA
+#   profiles; "hip", "hip-gfx950-adiabatic", "cpucoarse.hip" are HIP profiles ("cpucoarse" is a nekRS
+#   variant, not a backend token); "cuda" with backend hip, or "foo" with any backend, is refused (exit 2).
+l3_profile_backend_check() {
+    local profile=$1 want=$2 comp b found=0 other=""
+    case " $L3_BACKENDS " in *" $want "*) : ;; *) echo "l3: unknown backend '$want' (expected one of: $L3_BACKENDS)" >&2; return 2;; esac
+    local -a comps; IFS='.-' read -ra comps <<<"$profile"
+    for comp in "${comps[@]}"; do
+        for b in $L3_BACKENDS; do
+            if [ "$comp" = "$b" ] || [[ "$comp" =~ ^${b}[0-9]+$ ]]; then
+                if [ "$b" = "$want" ]; then found=1; else other="$other $comp"; fi
+            fi
+        done
+    done
+    if [ -n "$other" ]; then
+        echo "l3: profile '$profile' names another backend ($other) while backend '$want' was requested -- profile/BACKEND conflict, refusing" >&2; return 2
+    fi
+    if [ "$found" -ne 1 ]; then
+        echo "l3: profile '$profile' does not name backend '$want' -- a profile must carry its backend identity (e.g. '$want' or '<variant>.$want')" >&2; return 2
+    fi
+    return 0
 }
 
-# l3_paths_profile <app> <profile>: second-batch layout -- one private tree per
-# *configuration profile* (compiler/Toolkit/backend/key-dependency variant):
-#     $R/.deps/level3/<app>/<profile>/{src,build,install,logs,cache}
-# exports L3_APP, L3_PROFILE, L3_DEPS, L3_SRC, L3_BUILD_DEPS, L3_INSTALL, L3_LOGS,
-# L3_CACHE and L3_BUILD (= $R/build/level3/<app>/<profile>, the application build
-# tree). Different profiles never share a mutable source tree or an install.
+# l3_backend_profile <APPVAR> <backend> [variant]
+#   The profile name that build.sh, run.sh and validate.sh of a backend-only application derive
+#   IDENTICALLY: $HPCPERF_<APPVAR>_PROFILE when set (it must still name the backend; l3_paths_profile
+#   checks), otherwise "<backend>" or "<variant>.<backend>" (nekRS: hypregpu.cuda, cpucoarse.cuda).
+l3_backend_profile() {
+    local var="HPCPERF_${1}_PROFILE" backend=$2 variant=${3:-}
+    if [ -n "${!var:-}" ]; then printf '%s\n' "${!var}"; else printf '%s\n' "${variant:+$variant.}$backend"; fi
+}
+
+# l3_paths_profile <app> <profile> [backend]
+#   One private tree per *configuration profile*:
+#     $R/.deps/level3/<app>/<profile>/{src,build,install,logs,cache}   and   $R/build/level3/<app>/<profile>
+#   exports L3_APP, L3_PROFILE, L3_BACKEND, L3_DEPS, L3_SRC, L3_BUILD_DEPS, L3_INSTALL, L3_LOGS, L3_CACHE,
+#   L3_BUILD (the application build tree; run directories live under it). With <backend> given
+#   (cuda|hip|cpu) the profile must name that backend (l3_profile_backend_check): a profile override that
+#   conflicts with the requested BACKEND fails fast, before any directory is created. Different profiles
+#   never share a mutable source copy, a build tree, an install prefix, a fingerprint, logs or a cache.
+#   A pre-migration shared install (.deps/level3/<app>/install) is reported and NEVER used.
 l3_paths_profile() {
-    L3_APP="$1"; L3_PROFILE="$2"
+    L3_APP="$1"; L3_PROFILE="$2"; L3_BACKEND="${3:-}"
     case "$L3_PROFILE" in ""|*/*|.*) echo "l3_paths_profile: invalid profile name '$L3_PROFILE'" >&2; return 2;; esac
+    if [ -n "$L3_BACKEND" ]; then l3_profile_backend_check "$L3_PROFILE" "$L3_BACKEND" || return 2; fi
     L3_DEPS="$L3_R/.deps/level3/$L3_APP/$L3_PROFILE"
     L3_SRC="$L3_DEPS/src"; L3_BUILD_DEPS="$L3_DEPS/build"; L3_INSTALL="$L3_DEPS/install"; L3_LOGS="$L3_DEPS/logs"; L3_CACHE="$L3_DEPS/cache"
     L3_BUILD="$L3_R/build/level3/$L3_APP/$L3_PROFILE"
     mkdir -p "$L3_SRC" "$L3_BUILD_DEPS" "$L3_INSTALL" "$L3_LOGS" "$L3_CACHE"
+    if [ -e "$L3_R/.deps/level3/$L3_APP/install" ]; then
+        echo "# l3: legacy shared install $L3_R/.deps/level3/$L3_APP/install exists (pre-profile layout) -- not used; profile '$L3_PROFILE' owns $L3_INSTALL" >&2
+    fi
+}
+
+# l3_local_scratch_dir <component> <source-identity-sha256> <profile>
+#   Location for build scratch that MUST live outside the git worktree (CP2K's toolchain installer and the
+#   QMCPACK LLVM build break on a worktree's `.git` file over NFS), yet stays isolated like every other piece
+#   of generated state: the path names the WORKSPACE (sha256 of the realpath of the repository/workspace root,
+#   12 hex -- a local namespace only, never written into git provenance), the frozen SOURCE identity
+#   (source_tree_sha256 or tarball sha256 prefix) and the PROFILE:
+#     ${HPCPERF_L3_SCRATCH_BASE:-${TMPDIR:-/tmp}}/hpcperf-l3-scratch/<component>/<root12>/<source12>/<profile>
+#   Two worktrees with the same profile get different directories; the same root/source/profile always
+#   yields the same one; a different source identity or profile yields a different one. Callers keep an
+#   explicit override variable (HPCPERF_CP2K_TOOLCHAIN_SCRATCH, HPCPERF_LLVM_SCRATCH) for advanced use.
+#   The pre-2026-09-15 shared location /tmp/hpcperf-l3-b2-scratch/<component>[/<profile>] is legacy local
+#   state: never read, never migrated.
+l3_local_scratch_dir() {
+    local comp=$1 src=$2 profile=$3 root
+    [ -n "$comp" ] && [ -n "$src" ] && [ -n "$profile" ] || { echo "l3_local_scratch_dir: component, source identity and profile are required" >&2; return 2; }
+    case "$comp$profile" in *" "*|*/*) echo "l3_local_scratch_dir: component/profile must be plain names ('$comp', '$profile')" >&2; return 2;; esac
+    root="$(printf '%s' "$(realpath "$L3_R")" | sha256sum | cut -c1-12)"
+    printf '%s\n' "${HPCPERF_L3_SCRATCH_BASE:-${TMPDIR:-/tmp}}/hpcperf-l3-scratch/$comp/$root/${src:0:12}/$profile"
 }
 
 # l3_clean_conda_build_env: the project conda env exports its own compiler-driving
@@ -249,6 +314,18 @@ l3_fingerprint_check() {
         echo "l3: refusing to reuse a differently-configured install; remove $dir or change the request" >&2
         return 1
     fi
+    return 0
+}
+
+# l3_fingerprint_expect_backend <install_dir> <backend>
+#   Gate for run.sh/validate.sh: the profile's install must carry a fingerprint whose recorded backend is
+#   the requested one. A CUDA fingerprint never serves a HIP request; a profile without a fingerprint was
+#   never built -- there is no fallback to another (legacy or differently-configured) install.
+l3_fingerprint_expect_backend() {
+    local dir=$1 want=$2 fp="$1/.hpcperf-l3-fingerprint" rec
+    [ -f "$fp" ] || { echo "l3: $dir has no .hpcperf-l3-fingerprint -- this profile was not built (run build.sh for it; no other install is used)" >&2; return 1; }
+    rec="$(sed -n 's/^backend=\([^ ]*\).*/\1/p' "$fp" | head -1)"
+    [ "$rec" = "$want" ] || { echo "l3: fingerprint in $dir records backend '$rec' but '$want' was requested -- refusing" >&2; return 1; }
     return 0
 }
 

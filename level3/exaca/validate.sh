@@ -34,12 +34,14 @@ REF="$HERE/references/dirsolid_smoke.reference.json"; TOL="$HERE/references/dirs
 ORIENT="$HERE/src/examples/Substrate/GrainOrientationVectors.csv"
 [ -f "$REF" ] && [ -f "$TOL" ] || { echo "validate.sh: reference statistics/tolerances missing under references/" >&2; exit 1; }
 [ -f "$ORIENT" ] || { echo "validate.sh: $ORIENT missing (run tools/prepare_benchmark.sh level3 exaca)" >&2; exit 1; }
-RUN_ROOT="$R/build/level3/exaca/$MODEL/$L3_RUN_SUBDIR"
+PROFILE="$(l3_backend_profile EXACA "$MODEL")"
+l3_paths_profile exaca "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
+RUN_ROOT="$L3_BUILD/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"
 PY="$(l3_python_yaml)"
 unset HPCPERF_SCALE_MODE
 export HPCPERF_GPUS="$N"
-echo "validate.sh: ExaCA $BACKEND smoke (dirsolid 128^3 cells, Inconel625, G=5e5 K/m, R=3e5 K/s) on $N GPU(s)"
+echo "validate.sh: ExaCA $BACKEND smoke (dirsolid 128^3 cells, Inconel625, G=5e5 K/m, R=3e5 K/s) on $N GPU(s) [profile $PROFILE]"
 
 run_once() { # <ngpu> <stdout-file>
     local ng=$1 out=$2 rc=0
