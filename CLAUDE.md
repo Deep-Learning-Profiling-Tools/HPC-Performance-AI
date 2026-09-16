@@ -3,7 +3,7 @@
 HPC-Performance-AI: a three-level GPU benchmark/application suite used to build
 an AI framework for HPC performance prediction. Everything here was brought up
 on one node (dgx003: 4x NVIDIA B200 / sm_100, CUDA 13.2.78, RHEL 10, 64 CPUs,
-800 GB) and nothing is claimed beyond what actually ran there.
+2 TB RAM) and nothing is claimed beyond what actually ran there.
 
 | Level | Content | Where the truth lives |
 |---|---|---|
@@ -44,10 +44,14 @@ Facts that differ from any "reference" you may read elsewhere:
   per launch only after its rank<=GPU and CPU checks. Test suites that call
   `mpiexec -n 4` themselves need `PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe`.
 - 64 CPUs: use `-j32` or more for a single build; ~16 per build when three run
-  concurrently. Never run two `build.sh` of the same app at once (shared src).
+  concurrently. Never run two `build.sh` of the same app **and profile** at once
+  (they share that profile's build/install tree); different profiles are isolated.
 - NFS project storage is slow for 100k-file trees (LLVM, CP2K toolchain):
-  extract/build those on `/tmp/hpcperf-*-scratch/` and keep installs/logs under
-  `.deps/`. Expect stale NFS file handles on `rm -rf`; rename then delete.
+  those build on node-local scratch taken from `l3_local_scratch_dir <component>
+  <source sha> <profile>` (`${TMPDIR:-/tmp}/hpcperf-l3-scratch/<component>/<workspace-
+  root hash>/<source>/<profile>`; never a path shared across worktrees) while
+  installs/logs stay under `.deps/`. Expect stale NFS file handles on `rm -rf`;
+  rename then delete.
 
 ## Git rules (user-mandated, non-negotiable)
 
@@ -145,7 +149,9 @@ level3/<app>/
   unverified" is required evidence). Interface: `HPCPERF_GPUS=N|all`,
   `HPCPERF_NODES`, `HPCPERF_GPUS_PER_NODE`, `HPCPERF_CPUS_PER_RANK`,
   `HPCPERF_SCALE_MODE=smoke|strong|weak`, `HPCPERF_SITE_PROFILE`,
-  `HPCPERF_DRY_RUN=1`. Requested GPUs == used GPUs; a rank count that cannot
+  `HPCPERF_DRY_RUN=1`, `HPCPERF_GPU_BACKEND=CUDA|HIP` (default CUDA; HIP counts
+  devices with rocminfo and drops the CUDA-only MCA hook -- untested here).
+  Requested GPUs == used GPUs; a rank count that cannot
   partition the problem is **refused**, never silently changed; 8/40/80 GPUs
   exist only as HYPOTHETICAL dry-runs (`HPCPERF_NODES=N/4`).
 - Do not move the common runtime, do not refactor the launcher for an app;
@@ -171,6 +177,24 @@ level3/<app>/
   (records the exit code, never aborts), classify with `level3/tools/l3_verdict.py`
   (PASS / PENDING / UNSUPPORTED_LAYOUT / FAIL / MISSING). Exit 3 and 4 are never
   PASS and never enter a performance summary; report their counts separately.
+
+Level 2 specifics (mini-apps; the tree above is Level 3's):
+- Upstream source is vendored byte-identically in git (`src/UPSTREAM_SHA256SUMS`
+  where a stand-alone driver was extracted, e.g. MiniEM); `build.sh [CUDA|HIP]`
+  passes the backend to the upstream build system, products go to
+  `build/level2/<app>/<cuda|hip>`. The root `.gitignore` rule `build/` also
+  matches upstream directories named `build/`: re-include them explicitly
+  (`!level2/<app>/.../build/`) -- `level2/tools/tests/test_vendored_completeness.sh`
+  fails when a needed vendored file is missing from a clean clone.
+- Framework dependencies come from `setup_level2_deps.sh` into
+  `.deps/install/<dep>` (pins = tags or 40-hex commits, `.hpcperf-built` /
+  `.hpcperf-fingerprint` markers, `HPCPERF_DEPS_SEED_DIR` for local seeds);
+  MiniEM needs `setup_level2_deps.sh trilinos` (~30 min, Kokkos 5.2.1 develop pin,
+  Zoltan2 for MueLu at >1 rank, netCDF + gtest TPLs from conda). GAMESS RI-MP2
+  needs an environment-provided NVIDIA HPC SDK `nvfortran` (not conda).
+- validate.sh runs at `HPCPERF_GPUS=1` by default; upstream ctests that call
+  `mpirun -np 2` themselves need the PRRTE slot relaxation as a command-local
+  `env` (Branson pattern), never an export.
 
 ## Validation principles
 
@@ -245,6 +269,19 @@ CUDA 13.2 / Blackwell
   `LLVM_RUNTIME_TARGETS=...;nvptx64-nvidia-cuda`; official LLVM binaries ship no
   offload runtime. QMCPACK on this stack uses ~320 MB device memory per walker
   (open issue): keep <= 300 walkers/GPU.
+
+Level 3 build scripts
+- `l3_fingerprint_text` hashes patch FILES: pass `$HERE/patches/<name>`, never the
+  bare basenames from the lock (SPECFEM3D/nekRS aborted on their first rebuild).
+- A `build.sh` must work on an empty profile tree: never read install-layout facts
+  (RPATH dirs, a library path) before the stage that creates them (CP2K did, and
+  could only re-run on top of an existing toolchain).
+- Tpetra/Kokkos apps hang at >1 rank when Open MPI reports CUDA-aware device
+  buffers through smcuda on this site: MiniEM runs with
+  `TPETRA_ASSUME_GPU_AWARE_MPI=0`.
+- The site NVIDIA HPC SDK's shipped `localrc` targets a GCC 8 that RHEL 10 no
+  longer has: generate a per-user one (`makelocalrc -gcc /usr/bin/gcc ... -x -d
+  <dir>`, `NVLOCALRC=<dir>/localrc`) before using `nvfortran`.
 
 Build systems
 - GEOS `scripts/config-build.py` **deletes an existing build tree**; configure
