@@ -1,0 +1,116 @@
+# Registered inputs of Quicksilver (schema hpcperf-inputs-1), selected through
+# HPCPERF_QUICKSILVER_INPUT_ID=<id> in run.sh. Without the variable run.sh behaves as before
+# (CORAL-2 P1 physics deck + sizes from the HPCPERF_QUICKSILVER_* variables).
+schema: hpcperf-inputs-1
+benchmark: quicksilver
+level: 2
+selector: HPCPERF_QUICKSILVER_INPUT_ID   # HPCPERF_QUICKSILVER_INPUT already means "deck path" in run.sh
+default_input: p1-profile-8c-100k-20s
+entry:
+  kind: run.sh
+  path: level2/quicksilver/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    Quicksilver's MC_Fast_Timer "main" (main.cc): started after getParameters + initMC (mesh,
+    materials, cross sections, particle allocation) and stopped after the last cycle, so it
+    covers every time step's cycleInit (sourcing, population control) + cycleTracking (the GPU
+    transport kernel and its MPI exchange) + cycleFinalize (tally reduction). Excludes
+    argument/deck parsing, setup, the final timer/tally report and MPI finalize. Read from the
+    "Cumulative" timer table (avg column, microseconds); the "Last Cycle" table printed before
+    it is skipped. cycleTracking is a sub-timer of main and is not added.
+  kind: total
+  unit: us
+  section_start: '^Timer\s+Cumulative'
+  regex: '^main\s+\d+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+'
+  select: only
+baseline:
+  method: >-
+    Upstream's own CORAL-2 correctness checks (coralBenchmark: the four "PASS::" lines --
+    absorption/fission/scatter ratios within 1 %, collision-to-facet-crossing ratio within 1 %,
+    no particles lost, fluence homogeneous within 6 %) must all be present and no "FAIL::"
+    line. Quicksilver is a Monte Carlo code with a fixed seed (1029384756 in every deck) but
+    GPU tracking order is not bitwise reproducible: the final-cycle tallies (census population,
+    segments, scalar flux) are RECORDED for statistical comparison; their tolerance is not yet
+    fixed (NEEDS_VALIDATION for exact rules beyond upstream's checks).
+  reference: upstream coralBenchmark PASS checks (statistical); tallies recorded, tolerance TBD
+  quantities:
+    - name: pass_ratios
+      regex: '^PASS:: Absorption / Fission / Scatter Ratios'
+      compare: {rule: present}
+    - name: pass_facet
+      regex: '^PASS:: Collision to Facet Crossing Ratio'
+      compare: {rule: present}
+    - name: pass_no_loss
+      regex: '^PASS:: No Particles Lost'
+      compare: {rule: present}
+    - name: pass_fluence
+      regex: '^PASS:: Fluence is homogenous'
+      compare: {rule: present}
+    - name: fail_marker
+      regex: '^FAIL::'
+      compare: {rule: absent}
+    - name: final_cycle_census
+      regex: '^\s+\d+(\s+\d+){10}\s+(?P<value>\d+)\s+\d+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: record}
+    - name: final_cycle_num_seg
+      regex: '^\s+\d+(\s+\d+){11}\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: record}
+    - name: final_cycle_scalar_flux
+      regex: '^\s+\d+(\s+\d+){12}\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: record}
+inputs:
+  - id: p1-profile-8c-100k-20s
+    case: coral2-p1-physics
+    variant: default
+    source:
+      kind: derived
+      derivation: >-
+        Pre-existing run.sh default: the physics/material/cross-section blocks of upstream
+        Examples/CORAL2_Benchmark/Problem1/Coral2_P1.inp (inputs/coral2_p1_profile.inp) with the
+        geometry, mesh, particle and step counts supplied by run.sh (8^3 cells and 100,000
+        particles per rank, 20 steps) instead of the deck's official values.
+    params: {deck: inputs/coral2_p1_profile.inp, verbatim: false, cells_per_rank: 8, particles_per_rank: 100000, steps: 20, seed: 1029384756}
+    files: [inputs/coral2_p1_profile.inp]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: coral2-p1-1rank
+    case: coral2-problem1
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: LLNL/Quicksilver, version: eb68bb8d6fc53de1f65011d4e79ff2ed0dd60f3b, path: Examples/CORAL2_Benchmark/Problem1/Coral2_P1_1.inp, sha256: d303ebefff0cfdb10b2b2fd0a993a3b2e76f2b83765ec06e10b073d35ddaa23b}
+    params: {deck: inputs/upstream/Coral2_P1_1.inp, verbatim: true, nx: 16, ny: 16, nz: 16, particles: 163840, steps: 100, seed: 1029384756, coral_benchmark: 1}
+    files: [inputs/upstream/Coral2_P1_1.inp]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the official single-rank CORAL-2 Problem 1 deck, passed verbatim (-i only); same physics as the default input at the upstream size.
+  - id: coral2-p2-1rank
+    case: coral2-problem2
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: LLNL/Quicksilver, version: eb68bb8d6fc53de1f65011d4e79ff2ed0dd60f3b, path: Examples/CORAL2_Benchmark/Problem2/Coral2_P2_1.inp, sha256: cdbec400449271a0eec7b81d07423da925097529dc84e75ac1c3078feb4a3a9a}
+    params: {deck: inputs/upstream/Coral2_P2_1.inp, verbatim: true, nx: 11, ny: 11, nz: 11, particles: 53240, steps: 100, seed: 1029384756, coral_benchmark: 2}
+    files: [inputs/upstream/Coral2_P2_1.inp]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: different physics -- three energy-dependent cross-section tables (absorb/fission/scatter), balance tallies on, dt 1e-8.
+  - id: cts2-1rank
+    case: cts2
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: LLNL/Quicksilver, version: eb68bb8d6fc53de1f65011d4e79ff2ed0dd60f3b, path: Examples/CTS2_Benchmark/CTS2_1.inp, sha256: d95fd76ce5be29b590a89d7a3f16a9008bbef3e43fcb294b177f4134fb4420a3}
+    params: {deck: inputs/upstream/CTS2_1.inp, verbatim: true, nx: 16, ny: 16, nz: 16, particles: 40960, steps: 100, seed: 1029384756, coral_benchmark: 2}
+    files: [inputs/upstream/CTS2_1.inp]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the CTS-2 procurement problem (P2-type physics, total cross section 1.5227, dt 1.1e-7).
