@@ -1,0 +1,135 @@
+# Registered inputs of Laghos (schema hpcperf-inputs-1), selected through
+# HPCPERF_LAGHOS_INPUT=<id> in run.sh. Without the variable run.sh behaves as before
+# (smoke/strong/weak modes, HPCPERF_LAGHOS_ARGS). Every input is one of upstream's own
+# command lines: the README "Verification of Results" rows (reference final step / dt / |e|
+# printed by upstream, reproduced here on 1 GPU) plus the run.sh default FOM deck.
+schema: hpcperf-inputs-1
+benchmark: laghos
+level: 2
+selector: HPCPERF_LAGHOS_INPUT
+default_input: sedov3d-rs4-fom
+entry:
+  kind: run.sh
+  path: level2/laghos/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    Laghos' own "Major kernels total time" (laghos_solver.cpp PrintTimingData, T[4]): the sum of
+    the device-synchronised timers of the four major kernels -- CG (H1) mass solves, CG (L2)
+    solves, force evaluation and UpdateQuadratureData -- accumulated over every RK stage of every
+    time step, printed once at the end with 10 decimals (always printed; -f only adds the FOM
+    table). Mesh refinement/partitioning, operator assembly, the time-step loop's remaining
+    work (vector updates, |e| output every 5 steps), visualisation and MPI start-up are outside it.
+  kind: total
+  unit: s
+  regex: '^Major kernels total time \(seconds\): (?P<value>[0-9.eE+-]+)\s*$'
+  select: only
+baseline:
+  method: >-
+    Upstream's README verification table gives, per command line, the final step count, the
+    final dt (6 decimals) and the final internal-energy norm |e| (11 significant digits); its
+    acceptance is "within round-off distance". validate.sh reproduces these with 1e-8 relative
+    on |e| and exact step/dt (README: all eight GPU-capable rows matched to every printed
+    digit on this B200). The registry applies the same rules to the last "step ..." line of
+    the run: final step exact, final dt exact, |e| within 1e-8 relative of this build's
+    baseline; the "Energy diff" printed at the end (total energy conservation) is a diagnostic.
+  reference: upstream README "Verification of Results" (CEED/Laghos) rows for the five verification inputs; this build's first measured run for the FOM deck
+  quantities:
+    - name: final_step
+      role: required
+      regex: '^step\s+(?P<value>\d+),'
+      select: last
+      compare: {rule: exact}
+    - name: final_dt
+      role: required
+      regex: '^step\s+\d+,\s+t = \S+,\s+dt = (?P<value>[0-9.]+),'
+      select: last
+      compare: {rule: exact}
+    - name: e_final
+      role: required
+      regex: '^step\s+\d+,.*\|e\| = (?P<value>[0-9.eE+-]+)\s*$'
+      select: last
+      compare: {rule: rel, tol: 1.0e-8}
+    - name: energy_diff
+      role: diagnostic
+      regex: '^Energy\s+diff:\s+(?P<value>[0-9.eE+-]+)'
+      select: only
+      compare: {rule: record}
+inputs:
+  - id: tg3d-rs1
+    case: taylor-green-3d
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see level2/laghos/README.md (Source)", path: "README Verification of Results row 2: -p 0 -m data/cube01_hex.mesh -rs 1 -tf 0.75 -pa"}
+    params: {problem: 0, mesh: data/cube01_hex.mesh, rs: 1, tf: 0.75, ref_step: 1041, ref_dt: 0.000121, ref_e: 3.3909635545e+03}
+    args: ["-p", "0", "-m", "data/cube01_hex.mesh", "-rs", "1", "-tf", "0.75", "-pa"]
+    files: [data/cube01_hex.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: sedov2d-rs3
+    case: sedov-blast-2d
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see README", path: "README row 3: -p 1 -m data/square01_quad.mesh -rs 3 -tf 0.8 -pa"}
+    params: {problem: 1, mesh: data/square01_quad.mesh, rs: 3, tf: 0.8, ref_step: 1154, ref_dt: 0.001655, ref_e: 4.6303396053e+01}
+    args: ["-p", "1", "-m", "data/square01_quad.mesh", "-rs", "3", "-tf", "0.8", "-pa"]
+    files: [data/square01_quad.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: sedov3d-rs2
+    case: sedov-blast-3d
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see README", path: "README row 4: -p 1 -m data/cube01_hex.mesh -E0 2 -rs 2 -tf 0.6 -pa"}
+    params: {problem: 1, mesh: data/cube01_hex.mesh, rs: 2, tf: 0.6, E0: 2, ref_step: 560, ref_dt: 0.002449, ref_e: 1.3408616722e+02}
+    args: ["-p", "1", "-m", "data/cube01_hex.mesh", "-E0", "2", "-rs", "2", "-tf", "0.6", "-pa"]
+    files: [data/cube01_hex.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the same 3D Sedov problem as the run.sh default at two fewer refinements (512 hexes).
+  - id: sedov3d-rs4-fom
+    case: sedov-blast-3d
+    variant: default
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see README", path: "upstream single-GPU FOM deck (README Run section): -p 1 -m data/cube01_hex.mesh -E0 2 -rs 4 -tf 0.6 -pa -f"}
+    params: {problem: 1, mesh: data/cube01_hex.mesh, rs: 4, tf: 0.6, E0: 2, ref_step: null, ref_dt: null, ref_e: null}
+    args: ["-p", "1", "-m", "data/cube01_hex.mesh", "-E0", "2", "-rs", "4", "-tf", "0.6", "-pa", "-f"]
+    files: [data/cube01_hex.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: >-
+      the run.sh strong-mode default (32,768 hexes, 823,875 H1 dofs, 2408 steps); upstream
+      publishes no final |e| for this size, so the comparison is self-baseline only.
+  - id: triplept3d-rs1
+    case: triple-point-3d
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see README", path: "README row 7: -p 3 -m data/box01_hex.mesh -rs 1 -tf 5.0 -pa -cgt 1e-12"}
+    params: {problem: 3, mesh: data/box01_hex.mesh, rs: 1, tf: 5.0, cgt: 1.0e-12, ref_step: 858, ref_dt: 0.000474, ref_e: 5.6691500623e+01}
+    args: ["-p", "3", "-m", "data/box01_hex.mesh", "-rs", "1", "-tf", "5.0", "-pa", "-cgt", "1e-12"]
+    files: [data/box01_hex.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: rt2d-rs1
+    case: rayleigh-taylor-2d
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: CEED/Laghos, version: "see README", path: "README row 9: -p 7 -m data/rt2D.mesh -tf 4 -rs 1 -ok 4 -ot 3 -pa"}
+    params: {problem: 7, mesh: data/rt2D.mesh, rs: 1, tf: 4.0, ok: 4, ot: 3, ref_step: 2462, ref_dt: 0.000050, ref_e: 1.1792848680e+02}
+    args: ["-p", "7", "-m", "data/rt2D.mesh", "-tf", "4", "-rs", "1", "-ok", "4", "-ot", "3", "-pa"]
+    files: [data/rt2D.mesh]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: higher-order (Q4/Q3) Rayleigh-Taylor case -- a different kernel regime, not a size step.
