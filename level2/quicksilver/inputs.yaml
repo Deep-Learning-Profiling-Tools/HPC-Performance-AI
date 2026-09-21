@@ -24,6 +24,19 @@ timing:
   section_start: '^Timer\s+Cumulative'
   regex: '^main\s+\d+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+'
   select: only
+  secondary:
+    - name: cycleTracking
+      scope: >-
+        MC_Fast_Timer "cycleTracking" (Cumulative table, avg column, microseconds): the particle
+        transport phase of every cycle only -- the GPU tracking kernel launches plus the MPI
+        particle exchange and its test-for-done polling; a SUB-INTERVAL of main (cycleInit and
+        cycleFinalize excluded). Reported next to main_compute_s for reference; never added to it
+        and never substituted for it.
+      kind: total
+      unit: us
+      section_start: '^Timer\s+Cumulative'
+      regex: '^cycleTracking\s+\d+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+'
+      select: only
 baseline:
   method: >-
     Upstream's own CORAL-2 correctness checks (coralBenchmark: the four "PASS::" lines --

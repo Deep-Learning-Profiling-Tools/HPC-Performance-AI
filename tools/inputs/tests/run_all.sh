@@ -14,11 +14,12 @@ ok()  { echo "ok   $*"; pass=$((pass+1)); }
 bad() { echo "FAIL $*"; failn=$((failn+1)); }
 noise() { grep -viE 'lua|posix|no file|stack traceback|\[C\]|addto|no field' | grep -vE '^\s*$'; }
 unset HPCPERF_GPUS HPCPERF_NP HPCPERF_SCALE_MODE HPCPERF_DRY_RUN HPCPERF_HIPBONE_INPUT HPCPERF_QUICKSILVER_INPUT_ID HPCPERF_LAMMPS_INPUT \
-      HPCPERF_LAMMPS_STEPS HPCPERF_LAMMPS_STRONG HPCPERF_LAMMPS_LOCAL HPCPERF_QUICKSILVER_STEPS HPCPERF_QUICKSILVER_INPUT
+      HPCPERF_LAMMPS_STEPS HPCPERF_LAMMPS_STRONG HPCPERF_LAMMPS_LOCAL HPCPERF_QUICKSILVER_STEPS HPCPERF_QUICKSILVER_INPUT \
+      HPCPERF_TEALEAF_INPUT HPCPERF_TEALEAF_DECK HPCPERF_SPARTA_INPUT HPCPERF_SPARTA_STRONG HPCPERF_SPARTA_LOCAL FAKE_MODE
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 # ---- 1. every committed inputs.yaml validates; default_input is registered ----------------
-for d in level1/background_subtraction level2/hipbone level2/quicksilver level3/lammps; do
+for d in level1/background_subtraction level2/hipbone level2/quicksilver level3/lammps level2/tealeaf level3/sparta; do
     out="$(python3 "$TOOL" validate "$R/$d" 2>&1 | noise)"; rc=$?
     [ $rc -eq 0 ] && grep -q ': OK' <<<"$out" && ok "validate $d" || bad "validate $d: $out"
     n="$(python3 "$TOOL" list "$R/$d" 2>/dev/null | wc -l)"
@@ -153,6 +154,26 @@ if [ -x "$R/build/level3/lammps/cuda/lmp_kokkos_cuda" ] && [ -f "$R/level3/lammp
     out="$("$R/level3/lammps/run.sh" CUDA 2>&1 | noise)"
     grep -q 'mode=smoke ranks=1 box=20x20x20' <<<"$out" && ! grep -q 'input=' <<<"$out" && ok "lammps run.sh: default smoke command unchanged" || bad "lammps default changed: $out"
 else skip=$((skip+1)); echo "skip lammps run.sh (not built/materialized)"; fi
+if [ -x "$R/build/level2/tealeaf/cuda/cuda-tealeaf" ]; then
+    out="$(HPCPERF_TEALEAF_DECK=tea.in HPCPERF_TEALEAF_INPUT=bm4-1000sq-10steps "$R/level2/tealeaf/run.sh" CUDA 2>&1 | noise)"
+    grep -q "mutually exclusive" <<<"$out" && ok "tealeaf run.sh: id + HPCPERF_TEALEAF_DECK refused" || bad "tealeaf id+deck: $out"
+    out="$(HPCPERF_TEALEAF_INPUT=bm4-1000sq-10steps "$R/level2/tealeaf/run.sh" CUDA --solver cg 2>&1 | noise)"
+    grep -q "mutually exclusive" <<<"$out" && ok "tealeaf run.sh: id + extra args refused" || bad "tealeaf id+args: $out"
+    out="$(HPCPERF_TEALEAF_INPUT=bm6-8000sq-10steps "$R/level2/tealeaf/run.sh" CUDA 2>&1 | noise)"
+    grep -q -- '--file .*/Benchmarks/tea_bm_6.in' <<<"$out" && grep -q -- '--out .*/tea.input.bm6-8000sq-10steps.out' <<<"$out" && ok "tealeaf run.sh: id resolves to its deck and a per-input log" || bad "tealeaf id deck: $out"
+    out="$("$R/level2/tealeaf/run.sh" CUDA 2>&1 | noise)"
+    grep -q -- '--file .*/Benchmarks/tea_bm_5.in' <<<"$out" && grep -q -- '--out .*/run/tea.out' <<<"$out" && ! grep -q 'input=' <<<"$out" && ok "tealeaf run.sh: default command unchanged" || bad "tealeaf default changed: $out"
+else skip=$((skip+1)); echo "skip tealeaf run.sh (not built)"; fi
+if [ -n "$(find "$R/build/level3/sparta/cuda" -maxdepth 2 -name spa_kokkos_cuda -type f 2>/dev/null)" ] && [ -f "$R/level3/sparta/src/bench/in.sphere" ]; then
+    out="$(HPCPERF_SCALE_MODE=strong HPCPERF_SPARTA_INPUT=collide-1m "$R/level3/sparta/run.sh" CUDA 2>&1 | noise)"
+    grep -q "mutually exclusive" <<<"$out" && ok "sparta run.sh: id + strong mode refused" || bad "sparta id+strong: $out"
+    out="$(HPCPERF_SPARTA_LOCAL=20 HPCPERF_SPARTA_INPUT=collide-1m "$R/level3/sparta/run.sh" CUDA 2>&1 | noise)"
+    grep -q "mutually exclusive" <<<"$out" && ok "sparta run.sh: id + size knob refused" || bad "sparta id+knob: $out"
+    out="$(HPCPERF_SPARTA_INPUT=sphere-1m "$R/level3/sparta/run.sh" CUDA 2>&1 | noise)"
+    grep -q -- '-in in.sphere -var x 40 -var y 50 -var z 50' <<<"$out" && grep -q 'log.input.sphere-1m.np1.sparta' <<<"$out" && ok "sparta run.sh: id resolves to deck + size + per-input log" || bad "sparta sphere: $out"
+    out="$("$R/level3/sparta/run.sh" CUDA 2>&1 | noise)"
+    grep -q -- '-in in.collide -var x 10 -var y 10 -var z 10' <<<"$out" && grep -q 'log.smoke.np1.sparta' <<<"$out" && ! grep -q 'input=' <<<"$out" && ok "sparta run.sh: default smoke command unchanged" || bad "sparta default changed: $out"
+else skip=$((skip+1)); echo "skip sparta run.sh (not built/materialized)"; fi
 unset HPCPERF_DRY_RUN
 
 # ---- 7. frozen Level 3 source tree untouched by the input machinery -----------------------
@@ -160,6 +181,137 @@ if [ -f "$R/level3/lammps/provenance/source.lock.yaml" ] && [ -d "$R/level3/lamm
     st="$("$R/tools/prepare_benchmark.sh" level3 lammps --status 2>&1 | noise | grep -o 'PREPARE STATUS lammps [A-Z_]*')"
     [ "$st" = "PREPARE STATUS lammps READY" ] && ok "lammps frozen tree still READY (source_tree_sha256 unchanged)" || bad "lammps frozen tree: $st"
 else skip=$((skip+1)); echo "skip frozen-tree check (lammps not materialized)"; fi
+if [ -f "$R/level3/sparta/provenance/source.lock.yaml" ] && [ -d "$R/level3/sparta/src" ]; then
+    st="$("$R/tools/prepare_benchmark.sh" level3 sparta --status 2>&1 | noise | grep -o 'PREPARE STATUS sparta [A-Z_]*')"
+    [ "$st" = "PREPARE STATUS sparta READY" ] && ok "sparta frozen tree still READY (source_tree_sha256 unchanged)" || bad "sparta frozen tree: $st"
+else skip=$((skip+1)); echo "skip frozen-tree check (sparta not materialized)"; fi
+
+# ---- 8. negative cases: the tool must never report an unverified result as verified ---------
+# 8a. a science field missing from the log -> the comparison fails on that quantity
+grep -v '^CG: initial res norm' "$FX/hipbone_nx24_p14.log" > "$TMP/hb_nofield.log"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$TMP/hb_nofield.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert not d['ok'] and not d['verified'] and not c['r_norm_initial']['ok'] and 'no matching line' in c['r_norm_initial']['error']" "$TMP/c.json" 2>/dev/null \
+    && ok "neg: missing science field (r_norm_initial) -> compare fails, verified=false" || bad "neg: missing field accepted (rc=$rc) $(cat "$TMP/c.json")"
+# 8b. NaN / Inf in science fields -> not finite -> fails (also for a record-only quantity)
+sed -e 's/^CG: initial res norm .*/CG: initial res norm inf /' -e 's/^CG: it 100, r norm [^,]*,/CG: it 100, r norm nan,/' "$FX/hipbone_nx24_p14.log" > "$TMP/hb_naninf.log"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$TMP/hb_naninf.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+# hipBone's value regexes use [0-9.eE+-]+, so a printed nan/inf does not match at all and surfaces as
+# "no matching line"; a regex that does capture the token (\S+, fake benchmark below) yields "not finite".
+# Both are failures of that quantity; neither ever becomes a float nan that compares equal to itself.
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert not d['ok'] and not c['r_norm_initial']['ok'] and ('not finite' in c['r_norm_initial']['error'] or 'no matching line' in c['r_norm_initial']['error']) and not c['r_norm_final']['ok'] and ('not finite' in c['r_norm_final']['error'] or 'no matching line' in c['r_norm_final']['error'])" "$TMP/c.json" 2>/dev/null \
+    && ok "neg: inf initial residual + nan final residual -> both quantities fail (the record rule too)" || bad "neg: nan/inf accepted (rc=$rc) $(cat "$TMP/c.json")"
+python3 "$TOOL" extract "$R/level2/hipbone" "$TMP/hb_naninf.log" 2>/dev/null | grep -q '"value": null' && ok "neg: extract reports nan/inf as no value (never a float nan)" || bad "neg: extract emitted a non-finite value"
+# 8c. a modified final result (LAMMPS TotEng at step 100 shifted by 1e-3) -> the 1e-5 rule fails
+python3 "$TOOL" extract "$R/level3/lammps" "$FX/lammps_lj.log" --input lj-32k > "$TMP/lj.json" 2>/dev/null
+python3 - "$TMP/lj.json" > "$TMP/lj_baseline.json" <<'PY'
+import json,sys; print(json.dumps({"benchmark":"lammps","input_id":"lj-32k","quantities":json.load(open(sys.argv[1]))}))
+PY
+python3 - "$FX/lammps_lj.log" "$TMP/lj_mod.log" <<'PY'
+import re,sys
+out=[]
+for ln in open(sys.argv[1]):
+    if re.match(r'^\s+100\s+', ln):
+        f=ln.split(); f[4]="%.7f" % (float(f[4])+1e-3); ln="  ".join(f)+"\n"    # TotEng column of thermo_style one
+    out.append(ln)
+open(sys.argv[2],"w").write("".join(out))
+PY
+python3 "$TOOL" compare "$R/level3/lammps" "$TMP/lj_baseline.json" "$FX/lammps_lj.log" --input lj-32k >/dev/null 2>&1 && ok "neg-control: unmodified lj log compares equal (rc 0, verified)" || bad "neg-control: unmodified lj log failed"
+python3 "$TOOL" compare "$R/level3/lammps" "$TMP/lj_baseline.json" "$TMP/lj_mod.log" --input lj-32k >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert not c['toteng_step100']['ok'] and c['toteng_step100']['rel_err']>1e-5 and c['temp_step100']['ok']" "$TMP/c.json" 2>/dev/null \
+    && ok "neg: TotEng@100 shifted by 1e-3 -> toteng_step100 fails the 1e-5 rule, other fields still pass" || bad "neg: modified result accepted (rc=$rc) $(cat "$TMP/c.json")"
+# 8d. a baseline that belongs to another input / another benchmark is refused (exit 2)
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" --input sweep-nx16-p8 >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "belongs to input 'coral2-nx24-p14'" "$TMP/e" && ok "neg: baseline of another input -> exit 2, refused" || bad "neg: cross-input baseline accepted (rc=$rc) $(cat "$TMP/e")"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/lj_baseline.json" "$FX/hipbone_nx24_p14.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "belongs to benchmark 'lammps'" "$TMP/e" && ok "neg: baseline of another benchmark -> exit 2, refused" || bad "neg: cross-benchmark baseline accepted (rc=$rc)"
+# 8e. nonzero exit code: neither the timer nor the comparison uses the output
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" --rc 134 >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && grep -q '"verified": false' "$TMP/c.json" && grep -q 'exited 134' "$TMP/c.json" && ok "neg: candidate exited 134 -> compare fails without reading the science fields" || bad "neg: failed candidate compared (rc=$rc)"
+# 8f. exit 0 but the log says FAIL (background_subtraction really does this: printf FAIL; return 0)
+python3 "$TOOL" compare "$R/level1/background_subtraction" "$TMP/bg_base.json" "$FX/bgsub_fail.log" --rc 0 >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert not c['fail_marker']['ok'] and not c['pass_marker']['ok'] and not c['max_error']['ok']" "$TMP/c.json" 2>/dev/null \
+    && ok "neg: exit 0 + 'FAIL' + 'Max error is 3' -> all three markers fail" || bad "neg: FAIL log with exit 0 accepted (rc=$rc)"
+# 8h. record-only rules: nothing fails, but nothing is verified either -> exit 3, never 0
+mkdir -p "$TMP/reconly"
+cat > "$TMP/reconly/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: hipbone
+level: 2
+selector: HPCPERF_HIPBONE_INPUT
+default_input: coral2-nx24-p14
+entry: {kind: run.sh, path: level2/hipbone/run.sh, backend_arg: CUDA}
+timing: {scope: x, kind: total, unit: s, regex: '^hipBone: \d+, \d+, (?P<value>[0-9.eE+-]+), \d+,', select: only}
+baseline:
+  quantities:
+    - {name: r_norm_final, regex: '^CG: it 100, r norm (?P<value>[0-9.eE+-]+)', select: only, compare: {rule: record}}
+    - {name: r_norm_initial, regex: '^CG: initial res norm (?P<value>[0-9.eE+-]+)', select: only, compare: {rule: record}}
+inputs:
+  - {id: coral2-nx24-p14, case: c, variant: default, source: {kind: upstream-parameterized, upstream: x}, params: {}, args: [], backends_validated: [cuda]}
+EOF
+python3 "$TOOL" compare "$TMP/reconly" "$TMP/hb_baseline.json" "$FX/hipbone_99_iterations.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"record_only": true' "$TMP/c.json" && grep -q '"verified": false' "$TMP/c.json" && ok "neg: all rules record-only -> exit 3 (inconclusive), verified=false, ok=true" || bad "neg: record-only compare returned rc=$rc $(cat "$TMP/c.json")"
+# 8i. baseline and candidate are the same output file -> refused (exit 2)
+python3 - "$TMP/hb.json" "$FX/hipbone_nx24_p14.log" > "$TMP/hb_same.json" <<'PY'
+import json,sys; print(json.dumps({"benchmark":"hipbone","input_id":"coral2-nx24-p14","log":sys.argv[2],"quantities":json.load(open(sys.argv[1]))}))
+PY
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$FX/hipbone_nx24_p14.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "same output file" "$TMP/e" && ok "neg: baseline and candidate read the same file -> exit 2, refused" || bad "neg: same-file compare accepted (rc=$rc)"
+cp "$FX/hipbone_nx24_p14.log" "$TMP/hb_copy.log"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$TMP/hb_copy.log" >/dev/null 2>&1; rc=$?
+[ $rc -eq 0 ] && ok "neg-control: a different file with the same content is compared normally" || bad "neg-control: copy refused (rc=$rc)"
+
+# ---- 9. measure end-to-end on a fake benchmark (no GPU): exit codes, FAIL-with-exit-0, stale logs, record-only ----
+FR="$TMP/fakerepo"; mkdir -p "$FR/level1/fake" "$FR/level1/fakerec" "$FR/build/fake"; : > "$FR/hpcperf_env.sh"
+cat > "$FR/build/fake/fake_bin" <<'EOF'
+#!/bin/bash
+case "${FAKE_MODE:-ok}" in
+  ok)      echo "time 1.500 s"; echo "energy 42.000000"; echo "PASS" ;;
+  exit1)   echo "starting"; exit 1 ;;
+  failmark) echo "time 1.500 s"; echo "energy 42.000000"; echo "FAIL" ;;
+  nan)     echo "time 1.500 s"; echo "energy nan"; echo "PASS" ;;
+  notimer) echo "energy 42.000000"; echo "PASS" ;;
+esac
+EOF
+chmod +x "$FR/build/fake/fake_bin"
+cat > "$FR/level1/fake/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: fake
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/fake/fake_bin}
+timing: {scope: fake timer, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline:
+  quantities:
+    - {name: energy, regex: '^energy (?P<value>\S+)$', select: only, compare: {rule: rel, tol: 1.0e-6}}
+    - {name: pass_marker, regex: '^PASS$', compare: {rule: present}}
+    - {name: fail_marker, regex: '^FAIL$', compare: {rule: absent}}
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: custom, derivation: test}, params: {}, args: [], backends_validated: []}
+EOF
+sed -e 's/^benchmark: fake$/benchmark: fakerec/' -e "s/compare: {rule: rel, tol: 1.0e-6}/compare: {rule: record}/" -e '/pass_marker/d' -e '/fail_marker/d' "$FR/level1/fake/inputs.yaml" > "$FR/level1/fakerec/inputs.yaml"
+mrun() { python3 "$TOOL" measure "$FR/level1/$1" a --out "$TMP/m_$2" --warmup 1 --reps 2 --timeout 30 >"$TMP/m_$2.out" 2>&1; echo $?; }
+rc=$(FAKE_MODE=ok mrun fake ok)
+[ "$rc" -eq 0 ] && grep -q 'run_completed=True timing_ok=True native_check=PASS baseline_saved=True comparison_rules=READY' "$TMP/m_ok.out" && [ -f "$TMP/m_ok/baseline.json" ] && ok "measure: healthy fake run -> completed, native PASS, baseline saved, rules READY" || bad "measure ok: rc=$rc $(cat "$TMP/m_ok.out")"
+rc=$(FAKE_MODE=exit1 mrun fake exit1)
+[ "$rc" -eq 1 ] && grep -q 'run_completed=False timing_ok=False' "$TMP/m_exit1.out" && [ ! -f "$TMP/m_exit1/baseline.json" ] && grep -q '"main_compute_s": null' "$TMP/m_exit1/rep1/result.json" && ok "measure: binary exits 1 -> run_completed=False, no timer value, no baseline, exit 1" || bad "measure exit1: rc=$rc $(cat "$TMP/m_exit1.out")"
+rc=$(FAKE_MODE=failmark mrun fake failmark)
+grep -q 'native_check=FAIL' "$TMP/m_failmark.out" && grep -q 'baseline_saved=False' "$TMP/m_failmark.out" && grep -q 'run_completed=True' "$TMP/m_failmark.out" && ok "measure: exit 0 but 'FAIL' printed -> run_completed=True, native_check=FAIL, baseline NOT saved" || bad "measure failmark: rc=$rc $(cat "$TMP/m_failmark.out")"
+rc=$(FAKE_MODE=nan mrun fake nan)
+grep -q 'baseline_self_consistent=False' "$TMP/m_nan.out" && grep -q '"value": null' "$TMP/m_nan/rep1/result.json" && ok "measure: 'energy nan' -> quantity has no value, baseline not self-consistent" || bad "measure nan: rc=$rc $(cat "$TMP/m_nan.out")"
+rc=$(FAKE_MODE=notimer mrun fake notimer)
+[ "$rc" -eq 1 ] && grep -q 'timing_ok=False' "$TMP/m_notimer.out" && grep -q 'no matching line' "$TMP/m_notimer/rep1/result.json" && ! grep -q '"main_compute_s": [0-9]' "$TMP/m_notimer/rep1/result.json" && ok "measure: no timer line -> timing_ok=False, wall time never substituted, exit 1" || bad "measure notimer: rc=$rc"
+# stale log: a previous run's stdout.log in the run directory must never be read
+mkdir -p "$TMP/m_stale/rep1"; printf 'time 9.999 s\nenergy 42.000000\nPASS\n' > "$TMP/m_stale/rep1/stdout.log"
+rc=$(FAKE_MODE=exit1 mrun fake stale)
+! grep -q '9.999' "$TMP/m_stale/rep1/stdout.log" && grep -q '"main_compute_s": null' "$TMP/m_stale/rep1/result.json" && grep -q '"exit_code": 1' "$TMP/m_stale/rep1/result.json" && ok "measure: stale stdout.log from an earlier run is removed, not reused" || bad "measure stale: rc=$rc $(head -5 "$TMP/m_stale/rep1/result.json" 2>/dev/null)"
+rc=$(FAKE_MODE=ok mrun fakerec rec)
+grep -q 'comparison_rules=NONE' "$TMP/m_rec.out" && grep -q 'NEEDS_VALIDATION=energy' "$TMP/m_rec.out" && grep -q 'native_check=NONE' "$TMP/m_rec.out" && ok "measure: record-only rules -> comparison_rules=NONE, NEEDS_VALIDATION listed, native_check=NONE (never PASS)" || bad "measure record-only: $(cat "$TMP/m_rec.out")"
+python3 "$TOOL" compare "$FR/level1/fakerec" "$TMP/m_rec/baseline.json" "$TMP/m_rec/rep2/stdout.log" >/dev/null 2>&1; rc=$?
+[ $rc -eq 3 ] && ok "compare: record-only baseline vs a later run -> exit 3, not 0" || bad "compare record-only rc=$rc"
+python3 "$TOOL" compare "$FR/level1/fakerec" "$TMP/m_rec/baseline.json" "$TMP/m_rec/rep1/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "same output file" "$TMP/e" && ok "compare: baseline.json's own source log as candidate -> refused" || bad "compare same log rc=$rc"
+python3 "$TOOL" status "$FR/level1/fakerec" "$TMP/m_rec/measurement.json" 2>/dev/null | grep -q 'NEEDS_VALIDATION=energy' && ok "status: re-derives the vocabulary from measurement.json" || bad "status subcommand"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

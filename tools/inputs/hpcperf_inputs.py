@@ -9,9 +9,10 @@ source of truth for:
     build-time / run-time configuration, seed, validated backends);
   * how the benchmark's own timer is read (which line, which field, which unit,
     what the timed region covers) -- the tool never substitutes end-to-end wall
-    time for a missing or malformed timer value;
+    time for a missing or malformed timer value; optional secondary timers are
+    reported next to it, never added to it;
   * which scientific quantities form the baseline output and how a later run is
-    compared with them.
+    compared with them (rule per quantity; `record` = kept, not verified).
 
 Sub-commands (all read-only except `measure`, which writes into --out):
 
@@ -21,17 +22,36 @@ Sub-commands (all read-only except `measure`, which writes into --out):
   args     <bench_dir> <input_id>          the input's command-line arguments, one per line
                                            (run.sh reads these; unknown id -> exit 2)
   param    <bench_dir> <input_id> <key>    one parameter value (exit 2 if unknown)
-  parse-timing <bench_dir> <log> [--rc N]  main-compute time from a log (JSON); a nonzero
-                                           --rc or a missing/ambiguous timer line -> exit 1
-  extract  <bench_dir> <log>               the baseline quantities of a log (JSON)
-  compare  <bench_dir> <baseline.json> <log>   compare a log against a stored baseline
+  parse-timing <bench_dir> <log> [--rc N] [--input ID]
+                                           main-compute time from a log (JSON); a nonzero
+                                           --rc or a missing/ambiguous/non-finite timer line -> exit 1
+  extract  <bench_dir> <log> [--input ID]  the baseline quantities of a log (JSON)
+  compare  <bench_dir> <baseline.json> <log> [--input ID] [--rc N]
+                                           compare a log against a stored baseline:
+                                           exit 0 verified, 1 a rule failed / run failed,
+                                           2 baseline belongs to another input/benchmark or is the
+                                           same output file, 3 nothing failed but only `record`
+                                           rules exist (NEEDS_VALIDATION -- not a pass)
+  status   <bench_dir> <measurement.json>  the status vocabulary of a finished measurement
   measure  <bench_dir> <input_id> --out DIR [--warmup 1] [--reps 3] [--timeout S] [--gpus 1]
                                            warm-up run + N measured runs, one directory per run,
-                                           timing + baseline + summary (median, min, max, MAD)
+                                           timing + baseline + summary (median, min, max, MAD, spread)
 
-Exit codes: 0 ok, 1 validation/measurement failure, 2 usage / unknown input.
+Status vocabulary (summary of `measure`, also printed by `status`), kept separate on purpose:
+  run_completed        every measured run exited 0
+  timing_ok            every measured run yielded a main-compute value from the benchmark's own timer
+  native_check         PASS / FAIL / NONE -- rules that need no baseline (present, absent, abs_lt,
+                       ge, le) evaluated on every measured run; NONE when the input has no such rule
+  baseline_saved       the quantities of the first successful measured run were stored
+  comparison_rules     READY (every quantity has a verifying rule) / PARTIAL / NONE (record only)
+  needs_validation     the quantities whose rule is `record` (tolerance not fixed yet)
+  compute_ge_1s        median main compute >= 1 s (a reference value, not a gate)
+  stable               n >= 3 and (max-min)/median <= 0.10 over the measured runs
+
+Exit codes: 0 ok, 1 validation/measurement/comparison failure, 2 usage / unknown input /
+inconsistent baseline, 3 comparison inconclusive (record-only rules).
 """
-import argparse, hashlib, json, os, re, shutil, socket, statistics, subprocess, sys, time
+import argparse, hashlib, json, math, os, re, shutil, socket, statistics, subprocess, sys, time
 from pathlib import Path
 
 try:
@@ -46,7 +66,9 @@ VARIANTS = ("size", "case", "parameter", "implementation-path", "steps", "build-
 ENTRY_KINDS = ("run.sh", "binary")
 SELECT = ("first", "last", "only")
 RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "record", "ge", "le")
-NOISE = re.compile(r"lua|posix|stack traceback|no file|no field|\[C\]|addto:65")
+VERIFYING_RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "ge", "le")
+NATIVE_RULES = ("present", "absent", "abs_lt", "ge", "le")     # need no baseline
+STABLE_SPREAD = 0.10
 
 
 class InputError(Exception):
@@ -75,11 +97,31 @@ def load(bench_dir: Path) -> dict:
     return doc
 
 
+def _check_timer(t, where, errs, need_work=True):
+    for k in ("regex", "unit", "select"):
+        if k not in t:
+            errs.append(f"{where}.{k} missing")
+    if t.get("unit") not in UNIT_TO_S:
+        errs.append(f"{where}.unit must be one of {sorted(UNIT_TO_S)}")
+    if t.get("select") not in SELECT:
+        errs.append(f"{where}.select must be one of {SELECT}")
+    if t.get("kind", "total") not in ("total", "per_iteration", "per_step"):
+        errs.append(f"{where}.kind must be total | per_iteration | per_step")
+    if need_work and t.get("kind") in ("per_iteration", "per_step") and not t.get("work"):
+        errs.append(f"{where}.work {{key, offset}} is required for per_iteration/per_step timers")
+    try:
+        rx = re.compile(t.get("regex", ""))
+        if "value" not in rx.groupindex:
+            errs.append(f"{where}.regex needs a named group (?P<value>...)")
+    except re.error as ex:
+        errs.append(f"{where}.regex does not compile: {ex}")
+
+
 def validate(doc: dict) -> list:
     errs = []
-    need = lambda k: errs.append(f"missing top-level key '{k}'") if k not in doc else None
     for k in ("schema", "benchmark", "level", "entry", "default_input", "timing", "baseline", "inputs"):
-        need(k)
+        if k not in doc:
+            errs.append(f"missing top-level key '{k}'")
     if errs:
         return errs
     if doc["schema"] != SCHEMA:
@@ -88,27 +130,23 @@ def validate(doc: dict) -> list:
         errs.append("level must be 1, 2 or 3")
     e = doc["entry"]
     if not isinstance(e, dict) or e.get("kind") not in ENTRY_KINDS or not e.get("path"):
-        errs.append(f"entry must be {{kind: run.sh|binary, path: <repo-relative>}}")
-    if e.get("kind") == "run.sh" and not doc.get("selector"):
+        errs.append("entry must be {kind: run.sh|binary, path: <repo-relative>}")
+    if isinstance(e, dict) and e.get("kind") == "run.sh" and not doc.get("selector"):
         errs.append("a run.sh entry needs 'selector' (the HPCPERF_<APP>_INPUT variable run.sh honours)")
     t = doc["timing"]
-    for k in ("scope", "kind", "unit", "regex", "select"):
-        if k not in t:
-            errs.append(f"timing.{k} missing")
-    if t.get("unit") not in UNIT_TO_S:
-        errs.append(f"timing.unit must be one of {sorted(UNIT_TO_S)}")
-    if t.get("select") not in SELECT:
-        errs.append(f"timing.select must be one of {SELECT}")
-    if t.get("kind") not in ("total", "per_iteration", "per_step"):
-        errs.append("timing.kind must be total | per_iteration | per_step")
-    if t.get("kind") in ("per_iteration", "per_step") and not t.get("work"):
-        errs.append("timing.work {key, offset} is required for per_iteration/per_step timers")
-    try:
-        rx = re.compile(t.get("regex", ""))
-        if "value" not in rx.groupindex:
-            errs.append("timing.regex needs a named group (?P<value>...)")
-    except re.error as ex:
-        errs.append(f"timing.regex does not compile: {ex}")
+    if not isinstance(t, dict):
+        errs.append("timing must be a mapping"); t = {}
+    if "scope" not in t:
+        errs.append("timing.scope missing (where the timer starts/ends, what it includes/excludes)")
+    if "kind" not in t:
+        errs.append("timing.kind missing")
+    _check_timer(t, "timing", errs)
+    for i, sec in enumerate(t.get("secondary") or []):
+        if not isinstance(sec, dict) or not sec.get("name") or not sec.get("scope"):
+            errs.append(f"timing.secondary[{i}] needs name and scope")
+        else:
+            _check_timer(sec, f"timing.secondary[{sec['name']}]", errs, need_work=False)
+
     def check_quantities(qs, where):
         for q in qs:
             if not isinstance(q, dict) or not q.get("name") or not q.get("regex"):
@@ -131,7 +169,6 @@ def validate(doc: dict) -> list:
         errs.append("baseline.quantities must be a non-empty list")
     else:
         check_quantities(b["quantities"], "baseline")
-    # per-input overrides of the quantity list are validated with the same rules
     for inp in doc.get("inputs", []):
         ov = inp.get("baseline") if isinstance(inp, dict) else None
         if ov:
@@ -160,11 +197,10 @@ def validate(doc: dict) -> list:
             errs.append(f"input '{i}': derived/custom inputs must state 'derivation'")
         if src.get("kind") in ("upstream-file", "upstream-parameterized") and not src.get("upstream"):
             errs.append(f"input '{i}': upstream inputs must state 'upstream' (repo/version/path)")
-        if e.get("kind") == "binary" and not isinstance(inp.get("args"), list):
+        if isinstance(e, dict) and e.get("kind") == "binary" and not isinstance(inp.get("args"), list):
             errs.append(f"input '{i}': binary entries need an 'args' list")
         if "backends_validated" not in inp:
             errs.append(f"input '{i}': missing backends_validated (may be an empty list)")
-        # files referenced by the input must exist (protected harness side, or frozen tree)
         for f in inp.get("files", []) or []:
             if not (Path(doc["_path"]).parent / f).exists():
                 errs.append(f"input '{i}': referenced file '{f}' does not exist under the benchmark directory")
@@ -179,6 +215,14 @@ def get_input(doc: dict, input_id: str) -> dict:
             return inp
     known = ", ".join(i.get("id", "?") for i in doc["inputs"])
     raise InputError(f"unknown input id '{input_id}' for {doc['benchmark']} (registered: {known})")
+
+
+def quantities(doc: dict, inp=None):
+    """The baseline quantity list: an input may override the benchmark-wide one
+    (e.g. a deck with another thermo output style)."""
+    if inp and isinstance(inp.get("baseline"), dict) and inp["baseline"].get("quantities"):
+        return inp["baseline"]["quantities"]
+    return doc["baseline"]["quantities"]
 
 
 # ----------------------------------------------------------------------------- parsing
@@ -206,50 +250,78 @@ def _pick(matches, select, what):
     return matches[0] if select == "first" else matches[-1]
 
 
+def _finite(raw: str, what: str) -> float:
+    try:
+        v = float(raw)
+    except ValueError:
+        raise InputError(f"{what}: value '{raw}' is not a number")
+    if not math.isfinite(v):
+        raise InputError(f"{what}: value '{raw}' is not finite")
+    return v
+
+
+def _resolution(raw: str, unit: str):
+    """Print resolution of a timer value from its decimal places ('0.2876' s -> 1e-4 s)."""
+    m = re.match(r"^[-+]?\d*\.(\d+)$", raw.strip())
+    if not m:
+        return None
+    return 10.0 ** (-len(m.group(1))) * UNIT_TO_S[unit]
+
+
+def _read_timer(t: dict, lines, what: str, params=None) -> dict:
+    m = _pick(_matches(t["regex"], lines, t.get("section_start")), t["select"], what)
+    raw = m.group("value")
+    v = _finite(raw, what)
+    if v < 0:
+        raise InputError(f"{what}: negative timer value {raw}")
+    seconds = v * UNIT_TO_S[t["unit"]]
+    res = {"raw_value": v, "raw_text": raw, "unit": t["unit"], "kind": t.get("kind", "total"),
+           "line": m.group(0).strip(), "scope": t.get("scope"),
+           "print_resolution_s": _resolution(raw, t["unit"])}
+    if t.get("kind") in ("per_iteration", "per_step"):
+        w = t["work"]
+        if params is None or w["key"] not in params:
+            raise InputError(f"{what}: work key '{w['key']}' not in the input parameters")
+        n = int(params[w["key"]]) + int(w.get("offset", 0))
+        if n <= 0:
+            raise InputError(f"{what}: work count {n} <= 0 for key {w['key']}")
+        res.update({"per_unit_s": seconds, "work_count": n, "seconds": seconds * n,
+                    "print_resolution_s": (res["print_resolution_s"] * n) if res["print_resolution_s"] else None})
+    else:
+        res["seconds"] = seconds
+    return res
+
+
 def parse_timing(doc: dict, log_path: Path, rc=0, params=None) -> dict:
-    """Main-compute time in seconds from the benchmark's OWN timer line.
+    """Main-compute time in seconds from the benchmark's OWN timer line, plus any
+    secondary timers (reported separately, never summed).
 
     Never falls back to wall time: a nonzero exit code, a missing or ambiguous
     line, a non-finite value or an unknown unit raises InputError."""
-    t = doc["timing"]
     if rc != 0:
         raise InputError(f"run exited {rc}; timer output of a failed run is not used")
     if not Path(log_path).is_file():
         raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
-    m = _pick(_matches(t["regex"], lines, t.get("section_start")), t["select"], "timing")
-    raw = m.group("value")
-    try:
-        v = float(raw)
-    except ValueError:
-        raise InputError(f"timing value '{raw}' is not a number")
-    if not (v == v) or v in (float("inf"), float("-inf")) or v < 0:
-        raise InputError(f"timing value {raw} is not finite/non-negative")
-    seconds = v * UNIT_TO_S[t["unit"]]
-    res = {"raw_value": v, "unit": t["unit"], "kind": t["kind"], "line": m.group(0).strip(),
-           "scope": t["scope"]}
-    if t["kind"] in ("per_iteration", "per_step"):
-        w = t["work"]
-        if params is None or w["key"] not in params:
-            raise InputError(f"timing.work key '{w['key']}' not in the input parameters")
-        n = int(params[w["key"]]) + int(w.get("offset", 0))
-        if n <= 0:
-            raise InputError(f"work count {n} <= 0 for key {w['key']}")
-        res.update({"per_unit_s": seconds, "work_count": n, "main_compute_s": seconds * n})
-    else:
-        res["main_compute_s"] = seconds
+    main = _read_timer(doc["timing"], lines, "timing", params)
+    res = dict(main)
+    res["main_compute_s"] = main["seconds"]
+    sec = {}
+    for s in doc["timing"].get("secondary") or []:
+        try:
+            r = _read_timer(s, lines, f"secondary timer {s['name']}")
+            sec[s["name"]] = {"seconds": r["seconds"], "raw_text": r["raw_text"], "unit": r["unit"],
+                              "scope": s["scope"], "line": r["line"]}
+        except InputError as ex:
+            sec[s["name"]] = {"seconds": None, "error": str(ex), "scope": s["scope"]}
+    if sec:
+        res["secondary_timers"] = sec
     return res
 
 
-def quantities(doc: dict, inp=None):
-    """The baseline quantity list: an input may override the benchmark-wide one
-    (e.g. a deck with another thermo output style)."""
-    if inp and isinstance(inp.get("baseline"), dict) and inp["baseline"].get("quantities"):
-        return inp["baseline"]["quantities"]
-    return doc["baseline"]["quantities"]
-
-
 def extract(doc: dict, log_path: Path, inp=None) -> dict:
+    if not Path(log_path).is_file():
+        raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
     out = {}
     for q in quantities(doc, inp):
@@ -261,28 +333,34 @@ def extract(doc: dict, log_path: Path, inp=None) -> dict:
         try:
             m = _pick(ms, q.get("select", "last"), f"baseline quantity {q['name']}")
             raw = m.group("value")
-            out[q["name"]] = {"value": float(raw), "raw": raw, "line": m.group(0).strip()}
+            out[q["name"]] = {"value": _finite(raw, f"baseline quantity {q['name']}"), "raw": raw, "line": m.group(0).strip()}
         except InputError as ex:
             out[q["name"]] = {"value": None, "error": str(ex)}
     return out
 
 
 def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
-    """Apply each quantity's rule. Returns {ok, checks:[...]}."""
-    checks, ok = [], True
+    """Apply each quantity's rule. Returns {ok, verified, record_only, checks}:
+    ok           no rule failed (a `record` quantity only has to be present and finite);
+    verified     ok AND at least one verifying (non-record) rule was applied;
+    record_only  every rule is `record` -> nothing was verified (NEEDS_VALIDATION)."""
+    checks, ok, n_verifying = [], True, 0
     for q in quantities(doc, inp):
         n = q["name"]; cmp = q.get("compare", {}); rule = cmp["rule"]
         b = baseline.get(n, {}); c = current.get(n, {})
         rec = {"name": n, "rule": rule}
+        if rule in VERIFYING_RULES:
+            n_verifying += 1
         if rule == "present":
-            good = bool(c.get("present"))
-            rec.update({"present": good})
+            good = bool(c.get("present")); rec.update({"present": bool(c.get("present"))})
         elif rule == "absent":
-            good = not c.get("present")
-            rec.update({"present": not good})
+            good = not c.get("present"); rec.update({"present": bool(c.get("present"))})
         elif rule == "record":
-            good = c.get("value") is not None            # recorded for later analysis; tolerance not yet fixed
-            rec.update({"value": c.get("value"), "baseline": b.get("value"), "note": "recorded only, no tolerance defined yet"})
+            good = c.get("value") is not None
+            rec.update({"value": c.get("value"), "baseline": b.get("value"),
+                        "note": "recorded only, no tolerance defined yet (NEEDS_VALIDATION)"})
+            if not good:
+                rec["error"] = c.get("error", "missing")
         else:
             cv = c.get("value")
             if cv is None:
@@ -294,7 +372,7 @@ def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
             else:
                 bv = b.get("value")
                 if bv is None:
-                    good = False; rec["error"] = "baseline has no value"
+                    good = False; rec["error"] = "baseline has no value for this quantity"
                 elif rule == "exact":
                     good = (cv == bv); rec.update({"value": cv, "baseline": bv})
                 elif rule == "rel":
@@ -308,7 +386,18 @@ def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
         rec["ok"] = good
         ok = ok and good
         checks.append(rec)
-    return {"ok": ok, "checks": checks}
+    return {"ok": ok, "verified": ok and n_verifying > 0, "record_only": n_verifying == 0,
+            "verifying_rules": n_verifying, "checks": checks}
+
+
+def native_check(doc, current: dict, inp=None) -> dict:
+    """Only the rules that need no baseline (present/absent/abs_lt/ge/le): the
+    benchmark's own pass criteria as far as they are expressed in inputs.yaml."""
+    qs = [q for q in quantities(doc, inp) if q.get("compare", {}).get("rule") in NATIVE_RULES]
+    if not qs:
+        return {"status": "NONE", "checks": []}
+    res = compare({"baseline": {"quantities": qs}}, {}, current, None)
+    return {"status": "PASS" if res["ok"] else "FAIL", "checks": res["checks"]}
 
 
 # ----------------------------------------------------------------------------- measure
@@ -346,6 +435,8 @@ def build_command(doc, inp, root: Path, bench_dir: Path, gpus: int):
             raise InputError(f"binary {exe} not built")
         cmd = [str(exe)] + [str(a) for a in inp.get("args", [])]
         env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
+        for k, v in (inp.get("env") or {}).items():
+            env[str(k)] = str(v)
         return cmd, env, exe
     rs = root / e["path"]
     if not rs.is_file():
@@ -371,80 +462,131 @@ def run_once(cmd, env, cwd: Path, log: Path, timeout: int):
     return rc, time.monotonic() - t0
 
 
+def stats(v, resolution=None):
+    if not v:
+        return None
+    med = statistics.median(v)
+    spread = (max(v) - min(v)) / med if med > 0 else None
+    return {"n": len(v), "median": med, "min": min(v), "max": max(v),
+            "mad": statistics.median([abs(x - med) for x in v]),
+            "spread_rel": spread, "spread_formula": "(max - min) / median over the measured runs",
+            "stable_rule": f"n >= 3 and spread_rel <= {STABLE_SPREAD}",
+            "print_resolution_s": resolution,
+            "spread_below_print_resolution": (resolution is not None and (max(v) - min(v)) <= resolution),
+            "values": v}
+
+
+def summarize(doc, inp, runs, reps):
+    measured = [r for r in runs if r["measured"]]
+    good = [r for r in measured if r["exit_code"] == 0]
+    mc = [r["main_compute_s"] for r in good if r.get("main_compute_s") is not None]
+    e2e = [r["e2e_s"] for r in good]
+    res = None
+    for r in good:
+        if r.get("timing") and r["timing"].get("print_resolution_s"):
+            res = r["timing"]["print_resolution_s"]; break
+    s = {"run_completed": len(good) == len(measured) and len(measured) == reps,
+         "timing_ok": len(mc) == len(measured) and len(measured) == reps,
+         "main_compute_s": stats(mc, res), "e2e_s": stats(e2e)}
+    sec = {}
+    for r in good:
+        for k, v in (r.get("timing", {}).get("secondary_timers") or {}).items():
+            if v.get("seconds") is not None:
+                sec.setdefault(k, {"scope": v["scope"], "values": []})["values"].append(v["seconds"])
+    for k in sec:
+        sec[k].update({kk: vv for kk, vv in stats(sec[k]["values"]).items() if kk != "values"})
+    s["secondary_timers_s"] = sec or None
+    s["compute_ge_1s"] = bool(mc) and s["main_compute_s"]["median"] >= 1.0
+    s["stable"] = (bool(mc) and len(mc) >= 3 and s["main_compute_s"]["spread_rel"] is not None
+                   and s["main_compute_s"]["spread_rel"] <= STABLE_SPREAD)
+    # native (baseline-free) checks on every good run
+    nat = [native_check(doc, r["baseline_quantities"], inp) for r in good if r.get("baseline_quantities")]
+    if not nat or all(n["status"] == "NONE" for n in nat):
+        s["native_check"] = "NONE"
+    else:
+        s["native_check"] = "PASS" if all(n["status"] == "PASS" for n in nat) and len(nat) == len(measured) else "FAIL"
+    s["native_checks"] = nat
+    qs = quantities(doc, inp)
+    rec = [q["name"] for q in qs if q.get("compare", {}).get("rule") == "record"]
+    ver = [q["name"] for q in qs if q.get("compare", {}).get("rule") in VERIFYING_RULES]
+    s["comparison_rules"] = "READY" if (ver and not rec) else ("PARTIAL" if ver else "NONE")
+    s["needs_validation"] = rec
+    return s, good
+
+
 def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps: int, timeout: int, gpus: int):
     out.mkdir(parents=True, exist_ok=True)
     cmd, env, entry_path = build_command(doc, inp, root, bench_dir, gpus)
     e2e_boundary = ("process wall of the benchmark binary (fork/exec to exit; includes CUDA context creation)"
                     if doc["entry"]["kind"] == "binary" else
                     "wrapper wall of run.sh (env sourcing, launcher, mpirun, binding audit, application)")
-    meta = {"schema": "hpcperf-inputs-measurement-1", "benchmark": doc["benchmark"], "level": doc["level"],
+    meta = {"schema": "hpcperf-inputs-measurement-2", "benchmark": doc["benchmark"], "level": doc["level"],
             "input_id": inp["id"], "inputs_yaml_sha256": doc["_sha256"], "entry": doc["entry"],
             "entry_sha256": sha256_file(entry_path), "command": cmd, "gpus": gpus,
             "selector": {doc.get("selector"): inp["id"]} if doc.get("selector") else None,
             "host": socket.gethostname(), "gpu": gpu_info(), "git": git_head(root),
             "warmup_runs": warmup, "measured_runs": reps, "timeout_s": timeout,
             "e2e_boundary": e2e_boundary, "timing_scope": doc["timing"]["scope"],
+            "secondary_timer_scopes": {s["name"]: s["scope"] for s in (doc["timing"].get("secondary") or [])},
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "runs": []}
     for k in range(warmup + reps):
         label = f"warmup{k}" if k < warmup else f"rep{k - warmup + 1}"
         rdir = out / label
         if rdir.exists():
-            shutil.rmtree(rdir)
+            shutil.rmtree(rdir)               # never read a previous run's output
         rdir.mkdir(parents=True)
         renv = dict(env)
         if doc["level"] == 3:
             renv["HPCPERF_L3_RUN_SUBDIR"] = f"run.inputs.{inp['id']}.{label}"   # isolate app-written results per run
         log = rdir / "stdout.log"
+        t_start = time.time()
         rc, wall = run_once(cmd, renv, rdir, log, timeout)
-        rec = {"label": label, "exit_code": rc, "e2e_s": round(wall, 4), "log": str(log), "measured": k >= warmup}
+        rec = {"label": label, "exit_code": rc, "e2e_s": round(wall, 4), "log": str(log), "measured": k >= warmup,
+               "log_written_after_start": (log.exists() and log.stat().st_mtime >= t_start - 1)}
         try:
             rec["timing"] = parse_timing(doc, log, rc, inp.get("params"))
             rec["main_compute_s"] = rec["timing"]["main_compute_s"]
         except InputError as ex:
             rec["timing_error"] = str(ex); rec["main_compute_s"] = None
-        rec["baseline_quantities"] = extract(doc, log, inp) if rc == 0 else None
+        rec["baseline_quantities"] = extract(doc, log, inp) if rc == 0 and log.exists() else None
         (rdir / "result.json").write_text(json.dumps(rec, indent=2))
         meta["runs"].append(rec)
         print(f"[{doc['benchmark']}/{inp['id']}] {label}: rc={rc} e2e={wall:.3f}s main_compute="
               f"{rec['main_compute_s'] if rec['main_compute_s'] is None else round(rec['main_compute_s'], 4)}"
               + (f" ({rec['timing_error']})" if 'timing_error' in rec else ""), flush=True)
-    measured = [r for r in meta["runs"] if r["measured"]]
-    good = [r for r in measured if r["exit_code"] == 0]
-    mc = [r["main_compute_s"] for r in good if r["main_compute_s"] is not None]
-    e2e = [r["e2e_s"] for r in good]
-
-    def stats(v):
-        if not v:
-            return None
-        med = statistics.median(v)
-        return {"n": len(v), "median": med, "min": min(v), "max": max(v),
-                "mad": statistics.median([abs(x - med) for x in v]),
-                "spread_rel": (max(v) - min(v)) / med if med > 0 else None, "values": v}
-    summary = {"run_ok": len(good) == len(measured) and len(measured) == reps,
-               "timing_ok": len(mc) == len(measured) and len(measured) == reps,
-               "main_compute_s": stats(mc), "e2e_s": stats(e2e)}
-    summary["compute_ge_1s"] = bool(mc) and summary["main_compute_s"]["median"] >= 1.0
-    summary["stable"] = (bool(mc) and summary["main_compute_s"]["spread_rel"] is not None
-                         and summary["main_compute_s"]["spread_rel"] <= 0.10)
-    # baseline = the first measured run that succeeded; every later measured run is compared with it
-    base = next((r for r in good if r["baseline_quantities"]), None)
+    summary, good = summarize(doc, inp, meta["runs"], reps)
+    # the working baseline comes from the first measured run that exited 0 AND passed the
+    # benchmark's own baseline-free checks (a run that prints FAIL and exits 0 is never a baseline)
+    base = next((r for r in good if r["baseline_quantities"]
+                 and native_check(doc, r["baseline_quantities"], inp)["status"] != "FAIL"), None)
     if base:
         bfile = out / "baseline.json"
         bfile.write_text(json.dumps({"schema": "hpcperf-inputs-baseline-1", "benchmark": doc["benchmark"],
                                      "input_id": inp["id"], "from_run": base["label"], "log": base["log"],
-                                     "method": doc["baseline"].get("method"), "reference": (inp.get("baseline") or {}).get("reference", doc["baseline"].get("reference")),
+                                     "log_sha256": sha256_file(base["log"]),
+                                     "method": doc["baseline"].get("method"),
+                                     "reference": (inp.get("baseline") or {}).get("reference", doc["baseline"].get("reference")),
                                      "quantity_rules": quantities(doc, inp), "quantities": base["baseline_quantities"]}, indent=2))
-        summary["baseline_file"] = str(bfile)
+        summary["baseline_saved"] = True; summary["baseline_file"] = str(bfile)
         cmps = [compare(doc, base["baseline_quantities"], r["baseline_quantities"], inp) for r in good if r["baseline_quantities"]]
         summary["baseline_self_consistent"] = all(c["ok"] for c in cmps)
         summary["baseline_checks"] = cmps
     else:
-        summary["baseline_file"] = None
+        summary["baseline_saved"] = False; summary["baseline_file"] = None
         summary["baseline_self_consistent"] = False
     meta["summary"] = summary
     meta["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     (out / "measurement.json").write_text(json.dumps(meta, indent=2))
     return meta
+
+
+def status_line(s: dict) -> str:
+    keys = ("run_completed", "timing_ok", "native_check", "baseline_saved", "comparison_rules",
+            "compute_ge_1s", "stable", "baseline_self_consistent")
+    parts = [f"{k}={s.get(k)}" for k in keys]
+    if s.get("needs_validation"):
+        parts.append("NEEDS_VALIDATION=" + ",".join(s["needs_validation"]))
+    return " ".join(parts)
 
 
 # ----------------------------------------------------------------------------- cli
@@ -458,7 +600,8 @@ def main(argv=None):
     s = sub.add_parser("param"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("key")
     s = sub.add_parser("parse-timing"); s.add_argument("bench_dir"); s.add_argument("log"); s.add_argument("--rc", type=int, default=0); s.add_argument("--input")
     s = sub.add_parser("extract"); s.add_argument("bench_dir"); s.add_argument("log"); s.add_argument("--input")
-    s = sub.add_parser("compare"); s.add_argument("bench_dir"); s.add_argument("baseline"); s.add_argument("log"); s.add_argument("--input")
+    s = sub.add_parser("compare"); s.add_argument("bench_dir"); s.add_argument("baseline"); s.add_argument("log"); s.add_argument("--input"); s.add_argument("--rc", type=int, default=0)
+    s = sub.add_parser("status"); s.add_argument("bench_dir"); s.add_argument("measurement")
     s = sub.add_parser("measure"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("--out", required=True)
     s.add_argument("--warmup", type=int, default=1); s.add_argument("--reps", type=int, default=3)
     s.add_argument("--timeout", type=int, default=1800); s.add_argument("--gpus", type=int, default=1)
@@ -499,16 +642,38 @@ def main(argv=None):
             print(json.dumps(extract(doc, Path(a.log), inp), indent=2)); return 0
         if a.cmd == "compare":
             bdoc = json.loads(Path(a.baseline).read_text())
-            inp = get_input(doc, a.input or bdoc.get("input_id")) if (a.input or bdoc.get("input_id")) else None
+            bid = bdoc.get("input_id")
+            if a.input and bid and bid != a.input:
+                sys.stderr.write(f"hpcperf_inputs: baseline belongs to input '{bid}', not '{a.input}' -- refusing to compare\n"); return 2
+            if bdoc.get("benchmark") and bdoc["benchmark"] != doc["benchmark"]:
+                sys.stderr.write(f"hpcperf_inputs: baseline belongs to benchmark '{bdoc['benchmark']}', not '{doc['benchmark']}'\n"); return 2
+            blog = bdoc.get("log")
+            if blog and Path(blog).exists() and Path(a.log).exists() and os.path.realpath(blog) == os.path.realpath(a.log):
+                sys.stderr.write("hpcperf_inputs: baseline and candidate are the same output file -- refusing to compare\n"); return 2
+            if a.rc != 0:
+                print(json.dumps({"ok": False, "verified": False, "error": f"candidate run exited {a.rc}; its output is not compared"}, indent=2)); return 1
+            inp = get_input(doc, a.input or bid) if (a.input or bid) else None
             res = compare(doc, bdoc["quantities"], extract(doc, Path(a.log), inp), inp)
-            print(json.dumps(res, indent=2)); return 0 if res["ok"] else 1
+            res["baseline_input_id"] = bid
+            print(json.dumps(res, indent=2))
+            if not res["ok"]:
+                return 1
+            return 3 if res["record_only"] else 0
+        if a.cmd == "status":
+            m = json.loads(Path(a.measurement).read_text())
+            inp = get_input(doc, m["input_id"])
+            s, _ = summarize(doc, inp, m["runs"], m.get("measured_runs", len([r for r in m["runs"] if r["measured"]])))
+            old = m.get("summary", {})
+            for k in ("baseline_saved", "baseline_file", "baseline_self_consistent"):
+                s[k] = old.get(k, (old.get("baseline_file") is not None) if k == "baseline_saved" else None)
+            print(status_line(s)); return 0
         if a.cmd == "measure":
             inp = get_input(doc, a.input_id)
             root = repo_root(bench_dir)
             meta = measure(doc, inp, root, bench_dir, Path(a.out), a.warmup, a.reps, a.timeout, a.gpus)
             s = meta["summary"]
-            print(json.dumps({k: s[k] for k in ("run_ok", "timing_ok", "compute_ge_1s", "stable", "baseline_self_consistent")}))
-            return 0 if s["run_ok"] and s["timing_ok"] else 1
+            print(status_line(s))
+            return 0 if s["run_completed"] and s["timing_ok"] else 1
     except InputError as ex:
         sys.stderr.write(f"hpcperf_inputs: {ex}\n")
         return 2 if a.cmd in ("args", "param", "show") else 1
