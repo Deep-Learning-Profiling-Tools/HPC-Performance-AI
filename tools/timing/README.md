@@ -87,6 +87,16 @@ python3 tools/timing/gen_cases.py --build-root build/all           # regenerate
 python3 tools/timing/gen_cases.py --build-root build/all --check   # fail on drift
 ```
 
+`gen_cases.py` does not trust a bare `ctest` from `PATH`. It resolves one in this
+order and prints which it used: `CMAKE_CTEST_COMMAND` from the build tree's own
+`CMakeCache.txt` (authoritative -- by construction the ctest that wrote the
+`CTestTestfile.cmake` files being parsed, and independent of a conda/uv/system
+choice), then `$HPCPERF_CTEST`, then `PATH` but only if `ctest --version` actually
+succeeds; otherwise it fails naming every attempt. On the reference node
+`~/.local/bin/ctest` is a pip shim whose `cmake` module is missing and dies with
+`ModuleNotFoundError`, and a `PATH` search can reach an unrelated user's
+virtualenv, so this is not hypothetical.
+
 Nine benchmarks are wrapped by a repo-authored `verify.py` in their `add_test`
 command; four of those rewrite the arguments (`gaussian_elimination` turns a
 positional path into `-f <path>`, both `hotspot` variants append `output.out`,

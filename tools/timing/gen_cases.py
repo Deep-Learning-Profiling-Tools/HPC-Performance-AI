@@ -23,7 +23,9 @@ review and portable across build trees.
 import argparse
 import json
 import os
+import re
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -81,10 +83,63 @@ def inner_argv_of_wrapper(wrapper_path, wrapper_argv):
     raise RuntimeError(f"{wrapper_path}: wrapper never called subprocess.run")
 
 
-def ctest_show(test_dir):
+def resolve_ctest(build_root):
+    """Find a working ctest, preferring the one that generated this build tree.
+
+    A bare `ctest` from PATH is not safe: on the reference node
+    ~/.local/bin/ctest is a pip shim whose cmake module is missing and it dies
+    with ModuleNotFoundError, and a PATH search can pick up an unrelated user's
+    virtualenv. The build tree records the ctest CMake itself used, which is by
+    construction the one that wrote the CTestTestfile.cmake files parsed here and
+    is independent of a conda/uv/system choice.
+
+    Order: CMakeCache.txt -> $HPCPERF_CTEST -> PATH (only if it actually runs).
+    """
+    attempts = []
+
+    def works(path):
+        if not path:
+            return None
+        try:
+            p = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=30)
+        except Exception as exc:  # noqa: BLE001 - report the reason in the trail
+            attempts.append(f"{path}: {exc}")
+            return None
+        if p.returncode != 0:
+            attempts.append(f"{path}: exited {p.returncode}: {(p.stderr or p.stdout).strip().splitlines()[-1:]}")
+            return None
+        ver = ""
+        m = re.search(r"version\s+(\S+)", p.stdout)
+        if m:
+            ver = m.group(1)
+        return (path, ver)
+
+    cache = os.path.join(build_root, "CMakeCache.txt")
+    cached = None
+    if os.path.isfile(cache):
+        for line in open(cache, errors="ignore"):
+            if line.startswith("CMAKE_CTEST_COMMAND:INTERNAL="):
+                cached = line.split("=", 1)[1].strip()
+                break
+        if not cached:
+            attempts.append(f"{cache}: no CMAKE_CTEST_COMMAND entry")
+    else:
+        attempts.append(f"{cache}: not found")
+
+    for cand in (cached, os.environ.get("HPCPERF_CTEST"), shutil.which("ctest")):
+        got = works(cand)
+        if got:
+            return got
+
+    raise RuntimeError("no usable ctest found. Tried, in order, the build tree's "
+                       "CMAKE_CTEST_COMMAND, $HPCPERF_CTEST and PATH:\n  "
+                       + "\n  ".join(attempts or ["(no candidates)"]))
+
+
+def ctest_show(ctest, test_dir):
     """Return the parsed `ctest --show-only=json-v1` payload for one benchmark build dir."""
     proc = subprocess.run(
-        ["ctest", "--test-dir", test_dir, "--show-only=json-v1"],
+        [ctest, "--test-dir", test_dir, "--show-only=json-v1"],
         capture_output=True, text=True,
     )
     if proc.returncode != 0:
@@ -120,11 +175,13 @@ def placeholderize(text, build_root):
 
 def build_rows(build_root):
     rows = []
+    ctest, ctest_version = resolve_ctest(build_root)
+    print(f"gen_cases: using ctest {ctest_version or '?'} at {ctest}", file=sys.stderr)
     dirs = find_benchmark_dirs(build_root)
     if not dirs:
         raise RuntimeError(f"no benchmark build directories under {build_root}")
     for bm, test_dir in dirs.items():
-        payload = ctest_show(test_dir)
+        payload = ctest_show(ctest, test_dir)
         tests = payload.get("tests", [])
         if not tests:
             continue

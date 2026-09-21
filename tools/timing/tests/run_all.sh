@@ -203,5 +203,47 @@ else
 fi
 
 echo
+echo "=== 5: gen_cases.py resolves a working ctest, never a broken PATH one"
+G="$TOOLS/gen_cases.py"
+# a fixture build tree whose CMakeCache.txt names a stub ctest, plus a PATH whose
+# ctest is deliberately broken (this is the situation on the reference node, where
+# ~/.local/bin/ctest is a pip shim with no cmake module)
+FB="$TMP/fakebuild"; mkdir -p "$FB/level1/demo" "$TMP/badbin"
+printf '#!/bin/sh\nexit 1\n' > "$TMP/badbin/ctest"; chmod +x "$TMP/badbin/ctest"
+cat > "$TMP/stubctest" <<'STUB'
+#!/bin/sh
+case "$1" in
+  --version) echo "ctest version 9.9.9"; exit 0 ;;
+esac
+echo '{"kind":"ctestInfo","tests":[{"name":"demo_run","command":["/bin/true","7"],
+      "properties":[{"name":"WORKING_DIRECTORY","value":"/tmp"},{"name":"TIMEOUT","value":600}]}]}'
+STUB
+chmod +x "$TMP/stubctest"
+echo "CMAKE_CTEST_COMMAND:INTERNAL=$TMP/stubctest" > "$FB/CMakeCache.txt"
+touch "$FB/level1/demo/CTestTestfile.cmake"
+
+out="$(PATH="$TMP/badbin:$PATH" python3 "$G" --build-root "$FB" --out "$TMP/out.tsv" 2>&1 | noise)"
+case "$out" in *"ctest 9.9.9 at $TMP/stubctest"*) ok "5a: prefers CMAKE_CTEST_COMMAND over a broken PATH ctest" ;;
+                                               *) bad "5a: did not use the build tree's ctest: $out" ;; esac
+if /usr/bin/grep -q "^demo	/bin/true	7	" "$TMP/out.tsv" 2>/dev/null; then
+    ok "5b: parses the stub ctest's json-v1 into a case row"
+else
+    bad "5b: no demo row written"
+fi
+
+# no cache and no working ctest anywhere -> hard error naming all three attempts
+rm "$FB/CMakeCache.txt"
+PY3="$(command -v python3)"
+out="$(PATH="$TMP/badbin:/usr/bin:/bin" "$PY3" "$G" --build-root "$FB" --out "$TMP/out2.tsv" 2>&1 | noise)"
+if echo "$out" | /usr/bin/grep -q 'CMAKE_CTEST_COMMAND' && echo "$out" | /usr/bin/grep -q 'HPCPERF_CTEST'; then
+    ok "5c: with no usable ctest it fails naming every resolution attempt"
+else
+    bad "5c: resolution failure is not reported with its trail: $out"
+fi
+out="$(PATH="$TMP/badbin:/usr/bin:/bin" HPCPERF_CTEST="$TMP/stubctest" "$PY3" "$G" --build-root "$FB" --out "$TMP/out3.tsv" 2>&1 | noise)"
+case "$out" in *"$TMP/stubctest"*) ok "5d: \$HPCPERF_CTEST is honoured when the cache is absent" ;;
+                                *) bad "5d: HPCPERF_CTEST ignored: $out" ;; esac
+
+echo
 echo "timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]
