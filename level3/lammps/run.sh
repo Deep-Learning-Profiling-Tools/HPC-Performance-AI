@@ -40,7 +40,8 @@ source "$R/level3/tools/l3_common.sh"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+VARIANT="${HPCPERF_LAMMPS_VARIANT:-}"     # "" (default package set) or reaxff -- see build.sh
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL" "$VARIANT")"
 l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2     # same derivation as build.sh: binary, install and run tree of ONE profile
 EXE="$L3_BUILD/lmp_kokkos_$MODEL"
 [ -x "$EXE" ] || { echo "run.sh: $EXE not found -- run ./build.sh $BACKEND first (profile $PROFILE)" >&2; exit 1; }
@@ -83,9 +84,21 @@ if [ -n "$INPUT_ID" ]; then
     Z="$(python3 "$TOOL" param "$HERE" "$INPUT_ID" z)" || exit 2
     STEPS="$(python3 "$TOOL" param "$HERE" "$INPUT_ID" steps)" || exit 2
     ATOMS="$(python3 "$TOOL" param "$HERE" "$INPUT_ID" atoms)" || exit 2
-    case "$DECK" in in.lj|in.eam|in.chain|in.rhodo|in.chute) ;; *) echo "run.sh: input '$INPUT_ID' names deck '$DECK', which is not one of the frozen bench/ decks" >&2; exit 2 ;; esac
-    [ -f "$SRC/bench/$DECK" ] || { echo "run.sh: $SRC/bench/$DECK missing from the frozen source tree" >&2; exit 3; }
+    # deck_dir (default bench) names the directory of the frozen tree the deck lives in; a deck
+    # that needs a build variant (ReaxFF) declares it and is refused on any other profile.
+    DECK_DIR="$(python3 "$TOOL" param "$HERE" "$INPUT_ID" deck_dir 2>/dev/null)" || DECK_DIR=bench
+    NEED_VARIANT="$(python3 "$TOOL" param "$HERE" "$INPUT_ID" variant 2>/dev/null)" || NEED_VARIANT=""
+    case "$DECK_DIR/$DECK" in
+        bench/in.lj|bench/in.eam|bench/in.chain|bench/in.rhodo|bench/in.chute|examples/reaxff/HNS/in.reaxff.hns) ;;
+        *) echo "run.sh: input '$INPUT_ID' names deck '$DECK_DIR/$DECK', which is not one of the frozen upstream decks" >&2; exit 2 ;;
+    esac
+    [ -f "$SRC/$DECK_DIR/$DECK" ] || { echo "run.sh: $SRC/$DECK_DIR/$DECK missing from the frozen source tree" >&2; exit 3; }
+    if [ "$NEED_VARIANT" != "$VARIANT" ]; then
+        echo "run.sh: input '$INPUT_ID' needs build variant '${NEED_VARIANT:-default}' but profile $PROFILE is variant '${VARIANT:-default}' (set HPCPERF_LAMMPS_VARIANT=$NEED_VARIANT)" >&2; exit 2
+    fi
     LABEL="input.$INPUT_ID"
+else
+    DECK_DIR=bench
 fi
 RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR"
 # A dry-run must never touch real results: it writes its derived deck and would-be
@@ -103,9 +116,11 @@ rm -f "$LOG"      # validate only against THIS run's output; never a stale log l
 IN="$RUN_DIR/$DECK.$LABEL"
 {
     if [ -n "$INPUT_ID" ]; then
+        # read_data, EAM potentials and ReaxFF force-field files (pair_coeff * * ffield...) get absolute paths
         sed -e 's/^run[[:space:]].*/run             ${steps}/' \
-            -e "s#^\(read_data[[:space:]]\{1,\}\)\([^[:space:]/]\{1,\}\)#\1$SRC/bench/\2#" \
-            -e "s#^\(pair_coeff[[:space:]].*[[:space:]]\)\([A-Za-z0-9_.]*\.eam\)\([[:space:]]*\)\$#\1$SRC/bench/\2\3#" "$SRC/bench/$DECK"
+            -e "s#^\(read_data[[:space:]]\{1,\}\)\([^[:space:]/]\{1,\}\)#\1$SRC/$DECK_DIR/\2#" \
+            -e "s#^\(pair_coeff[[:space:]].*[[:space:]]\)\([A-Za-z0-9_.]*\.eam\)\([[:space:]]*\)\$#\1$SRC/$DECK_DIR/\2\3#" \
+            -e "s#^\(pair_coeff[[:space:]]\{1,\}\*[[:space:]]\{1,\}\*[[:space:]]\{1,\}\)\(ffield[A-Za-z0-9_.]*\)#\1$SRC/$DECK_DIR/\2#" "$SRC/$DECK_DIR/$DECK"
     elif [ "${#PROCS[@]}" -gt 0 ]; then
         sed -e 's/^create_box.*/processors      ${px} ${py} ${pz}\n&/' -e 's/^run[[:space:]].*/run             ${steps}/' "$SRC/bench/in.lj"
     else
@@ -113,7 +128,8 @@ IN="$RUN_DIR/$DECK.$LABEL"
     fi
 } > "$IN"
 
-echo "# LAMMPS $BACKEND profile=$PROFILE: mode=$MODE${INPUT_ID:+ input=$INPUT_ID deck=$DECK} ranks=$N_RANKS box=$((20*X))x$((20*Y))x$((20*Z)) fcc cells = $ATOMS atoms ($((ATOMS / N_RANKS))/rank), $STEPS steps, gpu-aware=$GAM, log=$LOG"
+if [ "$DECK_DIR" = bench ]; then GEOM="box=$((20*X))x$((20*Y))x$((20*Z)) fcc cells ="; else GEOM="replicate ${X}x${Y}x${Z} ="; fi
+echo "# LAMMPS $BACKEND profile=$PROFILE: mode=$MODE${INPUT_ID:+ input=$INPUT_ID deck=$DECK_DIR/$DECK} ranks=$N_RANKS $GEOM $ATOMS atoms ($((ATOMS / N_RANKS))/rank), $STEPS steps, gpu-aware=$GAM, log=$LOG"
 RUN_ID="$(l3_run_id)"
 rc=0
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
@@ -121,7 +137,7 @@ rc=0
     -in "$IN" -var x "$X" -var y "$Y" -var z "$Z" "${PROCS[@]}" -var steps "$STEPS" \
     -log "$LOG" -echo none "$@" || rc=$?
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
-    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=lammps" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" "input_id=${INPUT_ID:-}" "deck=$DECK" \
+    l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=lammps" "backend=$BACKEND" "profile=$PROFILE" "variant=${VARIANT:-default}" "mode=$MODE" "input_id=${INPUT_ID:-}" "deck=$DECK_DIR/$DECK" \
         "ranks=$N_RANKS" "atoms=$ATOMS" "steps=$STEPS" "gpu_aware=$GAM" "exit_code=$rc" \
         "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$IN" "input_sha256=$(l3_sha_file "$IN")" \
         "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \

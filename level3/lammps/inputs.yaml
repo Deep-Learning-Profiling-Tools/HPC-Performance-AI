@@ -35,30 +35,37 @@ baseline:
   reference: upstream bench/log.15Jul25.lj.fixed.g++.1 (32k) / self baseline (scaled sizes), upstream regression tolerances
   quantities:
     - name: atoms
+      role: required
       regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for \d+ steps with (?P<value>\d+) atoms'
       select: only
       compare: {rule: exact}
     - name: temp_step0
+      role: required
       regex: '^\s*0\s+(?P<value>[-0-9.eE+]+)\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-8}
     - name: epair_step0
+      role: required
       regex: '^\s*0\s+[-0-9.eE+]+\s+(?P<value>[-0-9.eE+]+)\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-8}
     - name: temp_step100
+      role: required
       regex: '^\s*100\s+(?P<value>[-0-9.eE+]+)\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
     - name: epair_step100
+      role: required
       regex: '^\s*100\s+[-0-9.eE+]+\s+(?P<value>[-0-9.eE+]+)\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
     - name: toteng_step100
+      role: required
       regex: '^\s*100\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+(?P<value>[-0-9.eE+]+)\s+[-0-9.eE+]+\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
     - name: press_step100
+      role: required
       regex: '^\s*100\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+(?P<value>[-0-9.eE+]+)\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
@@ -126,26 +133,185 @@ inputs:
       reference: upstream bench/log.15Jul25.rhodo.fixed.g++.1, same tolerances as validate.sh
       quantities:
         - name: atoms
+          role: required
           regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for \d+ steps with (?P<value>\d+) atoms'
           select: only
           compare: {rule: exact}
         - name: toteng_step0
+          role: required
           regex: '^TotEng\s+=\s+(?P<value>[-0-9.eE+]+)'
           select: first
           compare: {rule: rel, tol: 1.0e-8}
         - name: temp_step0
+          role: required
           regex: '^TotEng\s+=\s+[-0-9.eE+]+\s+KinEng\s+=\s+[-0-9.eE+]+\s+Temp\s+=\s+(?P<value>[-0-9.eE+]+)'
           select: first
           compare: {rule: rel, tol: 1.0e-8}
         - name: toteng_step100
+          role: required
           regex: '^TotEng\s+=\s+(?P<value>[-0-9.eE+]+)'
           select: last
           compare: {rule: rel, tol: 1.0e-5}
         - name: temp_step100
+          role: required
           regex: '^TotEng\s+=\s+[-0-9.eE+]+\s+KinEng\s+=\s+[-0-9.eE+]+\s+Temp\s+=\s+(?P<value>[-0-9.eE+]+)'
           select: last
           compare: {rule: rel, tol: 1.0e-5}
         - name: press_step100
+          role: required
           regex: '^E_coul\s+=\s+[-0-9.eE+]+\s+E_long\s+=\s+[-0-9.eE+]+\s+Press\s+=\s+(?P<value>[-0-9.eE+]+)'
           select: last
           compare: {rule: rel, tol: 1.0e-5}
+  - id: reaxff-hns-2k
+    case: reaxff-hns-crystal
+    variant: build-config
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: lammps/lammps, version: 9c5ab448c78a14fd534619622162ba418d6a1fb1, path: "examples/reaxff/HNS/in.reaxff.hns with its README example syntax -v x 2 -v y 2 -v z 2 -v t 100 (data.hns-equil 304 atoms replicated 2x2x2 = 2,432 atoms); reference log examples/reaxff/HNS/log.30Nov23.reaxff.hns.g++.1 (CPU, 1 process, LAMMPS 21 Nov 2023)"}
+    params: {deck: in.reaxff.hns, deck_dir: examples/reaxff/HNS, variant: reaxff, x: 2, y: 2, z: 2, steps: 100, atoms: 2432, units: real, timestep_fs: 0.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {profile: reaxff.cuda, variant: reaxff, packages: "KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR + REAXFF", kokkos_options: "-pk kokkos newton on neigh half (neigh/qeq default full) gpu/aware on"}
+    backends_validated: [cuda]
+    baseline:
+      reference: >-
+        upstream CPU reference log examples/reaxff/HNS/log.30Nov23.reaxff.hns.g++.1 (A-type comparison,
+        informational); this build's first measured run as the working baseline (B-type). Rule: the
+        CORAL-2 LAMMPS ReaxFF acceptance -- thermo Temp / PotEng / Press / E_vdwl / E_coul within 0.1 %
+        of the baseline (asc.llnl.gov CORAL-2 LAMMPS summary) -- applied at steps 0 and 100.
+      quantities:
+        - name: atoms
+          role: required
+          regex: '^\s+(?P<value>\d+) atoms$'
+          select: last
+          compare: {rule: exact}
+        - name: temp_step0
+          role: required
+          regex: '^\s+0\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: poteng_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: press_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: evdwl_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: ecoul_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: temp_step100
+          role: required
+          regex: '^\s+100\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: poteng_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: press_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: evdwl_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: ecoul_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+    notes: >-
+      needs the reaxff.cuda profile (HPCPERF_LAMMPS_VARIANT=reaxff for build.sh/run.sh/validate.sh);
+      run.sh refuses it on the default cuda profile. thermo_style custom step temp pe press evdwl
+      ecoul vol with thermo_modify norm yes (per-atom values); fix qeq/reax 1e-6 tolerance. The
+      derived deck differs from upstream only in run ${steps} and absolute read_data / ffield paths.
+  - id: reaxff-hns-16k
+    case: reaxff-hns-crystal
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: lammps/lammps, version: 9c5ab448c78a14fd534619622162ba418d6a1fb1, path: "examples/reaxff/HNS/in.reaxff.hns with its README example syntax -v x 4 -v y 4 -v z 4 -v t 100 (README: x/y/z are the deck's free size variables; data.hns-equil 304 atoms replicated 4x4x4 = 19,456 atoms); upstream ships no log for this size"}
+    params: {deck: in.reaxff.hns, deck_dir: examples/reaxff/HNS, variant: reaxff, x: 4, y: 4, z: 4, steps: 100, atoms: 19456, units: real, timestep_fs: 0.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {profile: reaxff.cuda, variant: reaxff, packages: "KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR + REAXFF", kokkos_options: "-pk kokkos newton on neigh half (neigh/qeq default full) gpu/aware on"}
+    backends_validated: [cuda]
+    baseline:
+      reference: >-
+        no upstream log at this size: this build's first measured run is the working baseline (B-type
+        only). Rule: the
+        CORAL-2 LAMMPS ReaxFF acceptance -- thermo Temp / PotEng / Press / E_vdwl / E_coul within 0.1 %
+        of the baseline (asc.llnl.gov CORAL-2 LAMMPS summary) -- applied at steps 0 and 100.
+      quantities:
+        - name: atoms
+          role: required
+          regex: '^\s+(?P<value>\d+) atoms$'
+          select: last
+          compare: {rule: exact}
+        - name: temp_step0
+          role: required
+          regex: '^\s+0\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: poteng_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: press_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: evdwl_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: ecoul_step0
+          role: required
+          regex: '^\s+0\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: temp_step100
+          role: required
+          regex: '^\s+100\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: poteng_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: press_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: evdwl_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+        - name: ecoul_step100
+          role: required
+          regex: '^\s+100\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s*$'
+          select: only
+          compare: {rule: rel, tol: 1.0e-3}
+    notes: >-
+      the same case at 8x the atoms (the README's size mechanism); needs the reaxff.cuda profile. thermo_style custom step temp pe press evdwl
+      ecoul vol with thermo_modify norm yes (per-atom values); fix qeq/reax 1e-6 tolerance. The
+      derived deck differs from upstream only in run ${steps} and absolute read_data / ffield paths.

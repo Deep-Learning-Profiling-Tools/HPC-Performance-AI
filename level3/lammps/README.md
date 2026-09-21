@@ -142,28 +142,53 @@ Only `lj-16m` reaches one second of loop time on a B200; the 32k-atom decks
 are 0.02-0.4 s (the bench convention is 100 steps). Raw runs, baselines and the
 upstream-reference comparisons: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level3-lammps/`.
 
-### ReaxFF: separate build-profile plan (not implemented, 2026-09-21)
+### ReaxFF: the separate `reaxff.cuda` build profile (implemented 2026-09-21, round 3)
 
-ReaxFF is the CORAL-2 LAMMPS tier-1 workload (HNS crystal, `-pk kokkos neigh
-half neigh/qeq full newton on`, FOM atom-steps/s, thermo Temp/PotEng/Press/
-E_vdwl/E_coul within 0.1 % of the baseline). The frozen tree carries everything
-needed: `examples/reaxff/HNS/` (`in.reaxff.hns` with `x/y/z/t` index variables,
-`data.hns-equil`, `ffield.reax.hns`, `log.30Nov23.reaxff.hns.g++.{1,4}`: 2,432
-atoms at 2x2x2, 100 steps, `thermo_style custom step temp pe press evdwl ecoul
-vol`) and the `REAXFF` package with its KOKKOS styles (`pair_reaxff_kokkos`,
-`fix_qeq_reaxff_kokkos`). The `cuda` profile enables only `KOKKOS MOLECULE KSPACE
-MANYBODY RIGID GRANULAR`, so `pair_style reaxff` is unknown to it. Plan:
+ReaxFF is the CORAL-2 LAMMPS tier-1 workload (HNS crystal). The frozen tree carries
+`examples/reaxff/HNS/` (`in.reaxff.hns` with `x/y/z/t` free variables, `data.hns-equil`
+(304 atoms), `ffield.reax.hns`, reference logs `log.30Nov23.reaxff.hns.g++.{1,4}`: CPU,
+LAMMPS 21 Nov 2023) and the `REAXFF` package with its KOKKOS styles. The default `cuda`
+profile does not enable `REAXFF`, and it is not changed; instead:
 
-| item | plan |
+| item | as implemented |
 |---|---|
-| profile name | `reaxff.cuda` (`l3_backend_profile LAMMPS cuda reaxff` -> `<variant>.<backend>`; the name carries the backend as `l3_profile_backend_check` requires), selected with `HPCPERF_LAMMPS_PROFILE=reaxff.cuda` for build.sh, run.sh and validate.sh alike |
-| package list | the `cuda` list plus `-DPKG_REAXFF=yes` (`KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR REAXFF`); no other CMake option changes, same bundled Kokkos 4.6.2, same `Kokkos_ARCH_BLACKWELL100`, same host compiler / CUDA 13.2 / Open MPI 5.0.10 |
-| fingerprint | `l3_fingerprint_text` includes the `cmake_options` string, so `PKGS=...,REAXFF` yields a different `.hpcperf-l3-fingerprint`; `l3_fingerprint_check` refuses to reuse the `cuda` install for this profile and vice versa |
-| output paths | `.deps/level3/lammps/reaxff.cuda/{install,logs,cache}` and `build/level3/lammps/reaxff.cuda/` (run directories `run/` and `run.inputs.<id>.<label>/` under it); nothing under `.deps/level3/lammps/cuda/` or `build/level3/lammps/cuda/` is touched |
-| default compatibility | the `cuda` profile, its fingerprint, `run.sh` default (`in.lj` smoke) and `validate.sh` stay as they are; the registered `lj-*`/`eam-32k`/`rhodo-32k` inputs keep running on `cuda`. build.sh needs only a profile-conditional package list (e.g. `HPCPERF_LAMMPS_VARIANT=reaxff` adding `-DPKG_REAXFF=yes`), run.sh a deck whitelist entry `in.reaxff.hns` (examples path, absolute `read_data`/`pair_coeff` paths as for `in.eam`) and the CORAL-2 `-pk kokkos ... neigh/qeq full` option for that deck only |
-| registered inputs (proposed ids) | `reaxff-hns-2k` (2x2x2 = 2,432 atoms, 100 steps, reference `log.30Nov23.reaxff.hns.g++.1`: Loop time 17.6 s on 1 CPU process; thermo at steps 0/100 with the CORAL-2 0.1 % rule), `reaxff-hns-4x` and a larger replication for > 1 s of GPU loop time, sizes to be fixed after the first measurement |
-| rebuild budget | the `cuda` profile built in 4.5 min at `HPCPERF_BUILD_JOBS=32` (configure 06:02, build done 06:06:36, install 15 s on 2026-09-21); REAXFF adds 41 source files plus their Kokkos instantiations, so 6-10 min of compile and ~1 GB more under `.deps/`; no new third-party dependency, no change to the frozen `src/`, `deps/` or `source.lock` |
-| not in scope | changing the `cuda` profile's package list (would invalidate its fingerprint and every recorded result), sharing the install between profiles, or registering ReaxFF inputs before the profile has built and validated |
+| profile | `reaxff.cuda` = `HPCPERF_LAMMPS_VARIANT=reaxff` for `build.sh`, `run.sh` and `validate.sh` (`l3_backend_profile LAMMPS cuda reaxff`); `HPCPERF_LAMMPS_PROFILE` override still honoured |
+| packages | `KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR` + `REAXFF` (`-DPKG_REAXFF=yes`); every other CMake option, the bundled Kokkos 4.6.2, `Kokkos_ARCH_BLACKWELL100`, the host compiler, CUDA 13.2.78 and Open MPI 5.0.10 identical to `cuda` |
+| fingerprint | `.deps/level3/lammps/reaxff.cuda/install/.hpcperf-l3-fingerprint` with `PKGS=...,REAXFF` in `cmake_options`; the `cuda` fingerprint (built 2026-09-21T10:06Z) is untouched |
+| paths | `.deps/level3/lammps/reaxff.cuda/{install,logs,cache}`, `build/level3/lammps/reaxff.cuda/` (+ `run.inputs.<id>.<label>/`); nothing under the `cuda` trees was written |
+| build | measured: **292 s** at `HPCPERF_BUILD_JOBS=32` (2026-09-21T21:49:00Z -> 21:53:52Z; the round-2 estimate was 6-10 min); binary `build/level3/lammps/reaxff.cuda/lmp_kokkos_cuda` |
+| frozen source | untouched (`prepare_benchmark.sh --status`: READY); the derived deck differs from upstream only in `run ${steps}` and absolute `read_data` / `pair_coeff * * ffield` paths |
+| run.sh | registered inputs may name `deck_dir: examples/reaxff/HNS` and `variant: reaxff`; a ReaxFF id is refused on the `cuda` profile ("needs build variant 'reaxff'"); `bench/` decks and the default smoke command are unchanged, `validate.sh CUDA` on the default profile re-run: PASS |
+| Kokkos options | the unchanged `-k on g 1 -sf kk -pk kokkos newton on neigh half gpu/aware on` (`neigh/qeq` stays at its default `full`) -- the CORAL-2 command line for this workload |
+
+Registered inputs (`inputs.yaml`, `HPCPERF_LAMMPS_VARIANT=reaxff HPCPERF_LAMMPS_INPUT=<id>`):
+
+| id | replication | atoms | steps | source | reference |
+|---|---|---|---|---|---|
+| `reaxff-hns-2k` | 2x2x2 (the README example syntax) | 2,432 | 100 | upstream deck + README `-v x 2 -v y 2 -v z 2 -v t 100` | upstream CPU log `log.30Nov23.reaxff.hns.g++.1` |
+| `reaxff-hns-16k` | 4x4x4 (README size mechanism) | 19,456 | 100 | upstream deck, size variables | none upstream (self baseline) |
+
+Executed GPU path (from the run logs' "Neighbor list info": `(1) pair reaxff/kk ...
+kokkos_device`, `(2) fix qeq/reax/kk ... kokkos_device`; `KOKKOS mode with Kokkos version
+4.6.2`): both the ReaxFF pair style and the QEq charge solver ran as Kokkos device styles.
+Numerical check (rule: CORAL-2 LAMMPS acceptance, thermo Temp / PotEng / Press / E_vdwl /
+E_coul within 0.1 % of the baseline, applied at steps 0 and 100; `thermo_modify norm yes`,
+`units real`): `reaxff-hns-2k` vs the upstream CPU log -- Temp, PotEng, E_vdwl, E_coul
+identical to all printed digits at both steps in 3/3 runs, Press within 4.8e-7 (step 0) and
+3.6e-6 (step 100) relative; verdict PASS, exit 0 (`measurements/level3-lammps/upstream-references/`).
+`reaxff-hns-16k` has no upstream log: self baseline, READY / PASS across the 3 runs.
+
+Calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; `Loop time` of the 100-step run):
+
+| id | Loop time median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
+|---|---|---|---|---|---|---|
+| `reaxff-hns-2k` | 0.8612 s | 0.8549, 0.8612, 0.8687 | 1.61 % | 4.58 s | no | yes |
+| `reaxff-hns-16k` | 0.9866 s | 0.9853, 0.9874, 0.9866 | 0.22 % | 4.63 s | no | yes |
+
+Both stay just under one second of loop time on a B200 (a reference value, not a gate);
+larger replications are the deck's own mechanism and can be registered later without any
+build change. `validate.sh` on the `reaxff.cuda` profile (in.lj smoke on the reaxff binary):
+PASS.
 
 ## Validation (`validate.sh`, upstream mechanism)
 
