@@ -90,6 +90,52 @@ slower than 1 GPU (1.12 s) at 16.4M atoms/100 steps is the expected
 communication-dominated behaviour of a fixed small workload and is **not** a
 scaling result.
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_LAMMPS_INPUT`, 2026-09-21)
+
+`HPCPERF_LAMMPS_INPUT=<id> level3/lammps/run.sh CUDA` selects one of the frozen
+`src/bench/` decks with its recorded replication and step count; the id is
+refused together with `HPCPERF_SCALE_MODE=strong|weak` or the
+`HPCPERF_LAMMPS_STEPS/STRONG/LOCAL` knobs. The derived deck written into the run
+directory differs from upstream only in `run ${steps}` and absolute paths for
+`data.*`/`*.eam` (the frozen tree is never touched; `benchmark.yaml` declares the
+decks and reference logs as protected inputs/references).
+
+| id | deck | atoms | source | reference |
+|---|---|---|---|---|
+| `lj-32k` (default) | `in.lj` x=y=z=1 | 32,000 | upstream file | `log.15Jul25.lj.fixed.g++.1` |
+| `lj-2m` | `in.lj` x=y=z=4 | 2,048,000 | upstream scaled-size mechanism (bench/README) | none upstream (self baseline) |
+| `lj-16m` | `in.lj` x=y=z=8 | 16,384,000 | upstream scaled-size mechanism | none upstream (self baseline) |
+| `eam-32k` | `in.eam` + `Cu_u3.eam` | 32,000 | upstream file | `log.15Jul25.eam.fixed.g++.1` |
+| `rhodo-32k` | `in.rhodo` + `data.rhodo` (CHARMM, PPPM/cuFFT, SHAKE, NPT) | 32,000 | upstream file | `log.15Jul25.rhodo.fixed.g++.1` |
+
+All styles of these decks have Kokkos versions in this build (no host
+fallback): lj/cut, eam, lj/charmm/coul/long, pppm, bond harmonic, angle/dihedral
+charmm, improper harmonic, fix nve/shake/npt. `in.chain` and `in.chute` also
+build with this package set but are not registered yet. Timer: LAMMPS' `Loop
+time` (the 100-step run loop). Baseline: Temp/E_pair/TotEng/Press at steps 0 and
+100 with the validate.sh tolerances (1e-8 / 1e-5 relative).
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
+
+| id | Loop time (main compute) | spread | run.sh wall (E2E) | vs upstream reference log |
+|---|---|---|---|---|
+| `lj-32k` | 0.0199 s | 0.6 % | 3.23 s | all 7 quantities identical to every printed digit |
+| `lj-2m` | 0.158 s | 0.5 % | 5.23 s | self baseline (no upstream log) |
+| `lj-16m` | 1.086 s | 0.3 % | 13.5 s | self baseline (no upstream log) |
+| `eam-32k` | 0.0765 s | 0.2 % | 3.12 s | all 7 quantities identical |
+| `rhodo-32k` | 0.387 s | 0.7 % | 6.33 s | all 6 quantities identical |
+
+Only `lj-16m` reaches one second of loop time on a B200; the 32k-atom decks
+are 0.02-0.4 s (the bench convention is 100 steps). Raw runs, baselines and the
+upstream-reference comparisons: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level3-lammps/`.
+
+ReaxFF (CORAL-2 LAMMPS tier-1/2 workload): the frozen tree carries
+`examples/reaxff/HNS/` (`in.reaxff.hns`, `data.hns-equil`, `ffield.reax.hns`,
+reference logs) and the `REAXFF` package with its KOKKOS styles
+(`pair_reaxff_kokkos`, `fix_qeq_reaxff_kokkos`), but this build enables only
+`KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR`; running it needs a build profile
+with `PKG_REAXFF=yes` (not done in the 2026-09-21 pilot).
+
 ## Validation (`validate.sh`, upstream mechanism)
 
 Thermo output (Temp, E_pair, TotEng, Press at steps 0 and 100) of the
