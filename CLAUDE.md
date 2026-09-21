@@ -143,6 +143,16 @@ level3/<app>/
   for system-GCC builds), `l3_binary_backend_check` (cuobjdump archs, works for
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
+- Registered inputs (since 2026-09-21, pilot: background_subtraction, hipbone, quicksilver,
+  lammps): a benchmark with several inputs carries `inputs.yaml` (schema
+  `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
+  content, source kind upstream-file / upstream-parameterized / derived / custom, the
+  benchmark's OWN timer scope, baseline quantities + comparison rule). Selection only
+  through the benchmark's selector variable (`HPCPERF_<APP>_INPUT`, Quicksilver:
+  `HPCPERF_QUICKSILVER_INPUT_ID`); run.sh refuses an id together with the knobs/args it
+  would override and the default command stays unchanged. `measure` = 1 warm-up + N runs
+  with the native timer (never wall time as main compute); tests in
+  `tools/inputs/tests/run_all.sh`. See `tools/inputs/README.md`.
 - Launch only through `level2/tools/hpcperf_mpi_launch.sh --gpus N
   [--cpus-per-rank C] --bind wrapper -- <exe> ...`: one MPI rank per GPU, per-rank
   `CUDA_VISIBLE_DEVICES`, nvidia-smi audit ("N verified, 0 mismatch, 0

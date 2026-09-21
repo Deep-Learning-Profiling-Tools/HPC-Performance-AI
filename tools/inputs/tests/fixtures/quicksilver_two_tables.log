@@ -1,0 +1,134 @@
+== Quicksilver CUDA: ranks=1 topology=1x1x1 mesh=8x8x8 particles=100000 steps=20
+hpcperf-launch: actual:    slurm job 323164: nodes=1 (dgx003) gpus/node=2 (scontrol -d) cpus/node=64 slots/node=1
+hpcperf-launch: requested: nodes=1 gpus/node=2 (subset of the allocation)
+hpcperf-launch: launch:    backend=CUDA site=gmu-hopper launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [dgx003], ranks/node=1, gpu-bind=wrapper, cpu: runtime default binding (<= 64 cpus/rank available; set HPCPERF_CPUS_PER_RANK to pin)
+hpcperf-launch: command:   mpirun -np 1 --host dgx003:1 --map-by ppr:1:node --mca pml ob1 --mca btl self,sm,smcuda env HPCPERF_BIND_LOG=/tmp/hpcperf-bind.Pgxoc0 HPCPERF_GPU_BACKEND=CUDA /projects/kzhou6/bcui2/research/HPC-Performance-AI-b6/level2/tools/mpi_gpu_bind.sh /projects/kzhou6/bcui2/research/HPC-Performance-AI-b6/build/level2/quicksilver/cuda/qs -i /projects/kzhou6/bcui2/research/HPC-Performance-AI-b6/level2/quicksilver/inputs/coral2_p1_profile.inp -X 8 -Y 8 -Z 8 -n 100000 -N 20 -x 8 -y 8 -z 8 -I 1 -J 1 -K 1
+hpcperf-bind: backend=CUDA host=dgx003 grank=0 lrank=0 pid=2809896 mode=bound expected_gpu=0 expected_uuid=GPU-d902db1a-b9f8-9aa3-fb38-c3c1ab08ba3f observed=unverified cpus=16
+Copyright (c) 2016
+Lawrence Livermore National Security, LLC
+All Rights Reserved
+Quicksilver Version     : master
+Quicksilver Git Hash    : eb68bb8d6fc53de1f65011d4e79ff2ed0dd60f3b
+MPI Version             : 3.1
+Number of MPI ranks     : 1
+Number of OpenMP Threads: 1
+Number of OpenMP CPUs   : 1
+
+Simulation:
+   dt: 2e-09
+   fMax: 0.1
+   inputFile: /projects/kzhou6/bcui2/research/HPC-Performance-AI-b6/level2/quicksilver/inputs/coral2_p1_profile.inp
+   energySpectrum: 
+   boundaryCondition: reflect
+   loadBalance: 0
+   cycleTimers: 0
+   debugThreads: 0
+   lx: 8
+   ly: 8
+   lz: 8
+   nParticles: 100000
+   batchSize: 0
+   nBatches: 10
+   nSteps: 20
+   nx: 8
+   ny: 8
+   nz: 8
+   seed: 1029384756
+   xDom: 1
+   yDom: 1
+   zDom: 1
+   eMax: 20
+   eMin: 1e-09
+   nGroups: 230
+   lowWeightCutoff: 0.001
+   bTally: 1
+   fTally: 1
+   cTally: 1
+   coralBenchmark: 1
+   crossSectionsOut:
+
+Geometry:
+   material: sourceMaterial
+   shape: brick
+   xMax: 10000
+   xMin: 0
+   yMax: 10000
+   yMin: 0
+   zMax: 10000
+   zMin: 0
+
+Material:
+   name: sourceMaterial
+   mass: 12.011
+   nIsotopes: 20
+   nReactions: 9
+   sourceRate: 1e+10
+   totalCrossSection: 1.5
+   absorptionCrossSection: flat
+   fissionCrossSection: flat
+   scatteringCrossSection: flat
+   absorptionCrossSectionRatio: 0.04
+   fissionCrossSectionRatio: 0.05
+   scatteringCrossSectionRatio: 1
+
+CrossSection:
+   name: flat
+   A: 0
+   B: 0
+   C: 0
+   D: 0
+   E: 1
+   nuBar: 1.6
+Building partition 0
+done building
+Building MC_Domain 0
+Starting Consistency Check
+Finished Consistency Check
+Finished initMesh
+cycle           start       source           rr        split       absorb      scatter      fission      produce      collisn       escape       census      num_seg   scalar_flux      cycleInit  cycleTracking  cycleFinalize
+       0            0         9728            0        90312        20410       505861        25497        40742       551768            0        94875      1198308  3.663627e+04   5.254000e-03   1.338000e-01   4.800000e-05
+       1        94875         9728         4582            0        35705       890014        44444        71124       970163            0        90996      2032817  1.006606e+05   4.341000e-03   1.727810e-01   3.600000e-05
+       2        90996         9728          750            0        34107       850431        42387        67721       926925            0        91201      1943122  1.562717e+05   7.139000e-03   1.696760e-01   3.800000e-05
+       3        91201         9728          914            0        33339       835333        41830        66892       910502            0        91738      1914089  2.046637e+05   5.147000e-03   2.902890e-01   4.300000e-05
+       4        91738         9728         1465            0        33298       828846        41547        66324       903691            0        91480      1900502  2.501536e+05   1.204900e-02   3.315450e-01   7.700000e-05
+       5        91480         9728         1194            0        32777       828817        41554        66394       903148            0        92077      1898271  2.896540e+05   1.683100e-02   3.832200e-01   3.600000e-05
+       6        92077         9728         1863            0        32794       824636        41111        65744       898541            0        91781      1888214  3.246582e+05   5.150300e-02   3.573370e-01   4.800000e-05
+       7        91781         9728         1521            0        32931       822939        40975        65626       896845            0        91708      1884987  3.599895e+05   5.009100e-02   3.514300e-01   4.800000e-05
+       8        91708         9728         1394            0        32864       822111        40883        65541       895858            0        91836      1883915  3.908131e+05   3.616100e-02   3.940560e-01   4.400000e-05
+       9        91836         9728         1632            0        32596       818718        40966        65692       892280            0        92062      1876970  4.172703e+05   3.620000e-02   3.640160e-01   4.400000e-05
+      10        92062         9728         1698            0        32752       822907        41449        66354       897108            0        92245      1887029  4.466022e+05   5.519900e-02   3.648510e-01   4.300000e-05
+      11        92245         9728         2051            0        32818       816219        40767        65233       889804            0        91570      1871769  4.686236e+05   5.364500e-02   3.555490e-01   4.200000e-05
+      12        91570         9728         1299            0        32895       818220        40988        65698       892103            0        91814      1873598  4.887111e+05   3.477800e-02   3.508950e-01   4.400000e-05
+      13        91814         9728         1529            0        32688       817044        40748        65323       890480            0        91900      1874473  5.087229e+05   3.649400e-02   3.171530e-01   4.400000e-05
+      14        91900         9728         1594            0        32767       820371        41170        65969       894308            0        92066      1878573  5.271489e+05   4.677900e-02   3.168350e-01   7.600000e-05
+      15        92066         9728         1856            0        32949       815841        41092        65782       889882            0        91679      1873596  5.440319e+05   4.904700e-02   3.125010e-01   4.500000e-05
+      16        91679         9728         1405            0        32657       814434        40705        65100       887796            0        91740      1869762  5.575797e+05   4.633000e-02   3.163760e-01   4.200000e-05
+      17        91740         9728         1447            0        32737       816014        40794        65295       889545            0        91785      1869766  5.699299e+05   4.817900e-02   3.239400e-01   4.300000e-05
+      18        91785         9728         1556            0        32456       813631        40544        64634       886631            0        91591      1865151  5.808408e+05   4.786500e-02   3.096240e-01   3.200000e-05
+      19        91591         9728         1298            0        32688       813893        40708        65176       887289            0        91801      1868057  5.918521e+05   4.965900e-02   3.491520e-01   4.300000e-05
+
+Timer                       Cumulative   Cumulative   Cumulative   Cumulative   Cumulative   Cumulative
+Name                            number    microSecs    microSecs    microSecs    microSecs   Efficiency
+                              of calls          min          avg          max       stddev       Rating
+main                                 1    7.057e+06    7.057e+06    7.057e+06    0.000e+00       100.00
+cycleInit                           20    6.927e+05    6.927e+05    6.927e+05    0.000e+00       100.00
+cycleTracking                       20    6.265e+06    6.265e+06    6.265e+06    0.000e+00       100.00
+cycleTracking_Kernel              1540    4.031e+06    4.031e+06    4.031e+06    0.000e+00       100.00
+cycleTracking_MPI                 1680    2.234e+06    2.234e+06    2.234e+06    0.000e+00       100.00
+cycleTracking_Test_Done              0    0.000e+00    0.000e+00    0.000e+00    0.000e+00         0.00
+cycleFinalize                       40    3.323e+03    3.323e+03    3.323e+03    0.000e+00       100.00
+Figure Of Merit              5.930e+06 [Num Segments / Cycle Tracking Time]
+
+Testing Ratios for Absorbtion, Fission, and Scattering are maintained
+PASS:: Absorption / Fission / Scatter Ratios maintained with 1% tolerance
+
+Testing balance between number of facet crossings and reactions
+PASS:: Collision to Facet Crossing Ratio maintained even balanced within 1% tolerance
+
+Test for lost / unaccounted for particles in this simulation
+PASS:: No Particles Lost During Run
+
+Test Fluence for homogeneity across cells
+PASS:: Fluence is homogenous across cells with 6% tolerance
+hpcperf-launch: audit: grank=0 host=dgx003 expected=GPU-d902db1a-b9f8-9aa3-fb38-c3c1ab08ba3f observed=GPU-d902db1a-b9f8-9aa3-fb38-c3c1ab08ba3f -> verified
+hpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks; observation = nvidia-smi compute-apps sampled on dgx003 only)
