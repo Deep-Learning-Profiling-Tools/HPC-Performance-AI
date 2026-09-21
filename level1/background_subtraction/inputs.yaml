@@ -1,0 +1,96 @@
+# Registered inputs of the background_subtraction benchmark (schema hpcperf-inputs-1).
+# Read by tools/inputs/hpcperf_inputs.py; the ctest default (CMakeLists.txt) is unchanged.
+schema: hpcperf-inputs-1
+benchmark: background_subtraction
+level: 1
+selector: null                     # Level 1 has no run.sh: the tool runs the binary with the input's args
+default_input: w4096-h2048-merged0-r102
+entry:
+  kind: binary
+  path: build/background_subtraction/cuda/background_subtraction_cuda
+timing:
+  scope: >-
+    The benchmark's own std::chrono timer around the GPU work of one frame (either the
+    single merged kernel or the findMovingPixels + updateBackground + updateThreshold triple,
+    followed by cudaDeviceSynchronize), summed over the last (repeat - 2) frames and printed
+    as the average per frame. Excludes host frame generation (mt19937 per pixel), the H2D copy
+    of each frame, the CPU reference (merge_ref) run every frame, allocation and the final
+    D2H + verification. main_compute_s = average x (repeat - 2).
+  kind: per_iteration
+  unit: us
+  regex: '^Average kernel execution time: (?P<value>[0-9.eE+-]+) \(us\)'
+  select: only
+  work: {key: repeat, offset: -2}
+baseline:
+  method: >-
+    Bit-exact check built into the benchmark: after all frames the device Tn/Bn arrays are
+    compared element-wise with the CPU reference (unsigned char); "Max error is 0" and PASS
+    are required. Inputs are generated in-process from mt19937(123), so the same
+    (width, height, repeat) always yields the same frames on any machine.
+  reference: in-process CPU reference (upstream merge_ref), exact
+  quantities:
+    - name: max_error
+      regex: '^Max error is (?P<value>\d+)'
+      select: only
+      compare: {rule: le, value: 0}
+    - name: pass_marker
+      regex: '^PASS$'
+      compare: {rule: present}
+    - name: fail_marker
+      regex: '^FAIL$'
+      compare: {rule: absent}
+inputs:
+  - id: w4096-h2048-merged0-r102
+    case: synthetic-video-4096x2048
+    variant: default
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ORNL/HeCBench, version: 23714d9980070bc5543e99c11fd93ee6f79c6947, path: "src/background-subtract-cuda/Makefile run target: ./main 4096 2048 0 102"}
+    params: {width: 4096, height: 2048, merged: 0, repeat: 102, seed: 123}
+    args: ["4096", "2048", "0", "102"]
+    runtime_config: {gpus: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: identical to the ctest default; 100 timed frames of 8.4 M pixels, three kernels per frame.
+  - id: w4096-h2048-merged1-r102
+    case: synthetic-video-4096x2048
+    variant: implementation-path
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ORNL/HeCBench, version: 23714d9980070bc5543e99c11fd93ee6f79c6947, path: "src/background-subtract-cuda/Makefile run target, second line: ./main 4096 2048 1 102"}
+    params: {width: 4096, height: 2048, merged: 1, repeat: 102, seed: 123}
+    args: ["4096", "2048", "1", "102"]
+    runtime_config: {gpus: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: >-
+      Same frames and same result as merged0 -- NOT a different data set: the single fused
+      kernel (merge) replaces the three-kernel path. Upstream's `make run` executes both.
+  - id: w8192-h4096-merged0-r102
+    case: synthetic-video-8192x4096
+    variant: size
+    source:
+      kind: derived
+      derivation: >-
+        Upstream ships no other frame size; width and height are the benchmark's own
+        positional parameters, doubled in each direction (33.5 M pixels, 4x the default).
+        Same generator seed, same kernels, same 100 timed frames.
+    params: {width: 8192, height: 4096, merged: 0, repeat: 102, seed: 123}
+    args: ["8192", "4096", "0", "102"]
+    runtime_config: {gpus: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: w4096-h2048-merged0-r1002
+    case: synthetic-video-4096x2048
+    variant: steps
+    source:
+      kind: derived
+      derivation: >-
+        Same 4096x2048 stream and kernels, 1000 timed frames instead of 100 (repeat is the
+        upstream positional parameter). Lengthens the timed region tenfold; every extra frame
+        also costs host generation, an H2D copy and a CPU reference pass outside the timer.
+    params: {width: 4096, height: 2048, merged: 0, repeat: 1002, seed: 123}
+    args: ["4096", "2048", "0", "1002"]
+    runtime_config: {gpus: 1}
+    build_config: null
+    backends_validated: [cuda]

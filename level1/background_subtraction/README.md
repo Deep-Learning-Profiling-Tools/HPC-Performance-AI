@@ -53,6 +53,37 @@ Run it via:
 ctest --test-dir build/background_subtraction/cuda --output-on-failure
 ```
 
+## Registered inputs (`inputs.yaml`, 2026-09-21)
+
+Four inputs are registered for `tools/inputs/hpcperf_inputs.py` (Level 1 has no
+run.sh; the tool runs the binary with the input's arguments, the ctest default
+above is unchanged):
+
+| id | what varies | source | args |
+|---|---|---|---|
+| `w4096-h2048-merged0-r102` (default) | -- | upstream `make run` line 1 | `4096 2048 0 102` |
+| `w4096-h2048-merged1-r102` | implementation path (one fused kernel instead of three), same frames | upstream `make run` line 2 | `4096 2048 1 102` |
+| `w8192-h4096-merged0-r102` | frame size 4x (33.5 M pixels) | derived (upstream has one size) | `8192 4096 0 102` |
+| `w4096-h2048-merged0-r1002` | 1000 timed frames instead of 100 | derived (repeat is the upstream parameter) | `4096 2048 0 1002` |
+
+Timer: the benchmark's `Average kernel execution time` = kernel-only time per
+frame (device sync included; host frame generation, H2D copies and the CPU
+reference are outside), multiplied by the `repeat - 2` timed frames. Baseline:
+`Max error is 0` + `PASS` (bit-exact against the in-process CPU reference).
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
+
+| id | main compute | spread | process wall (E2E) | main >= 1 s |
+|---|---|---|---|---|
+| `w4096-h2048-merged0-r102` | 0.0115 s (115 us/frame) | 12 % (one run 0.0129 s) | 6.18 s | no |
+| `w4096-h2048-merged1-r102` | 0.0070 s | 0.5 % | 6.18 s | no |
+| `w8192-h4096-merged0-r102` | 0.0495 s | < 0.1 % | 23.6 s | no |
+| `w4096-h2048-merged0-r1002` | 0.113 s | 0.6 % | 39.8 s | no |
+
+The GPU work of this benchmark is a few percent of its wall time at every
+registered size (host RNG + CPU reference dominate); no upstream input reaches
+one second of kernel time. Raw runs: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level1-background_subtraction/`.
+
 ## LOC
 
 CUDA: 180 (2 source files, cloc, cuda/ + common/)
