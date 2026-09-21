@@ -144,14 +144,18 @@ level3/<app>/
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
 - Registered inputs (since 2026-09-21; batch 1: background_subtraction, hipbone, quicksilver,
-  lammps; batch 2: tealeaf, sparta): a benchmark with several inputs carries `inputs.yaml` (schema
+  lammps; batch 2: tealeaf, sparta; batch 3: cloverleaf, laghos, lammps ReaxFF on the separate
+  `reaxff.cuda` profile via `HPCPERF_LAMMPS_VARIANT=reaxff`): a benchmark with several inputs carries `inputs.yaml` (schema
   `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
   content, source kind upstream-file / upstream-parameterized / derived / custom, the
   benchmark's OWN timer scope, baseline quantities + comparison rule). Selection only
   through the benchmark's selector variable (`HPCPERF_<APP>_INPUT`, Quicksilver:
   `HPCPERF_QUICKSILVER_INPUT_ID`); run.sh refuses an id together with the knobs/args it
   would override and the default command stays unchanged. `measure` = 1 warm-up + N runs
-  with the native timer (never wall time as main compute); tests in
+  with the native timer (never wall time as main compute). `compare` exit 0 only for verdict
+  PASS (every REQUIRED quantity verified); 3 = INCOMPLETE (a required quantity still `record`),
+  1 = FAIL, 2 = refused (other input/benchmark/workload or same file); diagnostic quantities
+  may stay `record`; tests in
   `tools/inputs/tests/run_all.sh`. See `tools/inputs/README.md`.
 - Launch only through `level2/tools/hpcperf_mpi_launch.sh --gpus N
   [--cpus-per-rank C] --bind wrapper -- <exe> ...`: one MPI rank per GPU, per-rank

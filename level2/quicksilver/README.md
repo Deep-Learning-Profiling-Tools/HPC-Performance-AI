@@ -121,8 +121,13 @@ The three upstream decks carry their own mesh/particle/step counts and
 cycleTracking + cycleFinalize; setup and the final report excluded). Baseline:
 the four upstream `PASS::` checks present, no `FAIL::`, last-cycle census /
 segments / scalar flux recorded (Monte Carlo, fixed seed 1029384756, GPU tracking
-order not bitwise reproducible -- a tolerance for the tallies is still to be
-fixed).
+order not bitwise reproducible). Roles (round 3): the four `PASS::` checks and the
+absent `FAIL::` are the required acceptance -- they are upstream's own correctness
+criterion for these decks (coralBenchmark, statistical ratios / facet crossing /
+particle loss / fluence homogeneity); the last-cycle census, segment count and
+scalar flux are diagnostic quantities (recorded, no upstream tolerance exists), so
+`compare` is READY and returns PASS when the upstream checks hold; the tallies are
+never used as a pass criterion.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
 

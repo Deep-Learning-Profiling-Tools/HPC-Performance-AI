@@ -40,22 +40,27 @@ baseline:
   reference: upstream reference logs bench/log.7Jul14.<deck>.icc.<size>.1 (icc, 1 process, 2014) through the same regexes; this build's first measured run as the working baseline
   quantities:
     - name: bench_steps
+      role: required
       regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for (?P<value>\d+) steps with \d+ particles'
       select: last
       compare: {rule: exact}
     - name: final_step
+      role: required
       regex: '^\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: exact}
     - name: np_final
+      role: required
       regex: '^\s+\d+\s+[0-9.eE+-]+\s+(?P<value>\d+)\s+\d+\s+\d+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: exact}
     - name: natt_final
+      role: required
       regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+(?P<value>\d+)\s+\d+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: rel, tol: 0.15}
     - name: temp_final
+      role: required
       regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>[0-9.eE+-]+)\s*$'
       select: last
       compare: {rule: rel, tol: 0.02}
@@ -126,26 +131,32 @@ inputs:
     baseline:
       quantities:
         - name: bench_steps
+          role: required
           regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for (?P<value>\d+) steps with \d+ particles'
           select: last
           compare: {rule: exact}
         - name: final_step
+          role: required
           regex: '^\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s*$'
           select: last
           compare: {rule: exact}
         - name: np_final
+          role: required
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+(?P<value>\d+)\s+\d+\s+\d+\s+\d+\s+\d+\s*$'
           select: last
           compare: {rule: record}
         - name: natt_final
+          role: required
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+(?P<value>\d+)\s+\d+\s+\d+\s+\d+\s*$'
           select: last
           compare: {rule: rel, tol: 0.15}
         - name: nscoll_final
+          role: diagnostic   # per-step surface-collision count, statistical diagnostic
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>\d+)\s+\d+\s*$'
           select: last
           compare: {rule: record}
         - name: max_particles_per_cell
+          role: diagnostic   # load-balance diagnostic (compute reduce max)
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+(?P<value>\d+)\s*$'
           select: last
           compare: {rule: record}
@@ -153,7 +164,11 @@ inputs:
       open boundaries with inflow (fix emit/face), diffuse surface collisions on the sphere
       (read_surf data.sphere), dynamic load balance; particle count fluctuates around the inflow
       steady state (upstream log: 999,920 at the last step), so np and the surface-collision
-      count are recorded, not verified (NEEDS_VALIDATION for those two). Stats every 100 steps
+      count are recorded, not verified (NEEDS_VALIDATION for np_final). Vs the 2014 reference
+      log: same seed/grid/fnum/timestep/stats points/phases and the same initial population
+      (955,103), but the deck commands differ by version (inflow -> emit/face, read_surf and
+      surf_modify syntax) and the count after equilibration is 1.0 % lower here (990,824 vs
+      1,000,977; ~10 Poisson sigma) -- cause not determined. Stats every 100 steps
       (7 columns: step cpu np nattempt ncoll nscoll c_max). All styles of the deck have KOKKOS
       versions in this build (fix_emit_face_kokkos, surf_collide_diffuse_kokkos,
       fix_balance_kokkos, compute_reduce_kokkos, compute_grid_kokkos, read_surf_kokkos).

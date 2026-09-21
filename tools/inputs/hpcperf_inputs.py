@@ -28,10 +28,13 @@ Sub-commands (all read-only except `measure`, which writes into --out):
   extract  <bench_dir> <log> [--input ID]  the baseline quantities of a log (JSON)
   compare  <bench_dir> <baseline.json> <log> [--input ID] [--rc N]
                                            compare a log against a stored baseline:
-                                           exit 0 verified, 1 a rule failed / run failed,
-                                           2 baseline belongs to another input/benchmark or is the
-                                           same output file, 3 nothing failed but only `record`
-                                           rules exist (NEEDS_VALIDATION -- not a pass)
+                                           exit 0 verified = no rule failed AND every REQUIRED
+                                           quantity was compared by a verifying rule (verdict PASS);
+                                           1 a rule failed / the candidate run failed (verdict FAIL);
+                                           2 refused: baseline belongs to another input or benchmark,
+                                           was recorded for a different workload (params/args/files),
+                                           or is the same output file; 3 nothing failed but a required
+                                           quantity is still `record` (verdict INCOMPLETE -- not a pass)
   status   <bench_dir> <measurement.json>  the status vocabulary of a finished measurement
   measure  <bench_dir> <input_id> --out DIR [--warmup 1] [--reps 3] [--timeout S] [--gpus 1]
                                            warm-up run + N measured runs, one directory per run,
@@ -43,8 +46,12 @@ Status vocabulary (summary of `measure`, also printed by `status`), kept separat
   native_check         PASS / FAIL / NONE -- rules that need no baseline (present, absent, abs_lt,
                        ge, le) evaluated on every measured run; NONE when the input has no such rule
   baseline_saved       the quantities of the first successful measured run were stored
-  comparison_rules     READY (every quantity has a verifying rule) / PARTIAL / NONE (record only)
-  needs_validation     the quantities whose rule is `record` (tolerance not fixed yet)
+  comparison_rules     READY (every REQUIRED quantity has a verifying rule; diagnostic records allowed) /
+                       PARTIAL (a required quantity is still record) / NONE (no required quantity verified)
+  needs_validation     the REQUIRED quantities whose rule is `record` (tolerance not fixed yet)
+  baseline_verdict     PASS / INCOMPLETE / FAIL of the measured runs against the working baseline
+Quantity roles (inputs.yaml `role: required|diagnostic`, default required): only required quantities
+decide acceptance; diagnostic quantities are reported and may stay `record` without a tolerance.
   compute_ge_1s        median main compute >= 1 s (a reference value, not a gate)
   stable               n >= 3 and (max-min)/median <= 0.10 over the measured runs
 
@@ -158,6 +165,8 @@ def validate(doc: dict) -> list:
                 errs.append(f"{where}: quantity {q['name']}: rule {cmp.get('rule')} needs tol or value")
             if q.get("select", "last") not in SELECT:
                 errs.append(f"{where}: quantity {q['name']}: select must be one of {SELECT}")
+            if q.get("role", "required") not in ("required", "diagnostic"):
+                errs.append(f"{where}: quantity {q['name']}: role must be required | diagnostic")
             try:
                 rx = re.compile(q["regex"])
                 if cmp.get("rule") not in ("present", "absent") and "value" not in rx.groupindex:
@@ -339,28 +348,52 @@ def extract(doc: dict, log_path: Path, inp=None) -> dict:
     return out
 
 
+def role_of(q: dict) -> str:
+    """required (default): a quantity the acceptance of this input depends on;
+    diagnostic: kept for information -- may stay `record` without blocking acceptance."""
+    return q.get("role", "required")
+
+
 def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
-    """Apply each quantity's rule. Returns {ok, verified, record_only, checks}:
-    ok           no rule failed (a `record` quantity only has to be present and finite);
-    verified     ok AND at least one verifying (non-record) rule was applied;
-    record_only  every rule is `record` -> nothing was verified (NEEDS_VALIDATION)."""
-    checks, ok, n_verifying = [], True, 0
+    """Apply each quantity's rule. Returns {ok, complete, verified, record_only, verdict, checks, ...}:
+    ok           no rule failed (a `record` quantity only has to be present and finite; a
+                 missing/non-finite DIAGNOSTIC record is noted, not a failure);
+    complete     every REQUIRED quantity has a verifying (non-record) rule -- the required
+                 science comparison is ready; `required_pending` lists the ones still `record`;
+    verified     ok AND complete AND at least one required quantity was actually verified;
+    record_only  every rule is `record` -> nothing was verified;
+    verdict      FAIL (a rule failed) / INCOMPLETE (nothing failed, but a required comparison is
+                 not ready) / PASS (verified). Only PASS means the science result was compared.
+    Rules passing on configuration quantities (iterations, DOFs, step counts, markers) never
+    stand in for a pending required result."""
+    checks, ok, n_verifying, n_req_verified = [], True, 0, 0
+    required_pending, diagnostic_recorded, diagnostic_missing = [], [], []
     for q in quantities(doc, inp):
-        n = q["name"]; cmp = q.get("compare", {}); rule = cmp["rule"]
+        n = q["name"]; cmp = q.get("compare", {}); rule = cmp["rule"]; role = role_of(q)
         b = baseline.get(n, {}); c = current.get(n, {})
-        rec = {"name": n, "rule": rule}
+        rec = {"name": n, "rule": rule, "role": role}
         if rule in VERIFYING_RULES:
             n_verifying += 1
+            if role == "required":
+                n_req_verified += 1
+        elif role == "required":
+            required_pending.append(n)
+        else:
+            diagnostic_recorded.append(n)
         if rule == "present":
             good = bool(c.get("present")); rec.update({"present": bool(c.get("present"))})
         elif rule == "absent":
             good = not c.get("present"); rec.update({"present": bool(c.get("present"))})
         elif rule == "record":
-            good = c.get("value") is not None
+            present = c.get("value") is not None
             rec.update({"value": c.get("value"), "baseline": b.get("value"),
-                        "note": "recorded only, no tolerance defined yet (NEEDS_VALIDATION)"})
-            if not good:
+                        "note": ("recorded only, no tolerance defined yet (NEEDS_VALIDATION: required result)"
+                                 if role == "required" else "diagnostic, recorded only")})
+            if not present:
                 rec["error"] = c.get("error", "missing")
+                if role != "required":
+                    diagnostic_missing.append(n)
+            good = present or role != "required"     # a required result must at least be there and finite
         else:
             cv = c.get("value")
             if cv is None:
@@ -386,8 +419,36 @@ def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
         rec["ok"] = good
         ok = ok and good
         checks.append(rec)
-    return {"ok": ok, "verified": ok and n_verifying > 0, "record_only": n_verifying == 0,
-            "verifying_rules": n_verifying, "checks": checks}
+    complete = not required_pending
+    verified = ok and complete and n_req_verified > 0
+    verdict = "FAIL" if not ok else ("PASS" if verified else "INCOMPLETE")
+    return {"ok": ok, "complete": complete, "verified": verified, "verdict": verdict,
+            "record_only": n_verifying == 0, "verifying_rules": n_verifying,
+            "required_verified_rules": n_req_verified, "required_pending": required_pending,
+            "diagnostic_recorded": diagnostic_recorded, "diagnostic_missing": diagnostic_missing,
+            "failed": [c["name"] for c in checks if not c["ok"]], "checks": checks}
+
+
+def workload_identity(doc: dict, inp: dict) -> dict:
+    """What a baseline is a baseline OF: the registry entry's parameters, arguments, env and the
+    sha256 of the input files it names. Deliberately excludes the binary, the git revision and
+    the build fingerprint: an optimized build is compared against the baseline of the SAME
+    workload, and a different code identity is exactly what such a comparison is for."""
+    bdir = Path(doc["_path"]).parent
+    files = {}
+    for f in inp.get("files", []) or []:
+        files[str(f)] = sha256_file(bdir / f)
+    return {"input_id": inp["id"], "params": inp.get("params") or {}, "args": [str(a) for a in inp.get("args", []) or []],
+            "env": {str(k): str(v) for k, v in (inp.get("env") or {}).items()}, "files_sha256": files}
+
+
+def workload_mismatch(baseline_wl: dict, current_wl: dict) -> list:
+    """The keys of the workload identity that differ (empty list = same workload)."""
+    diff = []
+    for k in ("input_id", "params", "args", "env", "files_sha256"):
+        if baseline_wl.get(k) != current_wl.get(k):
+            diff.append(k)
+    return diff
 
 
 def native_check(doc, current: dict, inp=None) -> dict:
@@ -507,10 +568,14 @@ def summarize(doc, inp, runs, reps):
         s["native_check"] = "PASS" if all(n["status"] == "PASS" for n in nat) and len(nat) == len(measured) else "FAIL"
     s["native_checks"] = nat
     qs = quantities(doc, inp)
-    rec = [q["name"] for q in qs if q.get("compare", {}).get("rule") == "record"]
-    ver = [q["name"] for q in qs if q.get("compare", {}).get("rule") in VERIFYING_RULES]
+    rec = [q["name"] for q in qs if q.get("compare", {}).get("rule") == "record" and role_of(q) == "required"]
+    diag = [q["name"] for q in qs if q.get("compare", {}).get("rule") == "record" and role_of(q) != "required"]
+    ver = [q["name"] for q in qs if q.get("compare", {}).get("rule") in VERIFYING_RULES and role_of(q) == "required"]
+    # READY: every required quantity has a verifying rule (diagnostic records do not count against it);
+    # PARTIAL: a required quantity is still record-only; NONE: no required quantity is verified at all.
     s["comparison_rules"] = "READY" if (ver and not rec) else ("PARTIAL" if ver else "NONE")
     s["needs_validation"] = rec
+    s["diagnostic_recorded"] = diag
     return s, good
 
 
@@ -566,14 +631,20 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
                                      "log_sha256": sha256_file(base["log"]),
                                      "method": doc["baseline"].get("method"),
                                      "reference": (inp.get("baseline") or {}).get("reference", doc["baseline"].get("reference")),
+                                     "workload": workload_identity(doc, inp),
+                                     "code_identity": {"entry_sha256": meta.get("entry_sha256"), "git": meta.get("git"),
+                                                       "note": "informational only -- compare never refuses on code identity"},
                                      "quantity_rules": quantities(doc, inp), "quantities": base["baseline_quantities"]}, indent=2))
         summary["baseline_saved"] = True; summary["baseline_file"] = str(bfile)
         cmps = [compare(doc, base["baseline_quantities"], r["baseline_quantities"], inp) for r in good if r["baseline_quantities"]]
         summary["baseline_self_consistent"] = all(c["ok"] for c in cmps)
+        # the verdict of the self-comparison: PASS only when every required quantity was verified
+        summary["baseline_verdict"] = ("FAIL" if not all(c["ok"] for c in cmps)
+                                       else ("PASS" if all(c["verified"] for c in cmps) else "INCOMPLETE"))
         summary["baseline_checks"] = cmps
     else:
         summary["baseline_saved"] = False; summary["baseline_file"] = None
-        summary["baseline_self_consistent"] = False
+        summary["baseline_self_consistent"] = False; summary["baseline_verdict"] = "NONE"
     meta["summary"] = summary
     meta["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     (out / "measurement.json").write_text(json.dumps(meta, indent=2))
@@ -582,10 +653,12 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
 
 def status_line(s: dict) -> str:
     keys = ("run_completed", "timing_ok", "native_check", "baseline_saved", "comparison_rules",
-            "compute_ge_1s", "stable", "baseline_self_consistent")
+            "baseline_verdict", "compute_ge_1s", "stable", "baseline_self_consistent")
     parts = [f"{k}={s.get(k)}" for k in keys]
     if s.get("needs_validation"):
         parts.append("NEEDS_VALIDATION=" + ",".join(s["needs_validation"]))
+    if s.get("diagnostic_recorded"):
+        parts.append("diagnostic_recorded=" + ",".join(s["diagnostic_recorded"]))
     return " ".join(parts)
 
 
@@ -651,21 +724,38 @@ def main(argv=None):
             if blog and Path(blog).exists() and Path(a.log).exists() and os.path.realpath(blog) == os.path.realpath(a.log):
                 sys.stderr.write("hpcperf_inputs: baseline and candidate are the same output file -- refusing to compare\n"); return 2
             if a.rc != 0:
-                print(json.dumps({"ok": False, "verified": False, "error": f"candidate run exited {a.rc}; its output is not compared"}, indent=2)); return 1
+                print(json.dumps({"ok": False, "complete": False, "verified": False, "verdict": "FAIL",
+                                  "error": f"candidate run exited {a.rc}; its output is not compared"}, indent=2)); return 1
             inp = get_input(doc, a.input or bid) if (a.input or bid) else None
+            wl_note = None
+            if inp is not None and isinstance(bdoc.get("workload"), dict):
+                diff = workload_mismatch(bdoc["workload"], workload_identity(doc, inp))
+                if diff:
+                    sys.stderr.write(f"hpcperf_inputs: baseline '{bid}' was recorded for a different workload "
+                                     f"(differs in: {', '.join(diff)}) -- same input id, different input identity; refusing to compare\n"); return 2
+            elif inp is not None:
+                wl_note = "baseline carries no workload identity (recorded before round 3); only input_id/benchmark were checked"
             res = compare(doc, bdoc["quantities"], extract(doc, Path(a.log), inp), inp)
             res["baseline_input_id"] = bid
+            if wl_note:
+                res["workload_note"] = wl_note
             print(json.dumps(res, indent=2))
+            # acceptance: 0 only when verified (no failure AND every required quantity compared);
+            # 1 = a rule or the run failed (never downgraded to "incomplete"); 3 = nothing failed but a
+            # required comparison is not ready (PARTIAL / record-only); 2 = identity refusals above.
             if not res["ok"]:
                 return 1
-            return 3 if res["record_only"] else 0
+            return 0 if res["verified"] else 3
         if a.cmd == "status":
             m = json.loads(Path(a.measurement).read_text())
             inp = get_input(doc, m["input_id"])
             s, _ = summarize(doc, inp, m["runs"], m.get("measured_runs", len([r for r in m["runs"] if r["measured"]])))
             old = m.get("summary", {})
-            for k in ("baseline_saved", "baseline_file", "baseline_self_consistent"):
+            for k in ("baseline_saved", "baseline_file", "baseline_self_consistent", "baseline_verdict"):
                 s[k] = old.get(k, (old.get("baseline_file") is not None) if k == "baseline_saved" else None)
+            if s.get("baseline_verdict") is None and old.get("baseline_checks"):
+                s["baseline_verdict"] = ("FAIL" if not all(c["ok"] for c in old["baseline_checks"])
+                                         else ("PASS" if s["comparison_rules"] == "READY" and all(c.get("ok") for c in old["baseline_checks"]) else "INCOMPLETE"))
             print(status_line(s)); return 0
         if a.cmd == "measure":
             inp = get_input(doc, a.input_id)

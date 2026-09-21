@@ -42,18 +42,22 @@ baseline:
   reference: this build's first measured run per input (deterministic RHS); CORAL-2 threshold informational
   quantities:
     - name: cg_iterations
+      role: required
       regex: '^hipBone: \d+, \d+, [0-9.eE+-]+, (?P<value>\d+),'
       select: only
       compare: {rule: exact}
     - name: dofs
+      role: required
       regex: '^hipBone: \d+, (?P<value>\d+),'
       select: only
       compare: {rule: exact}
     - name: r_norm_initial
+      role: diagnostic   # norm of the deterministic RHS, not a result; 1 % = validate.sh CUDA-vs-Serial guard
       regex: '^CG: initial res norm (?P<value>[0-9.eE+-]+)'
       select: only
       compare: {rule: rel, tol: 0.01}
     - name: r_norm_final
+      role: required   # the science result of the run; rule still record -> PARTIAL
       regex: '^CG: it 100, r norm (?P<value>[0-9.eE+-]+)'
       select: only
       compare: {rule: record}

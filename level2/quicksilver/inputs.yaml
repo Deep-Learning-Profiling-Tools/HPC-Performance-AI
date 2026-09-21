@@ -49,29 +49,37 @@ baseline:
   reference: upstream coralBenchmark PASS checks (statistical); tallies recorded, tolerance TBD
   quantities:
     - name: pass_ratios
+      role: required
       regex: '^PASS:: Absorption / Fission / Scatter Ratios'
       compare: {rule: present}
     - name: pass_facet
+      role: required
       regex: '^PASS:: Collision to Facet Crossing Ratio'
       compare: {rule: present}
     - name: pass_no_loss
+      role: required
       regex: '^PASS:: No Particles Lost'
       compare: {rule: present}
     - name: pass_fluence
+      role: required
       regex: '^PASS:: Fluence is homogenous'
       compare: {rule: present}
     - name: fail_marker
+      role: required
       regex: '^FAIL::'
       compare: {rule: absent}
     - name: final_cycle_census
+      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
       regex: '^\s+\d+(\s+\d+){10}\s+(?P<value>\d+)\s+\d+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: record}
     - name: final_cycle_num_seg
+      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
       regex: '^\s+\d+(\s+\d+){11}\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: record}
     - name: final_cycle_scalar_flux
+      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
       regex: '^\s+\d+(\s+\d+){12}\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: record}

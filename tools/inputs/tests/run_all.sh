@@ -15,11 +15,12 @@ bad() { echo "FAIL $*"; failn=$((failn+1)); }
 noise() { grep -viE 'lua|posix|no file|stack traceback|\[C\]|addto|no field' | grep -vE '^\s*$'; }
 unset HPCPERF_GPUS HPCPERF_NP HPCPERF_SCALE_MODE HPCPERF_DRY_RUN HPCPERF_HIPBONE_INPUT HPCPERF_QUICKSILVER_INPUT_ID HPCPERF_LAMMPS_INPUT \
       HPCPERF_LAMMPS_STEPS HPCPERF_LAMMPS_STRONG HPCPERF_LAMMPS_LOCAL HPCPERF_QUICKSILVER_STEPS HPCPERF_QUICKSILVER_INPUT \
-      HPCPERF_TEALEAF_INPUT HPCPERF_TEALEAF_DECK HPCPERF_SPARTA_INPUT HPCPERF_SPARTA_STRONG HPCPERF_SPARTA_LOCAL FAKE_MODE
+      HPCPERF_TEALEAF_INPUT HPCPERF_TEALEAF_DECK HPCPERF_SPARTA_INPUT HPCPERF_SPARTA_STRONG HPCPERF_SPARTA_LOCAL FAKE_MODE \
+      HPCPERF_CLOVERLEAF_INPUT HPCPERF_CLOVERLEAF_DECK HPCPERF_LAGHOS_INPUT HPCPERF_LAGHOS_ARGS HPCPERF_LAGHOS_RS HPCPERF_LAGHOS_EPM HPCPERF_LAMMPS_VARIANT
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 # ---- 1. every committed inputs.yaml validates; default_input is registered ----------------
-for d in level1/background_subtraction level2/hipbone level2/quicksilver level3/lammps level2/tealeaf level3/sparta; do
+for d in level1/background_subtraction level2/hipbone level2/quicksilver level3/lammps level2/tealeaf level3/sparta level2/cloverleaf level2/laghos; do
     out="$(python3 "$TOOL" validate "$R/$d" 2>&1 | noise)"; rc=$?
     [ $rc -eq 0 ] && grep -q ': OK' <<<"$out" && ok "validate $d" || bad "validate $d: $out"
     n="$(python3 "$TOOL" list "$R/$d" 2>/dev/null | wc -l)"
@@ -93,7 +94,8 @@ PY
 python3 - "$TMP/hb.json" > "$TMP/hb_baseline.json" <<'PY'
 import json,sys; print(json.dumps({"input_id":"coral2-nx24-p14","quantities":json.load(open(sys.argv[1]))}))
 PY
-python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" >/dev/null 2>&1 && ok "hipbone: log compares equal to its own baseline" || bad "hipbone self-compare failed"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"ok": true' "$TMP/c.json" && grep -q '"verdict": "INCOMPLETE"' "$TMP/c.json" && ok "hipbone: log vs its own baseline -> nothing fails, but exit 3 INCOMPLETE (required r_norm_final still record)" || bad "hipbone self-compare rc=$rc"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_bad_residual.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 1 ] && grep -q '"r_norm_initial"' "$TMP/c.json" && ok "hipbone: initial residual off by 5% -> compare fails (1% rule)" || bad "bad initial residual accepted (rc=$rc)"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_99_iterations.log" >"$TMP/c.json" 2>/dev/null; rc=$?
@@ -258,7 +260,7 @@ python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$FX/hipbone_nx2
 [ $rc -eq 2 ] && grep -q "same output file" "$TMP/e" && ok "neg: baseline and candidate read the same file -> exit 2, refused" || bad "neg: same-file compare accepted (rc=$rc)"
 cp "$FX/hipbone_nx24_p14.log" "$TMP/hb_copy.log"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$TMP/hb_copy.log" >/dev/null 2>&1; rc=$?
-[ $rc -eq 0 ] && ok "neg-control: a different file with the same content is compared normally" || bad "neg-control: copy refused (rc=$rc)"
+[ $rc -eq 3 ] && ok "neg-control: a different file with the same content is compared normally (exit 3 = hipBone's INCOMPLETE, not a refusal)" || bad "neg-control: copy refused (rc=$rc)"
 
 # ---- 9. measure end-to-end on a fake benchmark (no GPU): exit codes, FAIL-with-exit-0, stale logs, record-only ----
 FR="$TMP/fakerepo"; mkdir -p "$FR/level1/fake" "$FR/level1/fakerec" "$FR/build/fake"; : > "$FR/hpcperf_env.sh"
@@ -312,6 +314,90 @@ python3 "$TOOL" compare "$FR/level1/fakerec" "$TMP/m_rec/baseline.json" "$TMP/m_
 python3 "$TOOL" compare "$FR/level1/fakerec" "$TMP/m_rec/baseline.json" "$TMP/m_rec/rep1/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
 [ $rc -eq 2 ] && grep -q "same output file" "$TMP/e" && ok "compare: baseline.json's own source log as candidate -> refused" || bad "compare same log rc=$rc"
 python3 "$TOOL" status "$FR/level1/fakerec" "$TMP/m_rec/measurement.json" 2>/dev/null | grep -q 'NEEDS_VALIDATION=energy' && ok "status: re-derives the vocabulary from measurement.json" || bad "status subcommand"
+
+# ---- 10. acceptance semantics of compare: exit 0 only for a COMPLETE, passing science comparison ----
+# 10.1 one rule passes (dofs) and one fails (cg_iterations 99 != 100): the whole comparison fails (exit 1, FAIL)
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_99_iterations.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['verdict']=='FAIL' and not d['ok'] and not d['verified'] and c['dofs']['ok'] and not c['cg_iterations']['ok'] and d['failed']==['cg_iterations']" "$TMP/c.json" 2>/dev/null \
+    && ok "acceptance: dofs passes + cg_iterations fails -> exit 1, verdict FAIL (a pass never outweighs a failure)" || bad "acceptance 10.1: rc=$rc $(cat "$TMP/c.json")"
+# 10.2 configuration checks pass (iterations, DOFs, initial residual) but the REQUIRED final result is only recorded:
+#      exit 3 / INCOMPLETE -- never 0, even though nothing failed (the real hipBone registry)
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['ok'] and not d['complete'] and not d['verified'] and d['verdict']=='INCOMPLETE' and d['required_pending']==['r_norm_final'] and c['cg_iterations']['ok'] and c['dofs']['ok'] and c['r_norm_initial']['ok'] and c['r_norm_initial']['role']=='diagnostic'" "$TMP/c.json" 2>/dev/null \
+    && ok "acceptance: iterations/DOFs/initial residual pass, final residual only recorded -> exit 3, verdict INCOMPLETE, required_pending=[r_norm_final]" || bad "acceptance 10.2: rc=$rc $(cat "$TMP/c.json")"
+# 10.3 every REQUIRED result verified, one DIAGNOSTIC quantity only recorded -> exit 0 / PASS; a missing diagnostic is noted, not a failure
+mkdir -p "$FR/level1/fakediag"
+cat > "$FR/level1/fakediag/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: fakediag
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/fake/fake_bin}
+timing: {scope: fake timer, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline:
+  quantities:
+    - {name: energy, role: required, regex: '^energy (?P<value>\S+)$', select: only, compare: {rule: rel, tol: 1.0e-6}}
+    - {name: pass_marker, role: required, regex: '^PASS$', compare: {rule: present}}
+    - {name: iterations, role: diagnostic, regex: '^iterations (?P<value>\d+)$', select: only, compare: {rule: record}}
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: custom, derivation: test}, params: {}, args: [], backends_validated: []}
+EOF
+printf 'time 1.500 s\nenergy 42.000000\niterations 17\nPASS\n' > "$TMP/diag_base.log"; printf 'time 1.400 s\nenergy 42.000010\niterations 19\nPASS\n' > "$TMP/diag_cand.log"; printf 'time 1.400 s\nenergy 42.000010\nPASS\n' > "$TMP/diag_nodiag.log"
+python3 "$TOOL" extract "$FR/level1/fakediag" "$TMP/diag_base.log" > "$TMP/dq.json" 2>/dev/null
+python3 - "$TMP/dq.json" > "$TMP/diag_baseline.json" <<'PY'
+import json,sys; print(json.dumps({"benchmark":"fakediag","input_id":"a","quantities":json.load(open(sys.argv[1]))}))
+PY
+python3 "$TOOL" compare "$FR/level1/fakediag" "$TMP/diag_baseline.json" "$TMP/diag_cand.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['verified'] and d['complete'] and d['diagnostic_recorded']==['iterations'] and d['required_pending']==[]" "$TMP/c.json" 2>/dev/null \
+    && ok "acceptance: required energy (rel 1e-6) + marker pass, diagnostic iterations recorded (17 -> 19) -> exit 0, verdict PASS" || bad "acceptance 10.3: rc=$rc $(cat "$TMP/c.json")"
+python3 "$TOOL" compare "$FR/level1/fakediag" "$TMP/diag_baseline.json" "$TMP/diag_nodiag.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && grep -q '"diagnostic_missing": \[' "$TMP/c.json" && grep -q '"iterations"' "$TMP/c.json" && ok "acceptance: a missing DIAGNOSTIC field is reported (diagnostic_missing) but does not fail the comparison" || bad "acceptance 10.3b: rc=$rc"
+printf 'time 1.400 s\nenergy 42.001000\niterations 19\nPASS\n' > "$TMP/diag_bad.log"
+python3 "$TOOL" compare "$FR/level1/fakediag" "$TMP/diag_baseline.json" "$TMP/diag_bad.log" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && ok "acceptance: the same registry with the required energy off by 2.4e-5 -> exit 1 (a failure is never downgraded to incomplete)" || bad "acceptance 10.3c: rc=$rc"
+# 10.4 PARTIAL propagates through CLI exit code, JSON, measure summary, status line and a shell caller -- never PASS
+mkdir -p "$FR/level1/fakepartial"
+cat > "$FR/level1/fakepartial/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: fakepartial
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/fake/fake_bin}
+timing: {scope: fake timer, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline:
+  quantities:
+    - {name: pass_marker, role: required, regex: '^PASS$', compare: {rule: present}}
+    - {name: energy, role: required, regex: '^energy (?P<value>\S+)$', select: only, compare: {rule: record}}
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: custom, derivation: test}, params: {}, args: [], backends_validated: []}
+EOF
+rc=$(FAKE_MODE=ok mrun fakepartial partial)
+grep -q 'comparison_rules=PARTIAL' "$TMP/m_partial.out" && grep -q 'baseline_verdict=INCOMPLETE' "$TMP/m_partial.out" && grep -q 'NEEDS_VALIDATION=energy' "$TMP/m_partial.out" && grep -q 'native_check=PASS' "$TMP/m_partial.out" \
+    && ok "propagation: measure -> native_check=PASS (marker) but comparison_rules=PARTIAL, baseline_verdict=INCOMPLETE, NEEDS_VALIDATION=energy" || bad "propagation measure: $(cat "$TMP/m_partial.out")"
+python3 -c "import json,sys; s=json.load(open(sys.argv[1]))['summary']; assert s['comparison_rules']=='PARTIAL' and s['baseline_verdict']=='INCOMPLETE' and s['needs_validation']==['energy'] and all(not c['verified'] for c in s['baseline_checks'])" "$TMP/m_partial/measurement.json" 2>/dev/null \
+    && ok "propagation: measurement.json carries comparison_rules=PARTIAL, baseline_verdict=INCOMPLETE, every self-check verified=false" || bad "propagation json"
+python3 "$TOOL" status "$FR/level1/fakepartial" "$TMP/m_partial/measurement.json" 2>/dev/null | grep -q 'comparison_rules=PARTIAL baseline_verdict=INCOMPLETE' && ok "propagation: status re-derives PARTIAL/INCOMPLETE" || bad "propagation status"
+python3 "$TOOL" compare "$FR/level1/fakepartial" "$TMP/m_partial/baseline.json" "$TMP/m_partial/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"verdict": "INCOMPLETE"' "$TMP/c.json" && grep -q '"verified": false' "$TMP/c.json" && ok "propagation: compare CLI -> exit 3, JSON verdict INCOMPLETE / verified false" || bad "propagation cli rc=$rc"
+caller_saw=none
+if python3 "$TOOL" compare "$FR/level1/fakepartial" "$TMP/m_partial/baseline.json" "$TMP/m_partial/rep2/stdout.log" >/dev/null 2>&1; then caller_saw=PASS; else case $? in 0) caller_saw=PASS;; 1) caller_saw=FAIL;; 2) caller_saw=REFUSED;; 3) caller_saw=INCOMPLETE;; esac; fi
+[ "$caller_saw" = INCOMPLETE ] && ok "propagation: a shell caller using 'if compare' does not take the PASS branch (sees INCOMPLETE)" || bad "propagation caller saw $caller_saw"
+# 10.5 same input_id, different WORKLOAD (params) -> refused; same workload, different CODE identity -> compared normally
+python3 - "$TMP/m_ok/baseline.json" > "$TMP/wl_diff.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["workload"]=dict(b["workload"]); b["workload"]["params"]={"n": 10}; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_diff.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "different workload" "$TMP/e" && grep -q "params" "$TMP/e" && ok "identity: same input_id, baseline recorded with other params -> exit 2, refused (names the differing key)" || bad "identity workload rc=$rc $(cat "$TMP/e")"
+python3 - "$TMP/m_ok/baseline.json" > "$TMP/code_diff.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["code_identity"]={"entry_sha256":"0000deadbeef","git":{"head":"optimized-branch","dirty":True}}; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/code_diff.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>&1; rc=$?
+[ $rc -eq 0 ] && ok "identity: same workload, different binary/git identity (an optimized build) -> compared normally, exit 0" || bad "identity code rc=$rc"
+grep -q '"workload"' "$TMP/m_ok/baseline.json" && grep -q '"files_sha256"' "$TMP/m_ok/baseline.json" && grep -q 'informational only' "$TMP/m_ok/baseline.json" && ok "identity: baseline.json records workload (params/args/env/files sha256) and code identity separately" || bad "identity baseline fields"
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$TMP/hb_copy.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+grep -q 'no workload identity' "$TMP/c.json" && ok "identity: a baseline without workload identity (pre round 3) is compared with a note, not refused" || bad "identity legacy note rc=$rc"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

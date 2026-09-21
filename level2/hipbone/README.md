@@ -212,6 +212,11 @@ registered size. The 1 % rule on `r_norm_initial` comes from validate.sh check 4
 which compares the CUDA backend with OCCA's Serial backend (two libm realisations
 of the pseudo-random right-hand side); between two CUDA runs on the same GPU it is
 only a loose guard, not a tolerance that a 1 % change would satisfy.
+Acceptance status (round 3): `cg_iterations` and `dofs` are required configuration
+checks, `r_norm_initial` is a diagnostic (with the 1 % guard), `r_norm_final` is the
+required science result and still `record` -- so `compare` returns exit 3 / verdict
+INCOMPLETE for every hipBone input until a tolerance with a basis is fixed; the passing
+configuration checks never turn that into a PASS.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians; the
 warm-up absorbs the OCCA JIT compile of a new problem size, ~9 s here):

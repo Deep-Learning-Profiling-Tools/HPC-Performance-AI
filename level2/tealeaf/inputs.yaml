@@ -34,24 +34,30 @@ baseline:
   reference: upstream tea.problems (UoB-HPC/TeaLeaf e70261c0) through the application's own check; Actual against this build's first measured run
   quantities:
     - name: expected_energy
+      role: required
       regex: '^ Expected (?P<value>[0-9.eE+-]+)\s*$'
       select: only
       compare: {rule: exact}
     - name: actual_energy
+      role: required
       regex: '^ Actual\s+(?P<value>[0-9.eE+-]+)\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
     - name: timesteps_completed
+      role: required
       regex: '^ Timestep (?P<value>\d+)\s*$'
       select: last
       compare: {rule: exact}
     - name: pass_marker
+      role: required
       regex: '^ This run PASSED'
       compare: {rule: present}
     - name: outcome_passed
+      role: required
       regex: '^ - Outcome: PASSED'
       compare: {rule: present}
     - name: fail_marker
+      role: required
       regex: '(^ This run FAILED)|(Outcome: FAILED)'
       compare: {rule: absent}
 inputs:

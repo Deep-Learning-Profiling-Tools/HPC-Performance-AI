@@ -33,13 +33,16 @@ baseline:
   reference: in-process CPU reference (upstream merge_ref), exact
   quantities:
     - name: max_error
+      role: required
       regex: '^Max error is (?P<value>\d+)'
       select: only
       compare: {rule: le, value: 0}
     - name: pass_marker
+      role: required
       regex: '^PASS$'
       compare: {rule: present}
     - name: fail_marker
+      role: required
       regex: '^FAIL$'
       compare: {rule: absent}
   # The benchmark prints FAIL but still returns 0 (main.cu line 185: printf(...); return 0), so the

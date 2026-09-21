@@ -21,6 +21,9 @@ could have):
 | 3 | `lammps` | `HPCPERF_LAMMPS_INPUT` | 5 | same case at 3 sizes (32k/2M/16M atoms) + two other bench cases (EAM, rhodopsin) | 1 |
 | 2 | `tealeaf` | `HPCPERF_TEALEAF_INPUT` | 5 | upstream `Benchmarks/` decks: 1000^2 / 2000^2 / 4000^2 / 8000^2 cells at 10 steps, 4000^2 at 2 steps (each with its own `tea.problems` reference) | 2 |
 | 3 | `sparta` | `HPCPERF_SPARTA_INPUT` | 6 | the three upstream bench decks (collide / free / sphere) at the sizes upstream ships reference logs for (10K, 100K, 1M, 10M particles) | 2 |
+| 2 | `cloverleaf` | `HPCPERF_CLOVERLEAF_INPUT` | 5 | upstream `InputDecks/` at 960^2 / 1920^2 / 3840^2 cells for 87 steps (built-in references), the 3840^2 x 2955-step default and the 15360x7680 87-step deck | 3 |
+| 2 | `laghos` | `HPCPERF_LAGHOS_INPUT` | 6 | upstream README verification rows (Taylor-Green 3D, Sedov 2D/3D, triple point 3D, Rayleigh-Taylor 2D) + the single-GPU FOM deck | 3 |
+| 3 | `lammps` (+1) | `HPCPERF_LAMMPS_INPUT` with `HPCPERF_LAMMPS_VARIANT=reaxff` | 1 | CORAL-2 ReaxFF HNS crystal (examples/reaxff/HNS) on the separate `reaxff.cuda` build profile | 3 |
 
 ## What an entry records
 
@@ -104,17 +107,32 @@ without anything having been verified):
 | `timing_ok` | every measured run yielded `main_compute_s` from the benchmark's own timer |
 | `native_check` | PASS / FAIL / NONE -- the rules that need no baseline (`present`, `absent`, `abs_lt`, `ge`, `le`, i.e. the benchmark's own pass criteria) on every measured run; NONE when the input has none |
 | `baseline_saved` | a working baseline was stored (never from a run whose native check failed) |
-| `comparison_rules` | READY (every quantity has a verifying rule) / PARTIAL / NONE (record only) |
-| `needs_validation` | the quantities whose rule is `record`: kept, not verified, tolerance still to be fixed |
+| `comparison_rules` | READY (every REQUIRED quantity has a verifying rule; diagnostic records allowed) / PARTIAL (a required quantity is still record) / NONE |
+| `needs_validation` | the REQUIRED quantities whose rule is `record`: kept, not verified, tolerance still to be fixed; `diagnostic_recorded` lists the diagnostic ones |
+| `baseline_verdict` | PASS / INCOMPLETE / FAIL of the measured runs against the working baseline (PASS only when every required quantity was verified) |
 | `compute_ge_1s`, `stable` | median main compute >= 1 s (a reference value, not a gate); n >= 3 and spread <= 10 % |
-| `baseline_self_consistent` | every measured run compares OK against the working baseline (`ok`, which for record-only rules only means "present and finite") |
+| `baseline_self_consistent` | every measured run compares OK against the working baseline (`ok` = nothing failed; it is not a verdict -- see `baseline_verdict`) |
 
-`compare` exit codes: 0 verified (no rule failed and at least one verifying rule
-was applied), 1 a rule failed / the candidate run failed, 2 refused (the baseline
-belongs to another input or benchmark, or baseline and candidate are the same
-output file), 3 inconclusive (only `record` rules exist -- never reported as a
-pass). `status` re-derives the vocabulary from a `measurement.json` (also for
-files written by the first-batch tool).
+Quantity roles (`role: required | diagnostic`, default required): only required
+quantities decide acceptance; a diagnostic quantity is reported and may stay
+`record` without a tolerance (its absence is noted, never a failure).
+
+`compare` acceptance (round 3): the JSON carries `ok` (no rule failed),
+`complete` (every required quantity has a verifying rule), `verified`
+(`ok` and `complete` and at least one required quantity actually compared),
+`verdict` PASS / INCOMPLETE / FAIL, `required_pending`, `diagnostic_recorded`,
+`failed`. Exit codes: **0 only for verdict PASS**; 1 = a rule or the candidate
+run failed (never downgraded to "incomplete"); 2 = refused -- the baseline belongs
+to another input or benchmark, was recorded for a different workload (registry
+params / args / env / input-file sha256 differ under the same id; the binary, git
+revision and build fingerprint are deliberately NOT part of this identity, so an
+optimized build compares normally), or baseline and candidate are the same output
+file; 3 = INCOMPLETE -- nothing failed, but a required quantity is still `record`
+(hipBone's final residual, SPARTA sphere's particle count). Passing configuration
+checks (iterations, DOFs, step counts, markers) never stand in for a pending
+required result. `measure` mirrors this as `comparison_rules` READY / PARTIAL /
+NONE and `baseline_verdict` PASS / INCOMPLETE / FAIL; `status` re-derives the
+vocabulary from a `measurement.json` (also for files written by earlier rounds).
 
 What the tool never does: it never reports wall time as `main_compute_s` (a
 failed run, a missing, ambiguous or non-finite timer line is an error), never
