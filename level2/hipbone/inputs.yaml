@@ -1,0 +1,125 @@
+# Registered inputs of hipBone (schema hpcperf-inputs-1), selected through
+# HPCPERF_HIPBONE_INPUT=<id> in run.sh. Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: hipbone
+level: 2
+selector: HPCPERF_HIPBONE_INPUT
+default_input: coral2-nx24-p14
+entry:
+  kind: run.sh
+  path: level2/hipbone/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    hipBone's own timer (src/run.cpp): GlobalPlatformTime before and after the second
+    linearSolver.Solve call, i.e. exactly 100 CG iterations (operator apply, gather-scatter,
+    vector updates and the residual all-reduce), device-synchronised; the preceding 1000
+    warm-up CG iterations, mesh/operator setup, OCCA JIT kernel compilation and MPI start-up
+    are excluded. Printed as the third field of the "hipBone: N, DOFs, elapsed, ..." line.
+  kind: total
+  unit: s
+  regex: '^hipBone: \d+, \d+, (?P<value>[0-9.eE+-]+), \d+,'
+  select: only
+baseline:
+  method: >-
+    hipBone prints the CG residual norm every iteration with -v (every registered input passes
+    it; it only adds printing inside the CG loop). The right-hand side is the deterministic
+    sequence sin(1e9*cos(1e9*n*n)), so on the same GPU/CUDA math library the residual history is
+    reproducible run to run (observed bit-identical over 3 runs at every size). The CORAL-2 /
+    upstream guidance "r norm generally < 1e-8 after 100 iterations" holds for the small
+    validate.sh problem and for sweep-nx9-p14 (7.7e-9) but NOT at the larger sizes (nx24 p14:
+    3.58e-8, README "Note for the default run.sh problem"; nx16 p8: 1.7e-7; nx32 p4: 9.8e-6) --
+    unpreconditioned CG converges more slowly there, which is a convergence rate, not a defect.
+    The final residual is therefore RECORDED per input; the proposed comparison for an
+    optimized build is the relative error of r_norm_final (and r_norm_initial, 1% as in
+    validate.sh) against this baseline, tolerance to be fixed with the correctness protocol
+    (NEEDS_VALIDATION); cg_iterations and dofs must match exactly.
+  reference: this build's first measured run per input (deterministic RHS); CORAL-2 threshold informational
+  quantities:
+    - name: cg_iterations
+      regex: '^hipBone: \d+, \d+, [0-9.eE+-]+, (?P<value>\d+),'
+      select: only
+      compare: {rule: exact}
+    - name: dofs
+      regex: '^hipBone: \d+, (?P<value>\d+),'
+      select: only
+      compare: {rule: exact}
+    - name: r_norm_initial
+      regex: '^CG: initial res norm (?P<value>[0-9.eE+-]+)'
+      select: only
+      compare: {rule: rel, tol: 0.01}
+    - name: r_norm_final
+      regex: '^CG: it 100, r norm (?P<value>[0-9.eE+-]+)'
+      select: only
+      compare: {rule: record}
+inputs:
+  - id: coral2-nx24-p14
+    case: coral2-single-gpu-example
+    variant: default
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: paranumal/hipBone, version: e9f6908ae2dbf03307ab74798a8c5a3cca929e86, path: "README.md: mpirun -np 1 ./hipBone -m HIP -nx 24 -ny 24 -nz 24 -p 14"}
+    params: {nx: 24, ny: 24, nz: 24, p: 14, elements: 13824, dofs: 37595375, warmup_iterations: 1000, timed_iterations: 100}
+    args: ["-nx", "24", "-ny", "24", "-nz", "24", "-p", "14", "-v"]
+    runtime_config: {gpus: 1, ranks: 1, OMP_NUM_THREADS: 4}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the run.sh default problem plus -v (residual printing) so the CORAL-2 residual rule can be checked.
+  - id: sweep-nx32-p4
+    case: upstream-sweep-2m-dofs
+    variant: parameter
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: paranumal/hipBone, version: e9f6908ae2dbf03307ab74798a8c5a3cca929e86, path: "run.sh (15-point polynomial-degree sweep at ~2M DOFs per rank): -nx 32 -ny 32 -nz 32 -p 4"}
+    params: {nx: 32, ny: 32, nz: 32, p: 4, elements: 32768, dofs: 2048383, warmup_iterations: 1000, timed_iterations: 100}
+    args: ["-nx", "32", "-ny", "32", "-nz", "32", "-p", "4", "-v"]
+    runtime_config: {gpus: 1, ranks: 1, OMP_NUM_THREADS: 4}
+    build_config: null
+    backends_validated: [cuda]
+    notes: low polynomial degree at (roughly) constant DOF count -- a different operator/kernel regime, not a size step.
+  - id: sweep-nx16-p8
+    case: upstream-sweep-2m-dofs
+    variant: parameter
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: paranumal/hipBone, version: e9f6908ae2dbf03307ab74798a8c5a3cca929e86, path: "run.sh sweep line: -nx 16 -ny 16 -nz 16 -p 8"}
+    params: {nx: 16, ny: 16, nz: 16, p: 8, elements: 4096, dofs: 2048383, warmup_iterations: 1000, timed_iterations: 100}
+    args: ["-nx", "16", "-ny", "16", "-nz", "16", "-p", "8", "-v"]
+    runtime_config: {gpus: 1, ranks: 1, OMP_NUM_THREADS: 4}
+    build_config: null
+    backends_validated: [cuda]
+  - id: sweep-nx9-p14
+    case: upstream-sweep-2m-dofs
+    variant: parameter
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: paranumal/hipBone, version: e9f6908ae2dbf03307ab74798a8c5a3cca929e86, path: "run.sh sweep line: -nx 9 -ny 9 -nz 9 -p 14"}
+    params: {nx: 9, ny: 9, nz: 9, p: 14, elements: 729, dofs: 1953125, warmup_iterations: 1000, timed_iterations: 100}
+    args: ["-nx", "9", "-ny", "9", "-nz", "9", "-p", "14", "-v"]
+    runtime_config: {gpus: 1, ranks: 1, OMP_NUM_THREADS: 4}
+    build_config: null
+    backends_validated: [cuda]
+    notes: same polynomial degree as the CORAL-2 example at 1/19 of its DOFs (the sweep's constant-DOF point for p=14).
+  - id: nx40-p14
+    case: coral2-single-gpu-example
+    variant: size
+    source:
+      kind: derived
+      derivation: >-
+        The README example (-nx 24 -p 14) with more elements per rank: 40^3 = 64,000 elements,
+        (40*14-1)^3 = 174.7 M DOFs (4.6x the example; hipBone counts (nx*p-1)^3 interior nodes). nx/ny/nz are the benchmark's own per-rank size
+        parameters; upstream publishes no single-GPU point of this size. Chosen so the 100 timed
+        CG iterations exceed one second on a B200. A first attempt with -nx 48 (110,592 elements,
+        300.8 M DOFs) is NOT registered: hipBone aborts during host mesh setup with
+        std::bad_array_new_length (a 32-bit index overflow in the application, not GPU memory --
+        measurements/level2-hipbone/nx48-p14/ in the pilot results), so that size is an
+        application limit on this build.
+    params: {nx: 40, ny: 40, nz: 40, p: 14, elements: 64000, dofs: 174676879, warmup_iterations: 1000, timed_iterations: 100}
+    args: ["-nx", "40", "-ny", "40", "-nz", "40", "-p", "14", "-v"]
+    runtime_config: {gpus: 1, ranks: 1, OMP_NUM_THREADS: 4}
+    build_config: null
+    backends_validated: [cuda]
+    notes: >-
+      measured 2026-09-21 on dgx003: 100 timed CG iterations 1.2529 s (3 runs identical), 22.8 GB
+      device memory, ~90 s wall of which ~70 s is host mesh setup; r_norm after 100 iterations
+      7.77e-8 (recorded), 100 iterations, deterministic.
