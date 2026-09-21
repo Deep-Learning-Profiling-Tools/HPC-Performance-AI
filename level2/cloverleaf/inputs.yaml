@@ -1,0 +1,144 @@
+# Registered inputs of CloverLeaf (schema hpcperf-inputs-1), selected through
+# HPCPERF_CLOVERLEAF_INPUT=<id> in run.sh. Without the variable run.sh behaves as before
+# (HPCPERF_CLOVERLEAF_DECK or the default InputDecks/clover_bm16.in).
+schema: hpcperf-inputs-1
+benchmark: cloverleaf
+level: 2
+selector: HPCPERF_CLOVERLEAF_INPUT
+default_input: bm16-3840sq-2955steps
+entry:
+  kind: run.sh
+  path: level2/cloverleaf/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    CloverLeaf's own "Wall clock" (driver/hydro.cpp: timer() taken at the start of hydro(), i.e.
+    after mesh/chunk initialisation and the initial field summary, minus the same timer at
+    completion of the last step including its field summary and the reference check). The value
+    is printed after every step (cumulative) and once more at the end; the last one is the total
+    of the time-step loop. Kernel launch/JIT, MPI start-up and finalisation are outside it.
+    With a registered input run.sh appends clover.out to stdout, so the same line appears
+    twice with the same value (select last).
+  kind: total
+  unit: s
+  regex: '^\s*Wall clock (?P<value>[0-9.eE+-]+)\s*$'
+  select: last
+baseline:
+  method: >-
+    CloverLeaf checks itself (driver/report.cpp): decks that carry a test_problem id compare the
+    final total kinetic energy with a value hard-coded for that id and pass when
+    |100 ke/ref - 100| < 0.001, i.e. 1e-5 relative. The registry keeps the test id (exact), the
+    final step (exact), the final kinetic energy from the last field-summary row of clover.out
+    (compared with this build's baseline at the same 1e-5 relative tolerance -- the application's
+    own criterion), and the PASSED / Outcome markers. A deck without a test_problem id (bm128
+    short) has only the self-baseline comparison of the kinetic energy at that tolerance and no
+    upstream reference value.
+  reference: upstream hard-coded kinetic-energy references (driver/report.cpp, UoB-HPC/CloverLeaf 3e10ff92) through the application's own check; ke_final against this build's first measured run
+  quantities:
+    - name: test_problem
+      role: required
+      regex: '^\s*Test problem (?P<value>\d+) is within'
+      select: first
+      compare: {rule: exact}
+    - name: final_step
+      role: required
+      regex: '^\s*step:\s+(?P<value>\d+)\s'
+      select: last
+      compare: {rule: exact}
+    - name: ke_final
+      role: required
+      regex: '^\s*step:\s+\d+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s*$'
+      select: last
+      compare: {rule: rel, tol: 1.0e-5}
+    - name: pass_marker
+      role: required
+      regex: '^\s*This test is considered PASSED'
+      compare: {rule: present}
+    - name: outcome_passed
+      role: required
+      regex: '^\s*- Outcome: PASSED'
+      compare: {rule: present}
+    - name: fail_marker
+      role: required
+      regex: '(This test is considered NOT PASSED)|(Outcome: FAILED)'
+      compare: {rule: absent}
+inputs:
+  - id: bm-short-960sq-87steps
+    case: clover-bm-shock
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/CloverLeaf, version: 3e10ff9268d3704a744e5a2a4ea3c62831078082, path: InputDecks/clover_bm_short.in, sha256: 79372d0ed8c196d1186ca4965d7abd6075381483a5d47d9e7ef754337b7ef592}
+    params: {deck: InputDecks/clover_bm_short.in, x_cells: 960, y_cells: 960, end_step: 87, test_problem: 2, reference_ke: 1.19316898756307}
+    files: [InputDecks/clover_bm_short.in]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: one of the two validate.sh decks (960x960 cells, 87 steps, test_problem 2).
+  - id: bm4-short-1920sq-87steps
+    case: clover-bm-shock
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/CloverLeaf, version: 3e10ff9268d3704a744e5a2a4ea3c62831078082, path: InputDecks/clover_bm4_short.in, sha256: 97f921869ace8ee29997bddc813abdfc8cc3af8bf8988ab09fe20ca8f985f14f}
+    params: {deck: InputDecks/clover_bm4_short.in, x_cells: 1920, y_cells: 1920, end_step: 87, test_problem: 487, reference_ke: 6.088288e-01}
+    files: [InputDecks/clover_bm4_short.in]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: 1920x1920 cells, 87 steps; upstream reference id 487 ("bm4 @ 87", 7 significant digits in report.cpp).
+  - id: bm16-short-3840sq-87steps
+    case: clover-bm-shock
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/CloverLeaf, version: 3e10ff9268d3704a744e5a2a4ea3c62831078082, path: InputDecks/clover_bm16_short.in, sha256: 218cd34d9b16248890d82cafcc355052f71c0e7f38e25788f7d28c17d547caeb}
+    params: {deck: InputDecks/clover_bm16_short.in, x_cells: 3840, y_cells: 3840, end_step: 87, test_problem: 4, reference_ke: 0.307475452287895}
+    files: [InputDecks/clover_bm16_short.in]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the other validate.sh deck (3840x3840 cells, 87 steps, test_problem 4).
+  - id: bm16-3840sq-2955steps
+    case: clover-bm-shock
+    variant: default
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/CloverLeaf, version: 3e10ff9268d3704a744e5a2a4ea3c62831078082, path: InputDecks/clover_bm16.in, sha256: 2eaa6cbb9b9e25ec56dd889b490c706742a154079957ed26259391a2d891e10c}
+    params: {deck: InputDecks/clover_bm16.in, x_cells: 3840, y_cells: 3840, end_step: 2955, test_problem: 5, reference_ke: 4.85350315783719}
+    files: [InputDecks/clover_bm16.in]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the run.sh default deck (3840x3840 cells, 2955 steps to t = 4.35 -- the standard "bm16" benchmark, test_problem 5).
+  - id: bm128-short-15360x7680-87steps
+    case: clover-bm-shock
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/CloverLeaf, version: 3e10ff9268d3704a744e5a2a4ea3c62831078082, path: InputDecks/clover_bm128_short.in, sha256: f60c1b681f0b1a7423129f60ecb7e41dc8ed1cb4b0d274b5bef9e5c6e7793b65}
+    params: {deck: InputDecks/clover_bm128_short.in, x_cells: 15360, y_cells: 7680, end_step: 87, test_problem: null, reference_ke: null}
+    files: [InputDecks/clover_bm128_short.in]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      reference: no upstream reference for this deck (no test_problem id); ke_final against this build's first measured run at the application's 1e-5 tolerance
+      quantities:
+        - name: final_step
+          role: required
+          regex: '^\s*step:\s+(?P<value>\d+)\s'
+          select: last
+          compare: {rule: exact}
+        - name: ke_final
+          role: required
+          regex: '^\s*step:\s+\d+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s*$'
+          select: last
+          compare: {rule: rel, tol: 1.0e-5}
+        - name: outcome_passed
+          role: required
+          regex: '^\s*- Outcome: PASSED'
+          compare: {rule: present}
+    notes: >-
+      the largest 87-step upstream deck (118 M cells, 15360x7680); upstream ships no reference value
+      for it, so the comparison is self-baseline only (B-type), never an upstream check.
