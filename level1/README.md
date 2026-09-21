@@ -31,6 +31,22 @@ LOC measured with cloc over the benchmark's `cuda/` + `common/` (CUDA) and
 `hip/` + `common/` (HIP) source directories (shared `common/` code counted in
 both; data files, build files, and validation scripts excluded).
 
+## Runtime measurement
+
+`Working` in the catalog above is a correctness statement; it says nothing about
+speed. To measure runtime with a GPU/host breakdown (wall clock, kernel time, GPU
+busy time, transfer time, per-kernel detail) use:
+
+```bash
+tools/timing/measure_level1.sh --build-root build/all all
+python3 tools/timing/summarize.py        # one JSON per run + summary.csv
+```
+
+Measurement sets `HPCPERF_SKIP_VERIFY=1`, which makes each benchmark skip the CPU
+reference recomputation it uses for validation -- that is correctness machinery,
+not the workload being timed. ctest never sets the variable, so validation is
+unchanged. See [tools/timing/README.md](../tools/timing/README.md).
+
 ## Catalog
 
 | Benchmark | Source suite | Brief summary | CUDA | HIP | CUDA LOC | HIP LOC | Status |

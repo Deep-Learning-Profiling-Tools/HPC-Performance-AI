@@ -43,7 +43,7 @@ SCHEMA = "hpcperf-timing-1"
 
 SUMMARY_COLUMNS = [
     "run_id", "utc", "benchmark", "backend", "hostname", "skip_verify", "profiled",
-    "exit_code", "repeats",
+    "exit_code", "repeats", "verify_kind", "verify_skip_effect",
     "wall_s_median", "wall_s_min", "wall_s_max", "wall_s_stddev", "wall_s_profiled",
     "profiling_overhead_ratio",
     "gpu_kernel_time_s", "gpu_kernel_launches", "gpu_busy_s", "gpu_op_time_sum_s",
@@ -61,6 +61,50 @@ SUMMARY_COLUMNS = [
 ]
 
 KERNEL_COLUMNS = ["run_id", "benchmark", "kernel", "count", "total_s", "avg_s", "min_s", "max_s", "share"]
+
+# What verification each benchmark performs, and whether HPCPERF_SKIP_VERIFY actually
+# removes it. Without this a reader would take skip_verify=true to mean "no host-side
+# verification ran", which is false for the benchmarks listed as not_skippable.
+VERIFY_KIND = {
+    # host recomputation of the GPU workload; the switch removes it entirely
+    **{b: ("cpu-recompute", "skipped", "")
+       for b in ("daxpy", "del_dot_vec_2d", "energy", "fdtd_2d", "floyd_warshall",
+                 "jacobi_2d", "ltimes", "mat_mat_shared", "matvec_3d_stencil", "pressure",
+                 "aes", "black_scholes", "color_histogram", "fir", "pagerank",
+                 "adam", "background_subtraction", "bezier_surface", "bitonic_sort",
+                 "burgers_equation", "burrows_wheeler_transform", "channel_shuffle",
+                 "histogram", "nbody", "backprop", "hotspot_3d", "lud", "spgemm",
+                 "bilateral_filter", "all_pairs_distance")},
+    # host recomputation, but part of it is fused with work the GPU needs
+    "spmv": ("cpu-recompute", "partially_skipped",
+             "the gold loop also writes the matrix values uploaded to the GPU and the "
+             "extra matvec is GPU work, so both still run; only check_errors is skipped"),
+    "murmurhash3": ("cpu-recompute", "partially_skipped",
+                    "the reference hash sits in the key-generation loop the GPU consumes; "
+                    "only that call is skipped"),
+    "block_scan": ("cpu-reference-cheap", "partially_skipped",
+                   "Initialize() fills both the GPU input and the reference; only the two "
+                   "comparisons are skipped"),
+    "spadd": ("cpu-recompute", "skipped", ""),
+    "graph_coloring": ("cpu-reference-cheap", "skipped", ""),
+    "atomic_reduction": ("cpu-reference-cheap", "skipped", ""),
+    # O(1) comparisons against hardcoded reference constants: nothing to remove
+    **{b: ("cpu-reference-cheap", "not_skippable",
+           "verification is an O(1) comparison against hardcoded reference constants; it "
+           "recomputes nothing, so it still runs and costs no measurable time")
+       for b in ("cg", "ep", "ft", "mg")},
+    "is": ("cpu-reference-cheap", "not_skippable",
+           "verification runs inside the timed ranking kernels (rank_gpu_kernel_7) and in "
+           "three further CUDA kernels; it still runs and is included in the GPU time"),
+    "binary_search": ("none", "not_applicable",
+                      "its check is behind #ifdef DEBUG, which is never defined"),
+    # verification lives in a repo-authored verify.py the harness does not run
+    **{b: ("external-python", "not_executed",
+           "verification lives in verify.py, which the harness does not run: the binary is "
+           "measured directly")
+       for b in ("ao_bench", "bfs", "gaussian_elimination", "hotspot", "nearest_neighbor",
+                 "needleman_wunsch", "pathfinder", "srad_v1")},
+}
 
 SYNC_API = re.compile(r"^cuda(Device|Stream|Event)Synchronize$|^cudaMemcpy$|^cudaMemset$")
 
@@ -361,6 +405,19 @@ def build_record(raw_dir):
         if meta.get("profiled") == "1":
             rec["caveats"].append(f"nsys did not produce reports (nsys_status={meta.get('nsys_status')})")
 
+    kind, effect, note = VERIFY_KIND.get(rec["benchmark"], ("unknown", "unknown", ""))
+    rec["measurement"]["verify_kind"] = kind
+    rec["measurement"]["verify_skip_effect"] = effect if rec["measurement"]["skip_verify"] else "not_requested"
+    rec["measurement"]["verify_note"] = note
+
+    if rec["measurement"]["skip_verify"] and effect in ("not_skippable", "partially_skipped"):
+        rec["caveats"].append(
+            f"HPCPERF_SKIP_VERIFY was set but verification is {effect.replace('_', ' ')} here: "
+            f"{note}. Do not read host_outside_gpu_s as verification-free.")
+    if kind == "unknown":
+        rec["caveats"].append(
+            "This benchmark is not in VERIFY_KIND (tools/timing/summarize.py); what the "
+            "measured time includes on the host side is undocumented.")
     if not rec["measurement"]["skip_verify"]:
         rec["caveats"].append(
             "Verification was NOT skipped: the wall clock includes the benchmark's CPU "
@@ -383,6 +440,8 @@ def flatten(rec):
         "backend": rec["backend"], "hostname": e["hostname"],
         "skip_verify": int(rec["measurement"]["skip_verify"]),
         "profiled": int(rec["measurement"]["profiled"]),
+        "verify_kind": rec["measurement"].get("verify_kind", ""),
+        "verify_skip_effect": rec["measurement"].get("verify_skip_effect", ""),
         "exit_code": rec["measurement"]["exit_code"], "repeats": rec["measurement"]["repeats"],
         "wall_s_median": t["wall_s_median"], "wall_s_min": t["wall_s_min"],
         "wall_s_max": t["wall_s_max"], "wall_s_stddev": t["wall_s_stddev"],

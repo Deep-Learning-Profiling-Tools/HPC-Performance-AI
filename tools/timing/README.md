@@ -66,9 +66,15 @@ Cases where skipping is deliberately partial, and why:
 | `binary_search` | nothing to skip | its check is behind `#ifdef DEBUG`, which is never defined |
 | 8 python-wrapped benchmarks | nothing to skip | verification lives in `verify.py`; the harness runs the binary directly, so it is never executed |
 
-`is`, `cg`, `ep`, `ft` and `mg` therefore report `skip_verify: true` (the harness
-set the variable) while their verification still runs; their JSON carries that in
-`caveats`. Do not read their `host_outside_gpu_s` as verification-free.
+Every JSON therefore records what actually happened, not just what was requested:
+`measurement.verify_kind` (`cpu-recompute` / `cpu-reference-cheap` /
+`external-python` / `none`), `measurement.verify_skip_effect` (`skipped` /
+`partially_skipped` / `not_skippable` / `not_executed` / `not_applicable` /
+`not_requested`) and `measurement.verify_note`. Whenever the variable was set but
+verification was only partly removed or not removable, a `caveats` entry says so
+in words -- `cg`, `ep`, `ft`, `mg`, `is`, `spmv`, `murmurhash3` and `block_scan`
+each carry one. Do not read their `host_outside_gpu_s` as verification-free. Both
+fields are columns in `summary.csv`, so a model can filter on them.
 
 ## The case table
 
@@ -153,3 +159,29 @@ CUDA only; `nsys` only. Not covered: HIP/ROCm (absent on this machine),
 `ncu` hardware counters (occupancy, achieved bandwidth, cache hit rates -- they
 replay every launch and need their own budget), Level 2 and Level 3, and
 multi-GPU (every Level 1 benchmark is single-GPU, single-process).
+
+## First recorded sweep
+
+`build/gcc13` (GCC 13.3.0 from source, CUDA 13.2.78, nsys 2025.6.3), 1x NVIDIA
+B200 sm_100 (driver 595.58.03), 16 allocated CPUs, `--repeats 5`, verification
+skipped, 2026-09-21:
+
+* 50 of 50 benchmarks measured, 0 failures; 50 JSON files, `summarize: failed=0`.
+* The whole sweep (50 x [1 warm-up + 5 timed + 1 nsys]) takes **111 s**. The same
+  50 cases under ctest with verification take about **815 s**, of which
+  `channel_shuffle` alone is 573.9 s.
+* Slowest by wall clock: `block_scan` 57.8 s (97.7 % GPU), `channel_shuffle`
+  9.5 s (72.4 %), `bilateral_filter` 4.8 s (86.8 %), `cg` 3.4 s (5.5 %).
+* About 30 benchmarks spend under 5 % of their wall clock on the GPU: a roughly
+  constant 0.4-0.6 s of CUDA context creation and input generation dominates
+  them. That is why `host_outside_gpu_s` and `gpu_busy_frac_of_wall` are
+  first-class fields rather than derived afterthoughts.
+* `gpu_overlap_s` is 0 for all 50: every benchmark is single-stream and serial,
+  so no GPU operations overlap. The interval union therefore equals the naive sum
+  here -- it is kept because a multi-stream benchmark would otherwise report more
+  GPU time than wall clock.
+* Largest host-bound gaps inside the GPU active window (`gpu_idle_in_span_s`):
+  `channel_shuffle` 2.27 s, `background_subtraction` 1.28 s -- host-side loops
+  between launches.
+
+Numbers live in `results/timing/` and are not committed; rerun to regenerate.
