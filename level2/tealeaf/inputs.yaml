@@ -1,0 +1,117 @@
+# Registered inputs of TeaLeaf (schema hpcperf-inputs-1), selected through
+# HPCPERF_TEALEAF_INPUT=<id> in run.sh. Without the variable run.sh behaves as before
+# (HPCPERF_TEALEAF_DECK or the default Benchmarks/tea_bm_5.in).
+schema: hpcperf-inputs-1
+benchmark: tealeaf
+level: 2
+selector: HPCPERF_TEALEAF_INPUT
+default_input: bm5-4000sq-10steps
+entry:
+  kind: run.sh
+  path: level2/tealeaf/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    TeaLeaf's own "Wallclock" profile (driver/diffuse.cpp solve(): clock_gettime around each
+    timestep = min-timestep reduction, halo exchange, the CG solve, solve finalisation and the
+    periodic field summary; accumulated over all end_step timesteps and printed after every
+    timestep with 3 decimals). Excludes start-up, mesh/chunk initialisation, the initial field
+    summary, the final result check against tea.problems and finalisation. The value after the
+    last timestep (select last) is the total of the timestep loop.
+  kind: total
+  unit: s
+  regex: '^ Wallclock:\s+(?P<value>[0-9.]+)s\s*$'
+  select: last
+baseline:
+  method: >-
+    TeaLeaf checks itself (driver/field_summary_driver.cpp): at the end the global temperature
+    sum ("Actual") is compared with the tea.problems entry for (x_cells, y_cells, end_step)
+    ("Expected") and the run PASSES when |100*Actual/Expected - 100| < 0.001, i.e. a relative
+    difference below 1e-5. The registry keeps Expected (must be the same table entry: exact),
+    Actual (compared with this build's baseline with the same 1e-5 relative tolerance -- upstream's
+    own criterion, not a new one), the completed timestep count (exact) and the PASSED/Outcome
+    markers (present) / FAILED marker (absent). Every registered deck has a tea.problems entry.
+  reference: upstream tea.problems (UoB-HPC/TeaLeaf e70261c0) through the application's own check; Actual against this build's first measured run
+  quantities:
+    - name: expected_energy
+      regex: '^ Expected (?P<value>[0-9.eE+-]+)\s*$'
+      select: only
+      compare: {rule: exact}
+    - name: actual_energy
+      regex: '^ Actual\s+(?P<value>[0-9.eE+-]+)\s*$'
+      select: only
+      compare: {rule: rel, tol: 1.0e-5}
+    - name: timesteps_completed
+      regex: '^ Timestep (?P<value>\d+)\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: pass_marker
+      regex: '^ This run PASSED'
+      compare: {rule: present}
+    - name: outcome_passed
+      regex: '^ - Outcome: PASSED'
+      compare: {rule: present}
+    - name: fail_marker
+      regex: '(^ This run FAILED)|(Outcome: FAILED)'
+      compare: {rule: absent}
+inputs:
+  - id: bm4-1000sq-10steps
+    case: tea-bm-heat-conduction
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/TeaLeaf, version: e70261c0be40537da75b258108ed2898f84f3c58, path: Benchmarks/tea_bm_4.in, sha256: d62ee814c3a7281f438cdad0ea07b2cfd681f7c9a2cfa7ef46fbad14b26cb3fb}
+    params: {deck: Benchmarks/tea_bm_4.in, x_cells: 1000, y_cells: 1000, end_step: 10, solver: cg, eps: 1.0e-15, test_problem: 4, reference_energy: 9.727733205075556e+01}
+    files: [Benchmarks/tea_bm_4.in, tea.problems]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: upstream benchmark 4 (1000x1000 cells, 10 timesteps); no profiler_on in the deck (the Wallclock line is printed regardless).
+  - id: bm5e2-2000sq-10steps
+    case: tea-bm-heat-conduction
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/TeaLeaf, version: e70261c0be40537da75b258108ed2898f84f3c58, path: Benchmarks/tea_bm_5e_2.in, sha256: f18d817128dcdb6e405479c80fa818b2f9df4672677428b80adf2bf202a615a0}
+    params: {deck: Benchmarks/tea_bm_5e_2.in, x_cells: 2000, y_cells: 2000, end_step: 10, solver: cg, eps: 1.0e-15, test_problem: 5, reference_energy: 9.605026999605091e+01}
+    files: [Benchmarks/tea_bm_5e_2.in, tea.problems]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: upstream "5e" size series, 2000x2000 cells at the full 10 timesteps.
+  - id: bm5-4000sq-10steps
+    case: tea-bm-heat-conduction
+    variant: default
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/TeaLeaf, version: e70261c0be40537da75b258108ed2898f84f3c58, path: Benchmarks/tea_bm_5.in, sha256: 0bdcd5021e023a878e35936a404ef9e2181ebee47215fec0196a8a208a8ede9b}
+    params: {deck: Benchmarks/tea_bm_5.in, x_cells: 4000, y_cells: 4000, end_step: 10, solver: cg, eps: 1.0e-15, test_problem: 5, reference_energy: 9.5462351582214282e+01}
+    files: [Benchmarks/tea_bm_5.in, tea.problems]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the run.sh default deck (upstream benchmark 5).
+  - id: bm6-8000sq-10steps
+    case: tea-bm-heat-conduction
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/TeaLeaf, version: e70261c0be40537da75b258108ed2898f84f3c58, path: Benchmarks/tea_bm_6.in, sha256: 73c3596c9223b5e18cf34850b7ec61619124ae8f4072bccf4cd99212f2bb5930}
+    params: {deck: Benchmarks/tea_bm_6.in, x_cells: 8000, y_cells: 8000, end_step: 10, solver: cg, eps: 1.0e-15, test_problem: 6, reference_energy: 9.517473876862078e+01}
+    files: [Benchmarks/tea_bm_6.in, tea.problems]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: upstream benchmark 6 (8000x8000 cells, 64 M cells, 10 timesteps) -- the largest upstream deck.
+  - id: bm5e4-4000sq-2steps
+    case: tea-bm-heat-conduction
+    variant: steps
+    source:
+      kind: upstream-file
+      upstream: {repo: UoB-HPC/TeaLeaf, version: e70261c0be40537da75b258108ed2898f84f3c58, path: Benchmarks/tea_bm_5e_4_2.in, sha256: 9853046038484c81d88daf22deab16f834cb67fb63bb662b800da89c091cb4b2}
+    params: {deck: Benchmarks/tea_bm_5e_4_2.in, x_cells: 4000, y_cells: 4000, end_step: 2, solver: cg, eps: 1.0e-15, test_problem: 5, reference_energy: 8.944258537125111e+01}
+    files: [Benchmarks/tea_bm_5e_4_2.in, tea.problems]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the default grid at 2 instead of 10 timesteps (upstream "5e_4_2" deck, own tea.problems entry) -- the step-count axis of the same case.
