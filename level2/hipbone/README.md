@@ -183,9 +183,22 @@ residual norms can be kept as baseline quantities.
 | `sweep-nx9-p14` | `-nx 9 -ny 9 -nz 9 -p 14 -v` | 729 / 1.95 M | upstream `run.sh` sweep |
 | `nx40-p14` | `-nx 40 -ny 40 -nz 40 -p 14 -v` | 64,000 / 174.7 M | derived: the README example at 4.6x the DOFs, so the timed section exceeds 1 s |
 
-Not registered: `-nx 48 -p 14` (300.8 M DOFs) aborts in host mesh setup with
-`std::bad_array_new_length` (32-bit index overflow in the application, not GPU
-memory: nx40 uses 22.8 GB of 183 GB) -- an application size limit of this build.
+Upstream `run.sh` sweep (15 points at ~2 M DOFs per rank) -- status on this build:
+
+| point (`-nx N -p P`) | status |
+|---|---|
+| 32/4, 16/8, 9/14 | registered and measured (`sweep-*` above) |
+| 126/1, 63/2, 42/3, 26/5, 21/6, 18/7, 14/9, 13/10, 12/11, 11/12, 10/13, 9/15 | untested (not excluded; not run in the pilot) |
+
+Not registered: `-nx 48 -p 14` (110,592 elements, 300.8 M DOFs) exits 134 in
+host mesh setup with `std::bad_array_new_length` before any device allocation
+(record: `measurements/level2-hipbone/nx48-p14/`; nx40 uses 22.8 GB of 183 GB,
+so GPU memory is not the limit). Candidate cause, unconfirmed (no debug symbols,
+no backtrace): `libs/mesh/meshGeometricFactors.cpp:35`
+`ggeo.malloc(Nelements*Nggeo*Np)` multiplies three `dlong` = `int` operands
+(`include/types.h:60`; Nggeo = 7, Np = 15^3 = 3375): 110,592 x 7 x 3375 =
+2,612,736,000 > 2^31 - 1, while nx40 gives 1,512,000,000. Confirming it needs a
+`-g` build or a backtrace; upstream's integer types are not changed here.
 
 Timer: hipBone's own `elapsed` (100 CG iterations after the 1000 warm-up
 iterations; setup, JIT and MPI start-up excluded). Baseline: `cg_iterations` and
@@ -194,7 +207,11 @@ recorded -- the CORAL-2 "generally < 1e-8" guidance holds for the validate.sh
 problem and for `sweep-nx9-p14` (7.7e-9) but not at the larger sizes (see the
 note below), so no absolute threshold is applied there; a relative tolerance
 for an optimized build is still to be fixed (NEEDS_VALIDATION). The residual
-history is deterministic on this GPU (bit-identical over 3 runs at every size).
+history was identical to all printed digits (`%12.12le`) over the 3 runs at every
+registered size. The 1 % rule on `r_norm_initial` comes from validate.sh check 4,
+which compares the CUDA backend with OCCA's Serial backend (two libm realisations
+of the pseudo-random right-hand side); between two CUDA runs on the same GPU it is
+only a loose guard, not a tolerance that a 1 % change would satisfy.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians; the
 warm-up absorbs the OCCA JIT compile of a new problem size, ~9 s here):
@@ -207,6 +224,12 @@ warm-up absorbs the OCCA JIT compile of a new problem size, ~9 s here):
 | `sweep-nx9-p14` | 0.0271 s | < 0.1 % | 3.62 s | 7.66e-9 | no |
 | `nx40-p14` | 1.2529 s | < 0.1 % | 89.9 s | 7.77e-8 | yes |
 
+Spread = (max - min) / median over the 3 measured runs; "< 0.1 %" means the
+three values differ by at most the 1e-4 s print resolution of the `elapsed` field.
+The three registered upstream sweep points measure 0.022-0.029 s for the 100 timed
+iterations on a B200; the 12 other sweep points were not run, so nothing is claimed
+about them. hipBone's own 1000 warm-up iterations stay inside the application and
+are never counted as part of the measured section or as the harness warm-up run.
 Wall time is dominated by host-side setup at every size (the timed section is
 1.4 % of the wall for the CORAL-2 example). Raw runs and baselines:
 `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-hipbone/`.

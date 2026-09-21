@@ -68,21 +68,36 @@ above is unchanged):
 
 Timer: the benchmark's `Average kernel execution time` = kernel-only time per
 frame (device sync included; host frame generation, H2D copies and the CPU
-reference are outside), multiplied by the `repeat - 2` timed frames. Baseline:
-`Max error is 0` + `PASS` (bit-exact against the in-process CPU reference).
+reference are outside), multiplied by the `repeat - 2` timed frames (cuda/main.cu:
+the loop runs `repeat` frames, the timer accumulates for `i >= 2` only and the
+average divides by `repeat - 2`; the first two frames are the benchmark's own
+warm-up). Three different numbers therefore exist for one run and are reported
+separately, never mixed: the per-frame average the benchmark prints, the
+cumulative timed section (average x (repeat - 2) = `main_compute_s`) and the
+process wall (E2E, which includes the host RNG frame generation and the CPU
+reference pass -- neither is ever added to the main compute). Baseline:
+`Max error is 0` + `PASS` (bit-exact against the in-process CPU reference). Note
+that the binary prints `FAIL` but still exits 0 (main.cu line 185), so the exit
+code alone says nothing about correctness; the tool checks the markers.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
 
 | id | main compute | spread | process wall (E2E) | main >= 1 s |
 |---|---|---|---|---|
-| `w4096-h2048-merged0-r102` | 0.0115 s (115 us/frame) | 12 % (one run 0.0129 s) | 6.18 s | no |
+| `w4096-h2048-merged0-r102` | 0.0115 s (115 us/frame) | 12.3 % over 3 runs (0.0115, 0.0129, 0.0115 s); re-measured with 5 runs: 0.0114-0.0115 s, 0.9 % | 6.18 s | no |
 | `w4096-h2048-merged1-r102` | 0.0070 s | 0.5 % | 6.18 s | no |
-| `w8192-h4096-merged0-r102` | 0.0495 s | < 0.1 % | 23.6 s | no |
+| `w8192-h4096-merged0-r102` | 0.0495 s | < 0.1 % (below the 1e-6 s x 100 print resolution) | 23.6 s | no |
 | `w4096-h2048-merged0-r1002` | 0.113 s | 0.6 % | 39.8 s | no |
 
-The GPU work of this benchmark is a few percent of its wall time at every
-registered size (host RNG + CPU reference dominate); no upstream input reaches
-one second of kernel time. Raw runs: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level1-background_subtraction/`.
+Spread = (max - min) / median of the measured runs; "stable" = 3 or more runs
+and spread <= 10 %. Within the measured range (frame sizes 4096x2048 and
+8192x4096, 100 and 1000 timed frames) the timed kernel section stays between
+0.007 s and 0.113 s per run and the GPU work is a few percent of the wall time
+(host RNG + CPU reference dominate). This says nothing about sizes outside that
+range; the inputs are kept as registered, the ~1 s value is a reference for the
+timing protocol, not a deletion gate. Raw runs:
+`HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level1-background_subtraction/`
+(the 5-run re-measurement is `w4096-h2048-merged0-r102.remeasure-5reps/`).
 
 ## LOC
 

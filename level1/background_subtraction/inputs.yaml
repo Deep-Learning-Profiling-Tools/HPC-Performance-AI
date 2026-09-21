@@ -15,7 +15,10 @@ timing:
     followed by cudaDeviceSynchronize), summed over the last (repeat - 2) frames and printed
     as the average per frame. Excludes host frame generation (mt19937 per pixel), the H2D copy
     of each frame, the CPU reference (merge_ref) run every frame, allocation and the final
-    D2H + verification. main_compute_s = average x (repeat - 2).
+    D2H + verification. main_compute_s = average x (repeat - 2). Verified in cuda/main.cu:
+    the frame loop runs `repeat` times (line 125), the timer accumulates only for i >= 2
+    (line 146) and the printed average divides by (repeat - 2) (line 167); the first two
+    frames are the benchmark's own warm-up and are not part of the timed section.
   kind: per_iteration
   unit: us
   regex: '^Average kernel execution time: (?P<value>[0-9.eE+-]+) \(us\)'
@@ -39,6 +42,8 @@ baseline:
     - name: fail_marker
       regex: '^FAIL$'
       compare: {rule: absent}
+  # The benchmark prints FAIL but still returns 0 (main.cu line 185: printf(...); return 0), so the
+  # exit code alone never establishes correctness here -- the markers above are the check.
 inputs:
   - id: w4096-h2048-merged0-r102
     case: synthetic-video-4096x2048

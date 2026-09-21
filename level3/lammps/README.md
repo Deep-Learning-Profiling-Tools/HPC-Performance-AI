@@ -119,22 +119,51 @@ Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
 
 | id | Loop time (main compute) | spread | run.sh wall (E2E) | vs upstream reference log |
 |---|---|---|---|---|
-| `lj-32k` | 0.0199 s | 0.6 % | 3.23 s | all 7 quantities identical to every printed digit |
+| `lj-32k` | 0.0199 s | 0.6 % | 3.23 s | 7/7 selected fields identical at log print precision |
 | `lj-2m` | 0.158 s | 0.5 % | 5.23 s | self baseline (no upstream log) |
 | `lj-16m` | 1.086 s | 0.3 % | 13.5 s | self baseline (no upstream log) |
-| `eam-32k` | 0.0765 s | 0.2 % | 3.12 s | all 7 quantities identical |
-| `rhodo-32k` | 0.387 s | 0.7 % | 6.33 s | all 6 quantities identical |
+| `eam-32k` | 0.0765 s | 0.2 % | 3.12 s | 7/7 selected fields identical at log print precision |
+| `rhodo-32k` | 0.387 s | 0.7 % | 6.33 s | 6/6 selected fields identical at log print precision |
+
+"Identical at log print precision" means exactly this and no more: the selected
+thermo fields -- `lj`/`eam`: atoms, Temp and E_pair at step 0, Temp, E_pair,
+TotEng and Press at step 100 (`thermo_style one`, 8 significant digits as printed
+by LAMMPS `%g`-style thermo output, `units lj` for `in.lj`, `units metal` for
+`in.eam`); `rhodo`: TotEng at steps 0 and 100, Temp and Press at step 100
+(`thermo_style multi`, `units real`, 4-6 decimals) -- have the same printed
+string in this build's run and in the upstream reference logs
+`bench/log.15Jul25.{lj,eam,rhodo}.fixed.g++.1` (a 1-process CPU run, July 2025).
+The comparison rule applied is validate.sh's: 1e-8 relative at step 0, 1e-5
+relative at step 100 (measured relative error 0 for every field). Other thermo
+columns (E_mol, KinEng, E_bond, ...), other steps and the per-step timing
+breakdown are not compared. Spread = (max - min) / median over 3 runs.
 
 Only `lj-16m` reaches one second of loop time on a B200; the 32k-atom decks
 are 0.02-0.4 s (the bench convention is 100 steps). Raw runs, baselines and the
 upstream-reference comparisons: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level3-lammps/`.
 
-ReaxFF (CORAL-2 LAMMPS tier-1/2 workload): the frozen tree carries
-`examples/reaxff/HNS/` (`in.reaxff.hns`, `data.hns-equil`, `ffield.reax.hns`,
-reference logs) and the `REAXFF` package with its KOKKOS styles
-(`pair_reaxff_kokkos`, `fix_qeq_reaxff_kokkos`), but this build enables only
-`KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR`; running it needs a build profile
-with `PKG_REAXFF=yes` (not done in the 2026-09-21 pilot).
+### ReaxFF: separate build-profile plan (not implemented, 2026-09-21)
+
+ReaxFF is the CORAL-2 LAMMPS tier-1 workload (HNS crystal, `-pk kokkos neigh
+half neigh/qeq full newton on`, FOM atom-steps/s, thermo Temp/PotEng/Press/
+E_vdwl/E_coul within 0.1 % of the baseline). The frozen tree carries everything
+needed: `examples/reaxff/HNS/` (`in.reaxff.hns` with `x/y/z/t` index variables,
+`data.hns-equil`, `ffield.reax.hns`, `log.30Nov23.reaxff.hns.g++.{1,4}`: 2,432
+atoms at 2x2x2, 100 steps, `thermo_style custom step temp pe press evdwl ecoul
+vol`) and the `REAXFF` package with its KOKKOS styles (`pair_reaxff_kokkos`,
+`fix_qeq_reaxff_kokkos`). The `cuda` profile enables only `KOKKOS MOLECULE KSPACE
+MANYBODY RIGID GRANULAR`, so `pair_style reaxff` is unknown to it. Plan:
+
+| item | plan |
+|---|---|
+| profile name | `reaxff.cuda` (`l3_backend_profile LAMMPS cuda reaxff` -> `<variant>.<backend>`; the name carries the backend as `l3_profile_backend_check` requires), selected with `HPCPERF_LAMMPS_PROFILE=reaxff.cuda` for build.sh, run.sh and validate.sh alike |
+| package list | the `cuda` list plus `-DPKG_REAXFF=yes` (`KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR REAXFF`); no other CMake option changes, same bundled Kokkos 4.6.2, same `Kokkos_ARCH_BLACKWELL100`, same host compiler / CUDA 13.2 / Open MPI 5.0.10 |
+| fingerprint | `l3_fingerprint_text` includes the `cmake_options` string, so `PKGS=...,REAXFF` yields a different `.hpcperf-l3-fingerprint`; `l3_fingerprint_check` refuses to reuse the `cuda` install for this profile and vice versa |
+| output paths | `.deps/level3/lammps/reaxff.cuda/{install,logs,cache}` and `build/level3/lammps/reaxff.cuda/` (run directories `run/` and `run.inputs.<id>.<label>/` under it); nothing under `.deps/level3/lammps/cuda/` or `build/level3/lammps/cuda/` is touched |
+| default compatibility | the `cuda` profile, its fingerprint, `run.sh` default (`in.lj` smoke) and `validate.sh` stay as they are; the registered `lj-*`/`eam-32k`/`rhodo-32k` inputs keep running on `cuda`. build.sh needs only a profile-conditional package list (e.g. `HPCPERF_LAMMPS_VARIANT=reaxff` adding `-DPKG_REAXFF=yes`), run.sh a deck whitelist entry `in.reaxff.hns` (examples path, absolute `read_data`/`pair_coeff` paths as for `in.eam`) and the CORAL-2 `-pk kokkos ... neigh/qeq full` option for that deck only |
+| registered inputs (proposed ids) | `reaxff-hns-2k` (2x2x2 = 2,432 atoms, 100 steps, reference `log.30Nov23.reaxff.hns.g++.1`: Loop time 17.6 s on 1 CPU process; thermo at steps 0/100 with the CORAL-2 0.1 % rule), `reaxff-hns-4x` and a larger replication for > 1 s of GPU loop time, sizes to be fixed after the first measurement |
+| rebuild budget | the `cuda` profile built in 4.5 min at `HPCPERF_BUILD_JOBS=32` (configure 06:02, build done 06:06:36, install 15 s on 2026-09-21); REAXFF adds 41 source files plus their Kokkos instantiations, so 6-10 min of compile and ~1 GB more under `.deps/`; no new third-party dependency, no change to the frozen `src/`, `deps/` or `source.lock` |
+| not in scope | changing the `cuda` profile's package list (would invalidate its fingerprint and every recorded result), sharing the install between profiles, or registering ReaxFF inputs before the profile has built and validated |
 
 ## Validation (`validate.sh`, upstream mechanism)
 
