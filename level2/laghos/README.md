@@ -300,6 +300,47 @@ order, as in upstream's own FOM discussions. A second run reproduced the rates
 within 0.2 %. The `-rs 2` reference size (512 zones) runs in 20 s but is
 latency-bound (`CG (H1) rate` 49); `-rs 4` is where the B200 is saturated.
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_LAGHOS_INPUT`, 2026-09-21)
+
+`HPCPERF_LAGHOS_INPUT=<id> level2/laghos/run.sh CUDA` runs one of upstream's own command
+lines (the README "Verification of Results" rows, reproduced on 1 GPU, plus the single-GPU
+FOM deck that is the run.sh default); the id is refused together with `HPCPERF_LAGHOS_ARGS`,
+`HPCPERF_SCALE_MODE`, `HPCPERF_LAGHOS_RS/EPM` or extra arguments. Without the variable run.sh
+behaves exactly as above.
+
+| id | command (run.sh adds `-d cuda`) | upstream reference (final step / dt / abs(e)) |
+|---|---|---|
+| `tg3d-rs1` | `-p 0 -m data/cube01_hex.mesh -rs 1 -tf 0.75 -pa` | 1041 / 0.000121 / 3.3909635545e+03 |
+| `sedov2d-rs3` | `-p 1 -m data/square01_quad.mesh -rs 3 -tf 0.8 -pa` | 1154 / 0.001655 / 4.6303396053e+01 |
+| `sedov3d-rs2` | `-p 1 -m data/cube01_hex.mesh -E0 2 -rs 2 -tf 0.6 -pa` | 560 / 0.002449 / 1.3408616722e+02 |
+| `sedov3d-rs4-fom` (default) | `-p 1 -m data/cube01_hex.mesh -E0 2 -rs 4 -tf 0.6 -pa -f` | none upstream (self baseline) |
+| `triplept3d-rs1` | `-p 3 -m data/box01_hex.mesh -rs 1 -tf 5.0 -pa -cgt 1e-12` | 858 / 0.000474 / 5.6691500623e+01 |
+| `rt2d-rs1` | `-p 7 -m data/rt2D.mesh -tf 4 -rs 1 -ok 4 -ot 3 -pa` | 2462 / 0.000050 / 1.1792848680e+02 |
+
+Timer: Laghos' own `Major kernels total time` (laghos_solver.cpp `PrintTimingData`: the
+device-synchronised timers of CG (H1), CG (L2), force evaluation and UpdateQuadratureData
+summed over every RK stage of every step; printed always, `-f` only adds the FOM table).
+Baseline: final step exact, final dt exact (6 decimals), final `|e|` within 1e-8 relative
+(validate.sh's rule; upstream: "round-off distance"), `Energy diff` recorded as a diagnostic.
+All required quantities verifying -> READY.
+
+Calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; spread = (max - min) / median):
+
+| id | case | mesh / size | native timer field / scope | main compute median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable | rules / verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `tg3d-rs1` | Taylor-Green 3D (-p 0), README row 2 | cube01_hex -rs 1 (512 hexes), tf 0.75 | `Major kernels total time` (4 major kernels, all steps) | 20.22 s | 20.24, 20.2, 20.22 | 0.21 % | 25.3 s | yes | yes | READY / PASS |
+| `sedov2d-rs3` | Sedov 2D (-p 1), row 3 | square01_quad -rs 3, tf 0.8 | `Major kernels total time` (4 major kernels, all steps) | 15.19 s | 15.2, 15.19, 15.18 | 0.13 % | 19 s | yes | yes | READY / PASS |
+| `sedov3d-rs2` | Sedov 3D (-p 1), row 4 | cube01_hex -rs 2, tf 0.6 | `Major kernels total time` (4 major kernels, all steps) | 16.5 s | 16.5, 16.52, 16.46 | 0.34 % | 19.9 s | yes | yes | READY / PASS |
+| `sedov3d-rs4-fom` | Sedov 3D FOM deck (default) | cube01_hex -rs 4 (32,768 hexes, 823,875 H1 dofs), tf 0.6 | `Major kernels total time` (4 major kernels, all steps) | 117.4 s | 117.4, 117.6, 117.4 | 0.21 % | 129 s | yes | yes | READY / PASS |
+| `triplept3d-rs1` | triple point 3D (-p 3), row 7 | box01_hex -rs 1, tf 5.0, cgt 1e-12 | `Major kernels total time` (4 major kernels, all steps) | 38.09 s | 38.09, 38.07, 38.09 | 0.05 % | 44.6 s | yes | yes | READY / PASS |
+| `rt2d-rs1` | Rayleigh-Taylor 2D (-p 7, Q4/Q3), row 9 | rt2D -rs 1, tf 4 | `Major kernels total time` (4 major kernels, all steps) | 24.15 s | 24.15, 24.15, 24.19 | 0.14 % | 49.1 s | yes | yes | READY / PASS |
+
+A-type check (every measured run vs the upstream README values through the same rules):
+`measurements/level2-laghos/upstream-references/` -- see the round-3 report for the per-run
+result. `validate.sh CUDA` (upstream `--checks` + README rows 3, 2, 4, 7) re-run after the
+change: see `validate/laghos.validate.log`. Raw runs and baselines:
+`HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-laghos/`.
+
 ## Validation
 
 ```bash
