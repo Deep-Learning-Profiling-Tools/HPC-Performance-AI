@@ -185,3 +185,65 @@ skipped, 2026-09-21:
   between launches.
 
 Numbers live in `results/timing/` and are not committed; rerun to regenerate.
+
+## Cross-validation against the benchmarks' own instrumentation
+
+The tool deliberately ignores what the benchmarks print, so its numbers were
+checked against two independent, already-present instrumentations. Both are off
+by default and enabled only for this check.
+
+### NPB per-kernel table (`mg`, 2026-09-21)
+
+`cmake -DHPCPERF_NPB_PROFILING=ON` compiles the per-kernel seconds+percentage
+table upstream already ships behind `#if defined(PROFILING)`. Running the same
+binary with and without nsys:
+
+| kernel | launches | app (s) | nsys (s) | difference per timed region |
+|---|---|---|---|---|
+| comm3 | 1383 (461 regions x 3 kernels) | 0.006368 | 0.002684 | 7.99 us |
+| interp | 140 | 0.002655 | 0.001631 | 7.32 us |
+| psinv | 160 | 0.004807 | 0.003630 | 7.36 us |
+| resid | 161 | 0.008159 | 0.006789 | 8.51 us |
+| rprj3 | 140 | 0.002083 | 0.001078 | 7.18 us |
+| zero3 | 140 | 0.001367 | 0.000341 | 7.33 us |
+| norm2u3 | 2 | 0.001110 | 0.000142 | 484 us (see below) |
+
+* **Names and counts agree completely.** All seven instrumented regions map onto
+  the nine kernels nsys reports (`comm3` is three kernels per region, the rest are
+  1:1) with nothing unmatched on either side. That is the check that the
+  `cuda_gpu_kern_sum` parsing is right.
+* **The systematic gap is explained by one constant.** Six of seven rows differ by
+  7.2-8.5 us per timed region, which is the CUDA launch plus synchronization cost
+  on this node: the app's `timer_start`/`timer_stop` bracket host code around the
+  launch, nsys timestamps device execution. Short kernels are dominated by it
+  (`zero3`: nsys is 25 % of the app number), long ones are barely affected
+  (`resid`: 83 %).
+* **The one outlier is real host work, not an artifact.** `norm2u3`'s timed region
+  also contains `cudaMemcpy(..., cudaMemcpyDeviceToHost)` plus a host reduction
+  loop and a `sqrt` (mg.cu:1288-1301), so its 484 us per call is host time that
+  nsys correctly attributes outside the kernel.
+
+### Hetero-Mark six-phase timer (`aes`, `black_scholes`, `color_histogram`, `fir`, `pagerank`)
+
+`HPCPERF_L1_PHASE_TIMING=1` prints the `Initialize / WarmUp / Run / Verify /
+Summarize / Cleanup` summary the upstream `BenchmarkRunner` already computes (to
+stderr). These benchmarks allocate and upload in `Initialize()`, so the GPU active
+span is not contained in `WarmUp + Run` and the two cannot be compared directly.
+The checkable invariant is that kernel time must fit inside the two phases that
+each run the workload once:
+
+| benchmark | kernel total (s) | WarmUp + Run (s) | kernel share |
+|---|---|---|---|
+| aes | 0.000022 | 0.000623 | 3.5 % |
+| black_scholes | 0.001837 | 0.013257 | 13.9 % |
+| color_histogram | 0.000128 | 0.001077 | 11.9 % |
+| fir | 0.005754 | 0.066230 | 8.7 % |
+| pagerank | 0.004979 | 0.006059 | 82.2 % |
+
+It holds for all five, and `pagerank` shows the bound is tight where the
+benchmark is GPU-bound rather than vacuous.
+
+These same runs also quantify why the benchmarks' own "GPU time" is not GPU time:
+the `CPUGPUActivityLogger` in this family reports `GPU: 0.000198` for `aes` where
+nsys measures `gpu_busy_s = 0.000117`, a factor of 4.4, because the logger
+brackets host code around the launch and the blocking copy.

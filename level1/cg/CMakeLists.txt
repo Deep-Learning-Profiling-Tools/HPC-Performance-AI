@@ -25,6 +25,14 @@ if(BACKEND STREQUAL "CUDA")
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     add_executable(cg_cuda cuda/cg.cu common/c_print_results.cpp
                    common/c_randdp.cpp common/c_timers.cu common/wtime.cpp)
+
+# Upstream ships a per-kernel timing table guarded by #if defined(PROFILING).
+# OFF by default so the default output -- and therefore ctest -- is unchanged;
+# tools/timing uses it to cross-check the nsys per-kernel numbers by name.
+option(HPCPERF_NPB_PROFILING "Enable the upstream NPB per-kernel timing table" OFF)
+if(HPCPERF_NPB_PROFILING)
+    target_compile_definitions(cg_cuda PRIVATE PROFILING)
+endif()
     target_include_directories(cg_cuda PRIVATE cuda common)
     set(_hpcperf_target cg_cuda)
 elseif(BACKEND STREQUAL "HIP")

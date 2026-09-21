@@ -32,6 +32,9 @@ int main(int argc, char **argv) {
   runner.SetQuietMode(true);
   runner.SetVerificationMode(!hpcperf_skip_verify());  // off in measurement mode
   if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
+  // HPCPERF_L1_PHASE_TIMING=1 prints the six-phase summary the upstream
+  // BenchmarkRunner already computes (to stderr). Off by default.
+  runner.SetTimingMode(getenv("HPCPERF_L1_PHASE_TIMING") != nullptr);
   runner.Run();
   return 0;
 }
