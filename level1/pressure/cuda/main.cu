@@ -101,26 +101,33 @@ int main(int argc, char** argv)
   cudaFree(d_compression); cudaFree(d_bvc); cudaFree(d_p_new);
   cudaFree(d_e_old); cudaFree(d_vnewc);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Data c; setUp(c, size);
-  {
-    Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
-    Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;
-    const Real_type cls = c.cls; const Real_type p_cut = c.p_cut;
-    const Real_type pmin = c.pmin; const Real_type eosvmax = c.eosvmax;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type i = ibegin; i < iend; ++i ) {
-        PRESSURE_BODY1;
-      }
-      for (Index_type i = ibegin; i < iend; ++i ) {
-        PRESSURE_BODY2;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Data c; setUp(c, size);
+    {
+      Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
+      Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;
+      const Real_type cls = c.cls; const Real_type p_cut = c.p_cut;
+      const Real_type pmin = c.pmin; const Real_type eosvmax = c.eosvmax;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type i = ibegin; i < iend; ++i ) {
+          PRESSURE_BODY1;
+        }
+        for (Index_type i = ibegin; i < iend; ++i ) {
+          PRESSURE_BODY2;
+        }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("bvc", c.bvc, g.bvc, size, 1.0e-10)
-          & compareArrays("p_new", c.p_new, g.p_new, size, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("bvc", c.bvc, g.bvc, size, 1.0e-10)
+            & compareArrays("p_new", c.p_new, g.p_new, size, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

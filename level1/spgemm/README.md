@@ -73,6 +73,8 @@ Added check: C = A*A recomputed on the CPU with a dense accumulator; per-row sor
 ctest --test-dir build/spgemm/cuda --output-on-failure
 ```
 
+
+**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
 ## LOC
 
 CUDA: 393 (cloc, cuda/); HIP: 393 (identical mirrored source)

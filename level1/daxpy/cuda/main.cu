@@ -57,6 +57,12 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaFree(dx));
   GPU_CHECK(cudaFree(dy));
 
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
   // ------------------------ CPU (upstream Base_Seq) ------------------------
   resetDataInitCount();
   Real_ptr y_ref; Real_ptr x_ref; Real_type a_ref;
@@ -73,10 +79,12 @@ int main(int argc, char** argv)
   }
 
   // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("y", y_ref, y, size, 1.0e-10);
+  ok = compareArrays("y", y_ref, y, size, 1.0e-10);
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  deallocData(y); deallocData(x);
   deallocData(y_ref); deallocData(x_ref);
+  }
+
+  deallocData(y); deallocData(x);
   return ok ? 0 : 1;
 }

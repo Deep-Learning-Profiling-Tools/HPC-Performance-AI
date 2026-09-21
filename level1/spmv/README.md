@@ -63,6 +63,8 @@ Upstream built-in check: sequential CPU gold-standard SpMV; relative squared err
 ctest --test-dir build/spmv/cuda --output-on-failure
 ```
 
+
+**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
 ## LOC
 
 CUDA: 200 (cloc, cuda/); HIP: 200 (identical mirrored source)

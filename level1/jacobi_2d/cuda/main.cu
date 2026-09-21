@@ -73,30 +73,37 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(B, dB, bytes, cudaMemcpyDeviceToHost));
   cudaFree(dA); cudaFree(dB);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr A_ref; Real_ptr B_ref;
-  allocAndInitData(A_ref, len);
-  allocAndInitData(B_ref, len);
-  {
-    Real_ptr A = A_ref; Real_ptr B = B_ref;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type i = 1; i < N-1; ++i ) {
-        for (Index_type j = 1; j < N-1; ++j ) {
-          POLYBENCH_JACOBI_2D_BODY1;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr A_ref; Real_ptr B_ref;
+    allocAndInitData(A_ref, len);
+    allocAndInitData(B_ref, len);
+    {
+      Real_ptr A = A_ref; Real_ptr B = B_ref;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type i = 1; i < N-1; ++i ) {
+          for (Index_type j = 1; j < N-1; ++j ) {
+            POLYBENCH_JACOBI_2D_BODY1;
+          }
         }
-      }
-      for (Index_type i = 1; i < N-1; ++i ) {
-        for (Index_type j = 1; j < N-1; ++j ) {
-          POLYBENCH_JACOBI_2D_BODY2;
+        for (Index_type i = 1; i < N-1; ++i ) {
+          for (Index_type j = 1; j < N-1; ++j ) {
+            POLYBENCH_JACOBI_2D_BODY2;
+          }
         }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("A", A_ref, A, len, 1.0e-10)
-          & compareArrays("B", B_ref, B, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("A", A_ref, A, len, 1.0e-10)
+            & compareArrays("B", B_ref, B, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

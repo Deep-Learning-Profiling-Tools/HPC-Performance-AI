@@ -46,6 +46,8 @@ Run it via:
 ctest --test-dir build/lud/cuda --output-on-failure
 ```
 
+
+**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
 ## LOC
 
 CUDA: 466 (4 source files, cloc, cuda/ + common/)

@@ -230,30 +230,37 @@ int main(int argc, char** argv)
   ENERGY_ARRAYS(DFREE)
 #undef DFREE
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Data cd; setUp(cd, size);
-  {
-    Real_ptr e_new = cd.e_new; Real_ptr e_old = cd.e_old; Real_ptr delvc = cd.delvc;
-    Real_ptr p_new = cd.p_new; Real_ptr p_old = cd.p_old; Real_ptr q_new = cd.q_new;
-    Real_ptr q_old = cd.q_old; Real_ptr work = cd.work;
-    Real_ptr compHalfStep = cd.compHalfStep; Real_ptr pHalfStep = cd.pHalfStep;
-    Real_ptr bvc = cd.bvc; Real_ptr pbvc = cd.pbvc; Real_ptr ql_old = cd.ql_old;
-    Real_ptr qq_old = cd.qq_old; Real_ptr vnewc = cd.vnewc;
-    const Real_type rho0 = cd.rho0; const Real_type e_cut = cd.e_cut;
-    const Real_type emin = cd.emin; const Real_type q_cut = cd.q_cut;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY1; }
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY2; }
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY3; }
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY4; }
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY5; }
-      for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY6; }
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Data cd; setUp(cd, size);
+    {
+      Real_ptr e_new = cd.e_new; Real_ptr e_old = cd.e_old; Real_ptr delvc = cd.delvc;
+      Real_ptr p_new = cd.p_new; Real_ptr p_old = cd.p_old; Real_ptr q_new = cd.q_new;
+      Real_ptr q_old = cd.q_old; Real_ptr work = cd.work;
+      Real_ptr compHalfStep = cd.compHalfStep; Real_ptr pHalfStep = cd.pHalfStep;
+      Real_ptr bvc = cd.bvc; Real_ptr pbvc = cd.pbvc; Real_ptr ql_old = cd.ql_old;
+      Real_ptr qq_old = cd.qq_old; Real_ptr vnewc = cd.vnewc;
+      const Real_type rho0 = cd.rho0; const Real_type e_cut = cd.e_cut;
+      const Real_type emin = cd.emin; const Real_type q_cut = cd.q_cut;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY1; }
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY2; }
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY3; }
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY4; }
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY5; }
+        for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY6; }
+      }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("e_new", cd.e_new, g.e_new, size, 1.0e-10)
-          & compareArrays("q_new", cd.q_new, g.q_new, size, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("e_new", cd.e_new, g.e_new, size, 1.0e-10)
+            & compareArrays("q_new", cd.q_new, g.q_new, size, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

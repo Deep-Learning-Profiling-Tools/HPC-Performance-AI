@@ -63,26 +63,33 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(pout, d_pout, bytes, cudaMemcpyDeviceToHost));
   cudaFree(d_pin); cudaFree(d_pout);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr pin_ref; Real_ptr pout_ref;
-  allocAndInitDataRandSign(pin_ref, len);
-  allocAndInitDataConst(pout_ref, len, 0.0);
-  {
-    Real_ptr pin = pin_ref; Real_ptr pout = pout_ref;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type k = 0; k < N; ++k) {
-        for (Index_type i = 0; i < N; ++i) {
-          for (Index_type j = 0; j < N; ++j) {
-            POLYBENCH_FLOYD_WARSHALL_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr pin_ref; Real_ptr pout_ref;
+    allocAndInitDataRandSign(pin_ref, len);
+    allocAndInitDataConst(pout_ref, len, 0.0);
+    {
+      Real_ptr pin = pin_ref; Real_ptr pout = pout_ref;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type k = 0; k < N; ++k) {
+          for (Index_type i = 0; i < N; ++i) {
+            for (Index_type j = 0; j < N; ++j) {
+              POLYBENCH_FLOYD_WARSHALL_BODY;
+            }
           }
         }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("pout", pout_ref, pout, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("pout", pout_ref, pout, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

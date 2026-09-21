@@ -64,6 +64,8 @@ Added check (coloring has a complete correctness spec): host verifies every vert
 ctest --test-dir build/graph_coloring/cuda --output-on-failure
 ```
 
+
+**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
 ## LOC
 
 CUDA: 244 (cloc, cuda/); HIP: 244 (identical mirrored source)

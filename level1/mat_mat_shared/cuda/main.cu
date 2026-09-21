@@ -103,49 +103,56 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost));
   cudaFree(dA); cudaFree(dB); cudaFree(dC);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr A_r; Real_ptr B_r; Real_ptr C_r;
-  allocAndInitDataConst(A_r, len, 1.0);
-  allocAndInitDataConst(B_r, len, 1.0);
-  allocAndInitDataConst(C_r, len, 0.0);
-  {
-    Real_ptr A = A_r; Real_ptr B = B_r; Real_ptr C = C_r;
-    const Index_type Nx = RP_DIVIDE_CEILING_INT(N, TL_SZ);
-    const Index_type Ny = RP_DIVIDE_CEILING_INT(N, TL_SZ);
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type by = 0; by < Ny; ++by) {
-        for (Index_type bx = 0; bx < Nx; ++bx) {
-          MAT_MAT_SHARED_BODY_0_CPU(TL_SZ)
-          for (Index_type ty = 0; ty < TL_SZ; ++ty) {
-            for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-              MAT_MAT_SHARED_BODY_1(TL_SZ)
-            }
-          }
-          for (Index_type k = 0; k < (TL_SZ + N - 1) / TL_SZ; ++k) {
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr A_r; Real_ptr B_r; Real_ptr C_r;
+    allocAndInitDataConst(A_r, len, 1.0);
+    allocAndInitDataConst(B_r, len, 1.0);
+    allocAndInitDataConst(C_r, len, 0.0);
+    {
+      Real_ptr A = A_r; Real_ptr B = B_r; Real_ptr C = C_r;
+      const Index_type Nx = RP_DIVIDE_CEILING_INT(N, TL_SZ);
+      const Index_type Ny = RP_DIVIDE_CEILING_INT(N, TL_SZ);
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type by = 0; by < Ny; ++by) {
+          for (Index_type bx = 0; bx < Nx; ++bx) {
+            MAT_MAT_SHARED_BODY_0_CPU(TL_SZ)
             for (Index_type ty = 0; ty < TL_SZ; ++ty) {
               for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-                MAT_MAT_SHARED_BODY_2(TL_SZ)
+                MAT_MAT_SHARED_BODY_1(TL_SZ)
+              }
+            }
+            for (Index_type k = 0; k < (TL_SZ + N - 1) / TL_SZ; ++k) {
+              for (Index_type ty = 0; ty < TL_SZ; ++ty) {
+                for (Index_type tx = 0; tx < TL_SZ; ++tx) {
+                  MAT_MAT_SHARED_BODY_2(TL_SZ)
+                }
+              }
+              for (Index_type ty = 0; ty < TL_SZ; ++ty) {
+                for (Index_type tx = 0; tx < TL_SZ; ++tx) {
+                  MAT_MAT_SHARED_BODY_3(TL_SZ)
+                }
               }
             }
             for (Index_type ty = 0; ty < TL_SZ; ++ty) {
               for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-                MAT_MAT_SHARED_BODY_3(TL_SZ)
+                MAT_MAT_SHARED_BODY_4(TL_SZ)
               }
-            }
-          }
-          for (Index_type ty = 0; ty < TL_SZ; ++ty) {
-            for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-              MAT_MAT_SHARED_BODY_4(TL_SZ)
             }
           }
         }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("C", C_r, C, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("C", C_r, C, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
