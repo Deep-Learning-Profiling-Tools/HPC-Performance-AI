@@ -163,13 +163,13 @@ timesteps completed (exact), `This run PASSED` / `Outcome: PASSED` present,
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; spread =
 (max - min) / median; stable = spread <= 10 %):
 
-| id | Wallclock median (main compute) | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
-|---|---|---|---|---|---|---|
-| `bm4-1000sq-10steps` | 1.497 s | 1.499, 1.495, 1.497 | 0.27 % | 3.58 s | yes | yes |
-| `bm5e2-2000sq-10steps` | 4.228 s | 4.204, 4.228, 4.235 | 0.73 % | 6.94 s | yes | yes |
-| `bm5-4000sq-10steps` | 18.42 s | 18.4, 18.43, 18.42 | 0.17 % | 21.9 s | yes | yes |
-| `bm6-8000sq-10steps` | 115.4 s | 115.4, 115.4, 115.3 | 0.07 % | 119 s | yes | yes |
-| `bm5e4-4000sq-2steps` | 4.171 s | 4.171, 4.171, 4.173 | 0.05 % | 6.99 s | yes | yes |
+| id | case (deck) | size | native timer field / scope | main compute median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
+|---|---|---|---|---|---|---|---|---|---|
+| `bm4-1000sq-10steps` | tea_bm_4 | 1000 x 1000 cells, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 1.497 s | 1.499, 1.495, 1.497 | 0.27 % | 3.58 s | yes | yes |
+| `bm5e2-2000sq-10steps` | tea_bm_5e_2 | 2000 x 2000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 4.228 s | 4.204, 4.228, 4.235 | 0.73 % | 6.94 s | yes | yes |
+| `bm5-4000sq-10steps` | tea_bm_5 (default) | 4000 x 4000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 18.42 s | 18.4, 18.43, 18.42 | 0.17 % | 21.9 s | yes | yes |
+| `bm6-8000sq-10steps` | tea_bm_6 | 8000 x 8000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 115.4 s | 115.4, 115.4, 115.3 | 0.07 % | 119 s | yes | yes |
+| `bm5e4-4000sq-2steps` | tea_bm_5e_4_2 | 4000 x 4000, 2 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 4.171 s | 4.171, 4.171, 4.173 | 0.05 % | 6.99 s | yes | yes |
 
 Application check, every one of the 15 measured runs `This run PASSED`:
 `Actual` vs `Expected` relative difference 1.8e-11 (`bm4`), 5.7e-11 (`bm5e2`),

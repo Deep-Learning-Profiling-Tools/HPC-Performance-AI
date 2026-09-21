@@ -61,10 +61,10 @@ above is unchanged):
 
 | id | what varies | source | args |
 |---|---|---|---|
-| `w4096-h2048-merged0-r102` (default) | -- | upstream `make run` line 1 | `4096 2048 0 102` |
+| `w4096-h2048-merged0-r102` (default) | -- (4096 x 2048 frames; repeat = 102 frames in total, 100 of them timed) | upstream `make run` line 1 | `4096 2048 0 102` |
 | `w4096-h2048-merged1-r102` | implementation path (one fused kernel instead of three), same frames | upstream `make run` line 2 | `4096 2048 1 102` |
-| `w8192-h4096-merged0-r102` | frame size 4x (33.5 M pixels) | derived (upstream has one size) | `8192 4096 0 102` |
-| `w4096-h2048-merged0-r1002` | 1000 timed frames instead of 100 | derived (repeat is the upstream parameter) | `4096 2048 0 1002` |
+| `w8192-h4096-merged0-r102` | frame size 4x (8192 x 4096 = 33.5 M pixels); 102 frames, 100 timed | derived (upstream has one size) | `8192 4096 0 102` |
+| `w4096-h2048-merged0-r1002` | repeat = 1002 frames in total, 1000 timed (instead of 102 / 100) | derived (repeat is the upstream parameter) | `4096 2048 0 1002` |
 
 Timer: the benchmark's `Average kernel execution time` = kernel-only time per
 frame (device sync included; host frame generation, H2D copies and the CPU

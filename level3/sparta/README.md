@@ -115,20 +115,24 @@ particle count at the last stats row exact for the box decks (reflecting walls
 conserve particles -- the validate.sh criterion), gas temperature within 2 % and
 collision attempts within 15 % (both validate.sh tolerances, applied to the last
 stats row); for `in.sphere` the particle count, surface-collision count and
-max particles per cell are recorded only (NEEDS_VALIDATION) and `natt` keeps the
-15 % rule. All styles of the three decks have KOKKOS versions in this build.
+max particles per cell are recorded only and `natt` keeps the 15 % rule. Roles
+(round 3): for the box decks every quantity is required and READY; for `in.sphere`
+the steady-state particle count is the required result and still `record`
+(NEEDS_VALIDATION -> `compare` exit 3 / INCOMPLETE), while the surface-collision
+count and the max particles per cell are diagnostics. All styles of the three decks
+have KOKKOS versions in this build.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; spread =
 (max - min) / median; stable = spread <= 10 %):
 
-| id | Loop time median (main compute) | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
-|---|---|---|---|---|---|---|
-| `collide-10k` | 0.02669 s | 0.02669, 0.02663, 0.02673 | 0.39 % | 3.54 s | no | yes |
-| `collide-100k` | 0.03442 s | 0.03442, 0.03436, 0.03447 | 0.31 % | 3.48 s | no | yes |
-| `collide-1m` | 0.1098 s | 0.1097, 0.1098, 0.11 | 0.27 % | 4.29 s | no | yes |
-| `collide-10m` | 0.909 s | 0.9073, 0.9114, 0.909 | 0.45 % | 11.1 s | no | yes |
-| `free-1m` | 0.08789 s | 0.08789, 0.08807, 0.08772 | 0.39 % | 4.68 s | no | yes |
-| `sphere-1m` | 1.594 s | 1.594, 1.591, 1.594 | 0.23 % | 7.89 s | yes | yes |
+| id | case (deck) | size | native timer field / scope | main compute median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
+|---|---|---|---|---|---|---|---|---|---|
+| `collide-10k` | in.collide (default) | 10x10x10 cells, 10,000 particles | 2nd `Loop time` (100 benchmark steps after 30 equilibration steps) | 0.02669 s | 0.02669, 0.02663, 0.02673 | 0.39 % | 3.54 s | no | yes |
+| `collide-100k` | in.collide | 20x20x25, 100,000 particles | 2nd `Loop time` (100 steps) | 0.03442 s | 0.03442, 0.03436, 0.03447 | 0.31 % | 3.48 s | no | yes |
+| `collide-1m` | in.collide | 40x50x50, 1,000,000 particles | 2nd `Loop time` (100 steps) | 0.1098 s | 0.1097, 0.1098, 0.11 | 0.27 % | 4.29 s | no | yes |
+| `collide-10m` | in.collide | 100x100x100, 10,000,000 particles | 2nd `Loop time` (100 steps) | 0.909 s | 0.9073, 0.9114, 0.909 | 0.45 % | 11.1 s | no | yes |
+| `free-1m` | in.free | 40x50x50, 1,000,000 particles | 2nd `Loop time` (100 steps) | 0.08789 s | 0.08789, 0.08807, 0.08772 | 0.39 % | 4.68 s | no | yes |
+| `sphere-1m` | in.sphere + data.sphere | 40x50x50, ~1,000,000 particles | 2nd `Loop time` (1000 benchmark steps after 1000 equilibration steps) | 1.594 s | 1.594, 1.591, 1.594 | 0.23 % | 7.89 s | yes | yes |
 
 Comparison of every measured run with the upstream reference log of the same
 size through the same rules (`measurements/level3-sparta/upstream-references/`;
@@ -143,10 +147,24 @@ the reference is a 1-process CPU run with icc, July 2014):
 | `free-1m` | identical | 7.5e-04 (273.04732 vs 273.25108) | 0.0e+00 | all rules pass in 3/3 runs |
 | `sphere-1m` | recorded: 990,933, 990,518, 990,092 vs upstream 999,920 (-0.9..-1.0 %) | n/a (not printed by in.sphere) | 9.9e-02 | verifying rules pass in 3/3 runs; np/nscoll/c_max recorded only |
 
-The `sphere-1m` particle count sits 0.9-1.0 % below the 2014 reference at the
-same step; whether that is the 12 years of upstream changes to `fix emit/face` /
-`create_particles` or the GPU realisation is not investigated here -- it is one
-of the recorded quantities, not a verified one. `collide-10m` (the grid of the
+`sphere-1m` vs the 2014 reference log, facts checked (round 3): same seed
+(12345), same grid (40x50x50), same `fnum` (7.33e+15), same timestep (1e-5),
+same stats points (every 100 steps; last rows at step 1000 and 2000), same phase
+structure (1000 equilibration + 1000 benchmark steps) and the same initial
+population (`Created 955103 particles` in both). The 2014 deck (echoed in the
+log) uses the commands of that version -- `fix in inflow air all`, `read_surf 1
+data.sphere`, `surf_modify collide 1 1`, `compute g grid all n` -- where the
+frozen 27Aug2026 deck uses `fix in emit/face air all`, `read_surf data.sphere`,
+`surf_modify all collide 1`, `compute g grid all all n`; the current version
+also prints `WARNING: One or more fix inflow faces oppose streaming velocity`
+(fix_emit_face.cpp:210), absent in 2014. After the equilibration the particle
+count is 990,824 here vs 1,000,977 in 2014 (-1.0 %), and 990,092-990,933 vs
+999,920 at step 2000 (three runs, all within 0.1 % of each other). The
+Poisson standard deviation of a 1e6 count is ~0.1 %, so this is not per-run
+statistical noise; whether the emission fix's semantics changed between the
+versions (candidate, unconfirmed) or something else differs has not been
+determined. It is a recorded quantity, not a verified one, and no claim of
+correctness or of error is made for it. `collide-10m` (the grid of the
 strong-scaling default) stays just under one second of loop time on a B200
 (0.909 s); only `sphere-1m` exceeds it. Raw runs and baselines:
 `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level3-sparta/`;
