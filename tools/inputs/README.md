@@ -9,14 +9,18 @@ input is selected only through the benchmark's documented selector variable
 and `run.sh` refuses an input id together with the knobs or extra arguments it
 would override (nothing is silently replaced).
 
-First batch (2026-09-21, branch `inputs/upstream-pilot`):
+Registered so far (branch `inputs/upstream-pilot`; every other benchmark has not
+been wired into this registry yet -- that says nothing about how many inputs it
+could have):
 
-| Level | Benchmark | Selector | Inputs | Covers |
-|---|---|---|---|---|
-| 1 | `background_subtraction` | none (the tool runs the binary) | 4 | implementation path, frame size, frame count |
-| 2 | `hipbone` | `HPCPERF_HIPBONE_INPUT` | 5 | upstream polynomial-degree sweep, README size, larger size |
-| 2 | `quicksilver` | `HPCPERF_QUICKSILVER_INPUT_ID` | 4 | official CORAL-2 P1/P2 and CTS-2 decks + the derived default |
-| 3 | `lammps` | `HPCPERF_LAMMPS_INPUT` | 5 | same case at 3 sizes (32k/2M/16M atoms) + two other bench cases (EAM, rhodopsin) |
+| Level | Benchmark | Selector | Inputs | Covers | batch |
+|---|---|---|---|---|---|
+| 1 | `background_subtraction` | none (the tool runs the binary) | 4 | implementation path, frame size, frame count | 1 |
+| 2 | `hipbone` | `HPCPERF_HIPBONE_INPUT` | 5 | 3 of the 15 upstream polynomial-degree sweep points, README size, larger derived size | 1 |
+| 2 | `quicksilver` | `HPCPERF_QUICKSILVER_INPUT_ID` | 4 | official CORAL-2 P1/P2 and CTS-2 decks + the derived default | 1 |
+| 3 | `lammps` | `HPCPERF_LAMMPS_INPUT` | 5 | same case at 3 sizes (32k/2M/16M atoms) + two other bench cases (EAM, rhodopsin) | 1 |
+| 2 | `tealeaf` | `HPCPERF_TEALEAF_INPUT` | 5 | upstream `Benchmarks/` decks: 1000^2 / 2000^2 / 4000^2 / 8000^2 cells at 10 steps, 4000^2 at 2 steps (each with its own `tea.problems` reference) | 2 |
+| 3 | `sparta` | `HPCPERF_SPARTA_INPUT` | 6 | the three upstream bench decks (collide / free / sphere) at the sizes upstream ships reference logs for (10K, 100K, 1M, 10M particles) | 2 |
 
 ## What an entry records
 
@@ -34,6 +38,8 @@ timing:                        # how the benchmark's OWN timer is read
   select: only | first | last  # which matching line when a log has several
   section_start: '^Timer\s+Cumulative'   # optional: ignore lines before this one
   work: {key: repeat, offset: -2}        # per_iteration only: main_compute_s = value * (params[key] + offset)
+  secondary:                   # optional sub-interval timers, reported NEXT TO main, never added or substituted
+    - {name: cycleTracking, scope: <text>, kind: total, unit: us, section_start: ..., regex: ..., select: only}
 baseline:                      # scientific quantities kept per input and the comparison rule
   method: <text>; reference: <text>
   quantities:
@@ -72,24 +78,52 @@ python3 tools/inputs/hpcperf_inputs.py args     level2/hipbone sweep-nx16-p8    
 python3 tools/inputs/hpcperf_inputs.py param    level3/lammps  lj-2m x
 python3 tools/inputs/hpcperf_inputs.py parse-timing level2/quicksilver <stdout.log> [--rc N] [--input ID]
 python3 tools/inputs/hpcperf_inputs.py extract  level3/lammps  <log> --input rhodo-32k
-python3 tools/inputs/hpcperf_inputs.py compare  level3/lammps  <baseline.json> <log>
+python3 tools/inputs/hpcperf_inputs.py compare  level3/lammps  <baseline.json> <log> [--input ID] [--rc N]
+python3 tools/inputs/hpcperf_inputs.py status   level2/hipbone <measurement.json>
 python3 tools/inputs/hpcperf_inputs.py measure  level2/hipbone sweep-nx16-p8 --out <dir> [--warmup 1] [--reps 3] [--timeout 900] [--gpus 1]
 ```
 
 `measure` is the pilot calibration run: one complete warm-up run (kept, not
 counted) followed by N measured runs, one directory per run (`stdout.log`,
-`result.json`); `measurement.json` holds the command, host/GPU, git identity,
+`result.json`; a run directory that already exists is removed first, so a stale
+log is never read); `measurement.json` holds the command, host/GPU, git identity,
 the timing scope, every raw value and the summary (median, min, max, MAD,
-relative spread), plus the flags `run_ok`, `timing_ok`, `compute_ge_1s`,
-`stable` (spread <= 10 %) and `baseline_self_consistent`. `baseline.json` stores
-the quantities of the first measured run and the rules to compare a later run
-against them. Level 3 runs get `HPCPERF_L3_RUN_SUBDIR=run.inputs.<id>.<label>` so
-application-written results never overlap.
+spread = (max - min) / median, whether the spread is at or below the timer's
+print resolution). `baseline.json` stores the quantities of the first measured
+run that exited 0 and passed the benchmark's own baseline-free checks, plus the
+rules to compare a later run against them. Level 3 runs get
+`HPCPERF_L3_RUN_SUBDIR=run.inputs.<id>.<label>` so application-written results
+never overlap.
+
+The summary keeps these statuses apart on purpose (a benchmark can complete
+without anything having been verified):
+
+| status | meaning |
+|---|---|
+| `run_completed` | every measured run exited 0 |
+| `timing_ok` | every measured run yielded `main_compute_s` from the benchmark's own timer |
+| `native_check` | PASS / FAIL / NONE -- the rules that need no baseline (`present`, `absent`, `abs_lt`, `ge`, `le`, i.e. the benchmark's own pass criteria) on every measured run; NONE when the input has none |
+| `baseline_saved` | a working baseline was stored (never from a run whose native check failed) |
+| `comparison_rules` | READY (every quantity has a verifying rule) / PARTIAL / NONE (record only) |
+| `needs_validation` | the quantities whose rule is `record`: kept, not verified, tolerance still to be fixed |
+| `compute_ge_1s`, `stable` | median main compute >= 1 s (a reference value, not a gate); n >= 3 and spread <= 10 % |
+| `baseline_self_consistent` | every measured run compares OK against the working baseline (`ok`, which for record-only rules only means "present and finite") |
+
+`compare` exit codes: 0 verified (no rule failed and at least one verifying rule
+was applied), 1 a rule failed / the candidate run failed, 2 refused (the baseline
+belongs to another input or benchmark, or baseline and candidate are the same
+output file), 3 inconclusive (only `record` rules exist -- never reported as a
+pass). `status` re-derives the vocabulary from a `measurement.json` (also for
+files written by the first-batch tool).
 
 What the tool never does: it never reports wall time as `main_compute_s` (a
 failed run, a missing, ambiguous or non-finite timer line is an error), never
-adds nested timers, never renames an input because a measurement changed, and
-never touches `level3/<app>/src`.
+adds secondary timers to the main one, never treats a `record` quantity as
+verified, never takes a baseline from a run that printed its own FAIL marker
+even when it exited 0 (background_subtraction does exactly that), never renames
+an input because a measurement changed, and never touches `level3/<app>/src`.
 
 Tests: `tools/inputs/tests/run_all.sh` (no GPU; fixtures under `tests/fixtures/`,
-run.sh guards through `HPCPERF_DRY_RUN=1`).
+run.sh guards through `HPCPERF_DRY_RUN=1`, and a fake benchmark under a temporary
+repository root for the `measure` negative cases: nonzero exit, exit 0 with a FAIL
+marker, NaN, missing timer line, stale log, record-only rules).

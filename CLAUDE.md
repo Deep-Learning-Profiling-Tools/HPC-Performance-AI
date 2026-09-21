@@ -143,8 +143,8 @@ level3/<app>/
   for system-GCC builds), `l3_binary_backend_check` (cuobjdump archs, works for
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
-- Registered inputs (since 2026-09-21, pilot: background_subtraction, hipbone, quicksilver,
-  lammps): a benchmark with several inputs carries `inputs.yaml` (schema
+- Registered inputs (since 2026-09-21; batch 1: background_subtraction, hipbone, quicksilver,
+  lammps; batch 2: tealeaf, sparta): a benchmark with several inputs carries `inputs.yaml` (schema
   `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
   content, source kind upstream-file / upstream-parameterized / derived / custom, the
   benchmark's OWN timer scope, baseline quantities + comparison rule). Selection only
