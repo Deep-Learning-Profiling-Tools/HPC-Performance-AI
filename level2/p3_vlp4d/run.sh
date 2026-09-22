@@ -32,6 +32,8 @@ case "$BACKEND" in
     CUDA|HIP) shift || true ;;
     *) echo "usage: $0 [CUDA|HIP] [input deck] [extra vlp4d args]" >&2; exit 2 ;;
 esac
+# a registered input's deck/extra arguments come first (they are parsed like caller arguments below)
+set -- ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"
 
 BUILD_DIR="$R/build/level2/p3_vlp4d/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 EXE="$BUILD_DIR/miniapps/vlp4d/thrust/vlp4d"
@@ -55,4 +57,4 @@ mkdir -p "$RUN_DIR/data/vlp4d"
 cd "$RUN_DIR"
 
 echo "== P3-miniapps vlp4d ($BACKEND): $EXE $DECK $*   (cwd: $RUN_DIR, diagnostics -> nrj.out)"
-exec "$EXE" "$DECK" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"
+exec "$EXE" "$DECK" "$@"
