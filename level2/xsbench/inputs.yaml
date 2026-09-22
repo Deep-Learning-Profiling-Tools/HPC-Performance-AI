@@ -46,7 +46,7 @@ coverage:
     lookup count prints 'WARNING - INAVALID CHECKSUM' and exits 1 by design, so they cannot be registered
     as validated inputs (XL, XXL and -l 100000000 attempts are kept as unregistered records)
   upstream_inputs_not_added:
-  - -s XL and -s XXL (upstream sizes without a reference checksum: exit 1 'INAVALID CHECKSUM')
+  - "-s XL and -s XXL (upstream sizes without a reference checksum: exit 1 'INAVALID CHECKSUM')"
   - other lookup counts (-l) (no reference checksum)
   - -G hash|nuclide grid types and -k kernel variants (upstream parameters, not explored this round)
 inputs:

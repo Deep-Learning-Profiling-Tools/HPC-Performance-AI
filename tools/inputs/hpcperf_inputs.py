@@ -262,6 +262,8 @@ def validate(doc: dict) -> list:
                 errs.append(f"coverage {cov['status']} needs a reason")
             if cov["status"] == "BLOCKED" and not cov.get("blocker"):
                 errs.append("coverage BLOCKED needs 'blocker' (what is missing to add the other upstream inputs)")
+            if any(not isinstance(x, str) for x in (cov.get("upstream_inputs_not_added") or [])):
+                errs.append("coverage.upstream_inputs_not_added must be a list of strings (quote entries that contain ': ')")
     for inp in doc["inputs"]:
         if isinstance(inp, dict) and inp.get("timing") is not None:
             ti = inp["timing"]; where = f"input '{inp.get('id')}'.timing"
