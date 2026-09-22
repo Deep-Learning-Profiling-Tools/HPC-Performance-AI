@@ -41,6 +41,13 @@ Copied into this directory (byte-identical except for the changes listed below):
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/main.cc`: the region of interest is the IMC transport calculation (the TRT dispatch up to
+  `stop_timer("Total")`); mesh set-up is outside. Pure insertions -- no upstream line changed or
+  removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so
+  build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`.
+  Placement rule: `tools/timing/roi/README.md`.
+
 1. `src/CMakeLists.txt`, CUDA branch: added
    `set_target_properties(BRANSON PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCH}")`.
    Upstream sets `CMAKE_CUDA_ARCHITECTURES` to `CUDA_ARCH` only *after*
