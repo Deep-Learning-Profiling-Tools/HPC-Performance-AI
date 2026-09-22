@@ -304,6 +304,41 @@ import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_in
 doc = hi.load(sys.argv[2]); a = hi.workload_identity(doc, hi.get_input(doc, "class-b")); b = hi.workload_identity(doc, hi.get_input(doc, "class-c"))
 assert a["params"]["_build_config"] == {"CLASS": "B"} and hi.workload_mismatch(a, b)
 PY
+# ---- 8n. per-input timing override (a sweep-like input times its own summary line; another input has no timer)
+mkdir -p "$TMP/tov/build/fake" "$TMP/tov/level1/tov"; touch "$TMP/tov/hpcperf_env.sh"
+printf '#!/bin/sh\ncase "$1" in sweep) echo "block time 1.0 s"; echo "block time 2.0 s"; echo "best: sum 3.0 s";; short) echo "no timer here";; *) echo "time 4.0 s";; esac\necho PASS\n' > "$TMP/tov/build/fake/tov_bin"; chmod +x "$TMP/tov/build/fake/tov_bin"
+cat > "$TMP/tov/level1/tov/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: tov
+level: 1
+selector: null
+default_input: plain
+entry: {kind: binary, path: build/fake/tov_bin}
+timing: {scope: the benchmark's time line, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline: {quantities: [{name: pass_marker, regex: '^PASS$', compare: {rule: present}}]}
+coverage: {status: MULTI_INPUT}
+inputs:
+  - {id: plain, case: c, variant: default, source: {kind: upstream-file, upstream: x}, params: {}, args: [plain], backends_validated: [cuda]}
+  - {id: sweep, case: c, variant: parameter, source: {kind: upstream-file, upstream: x}, params: {}, args: [sweep], backends_validated: [cuda],
+     timing: {scope: the best block of the sweep, kind: total, unit: s, regex: '^best: sum (?P<value>[0-9.]+) s$', select: only}}
+  - {id: short, case: c, variant: case, source: {kind: upstream-file, upstream: x}, params: {}, args: [short], backends_validated: [cuda],
+     timing: {kind: none, status: NEEDS_TIMING_SUPPORT, reason: this deck is shorter than the timed window}}
+EOF
+python3 "$TOOL" validate "$TMP/tov/level1/tov" >/dev/null 2>&1 && ok "per-input timing: registry with two overrides validates" || bad "per-input timing registry invalid: $(python3 "$TOOL" validate "$TMP/tov/level1/tov" 2>&1 | noise)"
+sed -e "s/regex: '^best: sum (?P<value>\[0-9.\]+) s\$'/regex: '^best: sum [0-9.]+ s$'/" "$TMP/tov/level1/tov/inputs.yaml" > "$TMP/tov/bad.yaml"; mkdir -p "$TMP/tov2/level1/tov"; cp "$TMP/tov/bad.yaml" "$TMP/tov2/level1/tov/inputs.yaml"
+out="$(python3 "$TOOL" validate "$TMP/tov2/level1/tov" 2>&1 | noise || true)"; echo "$out" | grep -q "input 'sweep'.timing.regex needs a named group" && ok "per-input timing: the override is validated like the benchmark timer (regex without value group refused)" || bad "per-input timing override not validated: $out"
+python3 "$TOOL" measure "$TMP/tov/level1/tov" sweep --out "$TMP/tov_sweep" --warmup 1 --reps 2 --timeout 30 >/dev/null 2>&1; rc=$?
+python3 - "$TMP/tov_sweep/measurement.json" <<'PY' && ok "per-input timing: the sweep input is timed from its own summary line (3.0 s, timing_override recorded), exit 0" || bad "per-input timing sweep measurement (rc=$rc)"
+import json, sys; d = json.load(open(sys.argv[1]))
+assert d["timing_override"] is True and abs(d["summary"]["main_compute_s"]["median"] - 3.0) < 1e-9 and d["summary"]["timing_status"] == "NATIVE", d["summary"]
+PY
+python3 "$TOOL" measure "$TMP/tov/level1/tov" short --out "$TMP/tov_short" --warmup 1 --reps 2 --timeout 30 >/dev/null 2>&1; rc=$?
+python3 - "$TMP/tov_short/measurement.json" <<'PY' && [ $rc -eq 0 ] && ok "per-input timing: kind none on one input -> NEEDS_TIMING_SUPPORT for that input only, runs recorded, exit 0" || bad "per-input timing none (rc=$rc)"
+import json, sys; d = json.load(open(sys.argv[1]))
+assert d["summary"]["timing_status"] == "NEEDS_TIMING_SUPPORT" and d["summary"]["run_completed"] is True and d["summary"]["main_compute_s"] is None, d["summary"]
+PY
+python3 "$TOOL" measure "$TMP/tov/level1/tov" plain --out "$TMP/tov_plain" --warmup 1 --reps 2 --timeout 30 >/dev/null 2>&1
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['timing_override'] is False and abs(d['summary']['main_compute_s']['median']-4.0)<1e-9" "$TMP/tov_plain/measurement.json" && ok "per-input timing: inputs without an override keep the benchmark timer" || bad "benchmark timer changed by the override feature"
 # ---- 8l. repository-relative file arguments of a binary entry are passed as absolute paths (measure runs in the run dir)
 mkdir -p "$TMP/relarg/build/fake"; printf '#!/bin/sh\nexit 0\n' > "$TMP/relarg/build/fake/fake_bin"; chmod +x "$TMP/relarg/build/fake/fake_bin"
 mkdir -p "$TMP/relarg/level1/relarg/data"; echo x > "$TMP/relarg/level1/relarg/data/in.txt"

@@ -98,6 +98,12 @@ inputs: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
 A benchmark with two or more runnable inputs and further upstream inputs that were
 not added is `MULTI_INPUT` with `upstream_inputs_not_added`.
 
+An input may carry its own `timing:` block (same fields, validated the same way) when its output
+differs from the benchmark's usual one: a sweep input that prints one timer block per configuration
+(miniBUDE's all-PPWI default: its `best:` summary line is timed), or an upstream deck too short for the
+benchmark's timed window (HACCabanaPM's 5-step demo indat: `kind: none`). `measure` records
+`timing_override: true` for such inputs.
+
 `timing.kind: none` (with `status: NEEDS_TIMING_SUPPORT` and a `reason`) records a
 benchmark whose stdout carries no usable native timer; `parse-timing` fails with
 `NEEDS_TIMING_SUPPORT: ...`, `measure` still records the runs (exit 0 when they

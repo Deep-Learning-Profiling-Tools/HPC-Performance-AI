@@ -118,3 +118,9 @@ inputs:
     exists and the pm_run_timing summary line is not printed: the run completes but the native timer is
     unavailable for this input (E2E and the pm_ic/pm_run wall times of run.sh only); NEEDS_TIMING_SUPPORT for
     this input alone
+  timing:
+    kind: none
+    status: NEEDS_TIMING_SUPPORT
+    reason: >-
+      upstream's demo indat runs 5 DKD steps = pm_run's warm-up window (warmup=5), so steps_timed is 0 and
+      the pm_run_timing summary line is not printed; only the E2E wall and run.sh's pm_ic/pm_run wall times exist

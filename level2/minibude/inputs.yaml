@@ -69,6 +69,15 @@ inputs:
   files:
   - data/bm1/poses.in
   input_form: file
+  timing:
+    scope: >-
+      miniBUDE's own 'best:' summary line of the auto-tuning run: sum_ms of the timed iterations of the best
+      (ppwi, wgsize) configuration among the 8 PPWI values tried (each configuration prints its own block;
+      the best one is what upstream reports as the result of an auto-tuned run)
+    kind: total
+    unit: ms
+    regex: '^best: \{.*sum_ms: (?P<value>[0-9.]+)'
+    select: only
 - id: bm1-ppwi2
   case: bm1
   variant: parameter

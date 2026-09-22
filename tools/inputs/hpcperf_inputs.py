@@ -263,6 +263,17 @@ def validate(doc: dict) -> list:
             if cov["status"] == "BLOCKED" and not cov.get("blocker"):
                 errs.append("coverage BLOCKED needs 'blocker' (what is missing to add the other upstream inputs)")
     for inp in doc["inputs"]:
+        if isinstance(inp, dict) and inp.get("timing") is not None:
+            ti = inp["timing"]; where = f"input '{inp.get('id')}'.timing"
+            if not isinstance(ti, dict):
+                errs.append(f"{where} must be a mapping")
+            else:
+                if "scope" not in ti and ti.get("kind") != "none":
+                    errs.append(f"{where}.scope missing")
+                if "kind" not in ti:
+                    errs.append(f"{where}.kind missing")
+                _check_timer(ti, where, errs)
+    for inp in doc["inputs"]:
         if isinstance(inp, dict) and inp.get("input_form", "runtime") not in INPUT_FORMS:
             errs.append(f"input '{inp.get('id')}': input_form must be one of {INPUT_FORMS}")
         # a compile-time configuration that has no built binary/deck is registered but not runnable
@@ -356,7 +367,14 @@ def _read_timer(t: dict, lines, what: str, params=None) -> dict:
     return res
 
 
-def parse_timing(doc: dict, log_path: Path, rc=0, params=None) -> dict:
+def timing_of(doc: dict, inp=None) -> dict:
+    """The timer block that applies to an input: a per-input `timing` override (an input whose output
+    differs from the benchmark's usual one, e.g. a sweep that prints one block per configuration, or an
+    upstream deck too short for the benchmark's timed window) or the benchmark-level block."""
+    return (inp or {}).get("timing") or doc["timing"]
+
+
+def parse_timing(doc: dict, log_path: Path, rc=0, params=None, inp=None) -> dict:
     """Main-compute time in seconds from the benchmark's OWN timer line, plus any
     secondary timers (reported separately, never summed).
 
@@ -364,16 +382,17 @@ def parse_timing(doc: dict, log_path: Path, rc=0, params=None) -> dict:
     line, a non-finite value or an unknown unit raises InputError."""
     if rc != 0:
         raise InputError(f"run exited {rc}; timer output of a failed run is not used")
-    if doc["timing"].get("kind") == "none":
-        raise InputError("NEEDS_TIMING_SUPPORT: " + str(doc["timing"].get("reason", "no usable native timer")))
+    t = timing_of(doc, inp)
+    if t.get("kind") == "none":
+        raise InputError("NEEDS_TIMING_SUPPORT: " + str(t.get("reason", "no usable native timer")))
     if not Path(log_path).is_file():
         raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
-    main = _read_timer(doc["timing"], lines, "timing", params)
+    main = _read_timer(t, lines, "timing", params)
     res = dict(main)
     res["main_compute_s"] = main["seconds"]
     sec = {}
-    for s in doc["timing"].get("secondary") or []:
+    for s in t.get("secondary") or []:
         try:
             r = _read_timer(s, lines, f"secondary timer {s['name']}")
             sec[s["name"]] = {"seconds": r["seconds"], "raw_text": r["raw_text"], "unit": r["unit"],
@@ -776,7 +795,7 @@ def summarize(doc, inp, runs, reps):
             res = r["timing"]["print_resolution_s"]; break
     s = {"run_completed": len(good) == len(measured) and len(measured) == reps,
          "timing_ok": len(mc) == len(measured) and len(measured) == reps,
-         "timing_status": ("NEEDS_TIMING_SUPPORT" if doc["timing"].get("kind") == "none"
+         "timing_status": ("NEEDS_TIMING_SUPPORT" if timing_of(doc, inp).get("kind") == "none"
                            else ("NATIVE" if len(mc) == len(measured) and len(measured) == reps else "FAILED")),
          "main_compute_s": stats(mc, res), "e2e_s": stats(e2e)}
     sec = {}
@@ -821,8 +840,9 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
             "selector": {doc.get("selector"): inp["id"]} if doc.get("selector") else None,
             "host": socket.gethostname(), "gpu": gpu_info(), "git": git_head(root),
             "warmup_runs": warmup, "measured_runs": reps, "timeout_s": timeout,
-            "e2e_boundary": e2e_boundary, "timing_scope": doc["timing"].get("scope") or doc["timing"].get("reason"),
-            "secondary_timer_scopes": {s["name"]: s["scope"] for s in (doc["timing"].get("secondary") or [])},
+            "e2e_boundary": e2e_boundary, "timing_scope": timing_of(doc, inp).get("scope") or timing_of(doc, inp).get("reason"),
+            "timing_override": bool(inp.get("timing")),
+            "secondary_timer_scopes": {s["name"]: s["scope"] for s in (timing_of(doc, inp).get("secondary") or [])},
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "runs": []}
     for k in range(warmup + reps):
         label = f"warmup{k}" if k < warmup else f"rep{k - warmup + 1}"
@@ -839,7 +859,7 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
         rec = {"label": label, "exit_code": rc, "e2e_s": round(wall, 4), "log": str(log), "measured": k >= warmup,
                "log_written_after_start": (log.exists() and log.stat().st_mtime >= t_start - 1)}
         try:
-            rec["timing"] = parse_timing(doc, log, rc, inp.get("params"))
+            rec["timing"] = parse_timing(doc, log, rc, inp.get("params"), inp)
             rec["main_compute_s"] = rec["timing"]["main_compute_s"]
         except InputError as ex:
             rec["timing_error"] = str(ex); rec["main_compute_s"] = None
@@ -962,8 +982,8 @@ def main(argv=None):
                 raise InputError(f"input '{a.input_id}' has no parameter '{a.key}'")
             print(inp["params"][a.key]); return 0
         if a.cmd == "parse-timing":
-            params = get_input(doc, a.input).get("params") if a.input else None
-            print(json.dumps(parse_timing(doc, Path(a.log), a.rc, params), indent=2)); return 0
+            inp = get_input(doc, a.input) if a.input else None
+            print(json.dumps(parse_timing(doc, Path(a.log), a.rc, inp.get("params") if inp else None, inp), indent=2)); return 0
         if a.cmd == "extract":
             inp = get_input(doc, a.input) if a.input else None
             print(json.dumps(extract(doc, Path(a.log), inp), indent=2)); return 0
