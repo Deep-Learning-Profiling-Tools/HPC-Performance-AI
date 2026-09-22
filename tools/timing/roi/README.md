@@ -90,10 +90,15 @@ Annotation backend, chosen at compile time:
 
 1. **The ROI is the computation the application performs for its result**, from
    its first step to its last: the time loop, the solve, the timed repetitions.
-   Algorithmic set-up that is part of the method stays inside (AMG hierarchy
-   construction, per-step assembly); program set-up stays outside (reading or
-   generating the input, allocation, the one-time upload of the input to the
-   device).
+   Work done on every step stays inside (including per-step assembly). One-time
+   set-up before it stays outside -- reading or generating the input, the mesh,
+   allocation, the one-time upload to the device, operator and preconditioner
+   construction -- **unless the benchmark itself times that set-up as part of its
+   computation**: AMG2023's figure of merit is setup + solve, so its Setup phase
+   is inside. MiniEM shows why the line matters: its default case spends about
+   106 s of a 111 s process building the mesh, the DOF numbering and the
+   operators, and 1.3 s in its three time steps; the ROI is the time steps, and
+   the set-up remains visible as `pre_roi_s`.
 2. **Warm-up is outside.** Where the application warms up in the same loop,
    `BEGIN` sits at the first timed iteration (`minibude`:
    `if (i == p.warmupIterations) HPCPERF_ROI_BEGIN_SYNC();`).

@@ -22,7 +22,7 @@ cloverleaf	cuda,hip	900	Average time per cell	s/cell	lower	stdout	Average time p
 comb	cuda,hip	600	-	-	-	-	-	-	-	per-phase table (number, average(s), min(s), max(s)) written to Comb_NN_summary.csv in the run cwd, NOT stdout; times only, no rate
 exacmech	cuda,hip	900	-	-	-	-	-	-	-	prints 'Run time of set-up, material, and retrieve kernels over 1000 time steps is: X(s)' -- a total time, not normalized by the app
 examinimd	cuda,hip	900	Atomsteps/s	atom-steps/s	higher	stdout	\|\s*[0-9.eE+-]+\s+([0-9.eE+-]+)\s+[0-9.eE+-]+\s+PERFORMANCE	-	binary dumps; per-step correctness check (both off in the deck)	value sits in the data row under the #Procs header, anchored on the PERFORMANCE marker
-exampm	cuda,hip	900	-	-	-	-	-	-	periodic particle output (a no-op without HDF5/Silo)	prints only 'Time 0.25 / 1.0' progress lines; no timing whatsoever
+exampm	cuda,hip	900	-	-	-	-	-	-	the initial and periodic particle output (0.17 s in the default case)	prints only 'Time 0.25 / 1.0' progress lines; no timing whatsoever
 gamess_ri_mp2	cuda,hip	900	-	-	-	-	-	-	-	prints 'Wall time (minimum/mean/maximum) = X sec'; a time, not a rate
 haccabanapm	cuda,hip	1800	pm_run per-step median	s/step	lower	stdout	pm_run_timing: summary .*median_s=([0-9.eE+-]+)	-	intermediate snapshot writes	upstream benchmark metric (PMKOKKOS_TIMING=1, on by default); run.sh runs pm_ic then pm_run, so one report covers both binaries
 hipbone	cuda,hip	1200	NekBone FOM	GFLOPs	higher	stdout	NekBone FOM = ([0-9.eE+-]+) GFLOPs	-	-	-

@@ -34,10 +34,11 @@ no input decks: the problem is generated at run time from `-P`/`-n`/`-problem`.
 ## Changes from upstream
 
 - **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in `amg.c`: the
-  region of interest is each Setup and Solve phase upstream times, inside its `hypre_BeginTiming` /
-  `hypre_EndTiming` pair (4 ROI entries). Pure insertions -- no upstream line changed or removed.
-  The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run
-  and validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  region of interest is the Setup and Solve phase upstream times for the selected problem, inside
+  its `hypre_BeginTiming` / `hypre_EndTiming` pair (four marked regions, two per problem: 2 ROI
+  entries per run). Pure insertions -- no upstream line changed or removed. The markers are a no-op
+  unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as
+  before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
   `tools/timing/roi/README.md`.
 
 - Apart from the markers above, none. `amg-config.h.in` and `CMakeLists.txt` are byte-identical to
