@@ -67,7 +67,7 @@ inputs:
     dt: 0.01
     steps: 40
   args:
-  - wk/SLD10.dat
+  - SLD10.dat   # run.sh resolves a bare deck name under level2/p3_vlp4d/wk/
   runtime_config:
     gpus: 1
     ranks: 1
