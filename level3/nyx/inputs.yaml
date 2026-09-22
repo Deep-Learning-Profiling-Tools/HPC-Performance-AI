@@ -119,6 +119,7 @@ inputs:
   env:
     HPCPERF_NYX_CASE: lya_heatcool
     HPCPERF_SCALE_MODE: smoke
+    HPCPERF_NYX_HEATCOOL: 'YES'
   runtime_config:
     gpus: 1
     ranks: 1
