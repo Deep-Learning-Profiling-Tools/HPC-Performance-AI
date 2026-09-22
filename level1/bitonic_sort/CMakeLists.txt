@@ -35,6 +35,9 @@ else()
     message(FATAL_ERROR "Unknown BACKEND '${BACKEND}'; expected CUDA or HIP")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     add_test(NAME bitonic_sort_run COMMAND ${_hpcperf_target} 25 2)
     set_tests_properties(bitonic_sort_run PROPERTIES TIMEOUT 600

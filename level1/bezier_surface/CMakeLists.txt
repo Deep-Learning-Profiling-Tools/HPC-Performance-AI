@@ -35,6 +35,9 @@ else()
     message(FATAL_ERROR "Unknown BACKEND '${BACKEND}'; expected CUDA or HIP")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     add_test(NAME bezier_surface_run COMMAND ${_hpcperf_target} -f ${CMAKE_CURRENT_SOURCE_DIR}/data/control.txt -n 8192)
     set_tests_properties(bezier_surface_run PROPERTIES TIMEOUT 600

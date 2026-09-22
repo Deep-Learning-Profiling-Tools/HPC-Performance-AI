@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,6 +107,7 @@ int main(int argc, char* argv[])
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for(int itr = 0; itr < num_itrs; itr++){
 
@@ -121,6 +123,7 @@ int main(int argc, char* argv[])
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time %f (s)\n", time * 1e-9f);

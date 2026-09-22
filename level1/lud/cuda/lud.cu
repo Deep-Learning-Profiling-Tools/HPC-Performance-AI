@@ -16,6 +16,7 @@
  * =====================================================================================
  */
 
+#include "hpcperf_roi.h"
 #include <cuda.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -145,8 +146,10 @@ main ( int argc, char *argv[] )
   cudaMemcpy(d_m, m, matrix_dim*matrix_dim*sizeof(float), 
 	     cudaMemcpyHostToDevice);
 
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: lud_cuda (the blocked decomposition), not the copies inside the upstream stopwatch
   lud_cuda(d_m, matrix_dim);
 
+  HPCPERF_ROI_END_SYNC();
   cudaMemcpy(m, d_m, matrix_dim*matrix_dim*sizeof(float), 
 	     cudaMemcpyDeviceToHost);
 

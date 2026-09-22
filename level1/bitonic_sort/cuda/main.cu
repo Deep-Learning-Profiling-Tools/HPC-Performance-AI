@@ -34,6 +34,7 @@
 // ordered sequenes and sends data to the kernel. The kernel swaps the elements
 // accordingly in parallel.
 //
+#include "hpcperf_roi.h"
 #include <math.h>
 #include <string.h>
 #include <chrono>
@@ -91,6 +92,7 @@ void ParallelBitonicSort(int input[], int n) {
   cudaMemcpy(d_input, input, size_bytes, cudaMemcpyHostToDevice);
   
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   // step from 0, 1, 2, ...., n-1
   for (int step = 0; step < n; step++) {
@@ -108,6 +110,7 @@ void ParallelBitonicSort(int input[], int n) {
   } // end step
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Total kernel execution time: %f (ms)\n", time * 1e-6f);

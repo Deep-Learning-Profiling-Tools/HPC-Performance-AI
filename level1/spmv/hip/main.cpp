@@ -22,6 +22,7 @@
 // Validation (upstream semantics): relative squared error of y vs the
 // sequential CPU gold standard must be <= 1e-5.
 //
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -238,6 +239,7 @@ int main(int argc, char** argv)
 
   // ----- upstream benchmark loop -----
   double ave_time = 0.0, max_time = 0.0, min_time = 1.0e32;
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the benchmark loop, not the warm-up call and check before it
   for (int i = 0; i < loop; i++) {
     auto t0 = std::chrono::steady_clock::now();
     spmv_kernel<<<worksets, block>>>(numRows, d_rowPtr, d_colInd, d_values, d_x, d_y, rows_per_team);
@@ -247,6 +249,7 @@ int main(int argc, char** argv)
     if (t > max_time) max_time = t;
     if (t < min_time) min_time = t;
   }
+  HPCPERF_ROI_END_SYNC();
   GPU_CHECK(cudaGetLastError());
 
   // upstream-style performance summary

@@ -14,6 +14,7 @@
 // is the upstream Base_Seq loop nest, with upstream default sizes, reps, and
 // data initialization. Validation: element-wise comparison of phi.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 #define LTIMES_BODY \
@@ -77,6 +78,7 @@ int main(int argc, char** argv)
     dim3 nblocks((size_t)RP_DIVIDE_CEILING_INT(num_m, (Index_type)m_block_sz),
                  (size_t)RP_DIVIDE_CEILING_INT(num_g, (Index_type)g_block_sz),
                  (size_t)RP_DIVIDE_CEILING_INT(num_z, (Index_type)z_block_sz));
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       ltimes<<<nblocks, nthreads_per_block>>>(d_phi, d_ell, d_psi,
                                               num_d, num_m, num_g, num_z);
@@ -84,6 +86,7 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(phidat, d_phi, philen * sizeof(Real_type), cudaMemcpyDeviceToHost));
   cudaFree(d_phi); cudaFree(d_ell); cudaFree(d_psi);
 

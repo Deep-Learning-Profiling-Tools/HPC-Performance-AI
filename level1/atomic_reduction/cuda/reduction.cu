@@ -20,6 +20,7 @@
    THE SOFTWARE.
  */
 
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -88,11 +89,13 @@ int main(int argc, char** argv)
 
 #define benchmark(kernel_name, grid_size) \
     t1 = std::chrono::high_resolution_clock::now(); \
+    HPCPERF_ROI_BEGIN_SYNC(); \
     for(int i=0;i<N;i++) { \
       cudaMemset(out,0,sizeof(int)); \
       kernel_name<<< dim3(grid_size), dim3(block_size) >>>(in,out,arrayLength); \
     } \
     cudaDeviceSynchronize(); \
+    HPCPERF_ROI_END_SYNC(); \
     t2 = std::chrono::high_resolution_clock::now(); \
     times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count(); \
     std::cout << "Thread block size: " <<  block_size << ", "; \

@@ -82,6 +82,7 @@ void hotspot_opt1(float *p, float *tIn, float *tOut,
     dim3 grid_dim(nx / 64, ny / 4, 1);
 
     long long start = get_time();
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the numiter stencil iterations
     for (int i = 0; i < numiter; ++i) {
         hotspotOpt1<<<grid_dim, block_dim>>>
             (p_d, tIn_d, tOut_d, stepDivCap, nx, ny, nz, ce, cw, cn, cs, ct, cb, cc);
@@ -90,6 +91,7 @@ void hotspot_opt1(float *p, float *tIn, float *tOut,
         tOut_d = t;
     }
     cudaDeviceSynchronize();
+    HPCPERF_ROI_END_SYNC();
     long long stop = get_time();
     float time = (float)((stop - start)/(1000.0 * 1000.0));
     printf("Time: %.3f (s)\n",time);

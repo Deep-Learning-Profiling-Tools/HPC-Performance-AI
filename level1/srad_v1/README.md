@@ -46,6 +46,8 @@ Run it via:
 ctest --test-dir build/srad_v1/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu`: extract, the SRAD iterations, compress. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 628 (12 source files, cloc, cuda/ + common/)

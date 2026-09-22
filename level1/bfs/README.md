@@ -46,6 +46,8 @@ Run it via:
 ctest --test-dir build/bfs/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/bfs.cu`: the BFS frontier loop (kernels + per-level stop flag). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 176 (3 source files, cloc, cuda/ + common/)

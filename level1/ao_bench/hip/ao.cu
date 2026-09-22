@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -370,11 +371,13 @@ long render(unsigned char *img, int w, int h, int nsubsamples, const Sphere* sph
 
   gpuErrchk( hipDeviceSynchronize() );
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   render_kernel <<< dim3((w+BLOCK_SIZE-1)/BLOCK_SIZE, (h+BLOCK_SIZE-1)/BLOCK_SIZE), 
                     dim3(BLOCK_SIZE, BLOCK_SIZE) >>> (d_img, d_spheres, plane, h, w, nsubsamples);
 
   gpuErrchk( hipDeviceSynchronize() );
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 #ifdef DEBUG

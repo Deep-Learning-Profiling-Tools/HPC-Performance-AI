@@ -5,6 +5,7 @@
 // default problem size, reps, and data initialization.
 // Validation: element-wise comparison of GPU vs CPU p_new (and bvc).
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream PRESSURE.hpp
@@ -88,6 +89,7 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(d_e_old, g.e_old, bytes, cudaMemcpyHostToDevice));
   GPU_CHECK(cudaMemcpy(d_vnewc, g.vnewc, bytes, cudaMemcpyHostToDevice));
 
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, block_size);
     pressurecalc1<<<grid_size, block_size>>>(d_bvc, d_compression, g.cls, iend);
@@ -96,6 +98,7 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.p_new, d_p_new, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(g.bvc, d_bvc, bytes, cudaMemcpyDeviceToHost));
   cudaFree(d_compression); cudaFree(d_bvc); cudaFree(d_p_new);

@@ -15,6 +15,7 @@
 
   Created by Pawan Harish.
  ************************************************************************************/
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -182,6 +183,7 @@ void BFSGraph( int argc, char** argv)
 	printf("Start traversing the tree\n");
 	bool stop;
 	//Call the Kernel untill all the elements of Frontier are not false
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the BFS frontier loop (kernels + per-level stop flag)
 	do
 	{
 		//if no thread changes this value then the loop stops
@@ -199,6 +201,7 @@ void BFSGraph( int argc, char** argv)
 		k++;
 	}
 	while(stop);
+	HPCPERF_ROI_END_SYNC();
 
 
 	printf("Kernel Executed %d times\n",k);

@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -125,12 +126,14 @@ int main(int argc, char *argv[]) {
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<3><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
@@ -151,12 +154,14 @@ int main(int argc, char *argv[]) {
 
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<6><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
@@ -175,12 +180,14 @@ int main(int argc, char *argv[]) {
 
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<9><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);

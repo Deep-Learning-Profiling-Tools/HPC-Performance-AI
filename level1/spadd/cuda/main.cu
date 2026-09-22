@@ -32,6 +32,7 @@
 // CPU with the same merge order and compared exactly (structure) and
 // bitwise-order-identical accumulation (values, rel tol 1e-13).
 //
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -334,6 +335,7 @@ int main(int argc, char** argv)
   Offset nnzC = 0;
   double symbolicTime = 0, numericTime = 0;
 
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: symbolic + numeric, all repetitions
   for (int rep = 0; rep < repeat; rep++) {
     // -------- symbolic --------
     auto t0 = std::chrono::steady_clock::now();
@@ -363,6 +365,7 @@ int main(int argc, char** argv)
     numericTime += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   }
 
+  HPCPERF_ROI_END_SYNC();
   printf("Mean total time:    %f\n", (symbolicTime + numericTime) / repeat);
   printf("Mean symbolic time: %f\n", symbolicTime / repeat);
   printf("Mean numeric time:  %f\n", numericTime / repeat);

@@ -33,6 +33,7 @@
  *
  */
 
+#include "hpcperf_roi.h"
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
@@ -273,10 +274,12 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   hipDeviceSynchronize();
   auto kstart = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   hipLaunchKernelGGL(BezierGPU, grid, block , 0, 0, d_in, d_out, in_size_i, in_size_j, out_size_i, out_size_j);
 
   hipDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto kend = std::chrono::steady_clock::now();
   auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
   std::cout << "kernel execution time: " << ktime << " ms" << std::endl;

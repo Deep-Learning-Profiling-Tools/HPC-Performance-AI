@@ -38,6 +38,7 @@
  * DEALINGS WITH THE SOFTWARE.
  */
 
+#include "hpcperf_roi.h"
 #include "benchmark_runner.h"
 
 void BenchmarkRunner::Run() {
@@ -52,9 +53,11 @@ void BenchmarkRunner::Run() {
   time_measurement_->End({"WarmUp"});
 
   time_measurement_->Start();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed repetitions, not WarmUp/Verify
   for (uint32_t i = 0; i < repeat_time_; i++) {
     benchmark_->Run();
   }
+  HPCPERF_ROI_END_SYNC();
   time_measurement_->End({"Run"});
 
   if (verification_mode_) {

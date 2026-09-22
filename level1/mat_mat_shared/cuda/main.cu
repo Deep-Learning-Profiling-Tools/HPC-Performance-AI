@@ -6,6 +6,7 @@
 // size, reps, and data initialization.
 // Validation: element-wise comparison of C.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 constexpr Index_type TL_SZ = 16;  // upstream tile size
@@ -94,12 +95,14 @@ int main(int argc, char** argv)
     dim3 blockDim(TL_SZ, TL_SZ, 1);
     dim3 gridDim((size_t)RP_DIVIDE_CEILING_INT(N, TL_SZ),
                  (size_t)RP_DIVIDE_CEILING_INT(N, TL_SZ), 1);
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       mat_mat_shared<<<gridDim, blockDim>>>(N, dC, dA, dB);
     }
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost));
   cudaFree(dA); cudaFree(dB); cudaFree(dC);
 

@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -208,9 +209,11 @@ void run(int argc, char** argv)
     cudaMemcpy(gpuWall, data+cols, sizeof(int)*(size-cols), cudaMemcpyHostToDevice);
 
 
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: calc_path (all pyramid steps)
     int final_ret = calc_path(gpuWall, gpuResult, rows, cols, \
 	 pyramid_height, blockCols, borderCols);
 
+    HPCPERF_ROI_END_SYNC();
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
 
 

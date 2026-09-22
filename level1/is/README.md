@@ -53,6 +53,8 @@ Run it via:
 ctest --test-dir build/is/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/is.cu` and the HIP port: the timed ranking iterations, not key generation / full_verify. NPB `is` verifies partly inside its timed ranking kernels (`rank_gpu_kernel_7`), so that check is inside the ROI and every record says so. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 1265 (8 source files, cloc, cuda/ + common/)

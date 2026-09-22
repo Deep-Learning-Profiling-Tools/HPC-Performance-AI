@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +58,7 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
   const int S = (HxW + NUM_THREADS - 1) / NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   if (N <= GridDimMaxY) {
     const dim3 dim_grid(S, N, C);
@@ -71,6 +73,7 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
@@ -88,6 +91,7 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   const int outer_size = N * HxW;
 
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   if (C <= 32) {
     for (int i = 0; i < repeat; i++)
@@ -104,6 +108,7 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 

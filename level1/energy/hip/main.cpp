@@ -5,6 +5,7 @@
 // default problem size, reps, and data initialization.
 // Validation: element-wise comparison of GPU vs CPU e_new and q_new.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream ENERGY.hpp
@@ -203,6 +204,7 @@ int main(int argc, char** argv)
   ENERGY_ARRAYS(DALLOC)
 #undef DALLOC
 
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, block_size);
     energycalc1<<<grid_size, block_size>>>(d_e_new, d_e_old, d_delvc,
@@ -224,6 +226,7 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.e_new, d_e_new, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(g.q_new, d_q_new, bytes, cudaMemcpyDeviceToHost));
 #define DFREE(n) cudaFree(d_##n);

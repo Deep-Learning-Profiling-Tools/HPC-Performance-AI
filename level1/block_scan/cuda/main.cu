@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******************************************************************************/
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
@@ -215,6 +216,7 @@ void Test()
 
   // Run this several times and average the performance results
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int i = 0; i < repeat; ++i)
   {
     // Run aggregate/prefix kernel
@@ -223,6 +225,7 @@ void Test()
         d_out);
   }
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 

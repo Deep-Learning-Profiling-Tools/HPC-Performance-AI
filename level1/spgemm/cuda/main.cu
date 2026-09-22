@@ -36,6 +36,7 @@
 // Validation (added): C recomputed on the host with a dense accumulator;
 // per-row entries sorted and compared (cols exact, values rel tol 1e-10).
 //
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -428,6 +429,7 @@ int main(int argc, char** argv)
   dim3 block(vector_size, team_size);
   int league = (m + team_work_size - 1) / team_work_size;
   double numeric_time = 0;
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the GPU numeric phase (the symbolic phase is a host substitute, excluded)
   for (int rep = 0; rep < repeat; rep++) {
     auto t0 = std::chrono::steady_clock::now();
     kkmem_numeric<<<league, block, shared_memory_size>>>(
@@ -438,6 +440,7 @@ int main(int argc, char** argv)
     GPU_CHECK(cudaDeviceSynchronize());
     numeric_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   }
+  HPCPERF_ROI_END_SYNC();
   printf("mm_time: %f (numeric phase, %d repeats)\n", numeric_time / repeat, repeat);
 
   bool ok = true;

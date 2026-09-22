@@ -57,6 +57,7 @@
  * ------------------------------------------------------------------------------
  */
 
+#include "hpcperf_roi.h"
 #include <cuda.h>
 #include "npb-CPP.hpp"
 #include "npbparams.hpp"
@@ -419,10 +420,12 @@ int main(int argc, char** argv){
 	timer_start(PROFILING_TOTAL_TIME);
 #endif
 	/* this is the main iteration */
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed ranking iterations, not key generation / full_verify
 	for(iteration=1; iteration<=MAX_ITERATIONS; iteration++){
 		if(CLASS != 'S')printf( "        %ld\n", (long)iteration);		
 		rank_gpu(iteration);
 	}
+	HPCPERF_ROI_END_SYNC();
 #if defined(PROFILING)
 	timer_stop(PROFILING_RANK);
 #else

@@ -59,6 +59,7 @@
  * ------------------------------------------------------------------------------
  */
 
+#include "hpcperf_roi.h"
 #include <hip/hip_runtime.h>
 #include "npb.hpp"
 #include "npbparams.hpp"
@@ -490,6 +491,7 @@ int main(int argc, char** argv){
 #endif
 
 	timer_start(PROFILING_TOTAL_TIME);
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed V-cycle iterations (NPB's timed region)
 
 	resid_gpu(u_device,v_device,r_device,n1,n2,n3,a_device,k);	
 	norm2u3_gpu(r_device,n1,n2,n3,&rnm2,&rnmu,nx[lt],ny[lt],nz[lt]);
@@ -499,6 +501,7 @@ int main(int argc, char** argv){
 	}
 	norm2u3_gpu(r_device,n1,n2,n3,&rnm2,&rnmu,nx[lt],ny[lt],nz[lt]);
 
+	HPCPERF_ROI_END_SYNC();
 	timer_stop(PROFILING_TOTAL_TIME);
 	t = timer_read(PROFILING_TOTAL_TIME);  	
 

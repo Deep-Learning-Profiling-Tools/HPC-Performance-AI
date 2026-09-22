@@ -5,6 +5,7 @@
 // variant, with upstream default problem size, reps, and data initialization.
 // Validation: element-wise comparison of hz (and ex, ey).
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_FDTD_2D.hpp
@@ -96,6 +97,7 @@ int main(int argc, char** argv)
     dim3 nthreads_per_block234(j_block_sz, i_block_sz, 1);
     dim3 nblocks234((size_t)RP_DIVIDE_CEILING_INT(ny, (Index_type)j_block_sz),
                     (size_t)RP_DIVIDE_CEILING_INT(nx, (Index_type)i_block_sz), 1);
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       const size_t grid_size1 = RP_DIVIDE_CEILING_INT(ny, (Index_type)block_size);
       poly_fdtd2d_1<<<grid_size1, block_size>>>(d_ey, d_fict, ny, t);
@@ -107,6 +109,7 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(hz, d_hz, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ex, d_ex, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ey, d_ey, bytes, cudaMemcpyDeviceToHost));

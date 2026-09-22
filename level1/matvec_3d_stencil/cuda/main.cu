@@ -8,6 +8,7 @@
 // default problem size, reps, and data initialization.
 // Validation: element-wise comparison of b.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -199,6 +200,7 @@ int main(int argc, char** argv)
 
 #define PASS_X(n) dm.x##n,
 #define PASS_M(n) dm.n,
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, (Index_type)block_size);
     matvec_3d<<<grid_size, block_size>>>(d_b,
@@ -210,6 +212,7 @@ int main(int argc, char** argv)
 #undef PASS_M
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(b, d_b, bytes, cudaMemcpyDeviceToHost));
   cudaFree(d_b); cudaFree(d_x); cudaFree(d_rz);
 #define DFREE(n) cudaFree(dm.n);

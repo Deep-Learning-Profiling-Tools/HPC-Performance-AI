@@ -5,6 +5,7 @@
    Systems Biology: Interdisciplinary applications," by IGI Global.
  */
 
+#include "hpcperf_roi.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -248,12 +249,14 @@ int main(int argc, char **argv) {
   }
 
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
     /* register GPU kernel */
     cudaMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
     k1<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
   }
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -269,12 +272,14 @@ int main(int argc, char **argv) {
   }
 
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     cudaMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
     k2<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
   }
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -290,12 +295,14 @@ int main(int argc, char **argv) {
   }
 
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
     /* shared memory GPU kernel */
     cudaMemset(distance_device, 0, INSTANCES * INSTANCES * sizeof(int));
     k3<<<dimGrid,dimBlock>>>(data_char_device, distance_device);
   }
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 

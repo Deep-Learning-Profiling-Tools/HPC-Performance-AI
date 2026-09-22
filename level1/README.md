@@ -34,18 +34,21 @@ both; data files, build files, and validation scripts excluded).
 ## Runtime measurement
 
 `Working` in the catalog above is a correctness statement; it says nothing about
-speed. To measure runtime with a GPU/host breakdown (wall clock, kernel time, GPU
-busy time, transfer time, per-kernel detail) use:
+speed. Runtime is measured over each benchmark's **region of interest (ROI)** --
+the timed computation, without process start-up, input set-up, warm-up and
+verification -- which the sources mark with `tools/timing/roi/hpcperf_roi.h`
+(every benchmark, CUDA and HIP; a no-op unless measuring, so ctest is unchanged):
 
 ```bash
-tools/timing/measure_level1.sh --build-root build/all all
-python3 tools/timing/summarize.py        # one JSON per run + summary.csv
+tools/timing/measure_level1.sh --build-root build/gcc13 all   # 1 warm-up + 5 clean + 1 profiled run per case
+python3 tools/timing/summarize.py                             # JSON per run + summary_level1.csv
 ```
 
-Measurement sets `HPCPERF_SKIP_VERIFY=1`, which makes each benchmark skip the CPU
-reference recomputation it uses for validation -- that is correctness machinery,
-not the workload being timed. ctest never sets the variable, so validation is
-unchanged. See [tools/timing/README.md](../tools/timing/README.md).
+Measurement also sets `HPCPERF_SKIP_VERIFY=1` so the CPU reference recomputation
+(minutes for some benchmarks) is not run; it lies outside the ROI either way. NPB
+`is` verifies inside its timed kernels and is recorded as such. ctest never sets
+either variable. See [tools/timing/README.md](../tools/timing/README.md) and
+[tools/timing/roi/README.md](../tools/timing/roi/README.md).
 
 ## Catalog
 
