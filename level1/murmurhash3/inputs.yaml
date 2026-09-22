@@ -56,34 +56,38 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-- id: k1000000
+- id: k200000
   case: murmurhash3-128
   variant: size
   source:
     kind: derived
-    derivation: keys x10
+    derivation: >-
+      keys x2. The port draws every key length as rand() % 10000 (mean ~5,000 bytes) and stores the key
+      offsets as uint32_t, so the concatenated key buffer must stay below 4 GiB (about 850,000 keys):
+      the x10 size (1,000,000 keys, ~5 GB) segfaults during the host copy; that attempt is kept in the
+      rollout measurements as an unregistered record (k1000000).
   params:
-    keys: 1000000
+    keys: 200000
     repeat: 100
   args:
-  - '1000000'
+  - '200000'
   - '100'
   runtime_config:
     gpus: 1
   build_config: null
   backends_validated:
   - cuda
-- id: k10000000
+- id: k400000
   case: murmurhash3-128
   variant: size
   source:
     kind: derived
-    derivation: keys x100
+    derivation: keys x4 (~2 GB of keys, half of the port's uint32 offset limit; see k200000)
   params:
-    keys: 10000000
+    keys: 400000
     repeat: 100
   args:
-  - '10000000'
+  - '400000'
   - '100'
   runtime_config:
     gpus: 1
