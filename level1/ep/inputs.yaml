@@ -29,13 +29,14 @@ baseline:
     compare:
       rule: absent
 coverage:
-  status: SINGLE_INPUT
-  reason: only CLASS=B is materialized (random pairs); classes A and C are registered as compile-time inputs without
-    a build
-  blocker: npbparams.hpp is pre-generated for B only; upstream's sys/setparams tool is not vendored, so other classes
-    need a generated class header and a separate build directory
+  status: MULTI_INPUT
+  reason: >-
+    classes A, B and C are materialized (B in the default build directory, A and C through
+    tools/inputs/npb_materialize_class.sh with the class headers under inputs/); the class is a
+    compile-time upstream problem size
   upstream_inputs_not_added:
-  - CLASS=S/W/A/C/D headers and builds
+  - CLASS=S and W (upstream's tiny sanity classes, below the timer resolution)
+  - CLASS=D and E (upstream's large classes, not attempted within the single-GPU budget)
 inputs:
 - id: class-b
   case: npb-ep
@@ -65,7 +66,7 @@ inputs:
     upstream:
       repo: GMAP/NPB-GPU
       version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
-      path: NPB class A (upstream problem class; needs npbparams.hpp regenerated with sys/setparams)
+      path: "NPB class A (upstream problem class; npbparams.hpp regenerated from the sys/setparams class table -> inputs/npbparams.A.hpp)"
   params:
     class: A
   args: []
@@ -73,10 +74,15 @@ inputs:
     gpus: 1
   build_config:
     CLASS: A
-  backends_validated: []
-  notes: 'registered, NOT materialized: the class header is not generated in this worktree'
+    npbparams: level1/ep/inputs/npbparams.A.hpp
+    build_dir: build/ep/cuda-classA
+    materialize: tools/inputs/npb_materialize_class.sh ep A
+  binary: build/ep/cuda-classA/ep_cuda
+  backends_validated:
+  - cuda
+  notes: materialized as a separate build directory (the vendored sources with the class-A header); the
+    class verification constants inside the port check the result
   input_form: compile-time
-  materialized: false
 - id: class-c
   case: npb-ep
   variant: build-config
@@ -85,7 +91,7 @@ inputs:
     upstream:
       repo: GMAP/NPB-GPU
       version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
-      path: NPB class C (upstream problem class; needs npbparams.hpp regenerated with sys/setparams)
+      path: "NPB class C (upstream problem class; npbparams.hpp regenerated from the sys/setparams class table -> inputs/npbparams.C.hpp)"
   params:
     class: C
   args: []
@@ -93,7 +99,12 @@ inputs:
     gpus: 1
   build_config:
     CLASS: C
-  backends_validated: []
-  notes: 'registered, NOT materialized: the class header is not generated in this worktree'
+    npbparams: level1/ep/inputs/npbparams.C.hpp
+    build_dir: build/ep/cuda-classC
+    materialize: tools/inputs/npb_materialize_class.sh ep C
+  binary: build/ep/cuda-classC/ep_cuda
+  backends_validated:
+  - cuda
+  notes: materialized as a separate build directory (the vendored sources with the class-C header); the
+    class verification constants inside the port check the result
   input_form: compile-time
-  materialized: false

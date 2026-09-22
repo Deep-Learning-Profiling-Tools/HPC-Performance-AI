@@ -687,6 +687,22 @@ def git_head(root: Path):
         return {}
 
 
+REPO_PATH_PREFIXES = ("level1/", "level2/", "level3/", "build/")
+
+
+def resolve_repo_args(root: Path, args):
+    """Arguments of a binary entry that name an existing repository-relative path (level1/..., build/...)
+    are passed as absolute paths: measure runs every repetition inside its own run directory, and the
+    registry keeps the repository-relative spelling (stable workload identity)."""
+    out = []
+    for a in args:
+        a = str(a)
+        if a.startswith(REPO_PATH_PREFIXES) and (root / a).exists():
+            a = str(root / a)
+        out.append(a)
+    return out
+
+
 def build_command(doc, inp, root: Path, bench_dir: Path, gpus: int):
     e = doc["entry"]
     env = dict(os.environ)
@@ -697,7 +713,7 @@ def build_command(doc, inp, root: Path, bench_dir: Path, gpus: int):
         exe = root / inp["binary"]
         if not exe.is_file() or not os.access(exe, os.X_OK):
             raise InputError(f"binary {exe} of input '{inp['id']}' not built")
-        cmd = [str(exe)] + [str(a) for a in inp.get("args", [])]
+        cmd = [str(exe)] + resolve_repo_args(root, inp.get("args", []))
         env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
         for k, v in (inp.get("env") or {}).items():
             env[str(k)] = str(v)
@@ -706,7 +722,7 @@ def build_command(doc, inp, root: Path, bench_dir: Path, gpus: int):
         exe = root / e["path"]
         if not exe.is_file() or not os.access(exe, os.X_OK):
             raise InputError(f"binary {exe} not built")
-        cmd = [str(exe)] + [str(a) for a in inp.get("args", [])]
+        cmd = [str(exe)] + resolve_repo_args(root, inp.get("args", []))
         env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
         for k, v in (inp.get("env") or {}).items():
             env[str(k)] = str(v)

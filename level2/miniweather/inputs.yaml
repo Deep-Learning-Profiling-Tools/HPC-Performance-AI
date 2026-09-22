@@ -35,11 +35,11 @@ baseline:
       rule: abs_lt
       value: 4.5e-05
 coverage:
-  status: SINGLE_INPUT
-  reason: grid, simulated time and initial condition are compile-time (build.sh MINIWEATHER_* variables into one
-    build directory); only the default configuration is materialized -- the other upstream initial conditions and
-    a smaller grid are registered as unmaterialized compile-time inputs (a per-configuration build directory was
-    not added this round)
+  status: MULTI_INPUT
+  reason: >-
+    grid, simulated time and initial condition are compile-time (build.sh MINIWEATHER_* variables); the
+    default and three further configurations (two other upstream initial conditions, a smaller grid) are
+    materialized in tagged build directories (HPCPERF_MINIWEATHER_BUILD_TAG, build.sh/run.sh)
 inputs:
 - id: thermal-2048x1024-1000s
   case: rising-thermal
@@ -89,9 +89,12 @@ inputs:
     MINIWEATHER_NZ: 1024
     MINIWEATHER_SIM_TIME: 1000
     MINIWEATHER_DATA_SPEC: DATA_SPEC_COLLISION
-  backends_validated: []
+    HPCPERF_MINIWEATHER_BUILD_TAG: collision
+  env:
+    HPCPERF_MINIWEATHER_BUILD_TAG: collision
+  backends_validated:
+  - cuda
   input_form: compile-time
-  materialized: false
 - id: gravity-waves-2048x1024-1000s
   case: gravity-waves
   variant: case
@@ -114,9 +117,12 @@ inputs:
     MINIWEATHER_NZ: 1024
     MINIWEATHER_SIM_TIME: 1000
     MINIWEATHER_DATA_SPEC: DATA_SPEC_GRAVITY_WAVES
-  backends_validated: []
+    HPCPERF_MINIWEATHER_BUILD_TAG: gravity-waves
+  env:
+    HPCPERF_MINIWEATHER_BUILD_TAG: gravity-waves
+  backends_validated:
+  - cuda
   input_form: compile-time
-  materialized: false
 - id: thermal-1024x512-1000s
   case: rising-thermal
   variant: size
@@ -139,6 +145,9 @@ inputs:
     MINIWEATHER_NZ: 512
     MINIWEATHER_SIM_TIME: 1000
     MINIWEATHER_DATA_SPEC: DATA_SPEC_THERMAL
-  backends_validated: []
+    HPCPERF_MINIWEATHER_BUILD_TAG: thermal-1024x512
+  env:
+    HPCPERF_MINIWEATHER_BUILD_TAG: thermal-1024x512
+  backends_validated:
+  - cuda
   input_form: compile-time
-  materialized: false

@@ -64,16 +64,19 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-- id: n1048576
+- id: n524288
   case: backprop-train
   variant: size
   source:
     kind: derived
-    derivation: input layer x16
+    derivation: >-
+      input layer x8 (the port's hidden-layer kernel launches dim3 grid(1, in/16), so the input layer is
+      limited to 16 x 65535 = 1,048,560 units: 1,048,576 fails with 'bpnn kernel error: invalid argument',
+      recorded in the rollout measurements as an attempted size that is NOT registered)
   params:
-    input_layer_size: 1048576
+    input_layer_size: 524288
   args:
-  - '1048576'
+  - '524288'
   runtime_config:
     gpus: 1
   build_config: null

@@ -304,6 +304,30 @@ import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_in
 doc = hi.load(sys.argv[2]); a = hi.workload_identity(doc, hi.get_input(doc, "class-b")); b = hi.workload_identity(doc, hi.get_input(doc, "class-c"))
 assert a["params"]["_build_config"] == {"CLASS": "B"} and hi.workload_mismatch(a, b)
 PY
+# ---- 8l. repository-relative file arguments of a binary entry are passed as absolute paths (measure runs in the run dir)
+mkdir -p "$TMP/relarg/build/fake"; printf '#!/bin/sh\nexit 0\n' > "$TMP/relarg/build/fake/fake_bin"; chmod +x "$TMP/relarg/build/fake/fake_bin"
+mkdir -p "$TMP/relarg/level1/relarg/data"; echo x > "$TMP/relarg/level1/relarg/data/in.txt"
+cat > "$TMP/relarg/level1/relarg/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: relarg
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/fake/fake_bin}
+timing: {scope: x, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline: {quantities: [{name: pass_marker, regex: '^PASS$', compare: {rule: present}}]}
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: upstream-file, upstream: x}, params: {}, args: ["-f", "level1/relarg/data/in.txt", "-n", "8192", "level1/relarg/data/missing.txt"], files: [data/in.txt], backends_validated: [cuda]}
+EOF
+python3 - "$R" "$TMP/relarg" <<'PY' && ok "binary entry: an existing repo-relative path argument becomes absolute; other arguments (numbers, missing paths) are passed verbatim" || bad "repo-relative argument resolution"
+import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+root = Path(sys.argv[2]); doc = hi.load(str(root / "level1/relarg")); inp = hi.get_input(doc, "a")
+cmd, env, exe = hi.build_command(doc, inp, root, root / "level1/relarg", 1)
+assert cmd[2] == str(root / "level1/relarg/data/in.txt"), cmd
+assert cmd[4] == "8192" and cmd[5] == "level1/relarg/data/missing.txt", cmd
+assert hi.workload_identity(doc, inp)["args"][1] == "level1/relarg/data/in.txt"
+PY
 
 # ---- 8k. the shared run.sh selector helper (hpcperf_apply_input): knobs exported, args collected, conflicts refused
 mkdir -p "$TMP/sel/level2/selapp"
