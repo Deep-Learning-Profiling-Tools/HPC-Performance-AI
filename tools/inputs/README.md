@@ -71,6 +71,67 @@ documented run line; `derived` = built from upstream parameters at a point upstr
 does not publish (the `derivation` says what changed); `custom` = new data or workload
 (last resort, needs a stated reason).
 
+## Coverage status, compile-time inputs, timing support (round 5, all 84 benchmarks)
+
+Every active benchmark directory (`level1/*`, `level2/*`, `level3/*` except the retired
+GEOS) carries an `inputs.yaml`. Two optional top-level/per-input additions, all
+backward compatible:
+
+```yaml
+coverage:                      # the benchmark's multiple-input status (validated)
+  status: MULTI_INPUT | SINGLE_INPUT | BLOCKED
+  reason: <why SINGLE/BLOCKED, or what the MULTI set is>
+  blocker: <what is missing to add the remaining upstream inputs>   # required for BLOCKED
+  upstream_inputs_not_added: [<upstream input/case that exists but is not registered>, ...]
+timing: {kind: none, status: NEEDS_TIMING_SUPPORT, reason: <what the benchmark prints instead>}
+inputs:
+  - id: class-a
+    input_form: runtime | file | compile-time   # default runtime
+    build_config: {CLASS: A, ...}               # required for compile-time inputs; part of the workload identity
+    materialized: false                          # compile-time only: registered, NOT runnable (build_command refuses it)
+    binary: build/cg/cuda-classA/cg_cuda         # a materialized compile-time input's own binary
+```
+
+`coverage.status` is checked against the number of *runnable* (materialized)
+inputs: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
+`BLOCKED` at most one (upstream offers more, the `blocker` says what is missing).
+A benchmark with two or more runnable inputs and further upstream inputs that were
+not added is `MULTI_INPUT` with `upstream_inputs_not_added`.
+
+`timing.kind: none` (with `status: NEEDS_TIMING_SUPPORT` and a `reason`) records a
+benchmark whose stdout carries no usable native timer; `parse-timing` fails with
+`NEEDS_TIMING_SUPPORT: ...`, `measure` still records the runs (exit 0 when they
+complete) with `timing_status: NEEDS_TIMING_SUPPORT` and no `main_compute_s`; the
+E2E wall is auxiliary only.
+
+Compile-time inputs: the NPB ports (`cg ep ft is mg`) are built for CLASS=B in the
+default build directory; classes A and C are materialized by
+`tools/inputs/npb_materialize_class.sh <bench> <class>` (the vendored sources with
+`level1/<bench>/inputs/npbparams.<class>.hpp` -- the class-B header with upstream's
+setparams table values for the class -- built into `build/<bench>/cuda-class<X>`).
+miniWeather's grid / initial condition / simulated time are build variables:
+`HPCPERF_MINIWEATHER_BUILD_TAG=<tag> level2/miniweather/build.sh CUDA` builds a
+tagged directory and the registered input sets the same tag for run.sh.
+
+Selecting a registered input in a `run.sh`: every Level 2/3 script applies
+`HPCPERF_<APP>_INPUT=<id>` (`HPCPERF_SHAW_INPUT_ID`, `HPCPERF_SW4LITE_INPUT_ID`,
+`HPCPERF_QUICKSILVER_INPUT_ID` where the plain name is an existing knob) through
+`tools/inputs/hpcperf_input_selector.sh`: the input's `env` knobs are exported and
+its `args` appended (`shell-env` prints them as `E<TAB>key<TAB>value` /
+`A<TAB>arg` lines); a knob already set to another value is refused (exit 2, nothing
+is overridden silently), an unknown id is refused (exit 2), and without the variable
+the script behaves exactly as before. Arguments of a *binary* entry that name an
+existing repository-relative path (`level1/...`, `build/...`) are passed as absolute
+paths because `measure` runs every repetition in its own run directory; the registry
+keeps the relative spelling (workload identity).
+
+`tools/inputs/hpcperf_inputs_audit.py [--measurements DIR] [--blockers FILE]
+[--md FILE] [--json FILE]` generates the coverage audit from the registries: one row
+per benchmark (level, status, inputs, runnable, cases, size variants,
+upstream/derived/custom, input forms, selector, native timing status, measured
+inputs, correctness status, blocker) plus the SINGLE_INPUT / BLOCKED /
+derived-custom / not-measured lists and the totals.
+
 ## Commands
 
 ```bash

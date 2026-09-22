@@ -19,13 +19,13 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     set +eu
     # shellcheck disable=SC1091
     source "$R/hpcperf_env.sh" 2>/dev/null
+    set -eu
+fi
 # Registered inputs (inputs.yaml): HPCPERF_P3_HEAT3D_INPUT=<id> supplies this script's knobs / extra arguments
 # (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
 # shellcheck disable=SC1091
 source "$R/tools/inputs/hpcperf_input_selector.sh"
 hpcperf_apply_input "$HERE" HPCPERF_P3_HEAT3D_INPUT || exit 2
-    set -eu
-fi
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in

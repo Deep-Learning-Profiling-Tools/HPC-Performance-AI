@@ -13,6 +13,13 @@ hpcperf_apply_input() {
     local bench_dir="$1" var="$2" id="${!2:-}" tool root
     [ -n "$id" ] || return 0
     root="$(cd "$bench_dir/../.." && pwd)"; tool="$root/tools/inputs/hpcperf_inputs.py"
+    # the registry reader needs the repository's python3 + pyyaml: source the (idempotent) environment
+    # script when the calling shell has not done so yet (some run.sh only source it later or never).
+    if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$root" ] && [ -f "$root/hpcperf_env.sh" ]; then
+        local _sel_opts; _sel_opts="$(set +o)"; set +eu
+        # shellcheck disable=SC1091
+        source "$root/hpcperf_env.sh" 2>/dev/null; eval "$_sel_opts"
+    fi
     local lines; lines="$(python3 "$tool" shell-env "$bench_dir" "$id")" || { echo "run.sh: $var=$id is not a registered input of $(basename "$bench_dir")" >&2; return 2; }
     local kind k v
     while IFS=$'\t' read -r kind k v; do
