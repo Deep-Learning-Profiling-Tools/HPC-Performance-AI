@@ -386,7 +386,7 @@ PYEOF
 cav="$(python3 - "$TMP/l2out/level2" <<'PYEOF' 2>&1
 import glob, json, sys
 txt = " ".join(json.dumps(json.load(open(p))["caveats"]) for p in glob.glob(sys.argv[1] + "/*/*.json"))
-print("PROF" if "includes nsys overhead" in txt else "-", "MISS" if "did not match" in txt else "-")
+print("PROF" if "carry profiler cost" in txt else "-", "MISS" if "did not match" in txt else "-")
 PYEOF
 )"
 case "$cav" in

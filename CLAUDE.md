@@ -206,9 +206,13 @@ Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contain
 - nsys wraps `run.sh` from the OUTSIDE: 20 of 24 end in `exec`, and a profiler
   inside the launcher's wrapper breaks the nvidia-smi pid join and makes every rank
   `unverified`. Outside, the audit stays clean (verified on quicksilver).
-- Wall clock of a Level 2 run INCLUDES 1.66x-1.91x profiler overhead (measured;
-  `-s none` alone costs 1.66x, it is attach/flush not sampling) -- an upper bound.
-  GPU-side numbers are unaffected (CUPTI device timestamps, 1.2% spread).
+- A Level 2 wall clock is an upper bound, but do NOT read the 1.7x as the
+  application being slowed: that is the nsys command's wall clock. quicksilver's own
+  `main` timer grew only 8.9% (7.431 -> 8.09 s); the rest is nsys attach + report
+  writing OUTSIDE the application. Measured over 13 apps against unprofiled runs:
+  a fixed 2.9-6.9 s plus ~6.5-13 us per CUDA API call (rule of thumb 5 s + 10 us/call;
+  miniem's 15.2M calls cost +125 s). So `host_outside_gpu_s` is NOT application host
+  time. GPU-side numbers are unaffected (CUPTI device timestamps, 1.2% spread).
 - 16 of 24 applications print their own FOM and it is collected (patterns in
   `cases_l2.tsv`); the other 8 are left BLANK, never a derived number. The profiler
   depresses a FOM by 5.4%-6.4%, so every record carries `fom.from_profiled_run`.

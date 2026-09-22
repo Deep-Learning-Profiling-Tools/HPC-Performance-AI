@@ -19,8 +19,10 @@ cannot average them by accident:
     Level 1   N clean runs for the wall clock + 1 profiled run for the breakdown,
               host-side verification skipped (HPCPERF_SKIP_VERIFY)
     Level 2   ONE profiled run of level2/<app>/run.sh, no repeats, no verification
-              -> wall_s includes profiler overhead (~1.7x measured) and the
-              application's own FOM is read from that same profiled run
+              -> wall_s and host_outside_gpu_s carry profiler cost (a fixed
+              2.9-6.9 s of attach and report writing OUTSIDE the application plus
+              ~6.5-13 us per CUDA API call; the application itself slowed 8.9% on
+              quicksilver), and the FOM is read from that same profiled run
 
 What the numbers mean
 ---------------------
@@ -32,7 +34,10 @@ gpu_active_span_s   first GPU operation start .. last GPU operation end
 gpu_idle_in_span_s  span - busy: the GPU was idle inside the active window,
                     i.e. the host was the bottleneck between launches
 host_outside_gpu_s  wall - span: process start-up, allocation, data generation and
-                    teardown, which happen before/after any GPU work
+                    teardown, which happen before/after any GPU work. At Level 1
+                    this is profiler-free (the wall clock comes from clean runs);
+                    at Level 2 it also contains nsys attach and report writing and
+                    is NOT the application's host time
 
 The report is produced with verification skipped by default, so these numbers do
 not include the CPU reference recomputation those benchmarks perform. The JSON
@@ -95,9 +100,16 @@ SUMMARY_L2_COLUMNS = [
     "nsys_version", "nvcc_version", "git_commit", "git_dirty", "raw_dir",
 ]
 
-# Measured on this node (quicksilver, HPCPERF_GPUS=1), used only in the caveat text
-# so a reader of a single JSON knows the size of the effect they are looking at.
-L2_PROFILER_WALL_RATIO = "1.66x-1.91x (9.29 s clean vs 15.4-17.7 s profiled)"
+# Measured on this node, used only in the caveat text so a reader of a single JSON
+# knows the size of the effect. The overhead is NOT a uniform slowdown of the
+# application: on quicksilver the application's own `main` timer grew 7.431 -> 8.09 s
+# (+8.9%) while the nsys command's wall clock grew 9.29 -> 16.3 s. The difference sits
+# OUTSIDE the application, in nsys attach and post-run report writing. Fitted over 13
+# applications with an unprofiled reference run: a fixed 2.9-6.9 s plus roughly
+# 6.5-13 us per intercepted CUDA API call (miniem: 15.2M calls -> +125 s).
+L2_PROFILER_WALL_MODEL = ("a fixed 2.9-6.9 s of nsys attach and report writing outside "
+                          "the application, plus roughly 6.5-13 us per CUDA API call "
+                          "(the application itself slowed 8.9% on quicksilver)")
 L2_PROFILER_FOM_EFFECT = "-5.4%..-6.4% (5.631e6 clean vs 5.271/5.327/5.329e6 profiled)"
 
 # What verification each benchmark performs, and whether HPCPERF_SKIP_VERIFY actually
@@ -514,9 +526,10 @@ def build_record_l2(raw_dir):
     if blocks:
         rec.update(blocks)
         rec["host"]["note"] = (
-            "wall clock minus the GPU active span: process start-up, MPI_Init, input "
-            "setup and teardown -- and, because this is a single profiled run, the "
-            "profiler's own overhead. It is an upper bound on host time.")
+            "wall clock minus the GPU active span. It is NOT application host time: "
+            "besides process start-up, MPI_Init, input setup and teardown it contains "
+            "nsys attach and post-run report writing, which for a short run is most of "
+            "it. See cuda_api_calls and the caveats for the measured magnitude.")
         if rec["host"]["outside_gpu_s"] < 0:
             rec["caveats"].append(
                 "GPU active span exceeds the wall clock; host_outside_gpu_s is not "
@@ -525,11 +538,20 @@ def build_record_l2(raw_dir):
         rec["gpu"] = None
 
     if profiled:
+        api_calls = (rec.get("cuda_api") or {}).get("calls")
+        est = None
+        if api_calls:
+            est = (5.0 + 10e-6 * api_calls, api_calls)
         rec["caveats"].append(
-            f"Single profiled run, no clean baseline: wall_s includes nsys overhead, "
-            f"measured at {L2_PROFILER_WALL_RATIO} on this node. GPU-side numbers are "
-            f"unaffected (CUPTI timestamps on the device; kernel total moved 1.2% across "
-            f"sampling settings), host and wall numbers are upper bounds.")
+            f"Single profiled run, no clean baseline: wall_s and host_outside_gpu_s carry "
+            f"profiler cost -- {L2_PROFILER_WALL_MODEL}. GPU-side numbers are unaffected "
+            f"(CUPTI timestamps on the device; kernel total moved 1.2% across sampling "
+            f"settings). Neither wall_s nor host_outside_gpu_s is the application's own "
+            f"time; treat them as upper bounds."
+            + (f" Order of magnitude for this run: ~{est[0]:.0f} s of the wall clock, from "
+               f"{est[1]:,} intercepted CUDA API calls (rule of thumb 5 s + 10 us/call, "
+               f"which fitted the 13 measured applications to within about 40%)."
+               if est else ""))
         if rec["fom"]["status"] == "ok":
             rec["caveats"].append(
                 f"fom_value comes from the profiled run, where the profiler depresses it: "

@@ -223,10 +223,11 @@ rather than hidden. Measured on quicksilver at `HPCPERF_GPUS=1`:
 
 Three things follow, and they are why the flags are what they are:
 
-* **Wall clock is an upper bound.** Overhead is 1.66x-1.91x and it is not the
-  sampling: `-s none` alone already costs 1.66x. It is nsys attach, CUDA
-  interception and flush on an MPI process tree. `host_outside_gpu_s` therefore
-  includes profiler overhead as well as start-up, `MPI_Init` and teardown.
+* **Wall clock is an upper bound, but the application is not slowed by 1.7x.**
+  That ratio is the nsys *command's* wall clock. Read quicksilver's own timers for
+  the same regions and the application barely moves -- most of the cost sits
+  outside it, in nsys attach and post-run report writing (see below).
+  `host_outside_gpu_s` is therefore NOT application host time.
 * **GPU-side numbers are trustworthy.** CUPTI timestamps kernels on the device.
   Across the three flag sets the kernel total moved 1.2% with an identical launch
   count, so the full sampling set is taken: it is nearly free relative to the
@@ -235,6 +236,67 @@ Three things follow, and they are why the flags are what they are:
   same profiled run, so every record carries `fom.from_profiled_run = true` and a
   caveat. Do not compare these values against published unprofiled FOMs without
   that correction.
+
+### Where the profiler overhead actually lands
+
+The 1.66x-1.91x above is the wall clock of the `nsys` command, and reading it as
+"the application ran 1.7x slower" is wrong. quicksilver's own timer table for the
+same regions, unprofiled vs profiled:
+
+| region | no profiler | `-s none` | `process-tree` | `+ctxsw` |
+|---|---|---|---|---|
+| `main` | 7.431 s | 7.960 | 8.091 | 8.007 |
+| `cycleTracking` | 6.598 s | 6.975 | 7.049 | 6.972 |
+| `cycleTracking_Kernel` | 4.302 s | 3.832 | 3.825 | 3.798 |
+| `cycleTracking_MPI` | 2.295 s | 3.142 | 3.223 | 3.173 |
+
+The application's `main` grew **8.9%**, not 70%. (The kernel region got shorter and
+the MPI region longer -- profiling shifts where asynchronous waits are charged, so
+the split between those two is not comparable across modes; their sum is.)
+Subtracting `main` from the command's wall clock shows where the rest went:
+
+| | command wall | app `main` | outside `main` |
+|---|---|---|---|
+| no profiler | 9.29 s | 7.431 | 1.86 s (start-up, `MPI_Init`, launcher) |
+| `-s none` | 15.38 s | 7.960 | **7.42 s** |
+| `process-tree` | 16.28 s | 8.091 | **8.19 s** |
+| `+ctxsw --cuda-memory-usage` | 17.72 s | 8.007 | **9.71 s** |
+
+That outside-`main` time is nsys attaching and then writing the report, and it
+grows with how much was collected. Measured against an unprofiled reference run for
+13 applications, the overhead separates into a fixed part and a per-API-call part:
+
+| app | CUDA API calls | unprofiled s | profiled s | increment | us per API call |
+|---|---|---|---|---|---|
+| `minibude` | 756 | 5.60 | 8.46 | +2.86 | 3781.5 |
+| `sw4lite` | 1,930 | 8.20 | 13.96 | +5.76 | 2985.3 |
+| `kripke` | 2,511 | 3.20 | 9.43 | +6.23 | 2481.6 |
+| `quicksilver` | 2,665 | 9.29 | 16.18 | +6.89 | 2584.3 |
+| `p3_vlp4d` | 5,880 | 7.80 | 10.99 | +3.19 | 542.1 |
+| `gamess_ri_mp2` | 10,043 | 4.20 | 9.45 | +5.25 | 523.1 |
+| `exacmech` | 29,072 | 8.90 | 12.09 | +3.19 | 109.8 |
+| `comb` | 138,438 | 2.10 | 8.85 | +6.75 | 48.8 |
+| `exampm` | 249,721 | 11.70 | 17.52 | +5.82 | 23.3 |
+| `miniweather` | 1,475,106 | 33.90 | 51.50 | +17.60 | 11.9 |
+| `haccabanapm` | 1,534,132 | 20.60 | 40.97 | +20.37 | 13.3 |
+| `cabanapic` | 4,512,104 | 62.00 | 91.26 | +29.26 | 6.5 |
+| `miniem` | 15,165,911 | 110.09 | 235.10 | +125.01 | 8.2 |
+
+Two regimes, and the *ratio* is the wrong thing to look at in either:
+
+* **Under ~20k API calls the increment is a flat 2.9-6.9 s** regardless of anything
+  -- attach plus report writing. `comb` looks like a 4.2x slowdown only because it
+  runs for 2.1 s; its absolute cost is the same 6.75 s as everyone else's.
+* **Above ~1M API calls the per-call interception dominates and converges to
+  6.5-13 us per call.** This explains `miniem`, the worst case in the suite: 15.2
+  million CUDA API calls (a Trilinos/Kokkos stack, not a high kernel count -- it has
+  fewer launches than `cabanapic`, which has 17x more calls per launch) cost +125 s.
+
+Rule of thumb: **~5 s + ~10 us per CUDA API call**, which fits these 13 to within
+about 40%. `cuda_api_calls` is in the CSV, so the estimate is reproducible per run,
+and each JSON's caveat states it. It is an order of magnitude, not a correction to
+subtract: for an honest wall clock and an undistorted FOM, measure without the
+profiler.
 
 ### The figure of merit, where there is one
 
