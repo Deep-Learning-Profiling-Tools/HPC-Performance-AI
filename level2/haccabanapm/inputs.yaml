@@ -35,17 +35,19 @@ baseline:
       rule: record
 coverage:
   status: MULTI_INPUT
-  reason: both upstream indat files; larger NG/NP would be a derived indat (not added)
+  reason: >-
+    upstream's demo indat (5 steps, no timed window), the project's benchmark indat at 256^3 (run.sh
+    default, derived from the demo indat) and the same window at 128^3 (derived size step)
 inputs:
 - id: bench-256
   case: m000-cosmology
   variant: default
   source:
-    kind: upstream-file
-    upstream:
-      repo: ECP-copa/HACCabanaPM
-      version: see level2/<app>/README.md (Upstream commit)
-      path: apps/demo/indat_bench_256.params (NG=NP=256, RL=256, z 200->0, 500 DKD steps) -- run.sh default
+    kind: derived
+    derivation: >-
+      apps/demo/indat_bench_256.params is the project's benchmark indat derived from upstream's demo indat
+      (same HACC M000 cosmology, seed and transfer function; NG/NP/RL 128 -> 256, Z_FIN 50 -> 0, N_STEPS
+      5 -> 500 = upstream's validated z=200->0 window), the run.sh default since the Level 2 bring-up
   params:
     indat: apps/demo/indat_bench_256.params
     ng: 256
@@ -61,6 +63,30 @@ inputs:
   - cuda
   files:
   - apps/demo/indat_bench_256.params
+  input_form: file
+- id: bench-128
+  case: m000-cosmology
+  variant: size
+  source:
+    kind: derived
+    derivation: >-
+      inputs/indat_bench_128.params: the bench-256 window (z=200->0, 500 DKD steps) at NG=NP=128, RL=128
+      (the demo size, same 1 Mpc/h spacing); only NG/NP/RL differ from indat_bench_256.params
+  params:
+    indat: inputs/indat_bench_128.params
+    ng: 128
+    np: 128
+    steps: 500
+  env:
+    HPCPERF_HACCABANAPM_INDAT: inputs/indat_bench_128.params
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/indat_bench_128.params
   input_form: file
 - id: demo-128
   case: m000-cosmology
@@ -87,3 +113,8 @@ inputs:
   files:
   - apps/demo/indat.params
   input_form: file
+  notes: >-
+    upstream's demo indat runs 5 DKD steps, exactly pm_run's warm-up window (warmup=5), so no timed step
+    exists and the pm_run_timing summary line is not printed: the run completes but the native timer is
+    unavailable for this input (E2E and the pm_ic/pm_run wall times of run.sh only); NEEDS_TIMING_SUPPORT for
+    this input alone
