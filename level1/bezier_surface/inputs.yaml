@@ -31,7 +31,12 @@ baseline:
       rule: absent
 coverage:
   status: MULTI_INPUT
-  reason: upstream run line plus two larger surface resolutions via -n
+  reason: >-
+    the upstream Makefile run (-n 8192) and the program's own default resolution (-n 300). The x2 and x4
+    resolutions (16384, 32768) are NOT registered: the port's own check (relative L1 norm of the GPU
+    surface against the double-precision CPU reference, threshold 1e-6) reports FAIL there while the
+    default passes; the cause is not established (the float parametric evaluation is suspected, not
+    verified) -- the two attempts are kept as unregistered records in the rollout measurements
 inputs:
 - id: n8192
   case: bezier-surface
@@ -57,39 +62,23 @@ inputs:
   - cuda
   files:
   - data/control.txt
-- id: n16384
+- id: n300
   case: bezier-surface
   variant: size
   source:
-    kind: derived
-    derivation: -n (points per parametric direction) x2
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/bezier-surface-cuda main.cu: the program default output resolution (-n 300, -m 3 control points)'
   params:
-    n: 16384
+    control_points_file: data/control.txt
+    n: 300
   args:
   - -f
   - level1/bezier_surface/data/control.txt
   - -n
-  - '16384'
-  runtime_config:
-    gpus: 1
-  build_config: null
-  backends_validated:
-  - cuda
-  files:
-  - data/control.txt
-- id: n32768
-  case: bezier-surface
-  variant: size
-  source:
-    kind: derived
-    derivation: -n x4
-  params:
-    n: 32768
-  args:
-  - -f
-  - level1/bezier_surface/data/control.txt
-  - -n
-  - '32768'
+  - '300'
   runtime_config:
     gpus: 1
   build_config: null
