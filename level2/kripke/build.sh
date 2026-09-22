@@ -25,6 +25,8 @@ set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SRC_DIR}/../.." && pwd)"
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$REPO_ROOT/tools/timing/roi${CPATH:+:$CPATH}"
 BACKEND="${1:-CUDA}"
 BACKEND_UPPER="$(echo "${BACKEND}" | tr '[:lower:]' '[:upper:]')"
 JOBS="${HPCPERF_BUILD_JOBS:-4}"

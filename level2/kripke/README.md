@@ -50,7 +50,13 @@ umpire 3.3 MB), `blt/` 349 KB, `src/` 259 KB.
 
 ## Changes from upstream
 
-Copied code is byte-identical except for the following.
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/kripke.cpp`: the region of interest is the `SteadyStateSolver` call. Pure insertions -- no
+  upstream line changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a
+  profiler is attached, so build, run and validation behave as before; `build.sh` puts
+  `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
+Apart from the markers above, copied code is byte-identical except for the following.
 
 1. **`tpl/raja/include/RAJA/policy/cuda/MemUtils_CUDA.hpp`** and the identical
    **`tpl/chai/src/tpl/raja/include/RAJA/policy/cuda/MemUtils_CUDA.hpp`**
