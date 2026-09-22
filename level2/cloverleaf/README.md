@@ -55,7 +55,15 @@ used as the buildable stand-in for both the CUDA and HIP variants.
 
 ## Changes from upstream
 
-None to the copied source, decks or CMake files (all byte-identical). Wrapper-level:
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `driver/hydro.cpp`: the region of interest is the hydro time loop, ending before the final
+  `field_summary`. Excluded inside it: in-loop VisIt output. Pure insertions -- no upstream line
+  changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
+Apart from the markers above, none to the copied source, decks or CMake files (all byte-identical
+otherwise). Wrapper-level:
 
 - `build.sh` passes `-DCMAKE_CUDA_ARCHITECTURES=OFF`. Upstream adds
   `-arch=${CUDA_ARCH}` to `CMAKE_CUDA_FLAGS` itself (`src/cuda/model.cmake`) and
