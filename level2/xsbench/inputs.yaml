@@ -39,7 +39,16 @@ baseline:
       rule: present
 coverage:
   status: MULTI_INPUT
-  reason: the four upstream standard sizes plus a larger lookup count
+  reason: >-
+    the two upstream sizes that carry a reference checksum (small, large; event-based method as run.sh
+    runs it) plus upstream's history-based simulation method on the large size (its own reference
+    checksum). XSBench verifies only these size/method/lookup combinations; every other size (XL, XXL) or
+    lookup count prints 'WARNING - INAVALID CHECKSUM' and exits 1 by design, so they cannot be registered
+    as validated inputs (XL, XXL and -l 100000000 attempts are kept as unregistered records)
+  upstream_inputs_not_added:
+  - -s XL and -s XXL (upstream sizes without a reference checksum: exit 1 'INAVALID CHECKSUM')
+  - other lookup counts (-l) (no reference checksum)
+  - -G hash|nuclide grid types and -k kernel variants (upstream parameters, not explored this round)
 inputs:
 - id: large
   case: hoogenboom-martin
@@ -80,63 +89,22 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-- id: xl
+- id: large-history
   case: hoogenboom-martin
-  variant: size
+  variant: parameter
   source:
     kind: upstream-parameterized
     upstream:
       repo: ANL-CESAR/XSBench
       version: see level2/<app>/README.md (Upstream commit)
-      path: -s XL (upstream standard size)
-  params:
-    size: XL
-    lookups: 17000000
-  args:
-  - -s
-  - XL
-  runtime_config:
-    gpus: 1
-    ranks: 1
-  build_config: null
-  backends_validated:
-  - cuda
-- id: xxl
-  case: hoogenboom-martin
-  variant: size
-  source:
-    kind: upstream-parameterized
-    upstream:
-      repo: ANL-CESAR/XSBench
-      version: see level2/<app>/README.md (Upstream commit)
-      path: -s XXL (upstream standard size)
-  params:
-    size: XXL
-    lookups: 17000000
-  args:
-  - -s
-  - XXL
-  runtime_config:
-    gpus: 1
-    ranks: 1
-  build_config: null
-  backends_validated:
-  - cuda
-- id: large-l100m
-  case: hoogenboom-martin
-  variant: steps
-  source:
-    kind: upstream-parameterized
-    upstream:
-      repo: ANL-CESAR/XSBench
-      version: see level2/<app>/README.md (Upstream commit)
-      path: -s large -l 100000000 (lookup count = amount of work, XSBench's own parameter)
+      path: -m history -s large (upstream's history-based simulation method, the program default; own reference checksum)
   params:
     size: large
-    lookups: 100000000
+    lookups: 17000000
+    simulation_method: history
   args:
-  - -l
-  - '100000000'
+  - -m
+  - history
   runtime_config:
     gpus: 1
     ranks: 1
