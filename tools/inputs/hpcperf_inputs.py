@@ -33,9 +33,24 @@ Sub-commands (all read-only except `measure`, which writes into --out):
                                            1 a rule failed / the candidate run failed (verdict FAIL);
                                            2 refused: baseline belongs to another input or benchmark,
                                            was recorded for a different workload (params/args/files),
-                                           or is the same output file; 3 nothing failed but a required
-                                           quantity is still `record` (verdict INCOMPLETE -- not a pass)
-  status   <bench_dir> <measurement.json>  the status vocabulary of a finished measurement
+                                           is bound to another input, or is the same output file;
+                                           3 nothing failed but the comparison is not complete: a
+                                           required quantity is still `record`, or the workload
+                                           identity of baseline/candidate is not established (old
+                                           record without identity, incomplete identity) -- verdict
+                                           INCOMPLETE, never a pass. Identity is established by a
+                                           complete matching `workload` (measured or migrated with
+                                           evidence) or by a `reference_binding` of an upstream
+                                           reference to this input with recorded evidence.
+  status   <bench_dir> <measurement.json>  the status vocabulary of a finished measurement (the
+                                           self-comparison is re-derived over the runs OTHER than
+                                           the baseline run)
+  migrate-baseline <bench_dir> <baseline.json> --input ID --evidence <measurement.json> [--note ..] [--out F]
+                                           attach a workload identity to an old baseline from the
+                                           evidence of the measurement it came from (same benchmark,
+                                           input id, inputs.yaml sha256, command/selector); writes a
+                                           NEW file and records source/evidence/basis; never copies
+                                           the candidate's identity
   measure  <bench_dir> <input_id> --out DIR [--warmup 1] [--reps 3] [--timeout S] [--gpus 1]
                                            warm-up run + N measured runs, one directory per run,
                                            timing + baseline + summary (median, min, max, MAD, spread)
@@ -442,13 +457,153 @@ def workload_identity(doc: dict, inp: dict) -> dict:
             "env": {str(k): str(v) for k, v in (inp.get("env") or {}).items()}, "files_sha256": files}
 
 
+WORKLOAD_KEYS = ("input_id", "params", "args", "env", "files_sha256")
+
+
+def workload_complete(wl) -> bool:
+    """A workload identity is usable only when every key is present with the right shape and
+    no input-file hash is missing (a None sha256 = the file could not be read)."""
+    if not isinstance(wl, dict):
+        return False
+    if any(k not in wl for k in WORKLOAD_KEYS):
+        return False
+    if not isinstance(wl["input_id"], str) or not wl["input_id"]:
+        return False
+    if not isinstance(wl["params"], dict) or not isinstance(wl["args"], list) or not isinstance(wl["env"], dict):
+        return False
+    if not isinstance(wl["files_sha256"], dict) or any(v is None for v in wl["files_sha256"].values()):
+        return False
+    return True
+
+
 def workload_mismatch(baseline_wl: dict, current_wl: dict) -> list:
     """The keys of the workload identity that differ (empty list = same workload)."""
     diff = []
-    for k in ("input_id", "params", "args", "env", "files_sha256"):
+    for k in WORKLOAD_KEYS:
         if baseline_wl.get(k) != current_wl.get(k):
             diff.append(k)
     return diff
+
+
+def comparability(bdoc: dict, doc: dict, inp) -> dict:
+    """Whether baseline and candidate are known to be the SAME workload. Three outcomes:
+      established   -- the baseline carries a complete workload identity equal to the candidate
+                       input's registry identity, or an upstream reference explicitly bound to
+                       this input with recorded evidence (reference_binding);
+      contradicted  -- identities exist and differ (refused, exit 2);
+      not-established -- identity missing / incomplete on either side: the comparison may be
+                       computed and shown, but it can never be a PASS (verdict INCOMPLETE).
+    A candidate's identity is never copied into an old baseline; migration is explicit
+    (`migrate-baseline`) and records its evidence."""
+    if inp is None:
+        return {"status": "not-established", "reason": "candidate input unknown (no --input and the baseline names none)"}
+    cur = workload_identity(doc, inp)
+    if not workload_complete(cur):
+        return {"status": "not-established", "reason": "candidate workload identity incomplete (registry entry / input files unreadable)"}
+    wl = bdoc.get("workload")
+    if isinstance(wl, dict) and wl:
+        if not workload_complete(wl):
+            return {"status": "not-established", "reason": "baseline workload identity incomplete (missing or empty keys)"}
+        diff = workload_mismatch(wl, cur)
+        if diff:
+            return {"status": "contradicted", "reason": "differs in: " + ", ".join(diff), "diff": diff}
+        return {"status": "established", "reason": "baseline workload identity equals the candidate's registry identity" +
+                (" (migrated: " + str(bdoc["workload_migration"].get("source")) + ")" if isinstance(bdoc.get("workload_migration"), dict) else "")}
+    rb = bdoc.get("reference_binding")
+    if isinstance(rb, dict):
+        if rb.get("bound_input") != inp["id"]:
+            return {"status": "contradicted", "reason": f"upstream reference is bound to input '{rb.get('bound_input')}', not '{inp['id']}'"}
+        if not rb.get("evidence") or not rb.get("source") or not rb.get("adapted_by"):
+            return {"status": "not-established", "reason": "reference_binding lacks evidence/source/adapted_by"}
+        return {"status": "established", "reason": f"upstream reference bound to '{inp['id']}' (source: {rb['source']}; evidence: {rb['evidence']})", "kind": "upstream-reference"}
+    return {"status": "not-established", "reason": "baseline carries no workload identity (recorded before round 3); read/display only -- migrate it with evidence (migrate-baseline) to compare formally"}
+
+
+def _registry_entry_at(doc: dict, inp: dict, commit: str):
+    """The workload identity of this input as recorded in inputs.yaml at a git commit (None if absent)."""
+    root = repo_root(Path(doc["_path"]).parent); rel = str(Path(doc["_path"]).resolve().relative_to(root))
+    txt = subprocess.run(["git", "-C", str(root), "show", f"{commit}:{rel}"], capture_output=True, text=True, check=True).stdout
+    then = yaml.safe_load(txt); tinp = next((i for i in then.get("inputs", []) if i.get("id") == inp["id"]), None)
+    return None if tinp is None else workload_identity(doc, tinp)
+
+
+def migrate_baseline(doc: dict, bdoc: dict, inp: dict, evidence_path: Path, note: str, registry_commit=None, manual_basis=None) -> dict:
+    """Attach a workload identity to an old baseline from EVIDENCE, never from the candidate:
+    the measurement.json the baseline was written from must name the same benchmark and
+    input id, its recorded inputs.yaml sha256 must equal the current registry file's (so the
+    registry entry the identity is built from is the one that produced the run), and for a
+    binary entry the recorded command must end with the registry args. On success the
+    identity is built from the CURRENT registry entry and the migration is recorded
+    (source, evidence, note, time); the caller writes it to a NEW file."""
+    ev = json.loads(Path(evidence_path).read_text())
+    problems = []
+    if ev.get("benchmark") != doc["benchmark"]:
+        problems.append(f"evidence benchmark '{ev.get('benchmark')}' != '{doc['benchmark']}'")
+    if ev.get("input_id") != inp["id"]:
+        problems.append(f"evidence input_id '{ev.get('input_id')}' != '{inp['id']}'")
+    if bdoc.get("input_id") and bdoc["input_id"] != inp["id"]:
+        problems.append(f"baseline input_id '{bdoc['input_id']}' != '{inp['id']}'")
+    registry_basis = "evidence inputs_yaml_sha256 equals the current inputs.yaml"; kind = "automatic"
+    if ev.get("inputs_yaml_sha256") != doc["_sha256"]:
+        # The registry file changed since the run (roles, comments, other inputs...). The entry the run
+        # used is recoverable from git ONLY when the run recorded a clean commit; otherwise the operator
+        # must name a registry commit to check against AND state the basis that bridges the gap between
+        # the run-time (dirty) file and that commit -- both are recorded verbatim, nothing is assumed.
+        g = ev.get("git") or {}
+        commit = g["head"] if (g.get("head") and g.get("dirty") is False) else registry_commit
+        if commit is None:
+            problems.append("evidence inputs_yaml_sha256 differs from the current inputs.yaml and the run's git tree was dirty/unknown; pass --registry-commit <commit> (entry to check against) and --manual-basis <text>")
+        else:
+            try:
+                then_wl = _registry_entry_at(doc, inp, commit); now_wl = workload_identity(doc, inp)
+                if then_wl is None:
+                    problems.append(f"input '{inp['id']}' did not exist in inputs.yaml at commit {commit[:12]}")
+                else:
+                    diff = workload_mismatch(then_wl, now_wl)
+                    if diff:
+                        problems.append(f"registry entry changed since commit {commit[:12]} in: {', '.join(diff)}")
+                    elif g.get("dirty") is False and commit == g["head"]:
+                        registry_basis = f"inputs.yaml changed since the run, but the entry '{inp['id']}' at the run's clean commit {commit[:12]} has the same params/args/env/files as now (git show)"
+                    else:
+                        if not manual_basis or not manual_basis.strip():
+                            problems.append("the run's git tree was dirty: --manual-basis <text> stating what links the run-time registry file to the named commit is required")
+                        else:
+                            kind = "manual"
+                            registry_basis = (f"run-time inputs.yaml sha256 {ev.get('inputs_yaml_sha256')} differs from now (tree dirty at run time); the entry at the "
+                                              f"operator-named commit {commit[:12]} equals the current one (git show); the operator's basis for the run-time file: " + manual_basis.strip())
+            except (subprocess.CalledProcessError, InputError, yaml.YAMLError) as ex:
+                problems.append(f"could not recover the registry entry at commit {str(commit)[:12]}: {ex}")
+    # what the run itself printed about its input (recorded for the reviewer; not a pass criterion)
+    log_lines = []
+    try:
+        for ln in Path(bdoc.get("log", "")).read_text(errors="replace").splitlines()[:80]:
+            if (f"input={inp['id']}" in ln) or (inp.get("args") and all(str(a) in ln for a in inp["args"])):
+                log_lines.append(ln.strip()[:300])
+    except OSError:
+        pass
+    logs = [r.get("log") for r in ev.get("runs", [])]
+    if bdoc.get("log") and bdoc["log"] not in logs:
+        problems.append("baseline log is not one of the evidence measurement's run logs")
+    if doc["entry"]["kind"] == "binary":
+        args = [str(a) for a in inp.get("args", [])]
+        cmd = [str(c) for c in ev.get("command", [])]
+        if args and cmd[-len(args):] != args:
+            problems.append("evidence command line does not end with the registry args")
+    else:
+        sel = ev.get("selector") or {}
+        if sel.get(doc.get("selector")) != inp["id"]:
+            problems.append("evidence selector does not name this input id")
+    if problems:
+        raise InputError("migration refused: " + "; ".join(problems))
+    out = dict(bdoc)
+    out["workload"] = workload_identity(doc, inp)
+    out["workload_migration"] = {"kind": kind, "source": str(evidence_path), "evidence": {"benchmark": ev.get("benchmark"), "input_id": ev.get("input_id"),
+                                 "inputs_yaml_sha256": ev.get("inputs_yaml_sha256"), "command": ev.get("command"), "selector": ev.get("selector"),
+                                 "started_utc": ev.get("started_utc"), "host": ev.get("host"), "git": ev.get("git"), "entry_sha256": ev.get("entry_sha256"),
+                                 "registry_commit_checked": registry_commit, "run_log_lines": log_lines},
+                                 "note": note, "migrated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                 "basis": "identity built from the current registry entry; the evidence measurement recorded the same benchmark, input id and command/selector; registry: " + registry_basis}
+    return out
 
 
 def native_check(doc, current: dict, inp=None) -> dict:
@@ -636,10 +791,16 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
                                                        "note": "informational only -- compare never refuses on code identity"},
                                      "quantity_rules": quantities(doc, inp), "quantities": base["baseline_quantities"]}, indent=2))
         summary["baseline_saved"] = True; summary["baseline_file"] = str(bfile)
-        cmps = [compare(doc, base["baseline_quantities"], r["baseline_quantities"], inp) for r in good if r["baseline_quantities"]]
-        summary["baseline_self_consistent"] = all(c["ok"] for c in cmps)
+        # independent runs only: the baseline run is never compared with itself (that would be
+        # evidence of nothing); `independent_runs_compared` says how many runs the verdict rests on
+        others = [r for r in good if r["baseline_quantities"] and r["label"] != base["label"]]
+        cmps = [dict(compare(doc, base["baseline_quantities"], r["baseline_quantities"], inp), run=r["label"]) for r in others]
+        summary["baseline_from_run"] = base["label"]
+        summary["independent_runs_compared"] = len(cmps)
+        summary["baseline_self_consistent"] = bool(cmps) and all(c["ok"] for c in cmps)
         # the verdict of the self-comparison: PASS only when every required quantity was verified
-        summary["baseline_verdict"] = ("FAIL" if not all(c["ok"] for c in cmps)
+        # in at least one independent run; NONE when no independent run exists
+        summary["baseline_verdict"] = ("NONE" if not cmps else "FAIL" if not all(c["ok"] for c in cmps)
                                        else ("PASS" if all(c["verified"] for c in cmps) else "INCOMPLETE"))
         summary["baseline_checks"] = cmps
     else:
@@ -653,7 +814,7 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
 
 def status_line(s: dict) -> str:
     keys = ("run_completed", "timing_ok", "native_check", "baseline_saved", "comparison_rules",
-            "baseline_verdict", "compute_ge_1s", "stable", "baseline_self_consistent")
+            "baseline_verdict", "baseline_from_run", "independent_runs_compared", "compute_ge_1s", "stable", "baseline_self_consistent")
     parts = [f"{k}={s.get(k)}" for k in keys]
     if s.get("needs_validation"):
         parts.append("NEEDS_VALIDATION=" + ",".join(s["needs_validation"]))
@@ -675,6 +836,11 @@ def main(argv=None):
     s = sub.add_parser("extract"); s.add_argument("bench_dir"); s.add_argument("log"); s.add_argument("--input")
     s = sub.add_parser("compare"); s.add_argument("bench_dir"); s.add_argument("baseline"); s.add_argument("log"); s.add_argument("--input"); s.add_argument("--rc", type=int, default=0)
     s = sub.add_parser("status"); s.add_argument("bench_dir"); s.add_argument("measurement")
+    s = sub.add_parser("migrate-baseline"); s.add_argument("bench_dir"); s.add_argument("baseline"); s.add_argument("--input", required=True)
+    s.add_argument("--evidence", required=True, help="the measurement.json the baseline was written from"); s.add_argument("--note", default="")
+    s.add_argument("--out", help="destination (default: <baseline>.workload-migrated.json; never overwrites)")
+    s.add_argument("--registry-commit", help="when the run's tree was dirty: the commit whose registry entry is checked against the current one")
+    s.add_argument("--manual-basis", help="required with --registry-commit for a dirty run: the operator's stated basis linking the run-time registry file to that commit (recorded verbatim)")
     s = sub.add_parser("measure"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("--out", required=True)
     s.add_argument("--warmup", type=int, default=1); s.add_argument("--reps", type=int, default=3)
     s.add_argument("--timeout", type=int, default=1800); s.add_argument("--gpus", type=int, default=1)
@@ -727,32 +893,55 @@ def main(argv=None):
                 print(json.dumps({"ok": False, "complete": False, "verified": False, "verdict": "FAIL",
                                   "error": f"candidate run exited {a.rc}; its output is not compared"}, indent=2)); return 1
             inp = get_input(doc, a.input or bid) if (a.input or bid) else None
-            wl_note = None
-            if inp is not None and isinstance(bdoc.get("workload"), dict):
-                diff = workload_mismatch(bdoc["workload"], workload_identity(doc, inp))
-                if diff:
-                    sys.stderr.write(f"hpcperf_inputs: baseline '{bid}' was recorded for a different workload "
-                                     f"(differs in: {', '.join(diff)}) -- same input id, different input identity; refusing to compare\n"); return 2
-            elif inp is not None:
-                wl_note = "baseline carries no workload identity (recorded before round 3); only input_id/benchmark were checked"
+            comp = comparability(bdoc, doc, inp)
+            if comp["status"] == "contradicted":
+                sys.stderr.write(f"hpcperf_inputs: baseline '{bid}' is not the candidate's workload ({comp['reason']}) -- refusing to compare\n"); return 2
             res = compare(doc, bdoc["quantities"], extract(doc, Path(a.log), inp), inp)
             res["baseline_input_id"] = bid
-            if wl_note:
-                res["workload_note"] = wl_note
+            res["workload_status"] = comp["status"]; res["workload_reason"] = comp["reason"]
+            if comp.get("kind"):
+                res["comparison_kind"] = comp["kind"]
+            if comp["status"] != "established":
+                # the numbers are shown for reading/archiving, but nothing is verified: a comparison
+                # whose two sides are not known to be the same workload can never be a PASS
+                res["complete"] = False; res["verified"] = False
+                if res["ok"]:
+                    res["verdict"] = "INCOMPLETE"
+                res["required_pending"] = sorted(set(res["required_pending"]) | {"(workload identity not established)"})
             print(json.dumps(res, indent=2))
-            # acceptance: 0 only when verified (no failure AND every required quantity compared);
-            # 1 = a rule or the run failed (never downgraded to "incomplete"); 3 = nothing failed but a
-            # required comparison is not ready (PARTIAL / record-only); 2 = identity refusals above.
+            # acceptance: 0 only when verified (no failure, every required quantity compared AND the
+            # workload identity of both sides established); 1 = a rule or the run failed (never
+            # downgraded); 3 = nothing failed but the comparison is not complete (required quantity
+            # still record, or identity not established); 2 = identity contradictions above.
             if not res["ok"]:
                 return 1
             return 0 if res["verified"] else 3
+        if a.cmd == "migrate-baseline":
+            bdoc = json.loads(Path(a.baseline).read_text())
+            inp = get_input(doc, a.input)
+            out = migrate_baseline(doc, bdoc, inp, Path(a.evidence), a.note, a.registry_commit, a.manual_basis)
+            dest = Path(a.out) if a.out else Path(a.baseline).with_name(Path(a.baseline).stem + ".workload-migrated.json")
+            if dest.exists():
+                raise InputError(f"{dest} exists; not overwriting a migration record")
+            dest.write_text(json.dumps(out, indent=2))
+            print(json.dumps({"migrated_to": str(dest), "workload": out["workload"], "workload_migration": out["workload_migration"]}, indent=2)); return 0
         if a.cmd == "status":
             m = json.loads(Path(a.measurement).read_text())
             inp = get_input(doc, m["input_id"])
             s, _ = summarize(doc, inp, m["runs"], m.get("measured_runs", len([r for r in m["runs"] if r["measured"]])))
             old = m.get("summary", {})
-            for k in ("baseline_saved", "baseline_file", "baseline_self_consistent", "baseline_verdict"):
+            for k in ("baseline_saved", "baseline_file", "baseline_self_consistent", "baseline_verdict", "baseline_from_run", "independent_runs_compared"):
                 s[k] = old.get(k, (old.get("baseline_file") is not None) if k == "baseline_saved" else None)
+            # older files: recompute the self-comparison over the runs OTHER than the baseline run
+            bf = old.get("baseline_file")
+            if bf and Path(bf).is_file():
+                b = json.loads(Path(bf).read_text()); base_label = b.get("from_run")
+                others = [r for r in m["runs"] if r["measured"] and r["exit_code"] == 0 and r.get("baseline_quantities") and r["label"] != base_label]
+                cmps = [compare(doc, b["quantities"], r["baseline_quantities"], inp) for r in others]
+                s["baseline_from_run"] = base_label; s["independent_runs_compared"] = len(cmps)
+                s["baseline_self_consistent"] = bool(cmps) and all(c["ok"] for c in cmps)
+                s["baseline_verdict"] = ("NONE" if not cmps else "FAIL" if not all(c["ok"] for c in cmps)
+                                         else ("PASS" if all(c["verified"] for c in cmps) else "INCOMPLETE"))
             if s.get("baseline_verdict") is None and old.get("baseline_checks"):
                 s["baseline_verdict"] = ("FAIL" if not all(c["ok"] for c in old["baseline_checks"])
                                          else ("PASS" if s["comparison_rules"] == "READY" and all(c.get("ok") for c in old["baseline_checks"]) else "INCOMPLETE"))

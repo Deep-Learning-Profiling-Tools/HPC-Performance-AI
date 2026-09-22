@@ -87,13 +87,18 @@ python3 "$TOOL" parse-timing "$R/level2/hipbone" "$TMP/does-not-exist.log" >/dev
 [ $rc -eq 1 ] && grep -q "missing" "$TMP/e" && ok "missing log -> error" || bad "missing log accepted (rc=$rc)"
 
 # ---- 5. baseline extraction / comparison ---------------------------------------------------
+mkbase() { # $1 bench_dir  $2 input_id  $3 quantities.json  -> stdout baseline json with workload
+python3 - "$R" "$1" "$2" "$3" <<'PY'
+import json, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = hi.load(sys.argv[2]); inp = hi.get_input(doc, sys.argv[3])
+print(json.dumps({"benchmark": doc["benchmark"], "input_id": inp["id"], "workload": hi.workload_identity(doc, inp), "quantities": json.load(open(sys.argv[4]))}))
+PY
+}
 python3 "$TOOL" extract "$R/level2/hipbone" "$FX/hipbone_nx24_p14.log" > "$TMP/hb.json" 2>/dev/null
 python3 - "$TMP/hb.json" <<'PY' && ok "hipbone: residual norms and iteration count extracted" || bad "hipbone extract"
 import json,sys; d=json.load(open(sys.argv[1])); assert d["cg_iterations"]["value"]==100 and d["r_norm_final"]["value"]<1e-8 and d["dofs"]["value"]==37595375
 PY
-python3 - "$TMP/hb.json" > "$TMP/hb_baseline.json" <<'PY'
-import json,sys; print(json.dumps({"input_id":"coral2-nx24-p14","quantities":json.load(open(sys.argv[1]))}))
-PY
+mkbase "$R/level2/hipbone" coral2-nx24-p14 "$TMP/hb.json" > "$TMP/hb_baseline.json"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 3 ] && grep -q '"ok": true' "$TMP/c.json" && grep -q '"verdict": "INCOMPLETE"' "$TMP/c.json" && ok "hipbone: log vs its own baseline -> nothing fails, but exit 3 INCOMPLETE (required r_norm_final still record)" || bad "hipbone self-compare rc=$rc"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_bad_residual.log" >"$TMP/c.json" 2>/dev/null; rc=$?
@@ -115,9 +120,7 @@ assert all(d[k]["present"] for k in ("pass_ratios","pass_facet","pass_no_loss","
 assert d["final_cycle_census"]["value"]==91801 and d["final_cycle_num_seg"]["value"]==1868057 and abs(d["final_cycle_scalar_flux"]["value"]-5.918521e5)<1
 PY
 python3 "$TOOL" extract "$R/level1/background_subtraction" "$FX/bgsub_r102.log" > "$TMP/bg.json" 2>/dev/null
-python3 - "$TMP/bg.json" > "$TMP/bg_base.json" <<'PY'
-import json,sys; d=json.load(open(sys.argv[1])); assert d["max_error"]["value"]==0 and d["pass_marker"]["present"]; print(json.dumps({"quantities":d}))
-PY
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['max_error']['value']==0 and d['pass_marker']['present']" "$TMP/bg.json" && mkbase "$R/level1/background_subtraction" w4096-h2048-merged0-r102 "$TMP/bg.json" > "$TMP/bg_base.json"
 [ $? -eq 0 ] && ok "background_subtraction: Max error 0 + PASS extracted" || bad "bgsub extract"
 python3 "$TOOL" compare "$R/level1/background_subtraction" "$TMP/bg_base.json" "$FX/bgsub_fail.log" >/dev/null 2>&1; rc=$?
 [ $rc -eq 1 ] && ok "background_subtraction: 'Max error is 3' + FAIL -> compare fails" || bad "bgsub FAIL log accepted (rc=$rc)"
@@ -205,9 +208,7 @@ python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$TMP/hb_nan
 python3 "$TOOL" extract "$R/level2/hipbone" "$TMP/hb_naninf.log" 2>/dev/null | grep -q '"value": null' && ok "neg: extract reports nan/inf as no value (never a float nan)" || bad "neg: extract emitted a non-finite value"
 # 8c. a modified final result (LAMMPS TotEng at step 100 shifted by 1e-3) -> the 1e-5 rule fails
 python3 "$TOOL" extract "$R/level3/lammps" "$FX/lammps_lj.log" --input lj-32k > "$TMP/lj.json" 2>/dev/null
-python3 - "$TMP/lj.json" > "$TMP/lj_baseline.json" <<'PY'
-import json,sys; print(json.dumps({"benchmark":"lammps","input_id":"lj-32k","quantities":json.load(open(sys.argv[1]))}))
-PY
+mkbase "$R/level3/lammps" lj-32k "$TMP/lj.json" > "$TMP/lj_baseline.json"
 python3 - "$FX/lammps_lj.log" "$TMP/lj_mod.log" <<'PY'
 import re,sys
 out=[]
@@ -250,12 +251,11 @@ baseline:
 inputs:
   - {id: coral2-nx24-p14, case: c, variant: default, source: {kind: upstream-parameterized, upstream: x}, params: {}, args: [], backends_validated: [cuda]}
 EOF
-python3 "$TOOL" compare "$TMP/reconly" "$TMP/hb_baseline.json" "$FX/hipbone_99_iterations.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+mkbase "$TMP/reconly" coral2-nx24-p14 "$TMP/hb.json" > "$TMP/reconly_baseline.json"     # identity of the record-only registry's own input
+python3 "$TOOL" compare "$TMP/reconly" "$TMP/reconly_baseline.json" "$FX/hipbone_99_iterations.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 3 ] && grep -q '"record_only": true' "$TMP/c.json" && grep -q '"verified": false' "$TMP/c.json" && ok "neg: all rules record-only -> exit 3 (inconclusive), verified=false, ok=true" || bad "neg: record-only compare returned rc=$rc $(cat "$TMP/c.json")"
 # 8i. baseline and candidate are the same output file -> refused (exit 2)
-python3 - "$TMP/hb.json" "$FX/hipbone_nx24_p14.log" > "$TMP/hb_same.json" <<'PY'
-import json,sys; print(json.dumps({"benchmark":"hipbone","input_id":"coral2-nx24-p14","log":sys.argv[2],"quantities":json.load(open(sys.argv[1]))}))
-PY
+mkbase "$R/level2/hipbone" coral2-nx24-p14 "$TMP/hb.json" | python3 -c "import json,sys; b=json.load(sys.stdin); b['log']=sys.argv[1]; print(json.dumps(b))" "$FX/hipbone_nx24_p14.log" > "$TMP/hb_same.json"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$FX/hipbone_nx24_p14.log" >/dev/null 2>"$TMP/e"; rc=$?
 [ $rc -eq 2 ] && grep -q "same output file" "$TMP/e" && ok "neg: baseline and candidate read the same file -> exit 2, refused" || bad "neg: same-file compare accepted (rc=$rc)"
 cp "$FX/hipbone_nx24_p14.log" "$TMP/hb_copy.log"
@@ -345,9 +345,7 @@ inputs:
 EOF
 printf 'time 1.500 s\nenergy 42.000000\niterations 17\nPASS\n' > "$TMP/diag_base.log"; printf 'time 1.400 s\nenergy 42.000010\niterations 19\nPASS\n' > "$TMP/diag_cand.log"; printf 'time 1.400 s\nenergy 42.000010\nPASS\n' > "$TMP/diag_nodiag.log"
 python3 "$TOOL" extract "$FR/level1/fakediag" "$TMP/diag_base.log" > "$TMP/dq.json" 2>/dev/null
-python3 - "$TMP/dq.json" > "$TMP/diag_baseline.json" <<'PY'
-import json,sys; print(json.dumps({"benchmark":"fakediag","input_id":"a","quantities":json.load(open(sys.argv[1]))}))
-PY
+mkbase "$FR/level1/fakediag" a "$TMP/dq.json" > "$TMP/diag_baseline.json"
 python3 "$TOOL" compare "$FR/level1/fakediag" "$TMP/diag_baseline.json" "$TMP/diag_cand.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['verified'] and d['complete'] and d['diagnostic_recorded']==['iterations'] and d['required_pending']==[]" "$TMP/c.json" 2>/dev/null \
     && ok "acceptance: required energy (rel 1e-6) + marker pass, diagnostic iterations recorded (17 -> 19) -> exit 0, verdict PASS" || bad "acceptance 10.3: rc=$rc $(cat "$TMP/c.json")"
@@ -389,15 +387,137 @@ python3 - "$TMP/m_ok/baseline.json" > "$TMP/wl_diff.json" <<'PY'
 import json,sys; b=json.load(open(sys.argv[1])); b["workload"]=dict(b["workload"]); b["workload"]["params"]={"n": 10}; print(json.dumps(b))
 PY
 python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_diff.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
-[ $rc -eq 2 ] && grep -q "different workload" "$TMP/e" && grep -q "params" "$TMP/e" && ok "identity: same input_id, baseline recorded with other params -> exit 2, refused (names the differing key)" || bad "identity workload rc=$rc $(cat "$TMP/e")"
+[ $rc -eq 2 ] && grep -q "differs in: params" "$TMP/e" && ok "identity: same input_id, baseline recorded with other params -> exit 2, refused (names the differing key)" || bad "identity workload rc=$rc $(cat "$TMP/e")"
 python3 - "$TMP/m_ok/baseline.json" > "$TMP/code_diff.json" <<'PY'
 import json,sys; b=json.load(open(sys.argv[1])); b["code_identity"]={"entry_sha256":"0000deadbeef","git":{"head":"optimized-branch","dirty":True}}; print(json.dumps(b))
 PY
 python3 "$TOOL" compare "$FR/level1/fake" "$TMP/code_diff.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>&1; rc=$?
 [ $rc -eq 0 ] && ok "identity: same workload, different binary/git identity (an optimized build) -> compared normally, exit 0" || bad "identity code rc=$rc"
 grep -q '"workload"' "$TMP/m_ok/baseline.json" && grep -q '"files_sha256"' "$TMP/m_ok/baseline.json" && grep -q 'informational only' "$TMP/m_ok/baseline.json" && ok "identity: baseline.json records workload (params/args/env/files sha256) and code identity separately" || bad "identity baseline fields"
-python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$TMP/hb_copy.log" >"$TMP/c.json" 2>/dev/null; rc=$?
-grep -q 'no workload identity' "$TMP/c.json" && ok "identity: a baseline without workload identity (pre round 3) is compared with a note, not refused" || bad "identity legacy note rc=$rc"
+python3 - "$TMP/hb_baseline.json" > "$TMP/hb_legacy.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); del b["workload"]; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_legacy.json" "$TMP/hb_copy.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q 'no workload identity' "$TMP/c.json" && grep -q '"workload_status": "not-established"' "$TMP/c.json" && ok "identity: a baseline without workload identity (pre round 3) is shown but exit 3 INCOMPLETE, never PASS" || bad "identity legacy rc=$rc"
+
+# ---- 11. workload identity gate: no formal PASS without an ESTABLISHED identity on both sides ----
+# helper: a baseline JSON carrying the registry's workload identity (what `measure` writes)
+# 11a. baseline lacks workload (a pre-round-3 record): shown, but exit 3 / INCOMPLETE -- never 0
+python3 - "$TMP/m_ok/baseline.json" > "$TMP/wl_none.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b.pop("workload", None); b.pop("workload_migration", None); print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_none.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['ok'] and not d['verified'] and d['verdict']=='INCOMPLETE' and d['workload_status']=='not-established' and '(workload identity not established)' in d['required_pending'] and d['checks']" "$TMP/c.json" 2>/dev/null \
+    && ok "identity gate: baseline without workload -> values shown, exit 3 INCOMPLETE (workload_status=not-established), never PASS" || bad "identity gate 11a rc=$rc $(cat "$TMP/c.json")"
+# 11b. candidate side unknown (no --input, baseline names no input): exit 3, not 0
+python3 - "$TMP/m_ok/baseline.json" > "$TMP/wl_noinput.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b.pop("input_id", None); print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_noinput.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"workload_status": "not-established"' "$TMP/c.json" && ok "identity gate: candidate workload unknown (no input id on either side) -> exit 3, not PASS" || bad "identity gate 11b rc=$rc"
+# 11c. identity present but incomplete / empty
+for variant in empty missing_files null_params; do
+python3 - "$TMP/m_ok/baseline.json" "$variant" > "$TMP/wl_$variant.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); v=sys.argv[2]
+if v=="empty": b["workload"]={}
+elif v=="missing_files": b["workload"].pop("files_sha256")
+elif v=="null_params": b["workload"]["params"]=None
+print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_$variant.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"workload_status": "not-established"' "$TMP/c.json" && ok "identity gate: workload $variant -> exit 3 INCOMPLETE" || bad "identity gate 11c $variant rc=$rc"
+done
+# 11d. deleting the identity from a MISMATCHING baseline turns a refusal (2) into INCOMPLETE (3), never into 0
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_diff.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>&1; rc1=$?
+python3 - "$TMP/wl_diff.json" > "$TMP/wl_diff_stripped.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); del b["workload"]; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_diff_stripped.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>&1; rc2=$?
+[ $rc1 -eq 2 ] && [ $rc2 -eq 3 ] && ok "identity gate: mismatching baseline refused (2); with its identity deleted -> 3, not 0" || bad "identity gate 11d rc1=$rc1 rc2=$rc2"
+# 11e. a failing rule still fails (1) even when the identity is not established
+printf 'time 1.500 s\nenergy 43.000000\nPASS\n' > "$TMP/wl_badcand.log"
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_none.json" "$TMP/wl_badcand.log" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && ok "identity gate: identity not established AND energy off -> exit 1 (failure is never masked as incomplete)" || bad "identity gate 11e rc=$rc"
+# 11f. migration with trusted evidence (the measurement.json the baseline came from) -> new file, then exit 0
+python3 "$TOOL" migrate-baseline "$FR/level1/fake" "$TMP/wl_none.json" --input a --evidence "$TMP/m_ok/measurement.json" --note "test migration" --out "$TMP/wl_migrated.json" >"$TMP/mig.json" 2>"$TMP/e"; rc=$?
+[ $rc -eq 0 ] && grep -q '"workload_migration"' "$TMP/wl_migrated.json" && grep -q '"source"' "$TMP/wl_migrated.json" && grep -q 'test migration' "$TMP/wl_migrated.json" && [ -f "$TMP/wl_none.json" ] && ! grep -q '"workload"' "$TMP/wl_none.json" \
+    && ok "migration: identity attached from the evidence measurement into a NEW file with source/evidence/basis; the old record is untouched" || bad "migration 11f rc=$rc $(cat "$TMP/e")"
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/wl_migrated.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && grep -q '"workload_status": "established"' "$TMP/c.json" && grep -q 'migrated:' "$TMP/c.json" && ok "migration: the migrated record compares formally (exit 0, workload established, migration source shown)" || bad "migration compare rc=$rc"
+python3 "$TOOL" migrate-baseline "$FR/level1/fake" "$TMP/wl_none.json" --input a --evidence "$TMP/m_ok/measurement.json" --out "$TMP/wl_migrated.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && grep -q 'not overwriting' "$TMP/e" && ok "migration: never overwrites an existing migration record" || bad "migration overwrite rc=$rc"
+# 11g. migration is refused when the evidence does not fit (other input id / other registry file / other command)
+python3 - "$TMP/m_ok/measurement.json" > "$TMP/ev_bad.json" <<'PY'
+import json,sys; m=json.load(open(sys.argv[1])); m["input_id"]="b"; print(json.dumps(m))
+PY
+python3 "$TOOL" migrate-baseline "$FR/level1/fake" "$TMP/wl_none.json" --input a --evidence "$TMP/ev_bad.json" --out "$TMP/wl_mig_bad.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && grep -q "migration refused" "$TMP/e" && [ ! -f "$TMP/wl_mig_bad.json" ] && ok "migration: evidence naming another input id -> refused, nothing written" || bad "migration 11g rc=$rc $(cat "$TMP/e")"
+python3 - "$TMP/m_ok/measurement.json" > "$TMP/ev_bad2.json" <<'PY'
+import json,sys; m=json.load(open(sys.argv[1])); m["inputs_yaml_sha256"]="0"*64; print(json.dumps(m))
+PY
+python3 "$TOOL" migrate-baseline "$FR/level1/fake" "$TMP/wl_none.json" --input a --evidence "$TMP/ev_bad2.json" --out "$TMP/wl_mig_bad2.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && grep -q "inputs_yaml_sha256" "$TMP/e" && ok "migration: evidence recorded under another inputs.yaml with a dirty/unknown git tree -> refused (entry at run time not recoverable)" || bad "migration 11g2 rc=$rc"
+# a clean commit whose registry entry equals the current one is accepted as evidence (real repo history: hipbone coral2-nx24-p14 at c6efde5)
+if git -C "$R" cat-file -e c6efde5:level2/hipbone/inputs.yaml 2>/dev/null; then
+python3 - "$TMP/hb_legacy.json" "$FX/hipbone_nx24_p14.log" "$R" > "$TMP/hb_ev.json" <<'PY'
+import json,sys,hashlib
+print(json.dumps({"benchmark":"hipbone","input_id":"coral2-nx24-p14","inputs_yaml_sha256":"not-the-current-sha","selector":{"HPCPERF_HIPBONE_INPUT":"coral2-nx24-p14"},
+                  "command":["bash","run.sh","CUDA"],"git":{"head":"c6efde5","dirty":False},"runs":[{"label":"rep1","log":sys.argv[2]}],"started_utc":"2026-09-21T00:00:00Z"}))
+PY
+python3 - "$TMP/hb_legacy.json" "$FX/hipbone_nx24_p14.log" > "$TMP/hb_legacy2.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["log"]=sys.argv[2]; print(json.dumps(b))
+PY
+python3 "$TOOL" migrate-baseline "$R/level2/hipbone" "$TMP/hb_legacy2.json" --input coral2-nx24-p14 --evidence "$TMP/hb_ev.json" --out "$TMP/hb_migrated.json" >"$TMP/mig.json" 2>"$TMP/e"; rc=$?
+[ $rc -eq 0 ] && grep -q 'clean commit c6efde5' "$TMP/hb_migrated.json" && ok "migration: registry file changed since the run, but the entry at the run's clean commit equals the current one (git show) -> accepted, basis recorded" || bad "migration git-history rc=$rc $(cat "$TMP/e")"
+else skip=$((skip+1)); echo "skip migration git-history case (commit not in this clone)"; fi
+# dirty run + changed registry: refused without --manual-basis; accepted with --registry-commit whose entry equals now AND a stated basis (recorded as kind manual)
+if git -C "$R" cat-file -e c6efde5:level2/hipbone/inputs.yaml 2>/dev/null; then
+python3 - "$TMP/hb_ev.json" > "$TMP/hb_ev_dirty.json" <<'PY'
+import json,sys; e=json.load(open(sys.argv[1])); e["git"]={"head":"c6efde5","dirty":True}; print(json.dumps(e))
+PY
+python3 "$TOOL" migrate-baseline "$R/level2/hipbone" "$TMP/hb_legacy2.json" --input coral2-nx24-p14 --evidence "$TMP/hb_ev_dirty.json" --out "$TMP/hb_mig_dirty.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && grep -q "registry-commit" "$TMP/e" && [ ! -f "$TMP/hb_mig_dirty.json" ] && ok "migration: dirty run + changed registry without a named commit/basis -> refused" || bad "migration dirty rc=$rc $(cat "$TMP/e")"
+python3 "$TOOL" migrate-baseline "$R/level2/hipbone" "$TMP/hb_legacy2.json" --input coral2-nx24-p14 --evidence "$TMP/hb_ev_dirty.json" --registry-commit c6efde5 --out "$TMP/hb_mig_dirty.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && grep -q "manual-basis" "$TMP/e" && ok "migration: dirty run + named commit but no stated basis -> refused" || bad "migration dirty no-basis rc=$rc $(cat "$TMP/e")"
+python3 "$TOOL" migrate-baseline "$R/level2/hipbone" "$TMP/hb_legacy2.json" --input coral2-nx24-p14 --evidence "$TMP/hb_ev_dirty.json" --registry-commit c6efde5 --manual-basis "test: run.sh echoed the args; entry unchanged" --out "$TMP/hb_mig_dirty.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 0 ] && grep -q '"kind": "manual"' "$TMP/hb_mig_dirty.json" && grep -q 'entry unchanged' "$TMP/hb_mig_dirty.json" && grep -q '"registry_commit_checked": "c6efde5"' "$TMP/hb_mig_dirty.json" && grep -q '"run_log_lines"' "$TMP/hb_mig_dirty.json" \
+    && ok "migration: dirty run + named commit (entry equal) + stated basis -> accepted as kind=manual, basis/commit/log evidence recorded" || bad "migration dirty manual rc=$rc $(cat "$TMP/e")"
+else skip=$((skip+1)); echo "skip manual migration case"; fi
+# 11h. upstream reference bound to a known input (controlled adaptation) -> comparable; bound elsewhere -> refused; unbound -> incomplete
+python3 - "$TMP/wl_none.json" > "$TMP/ref_bound.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["reference_binding"]={"kind":"upstream-reference","bound_input":"a","source":"fake upstream log","evidence":"deck/size/version read from the log header","adapted_by":"tests/run_all.sh"}; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/ref_bound.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && grep -q '"comparison_kind": "upstream-reference"' "$TMP/c.json" && ok "reference binding: upstream reference bound to this input with evidence -> comparable (exit 0, kind upstream-reference)" || bad "reference binding rc=$rc"
+python3 - "$TMP/ref_bound.json" > "$TMP/ref_other.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["reference_binding"]["bound_input"]="other"; print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/ref_other.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "bound to input 'other'" "$TMP/e" && ok "reference binding: bound to another input -> exit 2, refused" || bad "reference binding other rc=$rc"
+python3 - "$TMP/ref_bound.json" > "$TMP/ref_noev.json" <<'PY'
+import json,sys; b=json.load(open(sys.argv[1])); b["reference_binding"].pop("evidence"); print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/ref_noev.json" "$TMP/m_ok/rep2/stdout.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q 'lacks evidence' "$TMP/c.json" && ok "reference binding: binding without evidence -> exit 3, not PASS" || bad "reference binding noev rc=$rc"
+# 11i. self-consistency never counts the baseline run against itself
+python3 -c "import json,sys; s=json.load(open(sys.argv[1]))['summary']; assert s['baseline_from_run']=='rep1' and s['independent_runs_compared']==1 and all(c['run']!='rep1' for c in s['baseline_checks'])" "$TMP/m_ok/measurement.json" 2>/dev/null \
+    && ok "self-consistency: baseline_from_run=rep1, independent_runs_compared=1 (rep2 only) -- the baseline is not compared with itself" || bad "self-consistency fields"
+
+# ---- 12. Quicksilver: what compare actually covers (real registry, real-format fixture) ----
+python3 "$TOOL" extract "$R/level2/quicksilver" "$FX/quicksilver_two_tables.log" > "$TMP/qsq.json" 2>/dev/null
+mkbase "$R/level2/quicksilver" p1-profile-8c-100k-20s "$TMP/qsq.json" > "$TMP/qs_baseline.json"
+python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$FX/quicksilver_two_tables.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['verdict']=='INCOMPLETE' and d['required_pending']==['final_cycle_scalar_flux'] and d['diagnostic_recorded']==['final_cycle_census','final_cycle_num_seg'] and all(c[k]['ok'] for k in ('pass_ratios','pass_facet','pass_no_loss','pass_fluence','fail_marker'))" "$TMP/c.json" 2>/dev/null \
+    && ok "quicksilver coverage: identical log -> native checks ok, scalar flux only recorded -> exit 3 INCOMPLETE (no numeric baseline comparison exists)" || bad "quicksilver coverage control rc=$rc $(cat "$TMP/c.json")"
+# change the extracted science result (scalar flux x 1.5) but keep every PASS:: line
+sed -E 's/^(\s+19\s.*\s)5\.918521e\+05(\s)/\18.877782e+05\2/' "$FX/quicksilver_two_tables.log" > "$TMP/qs_flux_changed.log"
+grep -q '8.877782e+05' "$TMP/qs_flux_changed.log" || bad "quicksilver fixture edit did not apply"
+python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$TMP/qs_flux_changed.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['ok'] and d['verdict']=='INCOMPLETE' and c['final_cycle_scalar_flux']['ok'] and abs(c['final_cycle_scalar_flux']['value']-887778.2)<1 and abs(c['final_cycle_scalar_flux']['baseline']-591852.1)<1 and c['final_cycle_scalar_flux']['rule']=='record'" "$TMP/c.json" 2>/dev/null \
+    && ok "quicksilver coverage: scalar flux changed x1.5 with all PASS:: lines kept -> NOT detected as a failure (record: 591852.1 -> 887778.2 shown), exit 3 INCOMPLETE -- the differential comparison is not ready" || bad "quicksilver coverage flux rc=$rc $(cat "$TMP/c.json")"
+sed -e '/^PASS:: Fluence/d' "$FX/quicksilver_two_tables.log" > "$TMP/qs_nofluence.log"
+python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$TMP/qs_nofluence.log" >"$TMP/c.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && grep -q '"failed": \[' "$TMP/c.json" && grep -q '"pass_fluence"' "$TMP/c.json" && ok "quicksilver coverage: a missing upstream PASS:: line -> exit 1 FAIL (the native checks are what is verified)" || bad "quicksilver coverage marker rc=$rc"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

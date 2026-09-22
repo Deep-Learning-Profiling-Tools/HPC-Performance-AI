@@ -153,7 +153,9 @@ level3/<app>/
   `HPCPERF_QUICKSILVER_INPUT_ID`); run.sh refuses an id together with the knobs/args it
   would override and the default command stays unchanged. `measure` = 1 warm-up + N runs
   with the native timer (never wall time as main compute). `compare` exit 0 only for verdict
-  PASS (every REQUIRED quantity verified); 3 = INCOMPLETE (a required quantity still `record`),
+  PASS (every REQUIRED quantity verified AND the workload identity of baseline and candidate
+  established -- measured `workload`, evidence-migrated, or an upstream reference bound to the
+  input); 3 = INCOMPLETE (a required quantity still `record`, or identity not established),
   1 = FAIL, 2 = refused (other input/benchmark/workload or same file); diagnostic quantities
   may stay `record`; tests in
   `tools/inputs/tests/run_all.sh`. See `tools/inputs/README.md`.

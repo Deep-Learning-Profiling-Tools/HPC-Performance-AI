@@ -83,6 +83,7 @@ python3 tools/inputs/hpcperf_inputs.py parse-timing level2/quicksilver <stdout.l
 python3 tools/inputs/hpcperf_inputs.py extract  level3/lammps  <log> --input rhodo-32k
 python3 tools/inputs/hpcperf_inputs.py compare  level3/lammps  <baseline.json> <log> [--input ID] [--rc N]
 python3 tools/inputs/hpcperf_inputs.py status   level2/hipbone <measurement.json>
+python3 tools/inputs/hpcperf_inputs.py migrate-baseline level2/hipbone <old baseline.json> --input coral2-nx24-p14 --evidence <its measurement.json> --note "..."
 python3 tools/inputs/hpcperf_inputs.py measure  level2/hipbone sweep-nx16-p8 --out <dir> [--warmup 1] [--reps 3] [--timeout 900] [--gpus 1]
 ```
 
@@ -127,12 +128,34 @@ to another input or benchmark, was recorded for a different workload (registry
 params / args / env / input-file sha256 differ under the same id; the binary, git
 revision and build fingerprint are deliberately NOT part of this identity, so an
 optimized build compares normally), or baseline and candidate are the same output
-file; 3 = INCOMPLETE -- nothing failed, but a required quantity is still `record`
-(hipBone's final residual, SPARTA sphere's particle count). Passing configuration
-checks (iterations, DOFs, step counts, markers) never stand in for a pending
-required result. `measure` mirrors this as `comparison_rules` READY / PARTIAL /
-NONE and `baseline_verdict` PASS / INCOMPLETE / FAIL; `status` re-derives the
-vocabulary from a `measurement.json` (also for files written by earlier rounds).
+file; 3 = INCOMPLETE -- nothing failed, but the comparison is not complete: a
+required quantity is still `record` (hipBone's final residual, Quicksilver's scalar
+flux, SPARTA sphere's particle count) **or the workload identity of the two sides
+is not established**. Passing configuration checks (iterations, DOFs, step counts,
+markers) never stand in for a pending required result. `measure` mirrors this as
+`comparison_rules` READY / PARTIAL / NONE and `baseline_verdict` PASS / INCOMPLETE /
+FAIL, computed over the independent runs only (`baseline_from_run`,
+`independent_runs_compared`: the baseline run is never compared with itself);
+`status` re-derives the vocabulary from a `measurement.json` (also for files written
+by earlier rounds).
+
+Workload identity (round 4). A comparison is formal only when baseline and
+candidate are known to be the same workload: the baseline carries a complete
+`workload` (input_id, params, args, env, input-file sha256 -- written by `measure`)
+equal to the candidate input's registry identity, or an upstream reference carries
+a `reference_binding` (`bound_input`, `source`, `evidence`, `adapted_by`) to this
+input. A record without identity, with an incomplete identity, or with a binding
+that lacks evidence is read and shown but returns 3 / INCOMPLETE with
+`workload_status: not-established`; a contradicting identity (other params/args/
+files under the same id, or a binding to another input) returns 2; a failing rule
+returns 1 regardless. The candidate's identity is never copied into an old
+record: `migrate-baseline <bench_dir> <baseline.json> --input ID --evidence
+<measurement.json> [--note ..] [--out F]` attaches the identity only when the
+evidence measurement names the same benchmark, input id, inputs.yaml sha256 and
+command/selector, writes a NEW file and records `workload_migration` (source,
+evidence, basis, note, time). The binary, git revision and build fingerprint are
+recorded (`code_identity`) but never compared -- an optimized build is compared
+against the baseline of the same workload by design.
 
 What the tool never does: it never reports wall time as `main_compute_s` (a
 failed run, a missing, ambiguous or non-finite timer line is an error), never
