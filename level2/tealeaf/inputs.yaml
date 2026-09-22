@@ -60,6 +60,10 @@ baseline:
       role: required
       regex: '(^ This run FAILED)|(Outcome: FAILED)'
       compare: {rule: absent}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    four upstream Benchmarks decks (bm4, bm5e2, bm5, bm6) and one derived short run
 inputs:
   - id: bm4-1000sq-10steps
     case: tea-bm-heat-conduction

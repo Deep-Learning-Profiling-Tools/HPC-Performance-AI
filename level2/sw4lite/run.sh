@@ -4,6 +4,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null
+# Registered inputs (inputs.yaml): HPCPERF_SW4LITE_INPUT_ID=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_SW4LITE_INPUT_ID || exit 2
 set -euo pipefail
 
 BACKEND=CUDA
@@ -19,4 +24,4 @@ INPUT="${HPCPERF_SW4LITE_INPUT:-$HERE/inputs/pointsource.in}"
 [ -f "$INPUT" ] || { echo "run.sh: input not found: $INPUT" >&2; exit 1; }
 mkdir -p "$BUILD/run"; cd "$BUILD/run"
 echo "== SW4lite $BACKEND: ranks=$N_RANKS input=$INPUT"
-exec "$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper -- "$EXE" "$INPUT" "$@"
+exec "$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper -- "$EXE" "$INPUT" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

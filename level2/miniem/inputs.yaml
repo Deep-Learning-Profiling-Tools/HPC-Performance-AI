@@ -1,0 +1,191 @@
+# Registered inputs of miniem (schema hpcperf-inputs-1), selected through HPCPERF_MINIEM_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: miniem
+level: 2
+selector: HPCPERF_MINIEM_INPUT
+default_input: maxwell-large-weak48
+entry:
+  kind: run.sh
+  path: level2/miniem/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'MiniEM''s own ''Time for Belos Linear Solve'' (FOM Calculation block): the linear solves of all time steps;
+    mesh generation, assembly and preconditioner setup are outside'
+  kind: total
+  unit: s
+  regex: ^\s*Time for Belos Linear Solve = (?P<value>[0-9.eE+-]+) seconds
+  select: only
+baseline:
+  method: validate.sh uses upstream's analytic-solution deck (L2 error < 0.065 asserted by the driver). The registry
+    records the FOM and the step count; no result value of the performance decks is printed.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: time_steps
+    role: diagnostic
+    regex: ^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)
+    select: last
+    compare:
+      rule: exact
+  - name: fom
+    role: diagnostic
+    regex: ^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: 'seven upstream decks/sizes are registered (two maxwell-large sizes, the smoke deck, two bdot sizes, blob,
+  darcy); NONE is measured in this worktree because Trilinos (MueLu/Panzer, ~2 h dependency build) is
+  not built here -- a measurement blocker, not an input blocker'
+inputs:
+- id: maxwell-large-weak48
+  case: maxwell-refmaxwell
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: packages/panzer/mini-em decks/maxwell-large.xml, 48^3 elements per rank, 3 steps (run.sh weak default)
+  params:
+    deck: maxwell-large.xml
+    elements: 48^3
+    steps: 3
+  env:
+    HPCPERF_SCALE_MODE: weak
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-large-strong64
+  case: maxwell-refmaxwell
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: maxwell-large.xml with a 64^3 global grid, 3 steps (upstream performance test size)
+  params:
+    deck: maxwell-large.xml
+    elements: 64^3
+    steps: 3
+  env:
+    HPCPERF_SCALE_MODE: strong
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-smoke-15
+  case: maxwell-refmaxwell
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: maxwell.xml, 15^3 hex elements, 1 step (upstream Maxwell_MueLu order1 test)
+  params:
+    deck: maxwell.xml
+    elements: 15^3
+    steps: 1
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-bdot-small
+  case: maxwell-bdot
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: decks/maxwell-bdot-small.xml (B-dot loop problem)
+  params:
+    deck: maxwell-bdot-small.xml
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_MINIEM_DECK: maxwell-bdot-small.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-bdot-medium
+  case: maxwell-bdot
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: decks/maxwell-bdot-medium.xml
+  params:
+    deck: maxwell-bdot-medium.xml
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_MINIEM_DECK: maxwell-bdot-medium.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-blob-r1
+  case: maxwell-blob
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: decks/maxwell-blob-R1.xml (refinement level 1)
+  params:
+    deck: maxwell-blob-R1.xml
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_MINIEM_DECK: maxwell-blob-R1.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: darcy-hex
+  case: darcy-flow
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: decks/darcyHex.xml (Darcy flow, a different physics driver of mini-em)
+  params:
+    deck: darcyHex.xml
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_MINIEM_DECK: darcyHex.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file

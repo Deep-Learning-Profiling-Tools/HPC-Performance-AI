@@ -50,6 +50,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
+# Registered inputs (inputs.yaml): HPCPERF_EXAMPM_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_EXAMPM_INPUT || exit 2
 
 set -euo pipefail
 
@@ -72,7 +77,7 @@ fi
 if [ $# -eq 0 ]; then
     ARGS=(0.01 2 0 0.001 1.0 1000)
 elif [ $# -eq 6 ]; then
-    ARGS=("$@")
+    ARGS=(${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@")
 else
     echo "run.sh: give either no problem arguments or all six: cell_size ppc halo_cells dt t_final write_freq" >&2
     exit 2

@@ -33,7 +33,7 @@ python3 "$TOOL" args "$R/level2/hipbone" no-such-input >/dev/null 2>"$TMP/e"; rc
 [ $rc -eq 2 ] && grep -q "unknown input id" "$TMP/e" && ok "unknown input id -> exit 2" || bad "unknown id: rc=$rc $(cat "$TMP/e")"
 python3 "$TOOL" param "$R/level3/lammps" lj-32k no_such_key >/dev/null 2>"$TMP/e"; rc=$?
 [ $rc -eq 2 ] && ok "unknown parameter -> exit 2" || bad "unknown parameter: rc=$rc"
-python3 "$TOOL" args "$R/level1/hotspot" x >/dev/null 2>"$TMP/e"; rc=$?
+mkdir -p "$TMP/noregistry"; python3 "$TOOL" args "$TMP/noregistry" x >/dev/null 2>"$TMP/e"; rc=$?
 [ $rc -ne 0 ] && grep -q "no inputs.yaml" "$TMP/e" && ok "benchmark without inputs.yaml -> error" || bad "missing inputs.yaml not reported (rc=$rc)"
 
 # ---- 3. schema errors are caught ----------------------------------------------------------
@@ -262,6 +262,73 @@ cp "$FX/hipbone_nx24_p14.log" "$TMP/hb_copy.log"
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_same.json" "$TMP/hb_copy.log" >/dev/null 2>&1; rc=$?
 [ $rc -eq 3 ] && ok "neg-control: a different file with the same content is compared normally (exit 3 = hipBone's INCOMPLETE, not a refusal)" || bad "neg-control: copy refused (rc=$rc)"
 
+# ---- 8j. compile-time inputs: an unmaterialized configuration is registered but never run (nothing substituted)
+mkdir -p "$TMP/ct"
+cat > "$TMP/ct/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: ct
+level: 1
+selector: null
+default_input: class-b
+entry: {kind: binary, path: build/fake/fake_bin}
+timing: {scope: x, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline: {quantities: [{name: pass_marker, regex: '^PASS$', compare: {rule: present}}]}
+coverage: {status: BLOCKED, reason: other classes need regenerated build parameters, blocker: class headers not generated}
+inputs:
+  - {id: class-b, case: c, variant: build-config, input_form: compile-time, build_config: {CLASS: B}, source: {kind: upstream-parameterized, upstream: x}, params: {}, args: [], backends_validated: [cuda]}
+  - {id: class-c, case: c, variant: build-config, input_form: compile-time, materialized: false, build_config: {CLASS: C}, source: {kind: upstream-parameterized, upstream: x}, params: {}, args: [], backends_validated: []}
+EOF
+python3 "$TOOL" validate "$TMP/ct" >/dev/null 2>&1 && ok "compile-time: registry with coverage BLOCKED and an unmaterialized class validates" || bad "compile-time registry invalid: $(python3 "$TOOL" validate "$TMP/ct" 2>&1 | noise)"
+mkdir -p "$TMP/cov1" "$TMP/cov2" "$TMP/cov3"
+sed -e 's/status: BLOCKED, reason: other classes need regenerated build parameters, blocker: class headers not generated/status: MULTI_INPUT/' "$TMP/ct/inputs.yaml" > "$TMP/cov1/inputs.yaml"
+out="$(python3 "$TOOL" validate "$TMP/cov1" 2>&1 | noise || true)"; echo "$out" | grep -q 'MULTI_INPUT needs at least two runnable' && ok "coverage: MULTI_INPUT with one runnable input (the other unmaterialized) is refused" || bad "coverage MULTI_INPUT with one runnable input accepted"
+sed -e 's/status: BLOCKED, reason: other classes need regenerated build parameters, blocker: class headers not generated/status: SINGLE_INPUT, reason: only class B is materialized/' "$TMP/ct/inputs.yaml" > "$TMP/cov2/inputs.yaml"
+python3 "$TOOL" validate "$TMP/cov2" >/dev/null 2>&1 && ok "coverage: SINGLE_INPUT = exactly one runnable input validates" || bad "coverage SINGLE_INPUT with one runnable input refused: $(python3 "$TOOL" validate "$TMP/cov2" 2>&1 | noise)"
+sed -e 's/materialized: false, //' "$TMP/ct/inputs.yaml" > "$TMP/cov3/inputs.yaml"
+out="$(python3 "$TOOL" validate "$TMP/cov3" 2>&1 | noise || true)"; echo "$out" | grep -q 'BLOCKED means at most one runnable' && ok "coverage: BLOCKED with two runnable inputs is refused (it is MULTI_INPUT)" || bad "coverage BLOCKED with two runnable inputs accepted"
+sed -e 's/materialized: false, //' -e 's/input_form: compile-time, build_config: {CLASS: C}/build_config: {CLASS: C}/' "$TMP/ct/inputs.yaml" > "$TMP/ct/bad.yaml"; mkdir -p "$TMP/ct2"; cp "$TMP/ct/bad.yaml" "$TMP/ct2/inputs.yaml"
+python3 "$TOOL" validate "$TMP/ct2" 2>&1 | noise | grep -q 'compile-time input needs build_config\|materialized' ; [ $? -eq 0 ] || true
+python3 "$TOOL" args "$TMP/ct" class-c >/dev/null 2>&1; rc=$?
+[ $rc -eq 0 ] && ok "compile-time: args/show of an unmaterialized input still work (read/display)" || bad "compile-time args rc=$rc"
+python3 - "$R" "$TMP/ct" <<'PY' && ok "compile-time: build_command refuses an unmaterialized input (never runs the class-B binary for it)" || bad "compile-time build_command did not refuse"
+import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+doc = hi.load(sys.argv[2]); inp = hi.get_input(doc, "class-c")
+try:
+    hi.build_command(doc, inp, Path(sys.argv[1]), Path(sys.argv[2]), 1); sys.exit(1)
+except hi.InputError as ex:
+    assert "not materialized" in str(ex); sys.exit(0)
+PY
+python3 - "$R" "$TMP/ct" <<'PY' && ok "compile-time: build_config is part of the workload identity (class-b != class-c)" || bad "compile-time workload identity"
+import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = hi.load(sys.argv[2]); a = hi.workload_identity(doc, hi.get_input(doc, "class-b")); b = hi.workload_identity(doc, hi.get_input(doc, "class-c"))
+assert a["params"]["_build_config"] == {"CLASS": "B"} and hi.workload_mismatch(a, b)
+PY
+
+# ---- 8k. the shared run.sh selector helper (hpcperf_apply_input): knobs exported, args collected, conflicts refused
+mkdir -p "$TMP/sel/level2/selapp"
+cat > "$TMP/sel/level2/selapp/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: selapp
+level: 2
+selector: HPCPERF_SELAPP_INPUT
+default_input: big
+entry: {kind: run.sh, path: level2/selapp/run.sh}
+timing: {scope: x, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline: {quantities: [{name: pass_marker, regex: '^PASS$', compare: {rule: present}}]}
+inputs:
+  - {id: big, case: c, variant: default, source: {kind: upstream-parameterized, upstream: x}, params: {n: 256}, env: {SELAPP_N: "256", HPCPERF_SCALE_MODE: weak}, args: ["--extra", "1"], backends_validated: [cuda]}
+EOF
+: > "$TMP/sel/hpcperf_env.sh"; mkdir -p "$TMP/sel/level1" "$TMP/sel/tools/inputs"; cp "$TOOL" "$TMP/sel/tools/inputs/hpcperf_inputs.py"
+sel_out="$(cd "$TMP/sel" && bash -c 'source "'"$R"'/tools/inputs/hpcperf_input_selector.sh"; unset SELAPP_N HPCPERF_SCALE_MODE; export HPCPERF_SELAPP_INPUT=big; hpcperf_apply_input level2/selapp HPCPERF_SELAPP_INPUT && echo "N=$SELAPP_N MODE=$HPCPERF_SCALE_MODE ID=$HPCPERF_INPUT_ID ARGS=${HPCPERF_INPUT_ARGS[*]}"' 2>&1 | noise)"
+grep -q 'N=256 MODE=weak ID=big ARGS=--extra 1' <<<"$sel_out" && ok "selector helper: knobs exported, args collected, input id recorded" || bad "selector helper: $sel_out"
+sel_out="$(cd "$TMP/sel" && bash -c 'source "'"$R"'/tools/inputs/hpcperf_input_selector.sh"; export SELAPP_N=128 HPCPERF_SELAPP_INPUT=big; hpcperf_apply_input level2/selapp HPCPERF_SELAPP_INPUT; echo "rc=$?"' 2>&1 | noise)"
+grep -q 'mutually exclusive' <<<"$sel_out" && grep -q 'rc=2' <<<"$sel_out" && ok "selector helper: a conflicting pre-set knob is refused (exit 2)" || bad "selector helper conflict: $sel_out"
+sel_out="$(cd "$TMP/sel" && bash -c 'source "'"$R"'/tools/inputs/hpcperf_input_selector.sh"; export HPCPERF_SELAPP_INPUT=nope; hpcperf_apply_input level2/selapp HPCPERF_SELAPP_INPUT; echo "rc=$?"' 2>&1 | noise)"
+grep -q 'rc=2' <<<"$sel_out" && ok "selector helper: unknown id -> exit 2" || bad "selector helper unknown: $sel_out"
+sel_out="$(cd "$TMP/sel" && bash -c 'source "'"$R"'/tools/inputs/hpcperf_input_selector.sh"; unset HPCPERF_SELAPP_INPUT; hpcperf_apply_input level2/selapp HPCPERF_SELAPP_INPUT; echo "rc=$? ID=${HPCPERF_INPUT_ID:-none}"' 2>&1 | noise)"
+grep -q 'rc=0 ID=none' <<<"$sel_out" && ok "selector helper: without the selector nothing changes" || bad "selector helper noop: $sel_out"
+
 # ---- 9. measure end-to-end on a fake benchmark (no GPU): exit codes, FAIL-with-exit-0, stale logs, record-only ----
 FR="$TMP/fakerepo"; mkdir -p "$FR/level1/fake" "$FR/level1/fakerec" "$FR/build/fake"; : > "$FR/hpcperf_env.sh"
 cat > "$FR/build/fake/fake_bin" <<'EOF'
@@ -294,7 +361,7 @@ EOF
 sed -e 's/^benchmark: fake$/benchmark: fakerec/' -e "s/compare: {rule: rel, tol: 1.0e-6}/compare: {rule: record}/" -e '/pass_marker/d' -e '/fail_marker/d' "$FR/level1/fake/inputs.yaml" > "$FR/level1/fakerec/inputs.yaml"
 mrun() { python3 "$TOOL" measure "$FR/level1/$1" a --out "$TMP/m_$2" --warmup 1 --reps 2 --timeout 30 >"$TMP/m_$2.out" 2>&1; echo $?; }
 rc=$(FAKE_MODE=ok mrun fake ok)
-[ "$rc" -eq 0 ] && grep -q 'run_completed=True timing_ok=True native_check=PASS baseline_saved=True comparison_rules=READY' "$TMP/m_ok.out" && [ -f "$TMP/m_ok/baseline.json" ] && ok "measure: healthy fake run -> completed, native PASS, baseline saved, rules READY" || bad "measure ok: rc=$rc $(cat "$TMP/m_ok.out")"
+[ "$rc" -eq 0 ] && grep -q 'run_completed=True timing_ok=True timing_status=NATIVE native_check=PASS baseline_saved=True comparison_rules=READY' "$TMP/m_ok.out" && [ -f "$TMP/m_ok/baseline.json" ] && ok "measure: healthy fake run -> completed, native PASS, baseline saved, rules READY" || bad "measure ok: rc=$rc $(cat "$TMP/m_ok.out")"
 rc=$(FAKE_MODE=exit1 mrun fake exit1)
 [ "$rc" -eq 1 ] && grep -q 'run_completed=False timing_ok=False' "$TMP/m_exit1.out" && [ ! -f "$TMP/m_exit1/baseline.json" ] && grep -q '"main_compute_s": null' "$TMP/m_exit1/rep1/result.json" && ok "measure: binary exits 1 -> run_completed=False, no timer value, no baseline, exit 1" || bad "measure exit1: rc=$rc $(cat "$TMP/m_exit1.out")"
 rc=$(FAKE_MODE=failmark mrun fake failmark)

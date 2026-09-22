@@ -1,0 +1,150 @@
+# Registered inputs of warpx (schema hpcperf-inputs-1), selected through HPCPERF_WARPX_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: warpx
+level: 3
+selector: HPCPERF_WARPX_INPUT
+default_input: uniform-plasma-64x32x32-10
+entry:
+  kind: run.sh
+  path: level3/warpx/run.sh
+  backend_arg: CUDA
+timing:
+  scope: WarpX's own 'Total Time' (AMReX timer of the whole Evolve loop over all steps, printed at the end); initialization
+    is outside, TinyProfiler totals are printed separately
+  kind: total
+  unit: s
+  regex: ^Total Time\s*:\s*(?P<value>[0-9.eE+-]+)
+  select: only
+baseline:
+  method: 'uniform_plasma has no reference output (performance case); langmuir''s analytic check is run by validate.sh''s
+    analysis script, not from this log. No science value is printed to stdout: the registry records the completed
+    step count only.'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: steps_completed
+    role: diagnostic
+    regex: ^STEP (?P<value>\d+) ends\.
+    select: last
+    compare:
+      rule: exact
+coverage:
+  status: MULTI_INPUT
+  reason: the two run.sh cases at four sizes/step counts are registered
+  blocker: the other upstream Physics_applications (laser_acceleration, plasma_acceleration, ...) are in the frozen
+    tree but run.sh's case list is uniform_plasma|langmuir; adding a case needs a run.sh case entry per deck (not
+    done this round)
+  upstream_inputs_not_added:
+  - Examples/Physics_applications/laser_acceleration/inputs_base_*
+  - plasma_acceleration
+  - beam_beam_collision
+  - '...'
+inputs:
+- id: uniform-plasma-64x32x32-10
+  case: uniform-plasma-3d
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: BLAST-WarpX/warpx
+      version: hpcperf-l3-v1 (WarpX 26.09 frozen tree e90d20b2)
+      path: Examples/Physics_applications/uniform_plasma/inputs_base_3d as shipped (64x32x32 cells, 2 ppc, 10 steps)
+        -- run.sh smoke
+  params:
+    case: uniform_plasma
+    n_cell: 64 32 32
+    steps: 10
+  env:
+    HPCPERF_WARPX_CASE: uniform_plasma
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: uniform-plasma-128cubed-20
+  case: uniform-plasma-3d
+  variant: size
+  source:
+    kind: derived
+    derivation: 'uniform_plasma inputs_base_3d with amr.n_cell 128^3 and 20 steps (run.sh weak-mode single-rank
+      size; derived class A: only n_cell/max_grid_size/max_step differ)'
+  params:
+    case: uniform_plasma
+    n_cell: 128 128 128
+    steps: 20
+  env:
+    HPCPERF_WARPX_CASE: uniform_plasma
+    HPCPERF_SCALE_MODE: weak
+    HPCPERF_WARPX_LOCAL: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: uniform-plasma-256cubed-20
+  case: uniform-plasma-3d
+  variant: size
+  source:
+    kind: derived
+    derivation: amr.n_cell 256^3, 20 steps (run.sh strong-mode default, 33.6 M particles)
+  params:
+    case: uniform_plasma
+    n_cell: 256 256 256
+    steps: 20
+  env:
+    HPCPERF_WARPX_CASE: uniform_plasma
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_WARPX_GLOBAL: '256'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: uniform-plasma-64x32x32-100
+  case: uniform-plasma-3d
+  variant: steps
+  source:
+    kind: derived
+    derivation: the shipped grid for 100 steps (HPCPERF_WARPX_STEPS)
+  params:
+    case: uniform_plasma
+    n_cell: 64 32 32
+    steps: 100
+  env:
+    HPCPERF_WARPX_CASE: uniform_plasma
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_WARPX_STEPS: '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: langmuir-multi-64cubed-40
+  case: langmuir-multi-3d
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: BLAST-WarpX/warpx
+      version: hpcperf-l3-v1 (WarpX 26.09 frozen tree e90d20b2)
+      path: 'Examples/Tests/langmuir/inputs_base_3d (test_3d_langmuir_multi: 64^3 cells, 40 steps; analytic solution
+        -- the validate.sh case)'
+  params:
+    case: langmuir
+    n_cell: 64 64 64
+    steps: 40
+  env:
+    HPCPERF_WARPX_CASE: langmuir
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

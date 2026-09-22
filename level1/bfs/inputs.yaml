@@ -1,0 +1,75 @@
+# Registered inputs of bfs (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: bfs
+level: 1
+selector: null
+default_input: graph65536
+entry:
+  kind: binary
+  path: build/bfs/cuda/bfs_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the CUDA port prints only 'Kernel Executed N times'; hop counts go to result.txt (checked by ctest verify.py)
+baseline:
+  method: no PASS line from the binary; ctest's verify.py recomputes all hop counts on the CPU (not wired into the
+    registry)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: kernel_executed
+    role: diagnostic
+    regex: ^Kernel Executed \d+ times
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: two upstream graph files are vendored and registered; the canonical graph1MW_6.txt (1 M nodes, 64 MB)
+    is not
+  blocker: graph1MW_6.txt is too large for git and upstream's inputGen generator is not vendored; needs the external-artifact
+    mechanism or a vendored deterministic generator
+  upstream_inputs_not_added:
+  - data/bfs/graph1MW_6.txt (1,000,000 nodes)
+inputs:
+- id: graph65536
+  case: bfs-rodinia-graph
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: data/bfs/graph65536.txt (upstream file, = ctest)
+  params:
+    nodes: 65536
+  args:
+  - level1/bfs/data/graph65536.txt
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/graph65536.txt
+  input_form: file
+- id: graph4096
+  case: bfs-rodinia-graph
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: data/bfs/graph4096.txt (upstream file)
+  params:
+    nodes: 4096
+  args:
+  - level1/bfs/data/graph4096.txt
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/graph4096.txt
+  input_form: file

@@ -1,0 +1,99 @@
+# Registered inputs of qmcpack (schema hpcperf-inputs-1), selected through HPCPERF_QMCPACK_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: qmcpack
+level: 3
+selector: HPCPERF_QMCPACK_INPUT
+default_input: diamond2-256w
+entry:
+  kind: run.sh
+  path: level3/qmcpack/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'QMCPACK''s own ''Total Execution time'' (all QMC sections: VMC + DMC blocks; input parsing/wavefunction
+    setup included as printed by the application)'
+  kind: total
+  unit: s
+  regex: ^\s*Total Execution time = (?P<value>[0-9.eE+-]+) secs
+  select: only
+baseline:
+  method: 'the energies go to <prefix>.s00N.scalar.dat (validate.sh: upstream check_scalars.py); stdout carries
+    no scalar value -- completion is recorded only'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_time_line
+    role: diagnostic
+    regex: '^\s*Total Execution time = '
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the diamond2 deck at three walker counts is registered
+  blocker: tests/performance/NiO needs orbital files (h5) that are not in the frozen tree (upstream download); C-graphite/C-molecule
+    performance inputs are not wired as run.sh cases; walker counts above 300/GPU fail (cuSOLVER, 320 MB/walker)
+  upstream_inputs_not_added:
+  - tests/performance/NiO/dmc-*
+  - tests/performance/C-graphite
+  - tests/performance/C-molecule
+inputs:
+- id: diamond2-256w
+  case: diamondC-2x1x1-pp
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: QMCPACK/qmcpack
+      version: hpcperf-l3-v1 (QMCPACK v4.4.0 frozen tree)
+      path: tests/solids/diamondC_2x1x1_pp/qmc_short_vmcbatch_dmcbatch.in.xml verbatim (256 walkers) -- run.sh smoke
+  params:
+    case: diamond2
+    walkers: 256
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: diamond2-128w
+  case: diamondC-2x1x1-pp
+  variant: size
+  source:
+    kind: derived
+    derivation: the same deck with total_walkers 128 (run.sh strong mode, HPCPERF_QMCPACK_WALKERS=128; only the
+      walker count differs)
+  params:
+    case: diamond2
+    walkers: 128
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_QMCPACK_WALKERS: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: diamond2-64w
+  case: diamondC-2x1x1-pp
+  variant: size
+  source:
+    kind: derived
+    derivation: total_walkers 64
+  params:
+    case: diamond2
+    walkers: 64
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_QMCPACK_WALKERS: '64'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

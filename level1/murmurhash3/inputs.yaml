@@ -1,0 +1,92 @@
+# Registered inputs of murmurhash3 (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: murmurhash3
+level: 1
+selector: null
+default_input: k100000
+entry:
+  kind: binary
+  path: build/murmurhash3/cuda/murmurhash3_cuda
+timing:
+  scope: the benchmark's own timer around the hash kernel averaged over `repeat` launches (main_compute = average
+    x repeat)
+  kind: per_iteration
+  unit: s
+  regex: ^Average kernel execution time (?P<value>[0-9.eE+-]+) \(s\)
+  select: only
+  work:
+    key: repeat
+    offset: 0
+baseline:
+  method: 'built-in comparison of every 128-bit hash with the CPU reference: SUCCESS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: success_marker
+    role: required
+    regex: ^SUCCESS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: FAIL
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger key counts
+inputs:
+- id: k100000
+  case: murmurhash3-128
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/murmurhash3-cuda Makefile run: ./main 100000 100 (= ctest)'
+  params:
+    keys: 100000
+    repeat: 100
+  args:
+  - '100000'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: k1000000
+  case: murmurhash3-128
+  variant: size
+  source:
+    kind: derived
+    derivation: keys x10
+  params:
+    keys: 1000000
+    repeat: 100
+  args:
+  - '1000000'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: k10000000
+  case: murmurhash3-128
+  variant: size
+  source:
+    kind: derived
+    derivation: keys x100
+  params:
+    keys: 10000000
+    repeat: 100
+  args:
+  - '10000000'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

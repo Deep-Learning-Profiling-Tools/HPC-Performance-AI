@@ -1,0 +1,99 @@
+# Registered inputs of mg (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: mg
+level: 1
+selector: null
+default_input: class-b
+entry:
+  kind: binary
+  path: build/mg/cuda/mg_cuda
+timing:
+  scope: NPB's own timer of the benchmark's timed section (class B; printed with 2 decimals)
+  kind: total
+  unit: s
+  regex: ^\s*Time in seconds\s*=\s*(?P<value>[0-9.]+)
+  select: only
+baseline:
+  method: 'built-in NPB verification against the class reference value: ''Verification = SUCCESSFUL'''
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: verification
+    role: required
+    regex: Verification\s+=\s+SUCCESSFUL
+    compare:
+      rule: present
+  - name: verification_fail
+    role: required
+    regex: Verification\s+=\s+UNSUCCESSFUL
+    compare:
+      rule: absent
+coverage:
+  status: SINGLE_INPUT
+  reason: only CLASS=B is materialized (V-cycle Poisson); classes A and C are registered as compile-time inputs
+    without a build
+  blocker: npbparams.hpp is pre-generated for B only; upstream's sys/setparams tool is not vendored, so other classes
+    need a generated class header and a separate build directory
+  upstream_inputs_not_added:
+  - CLASS=S/W/A/C/D headers and builds
+inputs:
+- id: class-b
+  case: npb-mg
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: NPB MultiGrid CLASS=B (npbparams.hpp pre-generated with upstream sys/setparams; = ctest)
+  params:
+    class: B
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: B
+    npbparams: level1/mg/cuda npbparams.hpp for B
+  backends_validated:
+  - cuda
+  input_form: compile-time
+- id: class-a
+  case: npb-mg
+  variant: build-config
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: NPB class A (upstream problem class; needs npbparams.hpp regenerated with sys/setparams)
+  params:
+    class: A
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: A
+  backends_validated: []
+  notes: 'registered, NOT materialized: the class header is not generated in this worktree'
+  input_form: compile-time
+  materialized: false
+- id: class-c
+  case: npb-mg
+  variant: build-config
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: NPB class C (upstream problem class; needs npbparams.hpp regenerated with sys/setparams)
+  params:
+    class: C
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: C
+  backends_validated: []
+  notes: 'registered, NOT materialized: the class header is not generated in this worktree'
+  input_form: compile-time
+  materialized: false

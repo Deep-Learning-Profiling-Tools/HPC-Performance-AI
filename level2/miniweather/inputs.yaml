@@ -1,0 +1,144 @@
+# Registered inputs of miniweather (schema hpcperf-inputs-1), selected through HPCPERF_MINIWEATHER_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: miniweather
+level: 2
+selector: HPCPERF_MINIWEATHER_INPUT
+default_input: thermal-2048x1024-1000s
+entry:
+  kind: run.sh
+  path: level2/miniweather/run.sh
+  backend_arg: CUDA
+timing:
+  scope: miniWeather's own 'CPU Time' (wall time of the time-step loop as printed by upstream)
+  kind: total
+  unit: s
+  regex: '^CPU Time: (?P<value>[0-9.]+) sec'
+  select: only
+baseline:
+  method: 'upstream''s own conservation check (README ''Checking for Correctness'', cpp/build/check_output.sh):
+    |d_mass| < 1e-9 and |d_te| < 4.5e-5 (the tolerances validate.sh enforces)'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: d_mass
+    role: required
+    regex: ^d_mass:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: abs_lt
+      value: 1.0e-09
+  - name: d_te
+    role: required
+    regex: ^d_te:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: abs_lt
+      value: 4.5e-05
+coverage:
+  status: SINGLE_INPUT
+  reason: grid, simulated time and initial condition are compile-time (build.sh MINIWEATHER_* variables into one
+    build directory); only the default configuration is materialized -- the other upstream initial conditions and
+    a smaller grid are registered as unmaterialized compile-time inputs (a per-configuration build directory was
+    not added this round)
+inputs:
+- id: thermal-2048x1024-1000s
+  case: rising-thermal
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: mrnorman/miniWeather
+      version: see level2/<app>/README.md (Upstream commit)
+      path: cpp parallelfor build with NX=2048 NZ=1024 SIM_TIME=1000 DATA_SPEC_THERMAL (build.sh defaults, upstream
+        GPU grid)
+  params:
+    nx: 2048
+    nz: 1024
+    sim_time: 1000
+    data_spec: DATA_SPEC_THERMAL
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config:
+    MINIWEATHER_NX: 2048
+    MINIWEATHER_NZ: 1024
+    MINIWEATHER_SIM_TIME: 1000
+    MINIWEATHER_DATA_SPEC: DATA_SPEC_THERMAL
+  backends_validated:
+  - cuda
+  input_form: compile-time
+- id: collision-2048x1024-1000s
+  case: colliding-thermals
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: mrnorman/miniWeather
+      version: see level2/<app>/README.md (Upstream commit)
+      path: DATA_SPEC_COLLISION (upstream initial condition)
+  params:
+    nx: 2048
+    nz: 1024
+    sim_time: 1000
+    data_spec: DATA_SPEC_COLLISION
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config:
+    MINIWEATHER_NX: 2048
+    MINIWEATHER_NZ: 1024
+    MINIWEATHER_SIM_TIME: 1000
+    MINIWEATHER_DATA_SPEC: DATA_SPEC_COLLISION
+  backends_validated: []
+  input_form: compile-time
+  materialized: false
+- id: gravity-waves-2048x1024-1000s
+  case: gravity-waves
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: mrnorman/miniWeather
+      version: see level2/<app>/README.md (Upstream commit)
+      path: DATA_SPEC_GRAVITY_WAVES
+  params:
+    nx: 2048
+    nz: 1024
+    sim_time: 1000
+    data_spec: DATA_SPEC_GRAVITY_WAVES
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config:
+    MINIWEATHER_NX: 2048
+    MINIWEATHER_NZ: 1024
+    MINIWEATHER_SIM_TIME: 1000
+    MINIWEATHER_DATA_SPEC: DATA_SPEC_GRAVITY_WAVES
+  backends_validated: []
+  input_form: compile-time
+  materialized: false
+- id: thermal-1024x512-1000s
+  case: rising-thermal
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: mrnorman/miniWeather
+      version: see level2/<app>/README.md (Upstream commit)
+      path: NX=1024 NZ=512 (compile-time grid)
+  params:
+    nx: 1024
+    nz: 512
+    sim_time: 1000
+    data_spec: DATA_SPEC_THERMAL
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config:
+    MINIWEATHER_NX: 1024
+    MINIWEATHER_NZ: 512
+    MINIWEATHER_SIM_TIME: 1000
+    MINIWEATHER_DATA_SPEC: DATA_SPEC_THERMAL
+  backends_validated: []
+  input_form: compile-time
+  materialized: false

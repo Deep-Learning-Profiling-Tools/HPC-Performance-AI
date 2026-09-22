@@ -1,0 +1,93 @@
+# Registered inputs of channel_shuffle (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: channel_shuffle
+level: 1
+selector: null
+default_input: g2-w224-h224
+entry:
+  kind: binary
+  path: build/channel_shuffle/cuda/channel_shuffle_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: per-layout timers (NHWC, NCHW) for several kernel variants; no total
+baseline:
+  method: built-in memcmp against the CPU reference; a message is printed only on mismatch
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus a larger map and another group count
+inputs:
+- id: g2-w224-h224
+  case: channel-shuffle
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/channelShuffle-cuda Makefile run: ./main 2 224 224 100 (= ctest)'
+  params:
+    group: 2
+    width: 224
+    height: 224
+    repeat: 100
+  args:
+  - '2'
+  - '224'
+  - '224'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: g2-w512-h512
+  case: channel-shuffle
+  variant: size
+  source:
+    kind: derived
+    derivation: feature map 512x512
+  params:
+    group: 2
+    width: 512
+    height: 512
+    repeat: 100
+  args:
+  - '2'
+  - '512'
+  - '512'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: g4-w224-h224
+  case: channel-shuffle
+  variant: parameter
+  source:
+    kind: derived
+    derivation: group size 4 on the default map
+  params:
+    group: 4
+    width: 224
+    height: 224
+    repeat: 100
+  args:
+  - '4'
+  - '224'
+  - '224'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

@@ -1,0 +1,85 @@
+# Registered inputs of dftfe (schema hpcperf-inputs-1), selected through HPCPERF_DFTFE_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: dftfe
+level: 3
+selector: HPCPERF_DFTFE_INPUT
+default_input: al-md-32atoms-4steps
+entry:
+  kind: run.sh
+  path: level3/dftfe/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: DFT-FE's timing summary lines are not verified in this worktree (no run log available; the reference output
+    carries no wall-time line); to be wired after the first run
+baseline:
+  method: 'upstream reference outputs (accuracyBenchmarks/output_MD_0, outputLLZO) give the total energies; validate.sh
+    compares them at printed precision. Registry: the last ''Total energy'' line of stdout (dftfe.out is tee''d)
+    is a required quantity, recorded until a rule with a basis is set.'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_energy_final
+    role: required
+    regex: ^\s*Total energy:\s+(?P<value>-?[0-9.]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the two run.sh cases are registered
+  blocker: the other upstream GPU .prm cases in testsGPU (Mg2x series, N2, ReS2, Pt3Ni hubbard, Be) are in the frozen
+    tree but run.sh wires only al_md and llzo; a case entry per .prm is a run.sh change (not done this round)
+  upstream_inputs_not_added:
+  - testsGPU/pseudopotential/real/parameterFileMg2x_*.prm
+  - parameterFileN2_*.prm
+  - parameterFile_ReS2.prm
+  - Pt3Ni_hubbard_spin.prm
+  - parameterFileBe.prm
+inputs:
+- id: al-md-32atoms-4steps
+  case: al-fcc-bomd
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: dftfeDevelopers/dftfe
+      version: hpcperf-l3-v1 (DFT-FE 1.2.0 frozen tree 54bea988)
+      path: testsGPU/pseudopotential/real/Input_MD_0.prm verbatim (32-atom Al, 4 BOMD steps) -- run.sh default,
+        reference output_MD_0
+  params:
+    case: al_md
+    atoms: 32
+    md_steps: 4
+  env:
+    HPCPERF_DFTFE_CASE: al_md
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: llzo-192atoms
+  case: llzo-electrolyte
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: dftfeDevelopers/dftfe
+      version: hpcperf-l3-v1 (DFT-FE 1.2.0 frozen tree 54bea988)
+      path: testsGPU/pseudopotential/real/parameterFile_LLZO.prm (192 atoms, 720 states; reference outputLLZO)
+  params:
+    case: llzo
+    atoms: 192
+  env:
+    HPCPERF_DFTFE_CASE: llzo
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

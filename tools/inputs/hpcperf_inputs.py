@@ -22,6 +22,8 @@ Sub-commands (all read-only except `measure`, which writes into --out):
   args     <bench_dir> <input_id>          the input's command-line arguments, one per line
                                            (run.sh reads these; unknown id -> exit 2)
   param    <bench_dir> <input_id> <key>    one parameter value (exit 2 if unknown)
+  shell-env <bench_dir> <input_id>         the input's env knobs and extra args as tab-separated
+                                           lines (E/A) for run.sh's hpcperf_apply_input
   parse-timing <bench_dir> <log> [--rc N] [--input ID]
                                            main-compute time from a log (JSON); a nonzero
                                            --rc or a missing/ambiguous/non-finite timer line -> exit 1
@@ -67,6 +69,10 @@ Status vocabulary (summary of `measure`, also printed by `status`), kept separat
   baseline_verdict     PASS / INCOMPLETE / FAIL of the measured runs against the working baseline
 Quantity roles (inputs.yaml `role: required|diagnostic`, default required): only required quantities
 decide acceptance; diagnostic quantities are reported and may stay `record` without a tolerance.
+Rollout fields (optional, backward compatible): `timing.kind: none` + `status: NEEDS_TIMING_SUPPORT` +
+`reason` for a benchmark without a usable native timer (measure records E2E only, never as main
+compute); top-level `coverage: {status: MULTI_INPUT|SINGLE_INPUT|BLOCKED, reason, blocker,
+upstream_inputs_not_added}` for the audit; per-input `input_form: runtime|file|compile-time`.
   compute_ge_1s        median main compute >= 1 s (a reference value, not a gate)
   stable               n >= 3 and (max-min)/median <= 0.10 over the measured runs
 
@@ -119,7 +125,17 @@ def load(bench_dir: Path) -> dict:
     return doc
 
 
+COVERAGE_STATUS = ("MULTI_INPUT", "SINGLE_INPUT", "BLOCKED")
+INPUT_FORMS = ("runtime", "file", "compile-time")
+
+
 def _check_timer(t, where, errs, need_work=True):
+    if t.get("kind") == "none":
+        # no usable native timer: the registry records why; measure() reports NEEDS_TIMING_SUPPORT
+        # and records only E2E wall as auxiliary information (never as main compute)
+        if not t.get("status") == "NEEDS_TIMING_SUPPORT" or not t.get("reason"):
+            errs.append(f"{where}.kind none requires status: NEEDS_TIMING_SUPPORT and a reason")
+        return
     for k in ("regex", "unit", "select"):
         if k not in t:
             errs.append(f"{where}.{k} missing")
@@ -127,8 +143,8 @@ def _check_timer(t, where, errs, need_work=True):
         errs.append(f"{where}.unit must be one of {sorted(UNIT_TO_S)}")
     if t.get("select") not in SELECT:
         errs.append(f"{where}.select must be one of {SELECT}")
-    if t.get("kind", "total") not in ("total", "per_iteration", "per_step"):
-        errs.append(f"{where}.kind must be total | per_iteration | per_step")
+    if t.get("kind", "total") not in ("total", "per_iteration", "per_step", "none"):
+        errs.append(f"{where}.kind must be total | per_iteration | per_step | none")
     if need_work and t.get("kind") in ("per_iteration", "per_step") and not t.get("work"):
         errs.append(f"{where}.work {{key, offset}} is required for per_iteration/per_step timers")
     try:
@@ -158,7 +174,7 @@ def validate(doc: dict) -> list:
     t = doc["timing"]
     if not isinstance(t, dict):
         errs.append("timing must be a mapping"); t = {}
-    if "scope" not in t:
+    if "scope" not in t and t.get("kind") != "none":
         errs.append("timing.scope missing (where the timer starts/ends, what it includes/excludes)")
     if "kind" not in t:
         errs.append("timing.kind missing")
@@ -230,6 +246,30 @@ def validate(doc: dict) -> list:
                 errs.append(f"input '{i}': referenced file '{f}' does not exist under the benchmark directory")
     if doc["default_input"] not in ids:
         errs.append(f"default_input '{doc['default_input']}' is not a registered input id")
+    cov = doc.get("coverage")
+    if cov is not None:
+        if not isinstance(cov, dict) or cov.get("status") not in COVERAGE_STATUS:
+            errs.append(f"coverage.status must be one of {COVERAGE_STATUS}")
+        else:
+            runnable = [i for i in doc["inputs"] if isinstance(i, dict) and i.get("materialized", True) is not False]
+            if cov["status"] == "MULTI_INPUT" and len(runnable) < 2:
+                errs.append("coverage MULTI_INPUT needs at least two runnable (materialized) inputs")
+            if cov["status"] == "SINGLE_INPUT" and len(runnable) != 1:
+                errs.append("coverage SINGLE_INPUT means exactly one runnable (materialized) input")
+            if cov["status"] == "BLOCKED" and len(runnable) > 1:
+                errs.append("coverage BLOCKED means at most one runnable input (with two or more it is MULTI_INPUT; list the missing upstream inputs under upstream_inputs_not_added)")
+            if cov["status"] in ("SINGLE_INPUT", "BLOCKED") and not cov.get("reason"):
+                errs.append(f"coverage {cov['status']} needs a reason")
+            if cov["status"] == "BLOCKED" and not cov.get("blocker"):
+                errs.append("coverage BLOCKED needs 'blocker' (what is missing to add the other upstream inputs)")
+    for inp in doc["inputs"]:
+        if isinstance(inp, dict) and inp.get("input_form", "runtime") not in INPUT_FORMS:
+            errs.append(f"input '{inp.get('id')}': input_form must be one of {INPUT_FORMS}")
+        # a compile-time configuration that has no built binary/deck is registered but not runnable
+        if isinstance(inp, dict) and inp.get("materialized", True) is False and inp.get("input_form") != "compile-time":
+            errs.append(f"input '{inp.get('id')}': materialized: false is only meaningful for input_form compile-time")
+        if isinstance(inp, dict) and inp.get("input_form") == "compile-time" and not inp.get("build_config"):
+            errs.append(f"input '{inp.get('id')}': a compile-time input needs build_config (what is fixed at build time)")
     return errs
 
 
@@ -324,6 +364,8 @@ def parse_timing(doc: dict, log_path: Path, rc=0, params=None) -> dict:
     line, a non-finite value or an unknown unit raises InputError."""
     if rc != 0:
         raise InputError(f"run exited {rc}; timer output of a failed run is not used")
+    if doc["timing"].get("kind") == "none":
+        raise InputError("NEEDS_TIMING_SUPPORT: " + str(doc["timing"].get("reason", "no usable native timer")))
     if not Path(log_path).is_file():
         raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
@@ -453,8 +495,11 @@ def workload_identity(doc: dict, inp: dict) -> dict:
     files = {}
     for f in inp.get("files", []) or []:
         files[str(f)] = sha256_file(bdir / f)
-    return {"input_id": inp["id"], "params": inp.get("params") or {}, "args": [str(a) for a in inp.get("args", []) or []],
-            "env": {str(k): str(v) for k, v in (inp.get("env") or {}).items()}, "files_sha256": files}
+    wl = {"input_id": inp["id"], "params": inp.get("params") or {}, "args": [str(a) for a in inp.get("args", []) or []],
+          "env": {str(k): str(v) for k, v in (inp.get("env") or {}).items()}, "files_sha256": files}
+    if inp.get("input_form") == "compile-time":
+        wl["params"] = dict(wl["params"], _build_config=inp.get("build_config") or {})   # what was fixed at build time is part of the workload
+    return wl
 
 
 WORKLOAD_KEYS = ("input_id", "params", "args", "env", "files_sha256")
@@ -645,6 +690,18 @@ def git_head(root: Path):
 def build_command(doc, inp, root: Path, bench_dir: Path, gpus: int):
     e = doc["entry"]
     env = dict(os.environ)
+    if inp.get("materialized", True) is False:
+        raise InputError(f"input '{inp['id']}' is a compile-time configuration that is not materialized in this worktree "
+                         f"(build_config {inp.get('build_config')}); registered, NOT runnable -- nothing else is substituted")
+    if inp.get("binary"):        # a materialized compile-time input carries its own binary (e.g. another NPB class)
+        exe = root / inp["binary"]
+        if not exe.is_file() or not os.access(exe, os.X_OK):
+            raise InputError(f"binary {exe} of input '{inp['id']}' not built")
+        cmd = [str(exe)] + [str(a) for a in inp.get("args", [])]
+        env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
+        for k, v in (inp.get("env") or {}).items():
+            env[str(k)] = str(v)
+        return cmd, env, exe
     if e["kind"] == "binary":
         exe = root / e["path"]
         if not exe.is_file() or not os.access(exe, os.X_OK):
@@ -703,6 +760,8 @@ def summarize(doc, inp, runs, reps):
             res = r["timing"]["print_resolution_s"]; break
     s = {"run_completed": len(good) == len(measured) and len(measured) == reps,
          "timing_ok": len(mc) == len(measured) and len(measured) == reps,
+         "timing_status": ("NEEDS_TIMING_SUPPORT" if doc["timing"].get("kind") == "none"
+                           else ("NATIVE" if len(mc) == len(measured) and len(measured) == reps else "FAILED")),
          "main_compute_s": stats(mc, res), "e2e_s": stats(e2e)}
     sec = {}
     for r in good:
@@ -746,7 +805,7 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
             "selector": {doc.get("selector"): inp["id"]} if doc.get("selector") else None,
             "host": socket.gethostname(), "gpu": gpu_info(), "git": git_head(root),
             "warmup_runs": warmup, "measured_runs": reps, "timeout_s": timeout,
-            "e2e_boundary": e2e_boundary, "timing_scope": doc["timing"]["scope"],
+            "e2e_boundary": e2e_boundary, "timing_scope": doc["timing"].get("scope") or doc["timing"].get("reason"),
             "secondary_timer_scopes": {s["name"]: s["scope"] for s in (doc["timing"].get("secondary") or [])},
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "runs": []}
     for k in range(warmup + reps):
@@ -813,7 +872,7 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
 
 
 def status_line(s: dict) -> str:
-    keys = ("run_completed", "timing_ok", "native_check", "baseline_saved", "comparison_rules",
+    keys = ("run_completed", "timing_ok", "timing_status", "native_check", "baseline_saved", "comparison_rules",
             "baseline_verdict", "baseline_from_run", "independent_runs_compared", "compute_ge_1s", "stable", "baseline_self_consistent")
     parts = [f"{k}={s.get(k)}" for k in keys]
     if s.get("needs_validation"):
@@ -829,7 +888,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     for c in ("validate", "list"):
         s = sub.add_parser(c); s.add_argument("bench_dir")
-    for c in ("show", "args"):
+    for c in ("show", "args", "shell-env"):
         s = sub.add_parser(c); s.add_argument("bench_dir"); s.add_argument("input_id")
     s = sub.add_parser("param"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("key")
     s = sub.add_parser("parse-timing"); s.add_argument("bench_dir"); s.add_argument("log"); s.add_argument("--rc", type=int, default=0); s.add_argument("--input")
@@ -867,6 +926,15 @@ def main(argv=None):
             inp = get_input(doc, a.input_id)
             for x in inp.get("args", []):
                 print(x)
+            return 0
+        if a.cmd == "shell-env":
+            # for run.sh selectors: the input's environment knobs (E<TAB>KEY<TAB>VALUE) and extra
+            # command-line arguments (A<TAB>ARG), one per line, for hpcperf_apply_input
+            inp = get_input(doc, a.input_id)
+            for k, v in (inp.get("env") or {}).items():
+                print(f"E\t{k}\t{v}")
+            for x in inp.get("args", []) or []:
+                print(f"A\t{x}")
             return 0
         if a.cmd == "param":
             inp = get_input(doc, a.input_id)
@@ -952,10 +1020,10 @@ def main(argv=None):
             meta = measure(doc, inp, root, bench_dir, Path(a.out), a.warmup, a.reps, a.timeout, a.gpus)
             s = meta["summary"]
             print(status_line(s))
-            return 0 if s["run_completed"] and s["timing_ok"] else 1
+            return 0 if s["run_completed"] and (s["timing_ok"] or s["timing_status"] == "NEEDS_TIMING_SUPPORT") else 1
     except InputError as ex:
         sys.stderr.write(f"hpcperf_inputs: {ex}\n")
-        return 2 if a.cmd in ("args", "param", "show") else 1
+        return 2 if a.cmd in ("args", "param", "show", "shell-env") else 1
     return 0
 
 

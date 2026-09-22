@@ -1,0 +1,141 @@
+# Registered inputs of kripke (schema hpcperf-inputs-1), selected through HPCPERF_KRIPKE_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: kripke
+level: 2
+selector: HPCPERF_KRIPKE_INPUT
+default_input: z32-g64-q128
+entry:
+  kind: run.sh
+  path: level2/kripke/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'Kripke''s own ''Solve'' timer (6th field of TIMER_DATA: Generate,LPlusTimes,LTimes,Population,Scattering,Solve,...):
+    all source iterations of the sweep solve'
+  kind: total
+  unit: s
+  regex: ^TIMER_DATA:(?:[0-9.eE+-]+,){5}(?P<value>[0-9.eE+-]+)
+  select: only
+baseline:
+  method: Kripke has no built-in reference; validate.sh compares the GPU with the Sequential architecture of the
+    same binary. The registry keeps the final particle count (required, recorded, no tolerance basis yet) and the
+    FOM (diagnostic).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: particle_count_final
+    role: required
+    regex: '^\s*iter \d+: particle count=(?P<value>[0-9.eE+-]+),'
+    select: last
+    compare:
+      rule: record
+  - name: throughput
+    role: diagnostic
+    regex: ^\s*Throughput:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the GPU default plus zone, group/quadrature and layout variants through Kripke's own parameters
+inputs:
+- id: z32-g64-q128
+  case: kobayashi-3i-sweep
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Kripke
+      version: see level2/<app>/README.md (Upstream commit)
+      path: --zones 32,32,32 --groups 64 --quad 128 --layout GDZ --niter 10 (run.sh default GPU configuration)
+  params:
+    zones: 32,32,32
+    groups: 64
+    quad: 128
+    layout: GDZ
+    niter: 10
+  env:
+    KRIPKE_ZONES: 32,32,32
+    KRIPKE_GROUPS: '64'
+    KRIPKE_QUAD: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: z64-g64-q128
+  case: kobayashi-3i-sweep
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Kripke
+      version: see level2/<app>/README.md (Upstream commit)
+      path: --zones 64,64,64 (Kripke's own size parameter)
+  params:
+    zones: 64,64,64
+    groups: 64
+    quad: 128
+    layout: GDZ
+    niter: 10
+  env:
+    KRIPKE_ZONES: 64,64,64
+    KRIPKE_GROUPS: '64'
+    KRIPKE_QUAD: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: z32-g32-q64
+  case: kobayashi-3i-sweep
+  variant: parameter
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Kripke
+      version: see level2/<app>/README.md (Upstream commit)
+      path: --groups 32 --quad 64 (energy/angle resolution)
+  params:
+    zones: 32,32,32
+    groups: 32
+    quad: 64
+    layout: GDZ
+    niter: 10
+  env:
+    KRIPKE_ZONES: 32,32,32
+    KRIPKE_GROUPS: '32'
+    KRIPKE_QUAD: '64'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: z32-g64-q128-dgz
+  case: kobayashi-3i-sweep
+  variant: parameter
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Kripke
+      version: see level2/<app>/README.md (Upstream commit)
+      path: --layout DGZ (data layout variant)
+  params:
+    zones: 32,32,32
+    groups: 64
+    quad: 128
+    layout: DGZ
+    niter: 10
+  env:
+    KRIPKE_ZONES: 32,32,32
+    KRIPKE_GROUPS: '64'
+    KRIPKE_QUAD: '128'
+    KRIPKE_LAYOUT: DGZ
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

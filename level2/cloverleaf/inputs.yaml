@@ -62,6 +62,10 @@ baseline:
       role: required
       regex: '(This test is considered NOT PASSED)|(Outcome: FAILED)'
       compare: {rule: absent}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    four upstream InputDecks (bm, bm4, bm16, bm128 short) and the full bm16 run
 inputs:
   - id: bm-short-960sq-87steps
     case: clover-bm-shock

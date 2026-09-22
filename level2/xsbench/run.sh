@@ -23,6 +23,11 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     set +eu
     # shellcheck disable=SC1091
     source "$R/hpcperf_env.sh" 2>/dev/null
+# Registered inputs (inputs.yaml): HPCPERF_XSBENCH_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_XSBENCH_INPUT || exit 2
     set -eu
 fi
 
@@ -40,4 +45,4 @@ if [ ! -x "$EXE" ]; then
 fi
 
 cd "$BUILD_DIR"
-exec ./XSBench -m event -s large "$@"
+exec ./XSBench -m event -s large ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

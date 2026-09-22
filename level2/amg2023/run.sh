@@ -35,6 +35,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
+# Registered inputs (inputs.yaml): HPCPERF_AMG2023_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_AMG2023_INPUT || exit 2
 
 set -euo pipefail
 
@@ -100,4 +105,4 @@ fi
 
 echo "# AMG2023 $BACKEND: mode=$MODE ranks=$N_RANKS topology=${PX}x${PY}x${PZ} local=${NX}x${NY}x${NZ} global=$((NX*PX))x$((NY*PY))x$((NZ*PZ)) ($GLOBAL_UNKNOWNS unknowns)"
 exec "$R/level2/tools/hpcperf_mpi_launch.sh" --gpus "$N_RANKS" --bind app -- \
-    "$EXE" -P "$PX" "$PY" "$PZ" -n "$NX" "$NY" "$NZ" -problem "$PROBLEM" "$@"
+    "$EXE" -P "$PX" "$PY" "$PZ" -n "$NX" "$NY" "$NZ" -problem "$PROBLEM" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

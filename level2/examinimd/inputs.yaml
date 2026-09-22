@@ -1,0 +1,142 @@
+# Registered inputs of examinimd (schema hpcperf-inputs-1), selected through HPCPERF_EXAMINIMD_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: examinimd
+level: 2
+selector: HPCPERF_EXAMINIMD_INPUT
+default_input: lj-160cubed-1000
+entry:
+  kind: run.sh
+  path: level2/examinimd/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'ExaMiniMD''s own PERFORMANCE line: total time of the MD loop (force + neighbor + comm + other) over all
+    steps'
+  kind: total
+  unit: s
+  regex: '^\d+ \d+ \| (?P<value>[0-9.]+) [0-9.]+ [0-9.]+ [0-9.]+ [0-9.]+ \| '
+  select: last
+baseline:
+  method: upstream ships no reference; validate.sh checks the LJ melt against independent references. The registry
+    keeps the final thermo row (step exact; temperature and potential energy recorded, required, no tolerance basis
+    yet).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: final_step
+    role: required
+    regex: ^(?P<value>\d+) [0-9.eE+-]+ -?[0-9.eE+-]+ -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: exact
+  - name: temperature_final
+    role: required
+    regex: ^\d+ (?P<value>[0-9.eE+-]+) -?[0-9.eE+-]+ -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: record
+  - name: pote_final
+    role: required
+    regex: ^\d+ [0-9.eE+-]+ (?P<value>-?[0-9.eE+-]+) -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream LJ deck at three sizes plus the upstream SNAP tantalum case (in.snap.W not registered)
+inputs:
+- id: lj-160cubed-1000
+  case: lj-melt
+  variant: default
+  source:
+    kind: derived
+    derivation: upstream input/in.lj (LJ melt) with the lattice box scaled to 160^3 unit cells (16.4 M atoms) and
+      1000 steps -- run.sh strong-mode default
+  params:
+    deck: input/in.lj
+    lattice: 160
+    atoms: 16384000
+    steps: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_EXAMINIMD_LATTICE: '160'
+    HPCPERF_EXAMINIMD_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: lj-40cubed-100
+  case: lj-melt
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: ECP-copa/ExaMiniMD
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'input/in.lj as shipped: 40^3 unit cells (256,000 atoms), 100 steps (run.sh smoke)'
+  params:
+    deck: input/in.lj
+    lattice: 40
+    atoms: 256000
+    steps: 100
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - input/in.lj
+  input_form: file
+- id: lj-80cubed-1000
+  case: lj-melt
+  variant: size
+  source:
+    kind: derived
+    derivation: 80^3 unit cells (2.05 M atoms), 1000 steps
+  params:
+    deck: input/in.lj
+    lattice: 80
+    atoms: 2048000
+    steps: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_EXAMINIMD_LATTICE: '80'
+    HPCPERF_EXAMINIMD_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: snap-ta06a
+  case: snap-tantalum
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: ECP-copa/ExaMiniMD
+      version: see level2/<app>/README.md (Upstream commit)
+      path: input/snap/in.snap.Ta06A (SNAP machine-learning potential, tantalum; deck run unchanged)
+  params:
+    deck: input/snap/in.snap.Ta06A
+    potential: SNAP Ta06A
+    steps: 100
+  env:
+    HPCPERF_EXAMINIMD_DECK: input/snap/in.snap.Ta06A
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: the deck references Ta06A.snapcoeff/.snapparam relative to its directory; run.sh must run it from input/snap
+    (to be confirmed by the first measurement)
+  files:
+  - input/snap/in.snap.Ta06A
+  - input/snap/Ta06A.snapcoeff
+  - input/snap/Ta06A.snapparam
+  input_form: file

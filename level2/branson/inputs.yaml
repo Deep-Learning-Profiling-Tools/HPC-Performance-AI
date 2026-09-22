@@ -1,0 +1,168 @@
+# Registered inputs of branson (schema hpcperf-inputs-1), selected through HPCPERF_BRANSON_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: branson
+level: 2
+selector: HPCPERF_BRANSON_INPUT
+default_input: hohlraum-single-node
+entry:
+  kind: run.sh
+  path: level2/branson/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'Branson''s own ''Total transport'' timer: the sum of the per-step event-based GPU transport phases (source,
+    transport, census); mesh setup and I/O are outside (''Total:'' is the whole run)'
+  kind: total
+  unit: s
+  regex: '^Total transport: (?P<value>[0-9.eE+-]+)'
+  select: only
+baseline:
+  method: Branson prints per-step conservation diagnostics and the photons-per-second FOM; validate.sh runs upstream's
+    unit tests and a small deck comparison. The registry records the transported photon count (required, no tolerance
+    basis yet) and the FOM (diagnostic).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: photons_transported
+    role: required
+    regex: '^Total Photons transported: (?P<value>\d+)'
+    select: last
+    compare:
+      rule: record
+  - name: fom_photons_per_s
+    role: diagnostic
+    regex: '^Photons Per Second \(FOM\): (?P<value>[0-9.eE+-]+)'
+    select: last
+    compare:
+      rule: record
+  - name: steps_done
+    role: required
+    regex: '^Step: (?P<value>\d+)\s'
+    select: last
+    compare:
+      rule: exact
+coverage:
+  status: MULTI_INPUT
+  reason: five upstream XML decks (three physics cases, two hohlraum sizes); big_cube.xml (800^3 cells) and 3D_lb_hohlraum.xml
+    (load-balance variant) are not registered
+inputs:
+- id: hohlraum-single-node
+  case: 3d-hohlraum
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: lanl/branson
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'inputs/3D_hohlraum_single_node.xml (upstream documented single-node problem: 10 M photons, 5 steps)'
+  params:
+    deck: inputs/3D_hohlraum_single_node.xml
+    photons: 10000000
+    t_stop: 0.05
+  env:
+    HPCPERF_BRANSON_DECK: inputs/3D_hohlraum_single_node.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/3D_hohlraum_single_node.xml
+  input_form: file
+- id: hot-zone
+  case: hot-zone
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: lanl/branson
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/hot_zone_input.xml (1 M photons, 200x200 cells)
+  params:
+    deck: inputs/hot_zone_input.xml
+    photons: 1000000
+    t_stop: 0.2
+  env:
+    HPCPERF_BRANSON_DECK: inputs/hot_zone_input.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/hot_zone_input.xml
+  input_form: file
+- id: marshak-wave-replicated
+  case: marshak-wave
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: lanl/branson
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/marshak_wave_replicated.xml (50 k photons, 25 cells)
+  params:
+    deck: inputs/marshak_wave_replicated.xml
+    photons: 50000
+    t_stop: 0.01
+  env:
+    HPCPERF_BRANSON_DECK: inputs/marshak_wave_replicated.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/marshak_wave_replicated.xml
+  input_form: file
+- id: cube-decomp-test
+  case: cube
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: lanl/branson
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/cube_decomp_test.xml (500 k photons, 8^3 cells)
+  params:
+    deck: inputs/cube_decomp_test.xml
+    photons: 500000
+    t_stop: 0.5
+  env:
+    HPCPERF_BRANSON_DECK: inputs/cube_decomp_test.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/cube_decomp_test.xml
+  input_form: file
+- id: hohlraum-multi-node
+  case: 3d-hohlraum
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: lanl/branson
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/3D_hohlraum_multi_node.xml (250 M photons, t_stop 0.02) run on one GPU
+  params:
+    deck: inputs/3D_hohlraum_multi_node.xml
+    photons: 250000000
+    t_stop: 0.02
+  env:
+    HPCPERF_BRANSON_DECK: inputs/3D_hohlraum_multi_node.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: upstream's multi-node deck used as a single-GPU size step; memory/time to be recorded by the first measurement
+  files:
+  - inputs/3D_hohlraum_multi_node.xml
+  input_form: file

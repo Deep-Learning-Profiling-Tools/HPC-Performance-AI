@@ -1,0 +1,133 @@
+# Registered inputs of exampm (schema hpcperf-inputs-1), selected through HPCPERF_EXAMPM_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: exampm
+level: 2
+selector: HPCPERF_EXAMPM_INPUT
+default_input: dambreak-0.01
+entry:
+  kind: run.sh
+  path: level2/exampm/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: ExaMPM prints only the simulation time ('Time t / t_final'), no wall-clock timer
+baseline:
+  method: no built-in check; validate.sh checks its own case against an analytic solution. Nothing numeric is printed
+    to stdout (particle dumps go to HDF5), so no quantity can be verified from the log.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: last_time_line
+    role: diagnostic
+    regex: ^Time [0-9.]+ / [0-9.]+
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: upstream's two examples; the dam break at three grid sizes
+inputs:
+- id: dambreak-0.01
+  case: dam-break
+  variant: default
+  source:
+    kind: derived
+    derivation: 'upstream DamBreak deck refined to a 0.01 m grid, t_final 1.0 s (run.sh default: 100^3 cells, 1.92
+      M particles)'
+  params:
+    example: DamBreak
+    cell_size: 0.01
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 1.0
+    write_freq: 1000
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dambreak-0.05-upstream
+  case: dam-break
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ECP-copa/ExaMPM
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README/CI deck: DamBreak 0.05 2 0 0.001 0.25 100'
+  params:
+    example: DamBreak
+    cell_size: 0.05
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 0.25
+    write_freq: 100
+  args:
+  - '0.05'
+  - '2'
+  - '0'
+  - '0.001'
+  - '0.25'
+  - '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dambreak-0.005
+  case: dam-break
+  variant: size
+  source:
+    kind: derived
+    derivation: 0.005 m grid, t_final 0.25 s (15.4 M particles; run.sh header alternative)
+  params:
+    example: DamBreak
+    cell_size: 0.005
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 0.25
+    write_freq: 2000
+  args:
+  - '0.005'
+  - '2'
+  - '0'
+  - '0.001'
+  - '0.25'
+  - '2000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: freefall-0.01
+  case: free-fall
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ECP-copa/ExaMPM
+      version: see level2/<app>/README.md (Upstream commit)
+      path: examples/free_fall.cpp (second upstream example) with the same seven-argument interface at the default
+        sizes
+  params:
+    example: FreeFall
+    cell_size: 0.01
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 1.0
+    write_freq: 1000
+  env:
+    HPCPERF_EXAMPM_EXAMPLE: FreeFall
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

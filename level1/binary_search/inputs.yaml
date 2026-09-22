@@ -1,0 +1,81 @@
+# Registered inputs of binary_search (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: binary_search
+level: 1
+selector: null
+default_input: n8388608
+entry:
+  kind: binary
+  path: build/binary_search/cuda/binary_search_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: four kernel variants (bs1..bs4) each print their own average; no total
+baseline:
+  method: no built-in PASS line; the program reports mismatches only on failure
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger element counts
+inputs:
+- id: n8388608
+  case: binary-search
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/binary-search-cuda Makefile run: ./main 8388608 100 (= ctest)'
+  params:
+    elements: 8388608
+    repeat: 100
+  args:
+  - '8388608'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n33554432
+  case: binary-search
+  variant: size
+  source:
+    kind: derived
+    derivation: elements x4
+  params:
+    elements: 33554432
+    repeat: 100
+  args:
+  - '33554432'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n134217728
+  case: binary-search
+  variant: size
+  source:
+    kind: derived
+    derivation: elements x16
+  params:
+    elements: 134217728
+    repeat: 100
+  args:
+  - '134217728'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

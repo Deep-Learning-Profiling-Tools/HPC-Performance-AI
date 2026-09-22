@@ -61,6 +61,10 @@ baseline:
       regex: '^CG: it 100, r norm (?P<value>[0-9.eE+-]+)'
       select: only
       compare: {rule: record}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    the CORAL-2 README example, three points of upstream run.sh's constant-DOF polynomial-degree sweep and one derived larger size (states frozen: r_norm_final record -> INCOMPLETE)
 inputs:
   - id: coral2-nx24-p14
     case: coral2-single-gpu-example

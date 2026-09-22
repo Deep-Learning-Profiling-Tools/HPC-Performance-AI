@@ -69,6 +69,10 @@ baseline:
       regex: '^\s*100\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+[-0-9.eE+]+\s+(?P<value>[-0-9.eE+]+)\s*$'
       select: only
       compare: {rule: rel, tol: 1.0e-5}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream bench decks (LJ at three sizes, EAM, rhodopsin) plus the ReaxFF HNS deck at two sizes on the reaxff.cuda profile
 inputs:
   - id: lj-32k
     case: lj-melt

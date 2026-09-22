@@ -1,0 +1,116 @@
+# Registered inputs of hotspot_3d (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: hotspot_3d
+level: 1
+selector: null
+default_input: g64-l8-i100
+entry:
+  kind: binary
+  path: build/hotspot_3d/cuda/hotspot_3d_cuda
+timing:
+  scope: the benchmark's own timer around the 3D stencil iterations (printed with 3 decimals -- coarser than a 100-iteration
+    run on the 64x64x8 grid)
+  kind: total
+  unit: s
+  regex: '^Time: (?P<value>[0-9.]+) \(s\)'
+  select: only
+baseline:
+  method: built-in CPU reference RMSE 'Accuracy' (verify.py enforces < 1e-2)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: accuracy_rmse
+    role: required
+    regex: '^Accuracy: (?P<value>[0-9.eE+-]+)'
+    select: only
+    compare:
+      rule: abs_lt
+      value: 0.01
+coverage:
+  status: MULTI_INPUT
+  reason: the vendored 64x8 grid at three iteration counts is registered; the canonical 512x8 grid is not vendored
+  blocker: power/temp_512x8 (~42 MB) are not in the repository; needs the external-artifact mechanism
+  upstream_inputs_not_added:
+  - data/hotspot3D/power_512x8+temp_512x8
+inputs:
+- id: g64-l8-i100
+  case: hotspot-3d
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/hotspot3D run: ./3D 64 8 100 power_64x8 temp_64x8 output.out (= ctest)'
+  params:
+    grid: 64
+    layers: 8
+    iterations: 100
+  args:
+  - '64'
+  - '8'
+  - '100'
+  - level1/hotspot_3d/data/power_64x8
+  - level1/hotspot_3d/data/temp_64x8
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/power_64x8
+  - data/temp_64x8
+  input_form: file
+- id: g64-l8-i1000
+  case: hotspot-3d
+  variant: steps
+  source:
+    kind: derived
+    derivation: 1000 iterations
+  params:
+    grid: 64
+    layers: 8
+    iterations: 1000
+  args:
+  - '64'
+  - '8'
+  - '1000'
+  - level1/hotspot_3d/data/power_64x8
+  - level1/hotspot_3d/data/temp_64x8
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/power_64x8
+  - data/temp_64x8
+  input_form: file
+- id: g64-l8-i10000
+  case: hotspot-3d
+  variant: steps
+  source:
+    kind: derived
+    derivation: 10000 iterations
+  params:
+    grid: 64
+    layers: 8
+    iterations: 10000
+  args:
+  - '64'
+  - '8'
+  - '10000'
+  - level1/hotspot_3d/data/power_64x8
+  - level1/hotspot_3d/data/temp_64x8
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/power_64x8
+  - data/temp_64x8
+  input_form: file

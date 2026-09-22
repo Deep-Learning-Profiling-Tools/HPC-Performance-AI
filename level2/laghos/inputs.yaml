@@ -55,6 +55,10 @@ baseline:
       regex: '^Energy\s+diff:\s+(?P<value>[0-9.eE+-]+)'
       select: only
       compare: {rule: record}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    six upstream problems/refinements (Taylor-Green, Sedov 2D/3D incl. the FOM case, triple point, Rayleigh-Taylor)
 inputs:
   - id: tg3d-rs1
     case: taylor-green-3d

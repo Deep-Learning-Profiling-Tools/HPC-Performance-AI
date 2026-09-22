@@ -1,0 +1,145 @@
+# Registered inputs of xsbench (schema hpcperf-inputs-1), selected through HPCPERF_XSBENCH_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: xsbench
+level: 2
+selector: HPCPERF_XSBENCH_INPUT
+default_input: large
+entry:
+  kind: run.sh
+  path: level2/xsbench/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'XSBench''s own Runtime: the event-based lookup kernel (all lookups); grid initialisation and the verification
+    reduction are outside'
+  kind: total
+  unit: s
+  regex: ^Runtime:\s+(?P<value>[0-9.]+) seconds
+  select: only
+baseline:
+  method: XSBench's built-in verification checksum over all lookup results (exact for a given size/lookups); upstream
+    marks the checksum (Valid) for its standard configurations
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: checksum
+    role: required
+    regex: '^Verification checksum: (?P<value>\d+)'
+    select: last
+    compare:
+      rule: exact
+  - name: valid_marker
+    role: diagnostic
+    regex: '^Verification checksum: \d+ \(Valid\)'
+    compare:
+      rule: present
+  - name: lookups
+    role: diagnostic
+    regex: ^Lookups:\s+(?P<value>[0-9,]+)
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the four upstream standard sizes plus a larger lookup count
+inputs:
+- id: large
+  case: hoogenboom-martin
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ANL-CESAR/XSBench
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -m event -s large (upstream GPU default; 17 M lookups)
+  params:
+    size: large
+    lookups: 17000000
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: small
+  case: hoogenboom-martin
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ANL-CESAR/XSBench
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -s small (upstream standard size)
+  params:
+    size: small
+    lookups: 17000000
+  args:
+  - -s
+  - small
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: xl
+  case: hoogenboom-martin
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ANL-CESAR/XSBench
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -s XL (upstream standard size)
+  params:
+    size: XL
+    lookups: 17000000
+  args:
+  - -s
+  - XL
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: xxl
+  case: hoogenboom-martin
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ANL-CESAR/XSBench
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -s XXL (upstream standard size)
+  params:
+    size: XXL
+    lookups: 17000000
+  args:
+  - -s
+  - XXL
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: large-l100m
+  case: hoogenboom-martin
+  variant: steps
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ANL-CESAR/XSBench
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -s large -l 100000000 (lookup count = amount of work, XSBench's own parameter)
+  params:
+    size: large
+    lookups: 100000000
+  args:
+  - -l
+  - '100000000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

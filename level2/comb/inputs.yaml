@@ -1,0 +1,103 @@
+# Registered inputs of comb (schema hpcperf-inputs-1), selected through HPCPERF_COMB_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: comb
+level: 2
+selector: HPCPERF_COMB_INPUT
+default_input: local128-c100
+entry:
+  kind: run.sh
+  path: level2/comb/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: Comb writes its per-test timing tables to its own output files under build/level2/comb/cuda/, not to stdout
+    (the survey stdout has no timing line); wiring those files is pending
+baseline:
+  method: Comb initializes halo cells analytically and asserts every received value itself (exit code); no science
+    value is printed
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: cycles
+    role: diagnostic
+    regex: ^Num cycles\s+(?P<value>\d+)
+    select: last
+    compare:
+      rule: exact
+  - name: sizes
+    role: diagnostic
+    regex: ^sizes\s+\d+\s+\d+\s+\d+
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: three local mesh sizes through Comb's own size parameter
+inputs:
+- id: local128-c100
+  case: halo-exchange
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Comb
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'comb 128_128_128 -divide 1_1_1 -periodic 1_1_1 ... (run.sh default: 128^3 local mesh, 100 cycles, 3
+        variables)'
+  params:
+    local_size: 128
+    cycles: 100
+    variables: 3
+  env:
+    HPCPERF_COMB_LOCAL_SIZE: '128'
+    HPCPERF_COMB_CYCLES: '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: local64-c100
+  case: halo-exchange
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Comb
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 64^3 local mesh (Comb's own size argument)
+  params:
+    local_size: 64
+    cycles: 100
+    variables: 3
+  env:
+    HPCPERF_COMB_LOCAL_SIZE: '64'
+    HPCPERF_COMB_CYCLES: '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: local256-c100
+  case: halo-exchange
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/Comb
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 256^3 local mesh
+  params:
+    local_size: 256
+    cycles: 100
+    variables: 3
+  env:
+    HPCPERF_COMB_LOCAL_SIZE: '256'
+    HPCPERF_COMB_CYCLES: '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

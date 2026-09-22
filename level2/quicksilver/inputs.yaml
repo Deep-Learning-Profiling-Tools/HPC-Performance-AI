@@ -87,6 +87,10 @@ baseline:
       regex: '^\s+\d+(\s+\d+){12}\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: record}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    the CORAL-2 problem 1 (two rank layouts) and problem 2 decks plus the CTS2 deck (states frozen: INCOMPLETE, native PASS:: markers only)
 inputs:
   - id: p1-profile-8c-100k-20s
     case: coral2-p1-physics

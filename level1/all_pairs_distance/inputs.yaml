@@ -1,0 +1,54 @@
+# Registered inputs of all_pairs_distance (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: all_pairs_distance
+level: 1
+selector: null
+default_input: iter10000
+entry:
+  kind: binary
+  path: build/all_pairs_distance/cuda/all_pairs_distance_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: two kernel variants each print their own 'Average kernel execution time'; no total, and the data size
+    is a compile-time constant
+baseline:
+  method: 'built-in comparison with the CPU result: PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: SINGLE_INPUT
+  reason: the only runtime parameter is the repeat count (timing repetitions are not inputs); the problem size is
+    a compile-time constant upstream
+inputs:
+- id: iter10000
+  case: all-pairs-distance
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/all-pairs-distance-cuda Makefile run: ./main 10000 (= ctest)'
+  params:
+    iterations: 10000
+  args:
+  - '10000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: the only command-line parameter is the repetition count; the instance/attribute counts are compile-time
+    constants of the upstream source

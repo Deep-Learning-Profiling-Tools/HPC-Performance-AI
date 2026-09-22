@@ -47,6 +47,10 @@ baseline:
       compare: {rule: absent}
   # The benchmark prints FAIL but still returns 0 (main.cu line 185: printf(...); return 0), so the
   # exit code alone never establishes correctness here -- the markers above are the check.
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    four upstream-parameterised sizes (two frame sizes, merged on/off, two repeat counts) of the HeCBench port's own CLI
 inputs:
   - id: w4096-h2048-merged0-r102
     case: synthetic-video-4096x2048

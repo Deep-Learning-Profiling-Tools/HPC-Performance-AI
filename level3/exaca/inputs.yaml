@@ -1,0 +1,137 @@
+# Registered inputs of exaca (schema hpcperf-inputs-1), selected through HPCPERF_EXACA_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: exaca
+level: 3
+selector: HPCPERF_EXACA_INPUT
+default_input: dirsolid-128cubed
+entry:
+  kind: run.sh
+  path: level3/exaca/run.sh
+  backend_arg: CUDA
+timing:
+  scope: ExaCA's own 'Time spent performing CA calculations' (nucleation, steering-vector creation, cell capture,
+    communication over all time steps); data initialization and output export are separate timers
+  kind: total
+  unit: s
+  regex: ^Time spent performing CA calculations = (?P<value>[0-9.eE+-]+) s
+  select: only
+baseline:
+  method: 'project statistical validation protocol v2 (references/dirsolid_smoke.tolerances.json: e.g. vol_fraction_nucleated
+    abs 0.01, n_nucleated rel 0.05 over 8 calibration runs) is run by validate.sh from the GrainID output; stdout
+    prints the nucleated volume fraction and the nucleation-event count, compared here with the protocol''s tolerances
+    against this build''s baseline'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: nucleated_fraction
+    role: required
+    regex: ^The fraction of the solidified material consisting of nucleated grains is (?P<value>[0-9.]+)
+    select: last
+    compare:
+      rule: abs
+      tol: 0.01
+  - name: nucleation_events
+    role: required
+    regex: '^Number of nucleation events during simulation of this layer: (?P<value>\d+)'
+    select: last
+    compare:
+      rule: rel
+      tol: 0.05
+coverage:
+  status: MULTI_INPUT
+  reason: the directional-solidification problem at four sizes is registered
+  blocker: the other upstream example problems (SpotMelt, EquiaxedGrain/SingleGrain, SingleLine/TwoLineTwoLayer
+    from temperature files, Finch) are in the frozen tree with their inputs, but run.sh derives every deck from
+    inputs/dirsolid.template.json; a per-example deck path is a run.sh change (not done this round); the reference/tolerance
+    protocol exists only for dirsolid
+  upstream_inputs_not_added:
+  - examples/Inp_SpotMelt.json
+  - Inp_SmallSpotMelt_Steel*.json
+  - Inp_EquiaxedGrain.json
+  - Inp_SingleLine.json (+Temperatures/Line.txt)
+  - Inp_Finch.json
+inputs:
+- id: dirsolid-128cubed
+  case: directional-solidification
+  variant: default
+  source:
+    kind: derived
+    derivation: 'inputs/dirsolid.template.json (upstream Inp_DirSolidification.json physics: Inconel625, G=5e5 K/m,
+      R=3e5 K/s) at 128^3 cells -- run.sh smoke'
+  params:
+    problem: Directional
+    cells: 128x128x128
+    material: Inconel625
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dirsolid-200cubed-upstream
+  case: directional-solidification
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/ExaCA
+      version: hpcperf-l3-v1 (ExaCA 2.1.0 frozen tree b88e84b7)
+      path: 'examples/Inp_DirSolidification.json size: 200x200x200 cells (the upstream example''s domain) through
+        HPCPERF_EXACA_NX/NY/NZ on the smoke deck'
+  params:
+    problem: Directional
+    cells: 200x200x200
+    material: Inconel625
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_EXACA_NX: '200'
+    HPCPERF_EXACA_NY: '200'
+    HPCPERF_EXACA_NZ: '200'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dirsolid-512x256x512
+  case: directional-solidification
+  variant: size
+  source:
+    kind: derived
+    derivation: 512x256x512 cells (run.sh strong-mode box, 67.1 M cells)
+  params:
+    problem: Directional
+    cells: 512x256x512
+    material: Inconel625
+  env:
+    HPCPERF_SCALE_MODE: strong
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dirsolid-64cubed
+  case: directional-solidification
+  variant: size
+  source:
+    kind: derived
+    derivation: 64^3 cells
+  params:
+    problem: Directional
+    cells: 64x64x64
+    material: Inconel625
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_EXACA_NX: '64'
+    HPCPERF_EXACA_NY: '64'
+    HPCPERF_EXACA_NZ: '64'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

@@ -1,0 +1,97 @@
+# Registered inputs of sw4lite (schema hpcperf-inputs-1), selected through HPCPERF_SW4LITE_INPUT_ID=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: sw4lite
+level: 2
+selector: HPCPERF_SW4LITE_INPUT_ID
+default_input: pointsource-h0.04
+entry:
+  kind: run.sh
+  path: level2/sw4lite/run.sh
+  backend_arg: CUDA
+timing:
+  scope: SW4lite's own solver-phase timer (all time steps); mesh generation and I/O are outside
+  kind: total
+  unit: s
+  regex: ^\s*Execution time, solver phase (?P<value>[0-9.eE+-]+) seconds
+  select: only
+baseline:
+  method: 'analytic point-source errors: validate.sh compares Linf, L2 and the solution norm with the upstream reference
+    at absolute tolerances 5e-6 / 5e-7 / 5e-5; the same tolerances are applied against this build''s baseline'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: linf
+    role: required
+    regex: '^Errors at time \S+ Linf = (?P<value>[0-9.eE+-]+) '
+    select: last
+    compare:
+      rule: abs
+      tol: 5.0e-06
+  - name: l2
+    role: required
+    regex: '^Errors at time \S+ Linf = [0-9.eE+-]+ L2 = (?P<value>[0-9.eE+-]+) '
+    select: last
+    compare:
+      rule: abs
+      tol: 5.0e-07
+  - name: norm
+    role: required
+    regex: ^Errors at time \S+ .* norm of solution = (?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: abs
+      tol: 5.0e-05
+  - name: steps
+    role: required
+    regex: ^Time step (?P<value>\d+) t=
+    select: last
+    compare:
+      rule: exact
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream deck and a refined derived deck; no other upstream .in cases are vendored
+inputs:
+- id: pointsource-h0.04
+  case: point-source-analytic
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: geodynamics/sw4lite
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/pointsource.in (grid 8x8x4, h=0.04) -- run.sh default
+  params:
+    deck: inputs/pointsource.in
+    h: 0.04
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/pointsource.in
+  input_form: file
+- id: pointsource-h0.02
+  case: point-source-analytic
+  variant: size
+  source:
+    kind: derived
+    derivation: 'inputs/pointsource-h0p02.in: the upstream deck with h=0.02 (twice the resolution in each direction,
+      ~16x the work) and its own fileio path'
+  params:
+    deck: inputs/pointsource-h0p02.in
+    h: 0.02
+  env:
+    HPCPERF_SW4LITE_INPUT: inputs/pointsource-h0p02.in
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: the analytic error values at h=0.02 differ from the h=0.04 reference; the registry compares them only with
+    this build's own baseline
+  files:
+  - inputs/pointsource-h0p02.in
+  input_form: file

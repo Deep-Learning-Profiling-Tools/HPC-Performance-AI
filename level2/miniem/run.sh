@@ -30,6 +30,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
+# Registered inputs (inputs.yaml): HPCPERF_MINIEM_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_MINIEM_INPUT || exit 2
 
 set -euo pipefail
 
@@ -80,4 +85,4 @@ export TPETRA_ASSUME_GPU_AWARE_MPI="${TPETRA_ASSUME_GPU_AWARE_MPI:-0}"
 echo "# MiniEM $BACKEND: mode=$MODE ranks=$N_RANKS $DESC steps=$STEPS solver=MueLu(RefMaxwell)/Tpetra gpu_aware_mpi=$TPETRA_ASSUME_GPU_AWARE_MPI"
 cd "$DECKS"
 exec "$R/level2/tools/hpcperf_mpi_launch.sh" --gpus "$N_RANKS" -- \
-    "$EXE" --inputFile="$DECK" --solver=MueLu --linAlgebra=Tpetra --numTimeSteps="$STEPS" "${SIZE[@]}" --stacked-timer "$@"
+    "$EXE" --inputFile="$DECK" --solver=MueLu --linAlgebra=Tpetra --numTimeSteps="$STEPS" "${SIZE[@]}" --stacked-timer ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

@@ -66,6 +66,10 @@ baseline:
       regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>[0-9.eE+-]+)\s*$'
       select: last
       compare: {rule: rel, tol: 0.02}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream collide deck at four sizes, the free deck and the sphere deck (sphere-1m frozen INCOMPLETE)
 inputs:
   - id: collide-10k
     case: collide-box
