@@ -247,5 +247,179 @@ case "$out" in *"$TMP/stubctest"*) ok "5d: \$HPCPERF_CTEST is honoured when the 
                                 *) bad "5d: HPCPERF_CTEST ignored: $out" ;; esac
 
 echo
+echo "=== 6: Level 2 case table, FOM extraction and measurement command"
+CASES2="$TOOLS/cases_l2.tsv"
+MEAS2="$TOOLS/measure_level2.sh"
+if [ ! -f "$CASES2" ]; then
+    bad "6a: cases_l2.tsv missing"
+else
+    ncol_bad=0
+    while IFS= read -r line; do
+        case "$line" in ''|\#*) continue ;; esac
+        n=$(awk -F'\t' '{print NF}' <<< "$line")
+        [ "$n" -eq 10 ] || ncol_bad=$((ncol_bad+1))
+    done < "$CASES2"
+    [ "$ncol_bad" -eq 0 ] && ok "6a: every Level 2 row has 10 tab-separated fields" \
+                          || bad "6a: $ncol_bad Level 2 rows with the wrong field count"
+
+    if /usr/bin/grep -qP '\t\t' "$CASES2"; then
+        bad "6b: cases_l2.tsv contains an empty field (consecutive tabs)"
+    else
+        ok "6b: no consecutive tabs in cases_l2.tsv"
+    fi
+
+    # one row per level2 application that has a run.sh, and no row for anything else
+    missing=""; extra=""
+    for d in "$REPO"/level2/*/; do
+        a="$(basename "$d")"
+        [ -f "$d/run.sh" ] || continue
+        /usr/bin/grep -q "^$a	" "$CASES2" || missing="$missing $a"
+    done
+    while IFS=$'\t' read -r a _rest; do
+        case "$a" in ''|\#*) continue ;; esac
+        [ -f "$REPO/level2/$a/run.sh" ] || extra="$extra $a"
+    done < "$CASES2"
+    [ -z "$missing" ] && ok "6c: every level2 app with a run.sh has a case row" \
+                      || bad "6c: no case row for:$missing"
+    [ -z "$extra" ] && ok "6d: no case row without a level2 run.sh" \
+                    || bad "6d: case rows with no run.sh:$extra"
+fi
+
+# every FOM pattern must compile, expose exactly one group, and declare a direction;
+# a blank FOM row must be blank in all five FOM columns, so a half-filled row cannot
+# silently produce a number with no unit.
+if [ -f "$CASES2" ]; then
+    out="$(python3 - "$CASES2" <<'PYEOF' 2>&1
+import csv, re, sys
+bad = []
+nfom = 0
+for r in csv.reader(open(sys.argv[1]), delimiter="\t"):
+    if not r or r[0].startswith("#"):
+        continue
+    app, be, gpus, tmo, name, unit, better, src, rx, note = r
+    if not tmo.isdigit() or int(tmo) <= 0:
+        bad.append(f"{app}: timeout_s={tmo!r}")
+    if name == "-":
+        if [unit, better, src, rx] != ["-", "-", "-", "-"]:
+            bad.append(f"{app}: no fom_name but other FOM columns are filled")
+        continue
+    nfom += 1
+    if better not in ("higher", "lower"):
+        bad.append(f"{app}: fom_better={better!r}")
+    if src != "stdout":
+        bad.append(f"{app}: fom_source={src!r} is not implemented")
+    if unit == "-" and app != "remhos":
+        bad.append(f"{app}: FOM without a unit")
+    try:
+        pat = re.compile(rx, re.M)
+    except re.error as exc:
+        bad.append(f"{app}: fom_regex does not compile: {exc}")
+        continue
+    if pat.groups != 1:
+        bad.append(f"{app}: fom_regex has {pat.groups} capture groups, need exactly 1")
+print(f"NFOM={nfom}")
+for b in bad:
+    print("BAD", b)
+PYEOF
+)"
+    nfom="$(echo "$out" | sed -n 's/^NFOM=//p')"
+    if echo "$out" | /usr/bin/grep -q '^BAD'; then
+        bad "6e: FOM columns are inconsistent: $(echo "$out" | /usr/bin/grep '^BAD' | head -3 | tr '\n' ';')"
+    else
+        ok "6e: all $nfom FOM patterns compile with one capture group and a direction"
+    fi
+fi
+
+# FOM extraction against synthetic stdout: last match wins, commas are stripped,
+# a case without a FOM stays empty, a pattern that misses reports not_matched.
+mk_l2_raw() {   # mk_l2_raw <app> <fom_name> <fom_regex> <stdout text>
+    local d="$L2/$1/r-$1"
+    mkdir -p "$d"
+    { echo "schema=hpcperf-timing-raw-1"; echo "level=2"; echo "run_id=r-$1"
+      echo "utc=1970-01-01T00:00:00Z"; echo "benchmark=$1"; echo "backend=CUDA"
+      echo "runner=level2/$1/run.sh"; echo "gpus=1"; echo "timeout_s=60"
+      echo "repeats=1"; echo "warmup=0"; echo "profiled=1"; echo "profiler_in_wall=1"
+      echo "run_status=ok"; echo "fom_name=$2"; echo "fom_unit=u"; echo "fom_better=higher"
+      echo "fom_source=$([ "$2" = "-" ] && echo - || echo stdout)"; echo "fom_regex=$3"
+      echo "fom_note="; echo "hostname=h"; echo "gpu_csv="
+      echo "gpu_audit=audit summary: 1 verified, 0 mismatch, 0 unverified"; } > "$d/run_meta.txt"
+    echo 1500000000 > "$d/wall_ns.txt"
+    echo 0 > "$d/exit_codes.txt"
+    printf '%s\n' "$4" > "$d/run.log"
+}
+SUM="$TOOLS/summarize.py"
+L2="$TMP/l2raw"
+mk_l2_raw commas 'Lookups/s' 'Lookups/s:\s*([0-9,]+)' 'Lookups/s:   1,234,567'
+mk_l2_raw anchored 'FOM' '^FOM:\s+([0-9.eE+-]+)' 'FOM RHS: 49.4
+FOM: 10.5
+FOM: 11.5'
+mk_l2_raw nofom '-' '-' 'no metric here at all'
+mk_l2_raw misses 'Ghost' 'Ghost = ([0-9.]+)' 'the application printed something else'
+out="$(python3 "$SUM" --raw-root "$TMP/none" --raw-root-l2 "$L2" --out-root "$TMP/l2out" 2>&1 | noise)"
+if echo "$out" | /usr/bin/grep -q 'level2 json_written=4'; then
+    ok "6f: four Level 2 records written"
+else
+    bad "6f: summarize did not write four Level 2 records: $out"
+fi
+res="$(python3 - "$TMP/l2out/summary_level2.csv" <<'PYEOF' 2>&1
+import csv, sys
+by = {r["app"]: r for r in csv.DictReader(open(sys.argv[1]))}
+checks = [
+    ("comma stripped", by["commas"]["fom_value"] == "1234567.0"),
+    ("comma status ok", by["commas"]["fom_status"] == "ok"),
+    ("last match wins", by["anchored"]["fom_value"] == "11.5"),
+    ("anchored ^FOM: only", by["anchored"]["fom_status"] == "ok"),
+    ("blank stays blank", by["nofom"]["fom_value"] == "" and by["nofom"]["fom_status"] == "none"),
+    ("blank name empty", by["nofom"]["fom_name"] == ""),
+    ("miss -> not_matched", by["misses"]["fom_value"] == "" and by["misses"]["fom_status"] == "not_matched"),
+    ("wall carries profiler", by["commas"]["wall_includes_profiler"] == "1"),
+    ("fom marked profiled", by["commas"]["fom_from_profiled_run"] == "1"),
+    ("audit parsed clean", by["commas"]["gpu_audit_ok"] == "1"),
+]
+print(";".join(n for n, okk in checks if not okk) or "ALLOK")
+PYEOF
+)"
+[ "$res" = "ALLOK" ] && ok "6g: FOM extraction handles commas, last-match, blanks and misses" \
+                     || bad "6g: FOM extraction wrong: $res"
+
+# a run whose FOM pattern misses, and a single profiled run, must both be caveated
+cav="$(python3 - "$TMP/l2out/level2" <<'PYEOF' 2>&1
+import glob, json, sys
+txt = " ".join(json.dumps(json.load(open(p))["caveats"]) for p in glob.glob(sys.argv[1] + "/*/*.json"))
+print("PROF" if "includes nsys overhead" in txt else "-", "MISS" if "did not match" in txt else "-")
+PYEOF
+)"
+case "$cav" in
+    "PROF MISS") ok "6h: single-profiled-run and pattern-miss caveats are emitted" ;;
+    *)           bad "6h: expected both caveats, got '$cav'" ;;
+esac
+
+# the measurement command: no validate.sh, reports under build/timing-l2, and a
+# planted credential must not reach the child environment (deny beats allow-list)
+if [ ! -x "$MEAS2" ]; then
+    bad "6i: measure_level2.sh is not executable"
+else
+    out="$(HPCPERF_SESSION_TOKEN=planted-l2-credential \
+           "$MEAS2" --dry-run xsbench 2>&1 | noise)"
+    fails=""
+    echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=1'            || fails="$fails no-gpus"
+    echo "$out" | /usr/bin/grep -q 'build/timing-l2'           || fails="$fails no-raw-root"
+    echo "$out" | /usr/bin/grep -q 'run.sh CUDA'               || fails="$fails no-runner"
+    echo "$out" | /usr/bin/grep -q 'validate.sh'               && fails="$fails calls-validate"
+    echo "$out" | /usr/bin/grep -q 'planted-l2-credential'     && fails="$fails leaks-value"
+    echo "$out" | /usr/bin/grep -q 'HPCPERF_SESSION_TOKEN'     && fails="$fails leaks-name"
+    echo "$out" | /usr/bin/grep -q 'repeats=1'                 || fails="$fails no-single-run"
+    [ -z "$fails" ] && ok "6i: dry-run command is single-run, profiled, validate-free and credential-free" \
+                    || bad "6i: dry-run command wrong:$fails"
+
+    # SESSION is on the deny list, so even if it were allow-listed it must be dropped
+    if /usr/bin/grep -q "ENV_DENY=" "$MEAS2" && /usr/bin/grep -q 'SESSION' "$MEAS2"; then
+        ok "6j: measure_level2.sh carries a credential deny rule that beats the allow-list"
+    else
+        bad "6j: no credential deny rule in measure_level2.sh"
+    fi
+fi
+
+echo
 echo "timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

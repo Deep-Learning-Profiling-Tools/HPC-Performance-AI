@@ -170,9 +170,11 @@ level3/<app>/
   `level3/tools/l3_clean_env.sh` (allow-listed `env -i` plus a credential
   deny-rule that beats the allow-list): the login shell carries credentials that
   must never land in a `declare -x` dump or a profiler report. Never print a full
-  `env` into a log; report variable names only. The common launcher/run.sh path
-  is NOT wrapped yet (follow-up): do not profile a science run with nsys/ncu
-  without the wrapper.
+  `env` into a log; report variable names only. For **Level 3** the common
+  launcher/run.sh path is still NOT wrapped (follow-up): do not profile a Level 3
+  science run with nsys/ncu without the wrapper. **Level 1/2 timing is wrapped**
+  by `tools/timing/` (see below), which carries its own self-contained allow-list
+  plus deny rule and does not use the Level 3 helpers.
 - Queues: run every step through `l3_run_recorded <rc-file> <label> -- cmd`
   (records the exit code, never aborts), classify with `level3/tools/l3_verdict.py`
   (PASS / PENDING / UNSUPPORTED_LAYOUT / FAIL / MISSING). Exit 3 and 4 are never
@@ -195,6 +197,23 @@ Level 2 specifics (mini-apps; the tree above is Level 3's):
 - validate.sh runs at `HPCPERF_GPUS=1` by default; upstream ctests that call
   `mpirun -np 2` themselves need the PRRTE slot relaxation as a command-local
   `env` (Branson pattern), never an export.
+
+Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contained
+(bash + python stdlib + nsys; it reads nothing from `level2/tools` or `level3/`):
+- `measure_level1.sh` N clean runs + 1 profiled run, `HPCPERF_SKIP_VERIFY=1`;
+  `measure_level2.sh` **one profiled run** of `level2/<app>/run.sh`, no repeats,
+  `validate.sh` never called (Level 2 keeps verification there, so no patch exists).
+- nsys wraps `run.sh` from the OUTSIDE: 20 of 24 end in `exec`, and a profiler
+  inside the launcher's wrapper breaks the nvidia-smi pid join and makes every rank
+  `unverified`. Outside, the audit stays clean (verified on quicksilver).
+- Wall clock of a Level 2 run INCLUDES 1.66x-1.91x profiler overhead (measured;
+  `-s none` alone costs 1.66x, it is attach/flush not sampling) -- an upper bound.
+  GPU-side numbers are unaffected (CUPTI device timestamps, 1.2% spread).
+- 16 of 24 applications print their own FOM and it is collected (patterns in
+  `cases_l2.tsv`); the other 8 are left BLANK, never a derived number. The profiler
+  depresses a FOM by 5.4%-6.4%, so every record carries `fom.from_profiled_run`.
+- Results go to `results/timing/` (git-ignored): **never commit measurement output**.
+  `bash tools/timing/tests/run_all.sh` is CPU-only, 33 assertions.
 
 ## Validation principles
 
@@ -335,8 +354,9 @@ Build systems
   UNVERIFIED); QMCPACK per-walker device memory / cuSOLVER (<= 300
   walkers/GPU); numerical acceptance of strong/weak runs; multi-node and HIP;
   2+/4-GPU validation of Comb/Quicksilver/SW4lite/GAMESS RI-MP2 and multi-GPU
-  decks for hipBone/miniWeather; wrapping the run/profiler path in the clean
-  environment; the site's device-buffer (smcuda) MPI path that hangs Tpetra
+  decks for hipBone/miniWeather; wrapping the Level 3 run/profiler path in the
+  clean environment (Level 1/2 is done, `tools/timing/`); Level 2 multi-rank
+  timing (this allocation exposes one GPU, so it is UNVERIFIED); the site's device-buffer (smcuda) MPI path that hangs Tpetra
   (MiniEM runs with `TPETRA_ASSUME_GPU_AWARE_MPI=0`).
 
 ## Reporting
