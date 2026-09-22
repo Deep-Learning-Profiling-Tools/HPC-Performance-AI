@@ -103,6 +103,7 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+  notes: run.sh's max_step default applies (HPCPERF_NYX_STEPS=10, upstream's MiniSB test length): 10 steps of the 64^3 deck, measured 1.5 s Run time
 - id: lya-heatcool-32cubed
   case: lyman-alpha-heat-cool
   variant: case
@@ -126,5 +127,5 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-  notes: correctness of the heating/cooling network is PENDING (I_R check) -- registered as an upstream case, not
+  notes: 10 steps (run.sh default) on the heatcool profile; correctness of the heating/cooling network stays PENDING (validate.sh I_R check), never a pass; correctness of the heating/cooling network is PENDING (I_R check) -- registered as an upstream case, not
     as a validated one
