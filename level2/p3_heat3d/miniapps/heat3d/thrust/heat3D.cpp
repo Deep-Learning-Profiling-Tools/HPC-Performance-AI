@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <iostream>
 #include <chrono>
 #include <array>
@@ -28,13 +29,17 @@ int main(int argc, char *argv[]) {
 
   // Main loop
   timers[Total]->begin();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the time-step loop (upstream Total timer)
   for(int i=0; i<conf.nbiter; i++) {
     timers[MainLoop]->begin();
+    if(enable_diag) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();   // tools/timing ROI: CSV output excluded
     if(enable_diag) to_csv(conf, u, i, timers);
+    if(enable_diag) HPCPERF_ROI_EXCLUDE_END();
     step(conf, u, un, timers);
     u.swap(un);
     timers[MainLoop]->end();
   }
+  HPCPERF_ROI_END_SYNC();
   timers[Total]->end();
 
   using real_type = RealView3D::value_type;
