@@ -5,6 +5,8 @@ R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null
 set -euo pipefail
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="${1:-CUDA}"; BACKEND="${BACKEND^^}"
 MPIFC="${MPIFC:-$(command -v mpifort || true)}"
@@ -32,8 +34,12 @@ case "$BACKEND" in
     echo "== GAMESS RI-MP2 CUDA build: cc${ARCH} -> $BUILD"
     "$NVFORTRAN" -cpp -mp=gpu -gpu="cc${ARCH}" -O3 -DCUBLAS \
       -c "$HERE/source/cublasf.f90" -o cublasf.o
+    # tools/timing ROI markers: the Fortran module and its C entry points (NVTX backend)
+    "$NVFORTRAN" -O2 -c "$R/tools/timing/roi/hpcperf_roi.f90" -o hpcperf_roi.o
+    "${CC:-cc}" -O2 -I"$R/tools/timing/roi" -c "$R/tools/timing/roi/hpcperf_roi_fortran.c" -o hpcperf_roi_fortran.o
     "$NVFORTRAN" -cpp -mp=gpu -gpu="cc${ARCH}" -O3 -DCUBLAS -DHPCPERF_MINIMAL_MPIF \
       "${MPI_COMPILE[@]}" "$HERE/source/rimp2_energy_whole_KERN.f90" cublasf.o \
+      hpcperf_roi.o hpcperf_roi_fortran.o \
       "${MPI_LINK[@]}" -L"$CUDA_ROOT/lib64" -Wl,-rpath,"$CUDA_ROOT/lib64" -lcublas -lcudart \
       -o rimp2-cublas
     EXE="$BUILD/rimp2-cublas"
@@ -74,8 +80,11 @@ case "$BACKEND" in
     echo "== GAMESS RI-MP2 HIP build: $ARCH -> $BUILD"
     # -homp is the authoritative Crusher/CCE route. Sites using another
     # hipfort compiler can override only this compiler-specific flag.
+    # tools/timing ROI markers (ROCTX backend; UNVERIFIED: no ROCm on the node this was written on)
+    "$HIPFC" -c "$R/tools/timing/roi/hpcperf_roi.f90" -o hpcperf_roi.o
+    "${CC:-cc}" -O2 -DHPCPERF_ROI_ROCTX -I"$R/tools/timing/roi" -c "$R/tools/timing/roi/hpcperf_roi_fortran.c" -o hpcperf_roi_fortran.o
     "$HIPFC" ${HPCPERF_HIP_OPENMP_FLAG:--homp} -O3 -DHIPBLAS "${HIP_ARCH_FLAGS[@]}" \
-      "${MPI_COMPILE[@]}" "$HERE/source/rimp2_energy_whole_KERN.f90" "${MPI_LINK[@]}" \
+      "${MPI_COMPILE[@]}" "$HERE/source/rimp2_energy_whole_KERN.f90" hpcperf_roi.o hpcperf_roi_fortran.o "${MPI_LINK[@]}" \
       -L"$HIPBLAS_LIBDIR" -Wl,-rpath,"$HIPBLAS_LIBDIR" -lhipblas -o rimp2-hipblas
     EXE="$BUILD/rimp2-hipblas"
     ;;
