@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include "application.h"
 #include "comms.h"
 #include "drivers.h"
@@ -9,9 +10,11 @@ void solve(Chunk *chunks, Settings &settings, int tt, double *wallclock_prev);
 // The main timestep loop
 bool diffuse(Chunk *chunks, Settings &settings) {
   double wallclock_prev = 0.0;
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the time steps, not the final checked field summary
   for (int tt = 0; tt < settings.end_step; ++tt) {
     solve(chunks, settings, tt, &wallclock_prev);
   }
+  HPCPERF_ROI_END_SYNC();
 
   return field_summary_driver(chunks, settings, true);
 }
