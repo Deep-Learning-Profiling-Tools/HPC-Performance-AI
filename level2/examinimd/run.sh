@@ -68,6 +68,9 @@ if [ -n "${HPCPERF_EXAMINIMD_DECK:-}" ]; then
     DECK="$HPCPERF_EXAMINIMD_DECK"
     case "$DECK" in /*) ;; *) DECK="$HERE/$DECK" ;; esac
     [ -f "$DECK" ] || { echo "run.sh: deck $DECK not found" >&2; exit 1; }
+    # SNAP decks name their coefficient/parameter files relative to the working directory (README:
+    # unchecked fopen, segfault otherwise): run such a deck from its own directory.
+    if compgen -G "$(dirname "$DECK")/*.snapcoeff" >/dev/null; then cd "$(dirname "$DECK")" || exit 1; fi
 else
     case "$MODE" in
         smoke)  LX=40; LY=40; LZ=40; STEPS="${HPCPERF_EXAMINIMD_STEPS:-100}" ;;
