@@ -1,0 +1,41 @@
+# tools/timing/cases/level2_apps.tsv -- per-application facts for Level 2 (hand-maintained).
+#
+# Tab-separated, "-" = empty (tabs collapse in bash `read`, so a bare empty field would shift columns).
+#   app          directory under level2/
+#   backends     comma list of backends its build.sh accepts (HIP is UNTESTED everywhere: no ROCm)
+#   timeout_s    default hard limit for a clean run; the profiled run gets 3x
+#   fom_*        the metric the application prints itself; "-" in all five when it prints none.
+#                fom_regex: python regex with exactly one capture group, the LAST match wins;
+#                a case may override it (level2_cases.tsv) because some FOM lines depend on the case
+#   extra_env    input variables a case may set beyond those run.sh reads (normally "-")
+#   roi_excludes what HPCPERF_ROI_EXCLUDE_* carves out INSIDE the ROI ("-" = nothing); set-up,
+#                warm-up, final checks and final output are simply outside the ROI
+#   notes        free text; for applications without a FOM, what they print instead
+#
+# The FOM is read from the CLEAN run (no profiler). The ROI -- not the FOM's own denominator --
+# defines the measured time; the two can differ (quicksilver's FOM covers cycleTracking only).
+#app	backends	timeout_s	fom_name	fom_unit	fom_better	fom_source	fom_regex	extra_env	roi_excludes	notes
+amg2023	cuda,hip	900	Figure of Merit (setup + solve)	nnz_AP/s	higher	stdout	Figure of Merit \(FOM\): nnz_AP / \(Setup Phase Time \+ Solve Phase Time\)\s+([0-9.eE+-]+)	-	-	the default case prints only this variant; other cases (problem2) also print a setup+3x-solve one, so the pattern is anchored on the 1x denominator to stay deterministic. FOM_Setup and FOM_Solve are printed separately too
+branson	cuda,hip	900	Photons Per Second	photons/s	higher	stdout	Photons Per Second \(FOM\):\s*([0-9.eE+-]+)	-	-	-
+cabanapic	cuda,hip	900	-	-	-	-	-	-	particle/field dumps (compiled out by build.sh: PARTICLE_DUMP_INTERVAL=0)	the app prints no timing at all; run.sh prints its own wall time
+cloverleaf	cuda,hip	900	Average time per cell	s/cell	lower	stdout	Average time per cell\s+([0-9.eE+-]+)	-	VisIt output (visit_frequency, 0 in the deck)	grind time, printed once per step; the last one wins
+comb	cuda,hip	600	-	-	-	-	-	-	-	per-phase table (number, average(s), min(s), max(s)) written to Comb_NN_summary.csv in the run cwd, NOT stdout; times only, no rate
+exacmech	cuda,hip	900	-	-	-	-	-	-	-	prints 'Run time of set-up, material, and retrieve kernels over 1000 time steps is: X(s)' -- a total time, not normalized by the app
+examinimd	cuda,hip	900	Atomsteps/s	atom-steps/s	higher	stdout	\|\s*[0-9.eE+-]+\s+([0-9.eE+-]+)\s+[0-9.eE+-]+\s+PERFORMANCE	-	binary dumps; per-step correctness check (both off in the deck)	value sits in the data row under the #Procs header, anchored on the PERFORMANCE marker
+exampm	cuda,hip	900	-	-	-	-	-	-	periodic particle output (a no-op without HDF5/Silo)	prints only 'Time 0.25 / 1.0' progress lines; no timing whatsoever
+gamess_ri_mp2	cuda,hip	900	-	-	-	-	-	-	-	prints 'Wall time (minimum/mean/maximum) = X sec'; a time, not a rate
+haccabanapm	cuda,hip	1800	pm_run per-step median	s/step	lower	stdout	pm_run_timing: summary .*median_s=([0-9.eE+-]+)	-	intermediate snapshot writes	upstream benchmark metric (PMKOKKOS_TIMING=1, on by default); run.sh runs pm_ic then pm_run, so one report covers both binaries
+hipbone	cuda,hip	1200	NekBone FOM	GFLOPs	higher	stdout	NekBone FOM = ([0-9.eE+-]+) GFLOPs	-	-	-
+kripke	cuda,hip	900	Throughput	unknowns/(s/iteration)	higher	stdout	Throughput:\s*([0-9.eE+-]+)\s*\[unknowns	-	-	the only app with an explicit 'Figures of Merit' section; also prints Grind time
+laghos	cuda,hip	3600	CG (H1) rate	megadofs*cg_iterations/s	higher	stdout	CG \(H1\) rate \(megadofs x cg_iterations / second\):\s*([0-9.eE+-]+)	-	visualization, VisIt, grid-function output, problem checks (-chk)	-
+minibude	cuda,hip	900	gflop/s	GFLOP/s	higher	stdout	gflop/s:\s*([0-9.eE+-]+)	-	-	also prints giga_interactions/s and gfinst/s
+miniem	cuda,hip	5400	FOM	k-cell-steps/s	higher	stdout	FOM \([^)]*\)\s*=\s*([0-9.eE+-]+)	-	response evaluation (L2 error vs the analytic solution + its assertion); Exodus output	the slowest case in the suite (README: 12-30 min)
+miniweather	cuda,hip	900	-	-	-	-	-	-	NetCDF output	prints 'CPU Time: X sec' only
+p3_heat3d	cuda,hip	900	Bandwidth	GB/s	higher	stdout	Bandwidth:\s*([0-9.eE+-]+)\s*\[GB/s\]	-	CSV field dumps (--freq_diag, 0 in run.sh)	also prints Flops in [GFlops]
+p3_vlp4d	cuda,hip	900	-	-	-	-	-	-	f(x,vx) CSV dumps (fxvx, off in the deck)	prints a per-region timer table (total, MainLoop, advec1D_*); times only
+quicksilver	cuda,hip	900	Figure Of Merit	segments/s	higher	stdout	Figure Of Merit\s+([0-9.eE+-]+)	-	-	denominator is cycleTracking only, not the wall clock; it also prints its own timer table
+remhos	cuda,hip	900	FOM	-	higher	stdout	^FOM:\s+([0-9.eE+-]+)	-	visualization, VisIt	upstream gives no unit; ^FOM: is required so the per-stage FOM RHS/INV/LO/FCT lines do not match
+shaw	cuda,hip	900	aveBandwidth	GB/s	higher	stdout	aveBandwidth\(GB/s\)\s*=\s*([0-9.eE+-]+)	-	snapshot/seismogram data collection (device-to-host copies + storage)	its '*** Compute FOM Jacobian matrices ***' line is a domain term, NOT a figure of merit. The default case reports ~4.8e4 GB/s, above this device's HBM peak, so this is an effective figure derived from an operation count, not achieved DRAM bandwidth
+sw4lite	cuda,hip	900	-	-	-	-	-	-	checkpoint writes	prints 'Execution time, solver phase X seconds', a phase table and 'Total running time'
+tealeaf	cuda,hip	900	Avg. time per cell	s/cell	lower	stdout	Avg\. time per cell:\s*([0-9.eE+-]+)	-	-	grind time, printed once per timestep; the last one wins
+xsbench	cuda,hip	900	Lookups/s	lookups/s	higher	stdout	Lookups/s:\s*([0-9,]+)	-	-	the value carries thousands separators; the extractor strips commas

@@ -1,0 +1,13 @@
+{
+  "schema": "hpcperf-conformance-1",
+  "program": "probe.cu",
+  "roi": {"entries": 1, "has_exclude": true},
+  "inside_roi": {"compute_ops": 20, "copy_d2d_ops": 1, "copy_h2d_ops": 0, "copy_d2h_ops": 0, "fill_ops": 0},
+  "whole_process": {"compute_ops": 36, "copy_h2d_ops": 1, "copy_d2d_ops": 1, "copy_d2h_ops": 1, "fill_ops": 1},
+  "tolerance": {
+    "profiled_vs_clean_roi_rel": 0.5,
+    "profiled_vs_clean_roi_abs_s": 0.02,
+    "marker_vs_trace_roi_abs_s": 0.002
+  },
+  "note": "36 = 10 warm-up + 20 ROI + 5 excluded check + 1 after. The excluded launches are in whole_process but not in inside_roi."
+}
