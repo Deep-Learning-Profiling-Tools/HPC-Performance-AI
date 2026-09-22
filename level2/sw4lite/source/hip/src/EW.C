@@ -29,6 +29,7 @@
 // # You should have received a copy of the GNU General Public License
 // # along with this program; if not, write to the Free Software
 // # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA 
+#include "hpcperf_roi.h"
 #include "sw4.h"
 
 #include "EW.h"
@@ -2524,6 +2525,9 @@ void EW::timesteploop( vector<Sarray>& U, vector<Sarray>& Um )
    setup_device_communication_array();
 
 // Begin time stepping loop
+   // tools/timing ROI: the time-stepping loop (set-up, initial data and the one-time
+   // host-to-device copies before it are outside; checkpoint writes are excluded)
+   HPCPERF_ROI_BEGIN_SYNC();
    for( int currentTimeStep = beginCycle; currentTimeStep <= mNumberOfTimeSteps; currentTimeStep++ )
    {    
       time_measure[0] = MPI_Wtime();
@@ -2778,6 +2782,7 @@ void EW::timesteploop( vector<Sarray>& U, vector<Sarray>& Um )
       for( int c=0 ; c < m_check_points.size() ; c++ )
 	 if( m_check_points[c]->timeToWrite( t, currentTimeStep, mDt) )
 	 {
+	    HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
 	    for( int g=0 ; g < mNumberOfGrids ; g++ )
 	    {
 	       U[g].copy_from_device(m_cuobj,true,0);
@@ -2788,6 +2793,7 @@ void EW::timesteploop( vector<Sarray>& U, vector<Sarray>& Um )
 #endif
 	    m_check_points[c]->write_checkpoint( t, currentTimeStep, U, Up );
 	    wrote=true;
+	    HPCPERF_ROI_EXCLUDE_END();
 	 }
       if( wrote )
       {
@@ -2876,6 +2882,7 @@ void EW::timesteploop( vector<Sarray>& U, vector<Sarray>& Um )
 	    trdata[s+12*(currentTimeStep-beginCycle)]= time_measure[s];
 
    } // end time stepping loop
+   HPCPERF_ROI_END_SYNC();
    double time_end_solve = MPI_Wtime();
    print_execution_time( time_start_solve, time_end_solve, "solver phase" );
    if( m_output_detailed_timing )
