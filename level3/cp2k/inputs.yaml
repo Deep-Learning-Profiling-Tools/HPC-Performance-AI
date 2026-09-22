@@ -13,7 +13,12 @@ entry:
 timing:
   kind: none
   status: NEEDS_TIMING_SUPPORT
-  reason: CP2K writes its output (timing report 'CP2K ... TOTAL TIME', energies) to cp2k.out in the run directory,
+  reason: >-
+    CP2K writes its report to cp2k.out in the run directory (run.sh -o cp2k.out;
+    build/level3/cp2k/<profile>/<run subdir>/<case>/cp2k.out), not to stdout. The file carries the native
+    timer: the T I M I N G table's 'CP2K' row (TOTAL TIME, e.g. 16.39 s for h2o-32) and the 'qs_mol_dyn_low' row
+    (the MD driver, 16.21 s), plus the 'ENERGY| Total FORCE_EVAL' lines. Wiring needs either run.sh to echo that
+    block to stdout or the tool to read a run-directory file; not done this round -- E2E only.
     not to stdout (run.sh -o cp2k.out); wiring the file is pending
 baseline:
   method: regtests carry upstream reference values (TEST_FILES.toml, used by validate.sh); H2O benchmarks have no
