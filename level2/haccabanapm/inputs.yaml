@@ -125,3 +125,10 @@ inputs:
     reason: >-
       upstream's demo indat runs 5 DKD steps = pm_run's warm-up window (warmup=5), so steps_timed is 0 and
       the pm_run_timing summary line is not printed; only the E2E wall and run.sh's pm_ic/pm_run wall times exist
+  baseline:   # the benchmark-level quantities come from the pm_run_timing summary, which this 5-step run never prints
+    quantities:
+    - name: provenance_5_steps
+      role: diagnostic
+      regex: '^pm_run_timing: provenance ranks=1 .* nsteps=5 warmup=5'
+      compare:
+        rule: present
