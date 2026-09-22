@@ -97,14 +97,21 @@ inputs:
     upstream:
       repo: ANL-CESAR/XSBench
       version: see level2/<app>/README.md (Upstream commit)
-      path: -m history -s large (upstream's history-based simulation method, the program default; own reference checksum)
+      path: -m history -s large -p 500000 -l 34 (upstream's history-based simulation method with its documented
+        defaults -- 500,000 particles x 34 lookups; own reference checksum)
   params:
     size: large
     lookups: 17000000
     simulation_method: history
+    particles: 500000
+    lookups_per_particle: 34
   args:
   - -m
   - history
+  - -p
+  - '500000'
+  - -l
+  - '34'
   runtime_config:
     gpus: 1
     ranks: 1
