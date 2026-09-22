@@ -230,3 +230,56 @@ interfaces refuse instead of guessing, `gen_cases.py`, and FOM extraction.
 * **Hardware counters** (`ncu`, occupancy, achieved bandwidth): not collected.
 * **Level 3**: not covered; its run path is not yet wrapped in the clean
   environment.
+
+## First ROI sweep (2026-09-22)
+
+dgx003, 1x NVIDIA B200 (sm_100, driver 595.58.03), CUDA 13.2.78, Nsight Systems
+2025.6.3, GCC 13.3 (uv toolchain), Level 1 `build/gcc13`, Level 2 at
+`HPCPERF_GPUS=1`. Conformance `nvidia-b200.cuda13.2` passed before the sweep.
+
+| | Level 1 | Level 2 |
+|---|---|---|
+| cases ok | **51 / 51** | **28 / 28** (24 default + `amg2023/n128,n192`, `quicksilver/p50000,p200000`) |
+| sweep wall time | 15.7 min | 34 min (incl. summarize) |
+| ROI as a share of the process (median) | **0.9%** (43 of 51 under 10%) | 66% (6 of 28 under 10%) |
+| device busy inside the ROI (median) | 90.7% | 92.3% |
+| clean-run spread (CV, median / max) | 0.18% / 6.4% | one clean run (see below) |
+| profiler inflation of the ROI (median / max) | 1.012 / 1.44 | 1.023 / 1.35 |
+| FOM captured | -- | 20 of 20 cases whose application prints one |
+| launcher audit | -- | 21 clean, 7 without the launcher, **0 not clean** |
+
+**The ROI agrees with the applications' own timers.** Ten Level 2 cases print a
+timer for the same region; the ROI matches each to within 0.01%: exacmech 8.04129
+vs 8.04127 s, miniweather 32.3133 s both, quicksilver `main` 7.481 vs 7.4809 s,
+shaw `loopTime` 15.4616 s both, P3 heat3d/vlp4d `total` 1.59309/2.31051 vs
+1.59306/2.31046 s, hipBone 0.2881 vs 0.28808 s (xsbench prints three digits:
+0.040 vs 0.04008 s).
+
+**The ROI changes the picture at Level 1.** Under the whole-process protocol about
+30 of 50 benchmarks looked less than 5% GPU-busy: a constant 0.4-0.6 s of context
+creation and input generation dominated. Inside the ROI the median device-busy
+share is 90.7%; the 11 benchmarks under 50% are genuinely host-bound loops (bfs,
+gaussian_elimination, pathfinder, spmv, fir, nearest_neighbor's host selection,
+...) or ROIs of a few hundred microseconds (hotspot's single 90 us kernel). Those
+tiny ROIs are also where the profiler inflation exceeds 1.2 (bfs, fir, hotspot,
+nearest_neighbor, srad_v1) -- the headline comes from the clean runs, so it is
+unaffected.
+
+Findings that need a decision rather than a fix:
+
+* **Several default Level 2 inputs are set-up dominated.** MiniEM: 106.7 s of a
+  111.2 s process before its three time steps (mesh 24.6 s, DOF numbering 11.8 s,
+  auxiliary operators 37.8 s, W operator 14.5 s, preconditioner 2.9 s), ROI 1.31 s.
+  hipBone 0.29 s of 19.5 s, SW4lite 0.06 s of 8.3 s, XSBench 0.04 s of 3.8 s. The ROI
+  is right by the rule (it matches upstream's own timed region), but as training data
+  these cases carry little computation; larger cases (more time steps) would fix it.
+* **Level 2 run-to-run spread is real.** quicksilver's ROI varied 4-7% over 5 clean
+  runs (default: 6.84-7.70 s), and its own timers show the same spread (unified-memory
+  migrations and the MPI phase). With one clean run per case the Level 2 protocol
+  cannot show it; `--clean-runs 3` or `5` costs one extra run each.
+* **Profiler inflation follows the API call count:** laghos 1.35 (14.5 M launches in
+  the ROI), comb 1.23. Device durations are unaffected; this only matters when reading
+  host-side quantities from the profiled run.
+
+`device_overlap_s` is non-zero only for quicksilver (0.22-0.35 s: unified-memory
+migrations overlap its kernel); everything else is single-stream.
