@@ -697,6 +697,9 @@ res="$(
 )"
 case "$res" in "OK: MY_SESSION_ID") ok "7f: run_clean passes only allow-listed names; the deny rule beats the allow-list" ;;
                *) bad "7f: clean environment: $res" ;; esac
+res="$(cd "$TMP" && LEVEL=1 RAW_ROOT=rel/raw bash -c '. "$1/lib/engine.sh" 2>/dev/null; echo "$RAW_ROOT"' _ "$TOOLS")"
+case "$res" in "$TMP/rel/raw") ok "7g: a relative --raw-root becomes absolute (the ROI log path is read from other cwds)" ;;
+               *) bad "7g: relative raw root stays '$res'" ;; esac
 
 echo
 echo "=== 8: hardware neutrality -- interface-only platforms refuse instead of guessing"
