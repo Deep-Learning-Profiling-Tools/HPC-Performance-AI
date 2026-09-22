@@ -71,7 +71,8 @@ inputs:
     kind: derived
     derivation: >-
       inputs/indat_bench_128.params: the bench-256 window (z=200->0, 500 DKD steps) at NG=NP=128, RL=128
-      (the demo size, same 1 Mpc/h spacing); only NG/NP/RL differ from indat_bench_256.params
+      (the demo size, same 1 Mpc/h spacing); only NG/NP/RL differ from indat_bench_256.params, and the
+      transfer function is referenced as ../apps/demo/cmbM000.tf (pm_ic resolves it from the indat's directory)
   params:
     indat: inputs/indat_bench_128.params
     ng: 128

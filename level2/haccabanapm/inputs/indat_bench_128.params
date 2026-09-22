@@ -31,7 +31,7 @@ USE_WHITE_NOISE_INIT YES
 TRANS CMB
 # pmkokkos resolves INPUT_BASE_NAME via the working directory; the demo
 # script copies cmbM000.tf next to the indat before invoking pm_ic.
-INPUT_BASE_NAME cmbM000.tf
+INPUT_BASE_NAME ../apps/demo/cmbM000.tf
 VELTRANSFER_BASE_NAME cmbM000.tf
 INPUT_TYPE INIT
 DISTRIBUTE_TYPE 170
