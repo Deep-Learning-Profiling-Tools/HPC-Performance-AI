@@ -35,6 +35,8 @@ R="$(cd "$HERE/../.." && pwd)"
 source "$R/hpcperf_env.sh" 2>/dev/null || true
 
 set -euo pipefail
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ $# -gt 0 ] && shift
