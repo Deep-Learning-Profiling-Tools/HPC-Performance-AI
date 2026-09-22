@@ -24,6 +24,7 @@ SOFTWARE.
 
 */
 
+#include "hpcperf_roi.h"
 #include "hipBone.hpp"
 #include "timer.hpp"
 
@@ -63,12 +64,14 @@ void hipBone_t::Run(){
   forcingKernel(N, o_r);
 
   timePoint_t startTime = GlobalPlatformTime(platform);
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed CG solve, not the warm-up solve
 
   //call the solver
   tol = 0.0;
   int maxIter = 100;
   Niter = linearSolver.Solve(*this, o_x, o_r, tol, maxIter, verbose);
 
+  HPCPERF_ROI_END_SYNC();
   timePoint_t endTime = GlobalPlatformTime(platform);
   double elapsedTime = ElapsedTime(startTime, endTime);
 
