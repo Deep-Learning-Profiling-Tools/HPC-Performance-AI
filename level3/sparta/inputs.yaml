@@ -34,9 +34,11 @@ baseline:
     particles are conserved -- validate.sh checks Np at every row), the gas temperature
     (validate.sh: within 2 % of the reference; the closed box conserves energy so the printed
     temperature is constant to all printed digits in every upstream log) and the number of
-    collision attempts (validate.sh: within 15 %; single-row statistical noise ~3 % at 10K
-    particles, < 1 % at >= 100K). in.sphere (open boundaries, inflow, surface collisions) prints
-    other columns; its particle count and surface-collision count are recorded only.
+    collision attempts (validate.sh: within 15 %). These are validate.sh's in.collide rules,
+    applied to the box decks (in.collide, in.free). in.sphere (open boundaries, inflow, surface
+    collisions) prints other columns and has no rule basis of its own: its particle count and
+    collision-attempt count are recorded (required, not verified); the surface-collision count
+    and max particles per cell are diagnostics.
   reference: upstream reference logs bench/log.7Jul14.<deck>.icc.<size>.1 (icc, 1 process, 2014) through the same regexes; this build's first measured run as the working baseline
   quantities:
     - name: bench_steps
@@ -149,7 +151,7 @@ inputs:
           role: required
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+(?P<value>\d+)\s+\d+\s+\d+\s+\d+\s*$'
           select: last
-          compare: {rule: rel, tol: 0.15}
+          compare: {rule: record}   # validate.sh's collide 15 % rule has no established basis for in.sphere -> recorded, not verified
         - name: nscoll_final
           role: diagnostic   # per-step surface-collision count, statistical diagnostic
           regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>\d+)\s+\d+\s*$'
@@ -168,7 +170,9 @@ inputs:
       log: same seed/grid/fnum/timestep/stats points/phases and the same initial population
       (955,103), but the deck commands differ by version (inflow -> emit/face, read_surf and
       surf_modify syntax) and the count after equilibration is 1.0 % lower here (990,824 vs
-      1,000,977; ~10 Poisson sigma) -- cause not determined. Stats every 100 steps
+      1,000,977; three runs here mutually within 0.1 %, the 2014 log is one run; no statistical
+      model validated, no significance claimed) -- cause not determined. The collide 15 % rule
+      has no established basis for this deck: natt is recorded. Stats every 100 steps
       (7 columns: step cpu np nattempt ncoll nscoll c_max). All styles of the deck have KOKKOS
       versions in this build (fix_emit_face_kokkos, surf_collide_diffuse_kokkos,
       fix_balance_kokkos, compute_reduce_kokkos, compute_grid_kokkos, read_surf_kokkos).
