@@ -849,6 +849,10 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
         print(f"[{doc['benchmark']}/{inp['id']}] {label}: rc={rc} e2e={wall:.3f}s main_compute="
               f"{rec['main_compute_s'] if rec['main_compute_s'] is None else round(rec['main_compute_s'], 4)}"
               + (f" ({rec['timing_error']})" if 'timing_error' in rec else ""), flush=True)
+        if rc == 124:                      # a timed-out run: the remaining repetitions would only repeat it
+            meta["aborted"] = f"{label} exceeded the timeout of {timeout} s; the remaining runs were not started"
+            print(f"[{doc['benchmark']}/{inp['id']}] {meta['aborted']}", flush=True)
+            break
     summary, good = summarize(doc, inp, meta["runs"], reps)
     # the working baseline comes from the first measured run that exited 0 AND passed the
     # benchmark's own baseline-free checks (a run that prints FAIL and exits 0 is never a baseline)

@@ -328,6 +328,16 @@ assert cmd[2] == str(root / "level1/relarg/data/in.txt"), cmd
 assert cmd[4] == "8192" and cmd[5] == "level1/relarg/data/missing.txt", cmd
 assert hi.workload_identity(doc, inp)["args"][1] == "level1/relarg/data/in.txt"
 PY
+# ---- 8m. measure stops after a timed-out run (the remaining repetitions are not started; the record says so)
+mkdir -p "$TMP/slow/build/fake" "$TMP/slow/level1/slow"; touch "$TMP/slow/hpcperf_env.sh"; printf '#!/bin/sh\nsleep 3\necho "time 1.0 s"\necho PASS\n' > "$TMP/slow/build/fake/slow_bin"; chmod +x "$TMP/slow/build/fake/slow_bin"
+sed -e 's/benchmark: relarg/benchmark: slow/' -e 's#build/fake/fake_bin#build/fake/slow_bin#' -e 's/args: \[.*\], files: \[data\/in.txt\], /args: [], /' "$TMP/relarg/level1/relarg/inputs.yaml" > "$TMP/slow/level1/slow/inputs.yaml"
+python3 "$TOOL" measure "$TMP/slow/level1/slow" a --out "$TMP/slow_out" --warmup 1 --reps 3 --timeout 1 >/dev/null 2>&1; rc=$?
+python3 - "$TMP/slow_out/measurement.json" <<'PY' && ok "measure: a timed-out warm-up (rc 124) stops the measurement -- 1 run recorded, 'aborted' note, exit 1" || bad "measure timeout abort (rc=$rc): $(python3 -c "import json,sys; d=json.load(open('$TMP/slow_out/measurement.json')); print(len(d['runs']), d.get('aborted'))" 2>&1)"
+import json, sys; d = json.load(open(sys.argv[1]))
+assert len(d["runs"]) == 1 and d["runs"][0]["exit_code"] == 124 and "timeout" in d.get("aborted", ""), (len(d["runs"]), d.get("aborted"))
+assert d["summary"]["run_completed"] is False
+PY
+[ $rc -eq 1 ] || bad "measure timeout abort exit code $rc (expected 1)"
 
 # ---- 8k. the shared run.sh selector helper (hpcperf_apply_input): knobs exported, args collected, conflicts refused
 mkdir -p "$TMP/sel/level2/selapp"
