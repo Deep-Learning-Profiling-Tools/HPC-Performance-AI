@@ -199,25 +199,35 @@ Level 2 specifics (mini-apps; the tree above is Level 3's):
   `env` (Branson pattern), never an export.
 
 Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contained
-(bash + python stdlib + nsys; it reads nothing from `level2/tools` or `level3/`):
-- `measure_level1.sh` N clean runs + 1 profiled run, `HPCPERF_SKIP_VERIFY=1`;
-  `measure_level2.sh` **one profiled run** of `level2/<app>/run.sh`, no repeats,
-  `validate.sh` never called (Level 2 keeps verification there, so no patch exists).
+(bash + python stdlib + an optional profiler; it reads nothing from `level2/tools` or `level3/`):
+- The measured time is the **ROI** (region of interest) the sources mark with
+  `tools/timing/roi/hpcperf_roi.h` (C/C++; Fortran module + C shim; Python twin):
+  after set-up and warm-up, before verification and final output; bulk output and
+  in-loop checks are carved out with `HPCPERF_ROI_EXCLUDE_*`. All 50 Level 1
+  benchmarks (CUDA + HIP sources) and all 24 Level 2 apps carry markers as PURE
+  INSERTIONS (Level 1 CMake include path; Level 2 `build.sh` exports `CPATH`). A
+  no-op unless `HPCPERF_ROI_LOG` is set or a profiler is injected, so ctest and
+  validate.sh are unchanged. Placement rule: `tools/timing/roi/README.md`. A new
+  app without markers fails `tools/timing/tests/run_all.sh` and measures `roi_missing` (FAIL).
+- Protocol: Level 1 1 warm-up + 5 clean + 1 profiled; Level 2 1 clean + 1 profiled.
+  The headline `roi_wall_s` comes from the CLEAN runs (the markers' own log, no
+  profiler); the profiled run only gives device activity clipped to the same
+  markers. FOMs (16 of 24 Level 2 apps; the other 8 BLANK) are read from the clean run.
+- Cases: `tools/timing/cases/*.tsv` via `cases.py`; identity (level, app, case,
+  platform); sweeps `NAME=a|b`; an input variable set in your shell but not declared
+  by the case is REFUSED. Hardware neutrality: collector adapters
+  (`collectors/`: `nvidia_nsys` verified, `none` everywhere, `amd_rocprofv3` and
+  `tpu_xprof` INTERFACE ONLY), neutral categories, null (not observable) is never 0,
+  conformance probe per platform (`probes/conformance/`, record in `platforms/`).
 - nsys wraps `run.sh` from the OUTSIDE: 20 of 24 end in `exec`, and a profiler
   inside the launcher's wrapper breaks the nvidia-smi pid join and makes every rank
-  `unverified`. Outside, the audit stays clean (verified on quicksilver).
-- A Level 2 wall clock is an upper bound, but do NOT read the 1.7x as the
-  application being slowed: that is the nsys command's wall clock. quicksilver's own
-  `main` timer grew only 8.9% (7.431 -> 8.09 s); the rest is nsys attach + report
-  writing OUTSIDE the application. Measured over 13 apps against unprofiled runs:
-  a fixed 2.9-6.9 s plus ~6.5-13 us per CUDA API call (rule of thumb 5 s + 10 us/call;
-  miniem's 15.2M calls cost +125 s). So `host_outside_gpu_s` is NOT application host
-  time. GPU-side numbers are unaffected (CUPTI device timestamps, 1.2% spread).
-- 16 of 24 applications print their own FOM and it is collected (patterns in
-  `cases_l2.tsv`); the other 8 are left BLANK, never a derived number. The profiler
-  depresses a FOM by 5.4%-6.4%, so every record carries `fom.from_profiled_run`.
-- Results go to `results/timing/` (git-ignored): **never commit measurement output**.
-  `bash tools/timing/tests/run_all.sh` is CPU-only, 33 assertions.
+  `unverified`. nsys cost (measured, whole-process protocol): a fixed 2.9-6.9 s plus
+  ~6.5-13 us per CUDA API call, mostly OUTSIDE the application (quicksilver's `main`
+  grew 8.9% while the command grew 1.7x) -- which is why the headline is clean.
+  No `--cuda-memory-usage` (MiniEM SIGSEGV in cudaFreeAsync).
+- Results go to `results/timing/`, raw evidence to `build/timing/` (both git-ignored):
+  **never commit measurement output**. `bash tools/timing/tests/run_all.sh` is CPU-only.
+  Formats: `tools/timing/SCHEMA.md`.
 
 ## Validation principles
 

@@ -72,27 +72,23 @@ reversible).
 ## Runtime measurement
 
 The status table below is a correctness statement; it says nothing about speed.
-To measure runtime with a GPU/host breakdown (wall clock, kernel time, GPU busy
-time via interval union, transfer time, per-kernel detail) plus the
-application's own figure of merit where it prints one:
+Runtime is measured over each application's **region of interest (ROI)** -- its
+time loop or solve, without start-up, set-up, warm-up, verification and bulk
+output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 24
+applications; pure insertions, a no-op unless measuring, recorded in each
+README's `## Changes from upstream`; `build.sh` puts the header on `CPATH`):
 
 ```bash
-tools/timing/measure_level2.sh all       # one profiled run per application
+tools/timing/measure_level2.sh all       # 1 clean + 1 profiled run per case
 python3 tools/timing/summarize.py        # JSON per run + summary_level2.csv
 ```
 
-No application source is touched and `validate.sh` is never called: Level 2
-keeps its correctness checks there, so timing `run.sh` needs no skip switch.
-nsys wraps `run.sh` from the outside, which keeps the launcher's GPU-binding
-audit intact (verified: `1 verified, 0 mismatch, 0 unverified` with nsys as an
-ancestor process).
-
-Read `tools/timing/README.md` before using the numbers. Two properties matter:
-the protocol is a **single profiled run**, so the wall clock carries 1.66x-1.91x
-profiler overhead and is an upper bound (GPU-side numbers are unaffected --
-CUPTI timestamps on the device, 1.2% spread across sampling settings); and 16 of
-the 24 applications report a FOM while **8 do not and are left blank**, never
-filled with a derived number.
+`validate.sh` is never called and validation is unchanged. The headline
+`roi_wall_s` comes from the clean run (no profiler); the profiled run only adds
+the device picture, clipped to the same markers, and the application's own figure
+of merit is read from the clean run (16 of 24 print one; the other 8 are left
+blank, never filled with a derived number). Read `tools/timing/README.md` before
+using the numbers.
 
 ## MPI and multi-GPU
 
