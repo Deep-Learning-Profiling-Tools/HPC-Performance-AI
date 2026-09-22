@@ -21,6 +21,8 @@ source "$HERE/../tools/hpcperf_launch_common.sh"
 export HPCPERF_GPU_BACKEND="$BACKEND"
 N_RANKS="$(hpcperf_ranks sw4lite no)" || exit 2
 INPUT="${HPCPERF_SW4LITE_INPUT:-$HERE/inputs/pointsource.in}"
+# a relative input path is taken from the caller's cwd, else relative to level2/sw4lite (registered inputs)
+case "$INPUT" in /*) ;; *) if [ -f "$INPUT" ]; then INPUT="$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")"; else INPUT="$HERE/$INPUT"; fi ;; esac
 [ -f "$INPUT" ] || { echo "run.sh: input not found: $INPUT" >&2; exit 1; }
 mkdir -p "$BUILD/run"; cd "$BUILD/run"
 echo "== SW4lite $BACKEND: ranks=$N_RANKS input=$INPUT"
