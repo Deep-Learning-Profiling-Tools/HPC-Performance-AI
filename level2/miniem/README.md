@@ -28,7 +28,16 @@ pinned commit). Not copied: the TriBITS `CMakeLists.txt` of the example (see "Ch
 
 ## Changes from upstream
 
-- No source change. `main.cpp`, `MiniEM_helpers.cpp`, `MiniEM_helpers.hpp` and the decks compile and run
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/main.cpp`: the region of interest is the time-step loop (assembly and linear solve). Excluded
+  inside it: the response evaluation (L2 error against the analytic solution, with its assertion)
+  and Exodus output. Pure insertions -- no upstream line changed or removed. The markers are a no-op
+  unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as
+  before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
+- No other source change (`src/UPSTREAM_SHA256SUMS` keeps upstream's checksums; `main.cpp` differs from
+  them only by the marker lines). `main.cpp`, `MiniEM_helpers.cpp`, `MiniEM_helpers.hpp` and the decks compile and run
   unmodified with CUDA 13.2 / GCC 13.3 / Kokkos 5.2.1 against this repo's Trilinos.
 - `src/CMakeLists.txt` is new: upstream builds the driver only through TriBITS as part of a Trilinos source
   build (`TRIBITS_ADD_EXECUTABLE(BlockPrec ...)`, not installed). Here the driver is compiled as a stand-alone

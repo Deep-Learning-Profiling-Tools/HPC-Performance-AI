@@ -10,7 +10,8 @@
 # through TriBITS. The Trilinos dependency (Panzer + STK adapters, MueLu, Teko, Belos, Ifpack2, Amesos2, Tpetra,
 # Kokkos 5.2.1 CUDA + Serial, SEACAS Exodus/Ioss) is built once by `setup_level2_deps.sh trilinos` into
 # .deps/install/trilinos (multi-hour); this script only compiles the vendored driver (src/, byte-identical to
-# upstream, see src/UPSTREAM_SHA256SUMS) with the standalone src/CMakeLists.txt.
+# upstream except the tools/timing ROI marker lines in main.cpp; src/UPSTREAM_SHA256SUMS keeps upstream's
+# checksums) with the standalone src/CMakeLists.txt.
 #
 # Compiler recipe = the one the dependency was built with: mpicxx driving Trilinos' nvcc_wrapper (OMPI_CXX),
 # host compiler = the project GCC ($CXX). The Panzer/Phalanx headers contain device code, so the driver cannot
@@ -27,6 +28,8 @@ R="$(cd "$HERE/../.." && pwd)"
 source "$R/hpcperf_env.sh" 2>/dev/null || true
 
 set -euo pipefail
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ $# -gt 0 ] && shift
