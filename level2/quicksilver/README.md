@@ -121,13 +121,25 @@ The three upstream decks carry their own mesh/particle/step counts and
 cycleTracking + cycleFinalize; setup and the final report excluded). Baseline:
 the four upstream `PASS::` checks present, no `FAIL::`, last-cycle census /
 segments / scalar flux recorded (Monte Carlo, fixed seed 1029384756, GPU tracking
-order not bitwise reproducible). Roles (round 3): the four `PASS::` checks and the
-absent `FAIL::` are the required acceptance -- they are upstream's own correctness
-criterion for these decks (coralBenchmark, statistical ratios / facet crossing /
-particle loss / fluence homogeneity); the last-cycle census, segment count and
-scalar flux are diagnostic quantities (recorded, no upstream tolerance exists), so
-`compare` is READY and returns PASS when the upstream checks hold; the tallies are
-never used as a pass criterion.
+order not bitwise reproducible). What `compare` actually covers (round 4):
+
+| side / quantity | read from | used how |
+|---|---|---|
+| candidate: `PASS:: Absorption/Fission/Scatter`, `PASS:: Collision to Facet`, `PASS:: No Particles Lost`, `PASS:: Fluence` | the candidate log | `present` -- upstream's own coralBenchmark checks (statistical, computed inside the run); no baseline value is consulted |
+| candidate: `FAIL::` | the candidate log | `absent` |
+| baseline + candidate: last-cycle `census`, `num_seg`, `scalar_flux` | both logs (cycle table, last row) | `record`: both values are stored and shown side by side; **no numeric comparison is made** (no tolerance basis) |
+
+So the only verified quantities are candidate-side PASS/FAIL markers; there is
+no baseline-vs-candidate numeric comparison yet. `scalar_flux` (the physical
+result) is a required quantity and stays `record`, so `compare` returns
+INCOMPLETE (exit 3) for every Quicksilver input; `census` and `num_seg` are
+diagnostics. This applies to all four registered decks (they all print the
+coralBenchmark block). A changed scalar flux with all `PASS::` lines kept is
+NOT detected as a failure -- it is shown as a recorded difference
+(`tests/run_all.sh` section 12 demonstrates it: 591852.1 -> 887778.2, exit 3);
+a missing `PASS::` line is a failure (exit 1). The "optimized vs baseline"
+requirement is therefore not met for Quicksilver until a tally rule with a
+basis exists; this round does not invent a statistical tolerance.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
 

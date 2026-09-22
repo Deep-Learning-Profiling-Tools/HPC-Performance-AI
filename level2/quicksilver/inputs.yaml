@@ -46,7 +46,11 @@ baseline:
     GPU tracking order is not bitwise reproducible: the final-cycle tallies (census population,
     segments, scalar flux) are RECORDED for statistical comparison; their tolerance is not yet
     fixed (NEEDS_VALIDATION for exact rules beyond upstream's checks).
-  reference: upstream coralBenchmark PASS checks (statistical); tallies recorded, tolerance TBD
+  reference: >-
+    upstream coralBenchmark PASS checks (statistical, candidate-side markers only: no baseline value
+    is consulted for them); the last-cycle tallies are recorded from baseline and candidate but not
+    numerically compared (no tolerance basis) -- scalar flux is the required science result and keeps
+    the comparison INCOMPLETE, census / num_seg are diagnostics
   quantities:
     - name: pass_ratios
       role: required
@@ -79,7 +83,7 @@ baseline:
       select: last
       compare: {rule: record}
     - name: final_cycle_scalar_flux
-      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
+      role: required     # the physical result of the transport run; no tolerance basis yet -> record -> the baseline-vs-candidate numeric comparison is NOT ready (INCOMPLETE)
       regex: '^\s+\d+(\s+\d+){12}\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
       compare: {rule: record}
