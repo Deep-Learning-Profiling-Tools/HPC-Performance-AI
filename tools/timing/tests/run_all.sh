@@ -8,6 +8,8 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS="$(cd "$HERE/.." && pwd)"
 REPO="$(cd "$TOOLS/../.." && pwd)"
+# exported because the python heredocs below read them from the environment
+export TOOLS REPO
 
 pass=0; failn=0; skipn=0
 ok()   { echo "ok   $*"; pass=$((pass+1)); }
