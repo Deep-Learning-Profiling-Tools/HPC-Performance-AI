@@ -69,17 +69,21 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-- id: n256000-s10
+- id: n32000-s10
   case: nbody-allpairs
   variant: size
   source:
     kind: derived
-    derivation: particles x16
+    derivation: >-
+      particles x2. The port verifies the result with an O(n^2) host reference of EVERY step
+      (common/GSimulationReference.hpp), so the wall time is ~n^2 x steps while the timed GPU loop stays
+      below 0.1 s: n64000-s10 needs ~140 s per run and the x16 size (256,000 particles) exceeded the
+      900 s per-run timeout in its warm-up (attempt kept as the unregistered record n256000-s10).
   params:
-    particles: 256000
+    particles: 32000
     steps: 10
   args:
-  - '256000'
+  - '32000'
   - '10'
   runtime_config:
     gpus: 1
