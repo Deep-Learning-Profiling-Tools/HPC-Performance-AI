@@ -46,6 +46,7 @@
 // Sample runs: see README.md, section 'Verification of Results'.
 //
 
+#include "hpcperf_roi.h"
 #include <fstream>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -738,6 +739,9 @@ int main(int argc, char *argv[])
 #ifdef LAGHOS_USE_CALIPER
    CALI_CXX_MARK_LOOP_BEGIN(mainloop_annotation, "timestep loop");
 #endif
+   // tools/timing ROI: the time loop (step prints inside; visualization, VisIt,
+   // grid-function output and the problem checks excluded)
+   HPCPERF_ROI_BEGIN_SYNC();
    int ti = 1;
    for (; !last_step; ti++)
    {
@@ -842,6 +846,8 @@ int main(int argc, char *argv[])
          // another set of GLVis connections (one from each rank):
          MPI_Barrier(pmesh.GetComm());
 
+         const bool hpcperf_output = visualization || visit || gfprint;
+         if (hpcperf_output) { HPCPERF_ROI_EXCLUDE_BEGIN_SYNC(); }
          if (visualization || visit || gfprint) { hydro.ComputeDensity(rho_gf); }
          if (visualization)
          {
@@ -898,11 +904,13 @@ int main(int argc, char *argv[])
             e_gf.SaveAsOne(e_ofs);
             e_ofs.close();
          }
+         if (hpcperf_output) { HPCPERF_ROI_EXCLUDE_END(); }
       }
 
       // Problems checks
       if (check)
       {
+         HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
          double lnorm = e_gf * e_gf, norm;
          MPI_Allreduce(&lnorm, &norm, 1, MPI_DOUBLE, MPI_SUM, pmesh.GetComm());
          const double e_norm = sqrt(norm);
@@ -916,8 +924,10 @@ int main(int argc, char *argv[])
          MFEM_VERIFY(std::string(mesh_file) == "data/square01_quad.mesh" ||
                      std::string(mesh_file) == "data/cube01_hex.mesh", "check: mesh_file");
          Checks(ti, e_norm, checks);
+         HPCPERF_ROI_EXCLUDE_END();
       }
    }
+   HPCPERF_ROI_END_SYNC();
 #ifdef LAGHOS_USE_CALIPER
    CALI_CXX_MARK_LOOP_END(mainloop_annotation);
    adiak::value("steps", ti);
