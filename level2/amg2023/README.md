@@ -33,8 +33,15 @@ no input decks: the problem is generated at run time from `-P`/`-n`/`-problem`.
 
 ## Changes from upstream
 
-- None. `amg.c`, `amg-config.h.in` and `CMakeLists.txt` are byte-identical to
-  upstream and compile, link and run unmodified with CUDA 13.2 / GCC 13.3 /
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in `amg.c`: the
+  region of interest is each Setup and Solve phase upstream times, inside its `hypre_BeginTiming` /
+  `hypre_EndTiming` pair (4 ROI entries). Pure insertions -- no upstream line changed or removed.
+  The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run
+  and validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
+- Apart from the markers above, none. `amg-config.h.in` and `CMakeLists.txt` are byte-identical to
+  upstream, `amg.c` differs only by the marker lines, and they compile, link and run unmodified with CUDA 13.2 / GCC 13.3 /
   CMake 3.28 against this repo's hypre.
 - Two things that looked like they would need a fix, but did not:
   - `find_library(HYPRE_LIBRARIES NAMES HYPRE HINTS ${HYPRE_PREFIX}/lib)` --
