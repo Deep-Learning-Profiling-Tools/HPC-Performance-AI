@@ -179,3 +179,13 @@ upstream's built-in verification (e.g. NPB reference sums, HeCBench CPU
 references) or an added independent reference (CPU re-computation, documented
 per benchmark). "Working" in the catalog means configure + build + run +
 validation all passed on the machine above.
+
+## Runtime measurement
+
+`tools/timing/` measures each Level 1 benchmark and Level 2 mini-application over its
+**region of interest** -- the computation marked in its source, without start-up,
+set-up, warm-up and verification -- and records the device activity inside it, per
+(application, input, platform). Results go to `results/timing/` (not in git); the
+interactive results page is published in [docs/timing/](docs/timing/). Start with
+[tools/timing/DESIGN.md](tools/timing/DESIGN.md) (what changed, why, interfaces) and
+[tools/timing/README.md](tools/timing/README.md) (method).

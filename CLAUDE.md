@@ -199,7 +199,8 @@ Level 2 specifics (mini-apps; the tree above is Level 3's):
   `env` (Branson pattern), never an export.
 
 Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contained
-(bash + python stdlib + an optional profiler; it reads nothing from `level2/tools` or `level3/`):
+(bash + python stdlib + an optional profiler; it reads nothing from `level2/tools` or `level3/`).
+Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
 - The measured time is the **ROI** (region of interest) the sources mark with
   `tools/timing/roi/hpcperf_roi.h` (C/C++; Fortran module + C shim; Python twin):
   after set-up and warm-up, before verification and final output; bulk output and

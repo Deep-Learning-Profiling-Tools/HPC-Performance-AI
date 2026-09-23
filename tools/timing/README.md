@@ -2,7 +2,8 @@
 
 Measures **how long the computation of each benchmark takes** and what the device
 did during it, in a form that stays comparable when applications, inputs and
-hardware platforms are added.
+hardware platforms are added. What was changed, why, and the interfaces for adding
+an application, an input or a platform: [DESIGN.md](DESIGN.md).
 
 ```bash
 tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 50 benchmarks
