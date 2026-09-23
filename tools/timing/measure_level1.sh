@@ -26,10 +26,12 @@
 #   --results-root DIR  records, CSVs and the web page (default results/timing)
 #   --no-summary        skip the summarize + report step after the runs
 #   --dry-run           print what would run
+#   --registry          measure the registered inputs (level*/<app>/inputs.yaml via the generated
+#                       cases/level1_registry.tsv; SELECT = all | <app> | <app>/<input_id>)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-LEVEL=1 CLEAN_RUNS=5 WARMUP_RUNS=1 PROFILED_RUNS=1 SKIP_VERIFY=1 DRY_RUN=0
+LEVEL=1 CLEAN_RUNS=5 WARMUP_RUNS=1 PROFILED_RUNS=1 SKIP_VERIFY=1 DRY_RUN=0 REGISTRY=0
 COLLECTOR=auto BACKEND=CUDA BUILD_ROOT="" ENV_SCRIPT="" RAW_ROOT="$REPO/build/timing"
 SELECT=()
 die() { echo "measure_level1: $*" >&2; exit 2; }
@@ -46,6 +48,7 @@ while [ $# -gt 0 ]; do
         --results-root) RESULTS_ROOT="${2:?}"; shift 2 ;;
         --no-summary)  SUMMARIZE=0; shift ;;
         --dry-run)     DRY_RUN=1; shift ;;
+        --registry)    REGISTRY=1; shift ;;
         -h|--help)     awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*)            die "unknown option '$1' (try --help)" ;;
         *)             SELECT+=("$1"); shift ;;
@@ -59,8 +62,10 @@ if [ -z "$BUILD_ROOT" ]; then
         [ -d "$cand/level1" ] && { BUILD_ROOT="$cand"; break; }
     done
 fi
-[ -n "$BUILD_ROOT" ] && [ -d "$BUILD_ROOT" ] || die "no Level 1 build tree; pass --build-root"
-BUILD_ROOT="$(cd "$BUILD_ROOT" && pwd)"
+if [ "${REGISTRY:-0}" != 1 ]; then      # registry cases name their own executables
+    [ -n "$BUILD_ROOT" ] && [ -d "$BUILD_ROOT" ] || die "no Level 1 build tree; pass --build-root"
+    BUILD_ROOT="$(cd "$BUILD_ROOT" && pwd)"
+fi
 # shellcheck source=lib/engine.sh
 . "$HERE/lib/engine.sh"
 engine_main "${SELECT[@]}"

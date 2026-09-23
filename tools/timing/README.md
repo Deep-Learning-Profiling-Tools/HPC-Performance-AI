@@ -164,6 +164,35 @@ are wrapped by a repo-authored `verify.py`; their inner argv is obtained by
 importing the wrapper with `subprocess.run` intercepted, so the binary is measured
 directly and no wrapper is modified.
 
+### Registered inputs (`--registry`)
+
+The benchmarks' registered inputs (`level<N>/<app>/inputs.yaml`, the inputs registry of
+`tools/inputs/`) are measured through the same engine with `--registry`:
+
+```
+tools/timing/measure_level1.sh --registry --no-profile all                 # every registered Level 1 input
+tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64-g64-q128
+```
+
+* **The registry defines the inputs.** `cases/level1_registry.tsv` and `cases/level2_registry.tsv`
+  are generated from it by `gen_registry_cases.py` (one case per input, case = input id) and never
+  edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
+* **Level 1** cases run the registry's own executable: a materialized compile-time input (an NPB
+  class, `tools/inputs/npb_materialize_class.sh`) runs its own binary, never the default one;
+  repository-relative argument paths are resolved to absolute ones, generated datasets are the
+  input's own files.
+* **Level 2** cases run `run.sh` with the registry selector (`HPCPERF_<APP>_INPUT=<id>`); run.sh
+  applies the input's knobs and arguments itself. The selector is an allowed input variable of the
+  application (it is read indirectly, so the text scan of run.sh cannot see it); a hand-written case
+  may not set it, and the selector or a registry knob set in the caller's shell is refused.
+* **Identity.** Before running a registry case the engine stores the input's workload identity
+  (`tools/inputs/hpcperf_inputs.py identity`: params, args, env, input-file / argument-file / class
+  header sha256, build configuration, selector, registry sha256 and git blob) as
+  `workload_identity.json` next to the raw runs; the JSON record carries it under `registry`, the CSV
+  in `input_id`. A case whose identity cannot be established (`identity_*`) or whose executable does
+  not exist (`build_not_materialized`) is not run and is never a result.
+* Correctness stays with the registry (`tools/inputs`); a timing run records rc and ROI only.
+
 ## Hardware neutrality
 
 ```

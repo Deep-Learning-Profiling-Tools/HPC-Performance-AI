@@ -22,6 +22,8 @@ Sub-commands (all read-only except `measure`, which writes into --out):
   args     <bench_dir> <input_id>          the input's command-line arguments, one per line
                                            (run.sh reads these; unknown id -> exit 2)
   param    <bench_dir> <input_id> <key>    one parameter value (exit 2 if unknown)
+  identity <bench_dir> <input_id>          the input's workload identity as JSON (tools/timing links each ROI
+                                           measurement to it; exit 3 when it cannot be established)
   shell-env <bench_dir> <input_id>         the input's env knobs and extra args as tab-separated
                                            lines (E/A) for run.sh's hpcperf_apply_input
   parse-timing <bench_dir> <log> [--rc N] [--input ID]
@@ -526,6 +528,57 @@ def workload_identity(doc: dict, inp: dict) -> dict:
 WORKLOAD_KEYS = ("input_id", "params", "args", "env", "files_sha256")
 
 
+IDENTITY_SCHEMA = "hpcperf-workload-identity-1"
+
+
+def registry_identity(doc: dict, inp: dict) -> dict:
+    """The full identity of one registered input, for linking a measurement made by another tool
+    (tools/timing) back to the registry: the workload identity above plus the registry context
+    (benchmark, level, selector, source kind, input form, build configuration, binary override) and
+    the provenance of the registry file itself (its sha256, its git blob id and whether the tree's
+    copy differs from the committed one). `complete` is False when a named input file is missing or
+    the input is a compile-time configuration that is not materialized -- such a measurement cannot
+    count as a result for this input."""
+    path = Path(doc["_path"]).resolve()
+    root = repo_root(path.parent)
+    rel = str(path.relative_to(root))
+    blob = committed = None
+    try:
+        blob = subprocess.run(["git", "-C", str(root), "hash-object", rel], capture_output=True, text=True, timeout=30).stdout.strip() or None
+        committed = subprocess.run(["git", "-C", str(root), "rev-parse", f"HEAD:{rel}"], capture_output=True, text=True, timeout=30).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        pass
+    wl = workload_identity(doc, inp)
+    materialized = inp.get("materialized", True) is not False
+    binary = inp.get("binary")
+
+    def repo_file_hashes(values):
+        """sha256 of every value that names a repository-relative path (level1/..., build/...):
+        generated datasets passed as arguments, class headers named by the build configuration."""
+        out = {}
+        for v in values:
+            v = str(v)
+            # a path-like value: repository prefix, no whitespace (free text such as "level1/cg/cuda npbparams.hpp
+            # for B" is a note, not a path); directories (build dirs) are not content
+            if v.startswith(REPO_PATH_PREFIXES) and not any(c.isspace() for c in v) and not (root / v).is_dir():
+                out[v] = sha256_file(root / v) if (root / v).is_file() else None
+        return out
+    arg_files = repo_file_hashes(inp.get("args") or [])
+    build_files = repo_file_hashes((inp.get("build_config") or {}).values())
+    return {
+        "schema": IDENTITY_SCHEMA, "level": doc["level"], "benchmark": doc["benchmark"], "input_id": inp["id"],
+        "selector": doc.get("selector"), "source_kind": (inp.get("source") or {}).get("kind"),
+        "input_form": inp.get("input_form", "runtime"), "materialized": materialized,
+        "build_config": inp.get("build_config"), "binary": binary,
+        "entry": doc.get("entry"), "workload": wl,
+        "arg_files_sha256": arg_files, "build_files_sha256": build_files,
+        "registry": {"path": rel, "sha256": sha256_file(path), "git_blob": blob,
+                     "matches_head": (blob is not None and blob == committed)},
+        "complete": materialized and workload_complete(wl) and all(v is not None for v in arg_files.values())
+                    and all(v is not None for v in build_files.values()),
+    }
+
+
 def workload_complete(wl) -> bool:
     """A workload identity is usable only when every key is present with the right shape and
     no input-file hash is missing (a None sha256 = the file could not be read)."""
@@ -930,7 +983,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     for c in ("validate", "list"):
         s = sub.add_parser(c); s.add_argument("bench_dir")
-    for c in ("show", "args", "shell-env"):
+    for c in ("show", "args", "shell-env", "identity"):
         s = sub.add_parser(c); s.add_argument("bench_dir"); s.add_argument("input_id")
     s = sub.add_parser("param"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("key")
     s = sub.add_parser("parse-timing"); s.add_argument("bench_dir"); s.add_argument("log"); s.add_argument("--rc", type=int, default=0); s.add_argument("--input")
@@ -969,6 +1022,10 @@ def main(argv=None):
             for x in inp.get("args", []):
                 print(x)
             return 0
+        if a.cmd == "identity":
+            ident = registry_identity(doc, get_input(doc, a.input_id))
+            print(json.dumps(ident, indent=1, sort_keys=True))
+            return 0 if ident["complete"] else 3
         if a.cmd == "shell-env":
             # for run.sh selectors: the input's environment knobs (E<TAB>KEY<TAB>VALUE) and extra
             # command-line arguments (A<TAB>ARG), one per line, for hpcperf_apply_input
@@ -1065,7 +1122,7 @@ def main(argv=None):
             return 0 if s["run_completed"] and (s["timing_ok"] or s["timing_status"] == "NEEDS_TIMING_SUPPORT") else 1
     except InputError as ex:
         sys.stderr.write(f"hpcperf_inputs: {ex}\n")
-        return 2 if a.cmd in ("args", "param", "show", "shell-env") else 1
+        return 2 if a.cmd in ("args", "param", "show", "shell-env", "identity") else 1
     return 0
 
 

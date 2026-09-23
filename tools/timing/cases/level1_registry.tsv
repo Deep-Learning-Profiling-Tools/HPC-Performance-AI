@@ -1,0 +1,139 @@
+# tools/timing/cases/level1_registry.tsv -- GENERATED from the inputs registry by tools/timing/gen_registry_cases.py.
+# Do not edit: change level1/<benchmark>/inputs.yaml and regenerate; `gen_registry_cases.py --check`
+# (run by `cases.py check` and the tests) fails when this file and the registry disagree.
+# One row per registered input; case == input_id. {REPO} is the repository root. "-" = empty.
+#app	case	input_id	materialized	exe	args	cwd	env	timeout_s
+adam	n10000-t200	n10000-t200	1	{REPO}/build/adam/cuda/adam_cuda	10000 200 100	{REPO}/build/adam/cuda	-	1800
+adam	n100000-t200	n100000-t200	1	{REPO}/build/adam/cuda/adam_cuda	100000 200 100	{REPO}/build/adam/cuda	-	1800
+adam	n1000000-t200	n1000000-t200	1	{REPO}/build/adam/cuda/adam_cuda	1000000 200 100	{REPO}/build/adam/cuda	-	1800
+aes	plaintext-1mib	plaintext-1mib	1	{REPO}/build/aes/cuda/aes_cuda	-i '{REPO}/build/aes/cuda/data/input_1MB.hex' -k '{REPO}/build/aes/cuda/data/key.hex'	{REPO}/build/aes/cuda	-	1800
+aes	plaintext-4mib	plaintext-4mib	1	{REPO}/build/aes/cuda/aes_cuda	-i '{REPO}/build/aes/cuda/data/input_4MB.hex' -k '{REPO}/build/aes/cuda/data/key.hex'	{REPO}/build/aes/cuda	-	1800
+aes	plaintext-16mib	plaintext-16mib	1	{REPO}/build/aes/cuda/aes_cuda	-i '{REPO}/build/aes/cuda/data/input_16MB.hex' -k '{REPO}/build/aes/cuda/data/key.hex'	{REPO}/build/aes/cuda	-	1800
+all_pairs_distance	iter10000	iter10000	1	{REPO}/build/all_pairs_distance/cuda/all_pairs_distance_cuda	10000	{REPO}/build/all_pairs_distance/cuda	-	1800
+ao_bench	iter100	iter100	1	{REPO}/build/ao_bench/cuda/ao_bench_cuda	100	{REPO}/build/ao_bench/cuda	-	1800
+atomic_reduction	default	default	1	{REPO}/build/atomic_reduction/cuda/atomic_reduction_cuda	-	{REPO}/build/atomic_reduction/cuda	-	1800
+background_subtraction	w4096-h2048-merged0-r102	w4096-h2048-merged0-r102	1	{REPO}/build/background_subtraction/cuda/background_subtraction_cuda	4096 2048 0 102	{REPO}/build/background_subtraction/cuda	-	1800
+background_subtraction	w4096-h2048-merged1-r102	w4096-h2048-merged1-r102	1	{REPO}/build/background_subtraction/cuda/background_subtraction_cuda	4096 2048 1 102	{REPO}/build/background_subtraction/cuda	-	1800
+background_subtraction	w8192-h4096-merged0-r102	w8192-h4096-merged0-r102	1	{REPO}/build/background_subtraction/cuda/background_subtraction_cuda	8192 4096 0 102	{REPO}/build/background_subtraction/cuda	-	1800
+background_subtraction	w4096-h2048-merged0-r1002	w4096-h2048-merged0-r1002	1	{REPO}/build/background_subtraction/cuda/background_subtraction_cuda	4096 2048 0 1002	{REPO}/build/background_subtraction/cuda	-	1800
+backprop	n65536	n65536	1	{REPO}/build/backprop/cuda/backprop_cuda	65536	{REPO}/build/backprop/cuda	-	1800
+backprop	n262144	n262144	1	{REPO}/build/backprop/cuda/backprop_cuda	262144	{REPO}/build/backprop/cuda	-	1800
+backprop	n524288	n524288	1	{REPO}/build/backprop/cuda/backprop_cuda	524288	{REPO}/build/backprop/cuda	-	1800
+bezier_surface	n8192	n8192	1	{REPO}/build/bezier_surface/cuda/bezier_surface_cuda	-f '{REPO}/level1/bezier_surface/data/control.txt' -n 8192	{REPO}/build/bezier_surface/cuda	-	1800
+bezier_surface	n300	n300	1	{REPO}/build/bezier_surface/cuda/bezier_surface_cuda	-f '{REPO}/level1/bezier_surface/data/control.txt' -n 300	{REPO}/build/bezier_surface/cuda	-	1800
+bfs	graph65536	graph65536	1	{REPO}/build/bfs/cuda/bfs_cuda	'{REPO}/level1/bfs/data/graph65536.txt'	{REPO}/build/bfs/cuda	-	1800
+bfs	graph4096	graph4096	1	{REPO}/build/bfs/cuda/bfs_cuda	'{REPO}/level1/bfs/data/graph4096.txt'	{REPO}/build/bfs/cuda	-	1800
+bilateral_filter	w2960-h1440	w2960-h1440	1	{REPO}/build/bilateral_filter/cuda/bilateral_filter_cuda	2960 1440 0.5 0.5 1000	{REPO}/build/bilateral_filter/cuda	-	1800
+bilateral_filter	w5920-h2880	w5920-h2880	1	{REPO}/build/bilateral_filter/cuda/bilateral_filter_cuda	5920 2880 0.5 0.5 1000	{REPO}/build/bilateral_filter/cuda	-	1800
+binary_search	n8388608	n8388608	1	{REPO}/build/binary_search/cuda/binary_search_cuda	8388608 100	{REPO}/build/binary_search/cuda	-	1800
+binary_search	n33554432	n33554432	1	{REPO}/build/binary_search/cuda/binary_search_cuda	33554432 100	{REPO}/build/binary_search/cuda	-	1800
+binary_search	n134217728	n134217728	1	{REPO}/build/binary_search/cuda/binary_search_cuda	134217728 100	{REPO}/build/binary_search/cuda	-	1800
+bitonic_sort	exp25	exp25	1	{REPO}/build/bitonic_sort/cuda/bitonic_sort_cuda	25 2	{REPO}/build/bitonic_sort/cuda	-	1800
+bitonic_sort	exp22	exp22	1	{REPO}/build/bitonic_sort/cuda/bitonic_sort_cuda	22 2	{REPO}/build/bitonic_sort/cuda	-	1800
+bitonic_sort	exp27	exp27	1	{REPO}/build/bitonic_sort/cuda/bitonic_sort_cuda	27 2	{REPO}/build/bitonic_sort/cuda	-	1800
+black_scholes	x1048576	x1048576	1	{REPO}/build/black_scholes/cuda/black_scholes_cuda	-x 1048576	{REPO}/build/black_scholes/cuda	-	1800
+black_scholes	x4194304	x4194304	1	{REPO}/build/black_scholes/cuda/black_scholes_cuda	-x 4194304	{REPO}/build/black_scholes/cuda	-	1800
+black_scholes	x16777216	x16777216	1	{REPO}/build/black_scholes/cuda/black_scholes_cuda	-x 16777216	{REPO}/build/black_scholes/cuda	-	1800
+block_scan	g2227104	g2227104	1	{REPO}/build/block_scan/cuda/block_scan_cuda	2227104 100	{REPO}/build/block_scan/cuda	-	1800
+block_scan	g8908416	g8908416	1	{REPO}/build/block_scan/cuda/block_scan_cuda	8908416 100	{REPO}/build/block_scan/cuda	-	1800
+burgers_equation	x8200-y8100-t100	x8200-y8100-t100	1	{REPO}/build/burgers_equation/cuda/burgers_equation_cuda	8200 8100 100	{REPO}/build/burgers_equation/cuda	-	1800
+burgers_equation	x16400-y16200-t100	x16400-y16200-t100	1	{REPO}/build/burgers_equation/cuda/burgers_equation_cuda	16400 16200 100	{REPO}/build/burgers_equation/cuda	-	1800
+burgers_equation	x8200-y8100-t1000	x8200-y8100-t1000	1	{REPO}/build/burgers_equation/cuda/burgers_equation_cuda	8200 8100 1000	{REPO}/build/burgers_equation/cuda	-	1800
+burrows_wheeler_transform	n10000000	n10000000	1	{REPO}/build/burrows_wheeler_transform/cuda/burrows_wheeler_transform_cuda	10000000	{REPO}/build/burrows_wheeler_transform/cuda	-	1800
+burrows_wheeler_transform	n40000000	n40000000	1	{REPO}/build/burrows_wheeler_transform/cuda/burrows_wheeler_transform_cuda	40000000	{REPO}/build/burrows_wheeler_transform/cuda	-	1800
+cg	class-b	class-b	1	{REPO}/build/cg/cuda/cg_cuda	-	{REPO}/build/cg/cuda	-	1800
+cg	class-a	class-a	1	{REPO}/build/cg/cuda-classA/cg_cuda	-	{REPO}/build/cg/cuda-classA	-	1800
+cg	class-c	class-c	1	{REPO}/build/cg/cuda-classC/cg_cuda	-	{REPO}/build/cg/cuda-classC	-	1800
+channel_shuffle	g2-w224-h224	g2-w224-h224	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	2 224 224 100	{REPO}/build/channel_shuffle/cuda	-	1800
+channel_shuffle	g2-w512-h512	g2-w512-h512	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	2 512 512 100	{REPO}/build/channel_shuffle/cuda	-	1800
+channel_shuffle	g4-w224-h224	g4-w224-h224	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	4 224 224 100	{REPO}/build/channel_shuffle/cuda	-	1800
+color_histogram	x1048576	x1048576	1	{REPO}/build/color_histogram/cuda/color_histogram_cuda	-x 1048576	{REPO}/build/color_histogram/cuda	-	1800
+color_histogram	x4194304	x4194304	1	{REPO}/build/color_histogram/cuda/color_histogram_cuda	-x 4194304	{REPO}/build/color_histogram/cuda	-	1800
+color_histogram	x16777216	x16777216	1	{REPO}/build/color_histogram/cuda/color_histogram_cuda	-x 16777216	{REPO}/build/color_histogram/cuda	-	1800
+daxpy	size1000000	size1000000	1	{REPO}/build/daxpy/cuda/daxpy_cuda	-	{REPO}/build/daxpy/cuda	-	1800
+daxpy	size4000000	size4000000	1	{REPO}/build/daxpy/cuda/daxpy_cuda	4000000 500	{REPO}/build/daxpy/cuda	-	1800
+daxpy	size16000000	size16000000	1	{REPO}/build/daxpy/cuda/daxpy_cuda	16000000 500	{REPO}/build/daxpy/cuda	-	1800
+del_dot_vec_2d	size1000000	size1000000	1	{REPO}/build/del_dot_vec_2d/cuda/del_dot_vec_2d_cuda	-	{REPO}/build/del_dot_vec_2d/cuda	-	1800
+del_dot_vec_2d	size4000000	size4000000	1	{REPO}/build/del_dot_vec_2d/cuda/del_dot_vec_2d_cuda	4000000 100	{REPO}/build/del_dot_vec_2d/cuda	-	1800
+del_dot_vec_2d	size16000000	size16000000	1	{REPO}/build/del_dot_vec_2d/cuda/del_dot_vec_2d_cuda	16000000 100	{REPO}/build/del_dot_vec_2d/cuda	-	1800
+energy	size1000000	size1000000	1	{REPO}/build/energy/cuda/energy_cuda	-	{REPO}/build/energy/cuda	-	1800
+energy	size4000000	size4000000	1	{REPO}/build/energy/cuda/energy_cuda	4000000 130	{REPO}/build/energy/cuda	-	1800
+energy	size16000000	size16000000	1	{REPO}/build/energy/cuda/energy_cuda	16000000 130	{REPO}/build/energy/cuda	-	1800
+ep	class-b	class-b	1	{REPO}/build/ep/cuda/ep_cuda	-	{REPO}/build/ep/cuda	-	1800
+ep	class-a	class-a	1	{REPO}/build/ep/cuda-classA/ep_cuda	-	{REPO}/build/ep/cuda-classA	-	1800
+ep	class-c	class-c	1	{REPO}/build/ep/cuda-classC/ep_cuda	-	{REPO}/build/ep/cuda-classC	-	1800
+fdtd_2d	size1000	size1000	1	{REPO}/build/fdtd_2d/cuda/fdtd_2d_cuda	-	{REPO}/build/fdtd_2d/cuda	-	1800
+fdtd_2d	size2000	size2000	1	{REPO}/build/fdtd_2d/cuda/fdtd_2d_cuda	2000 320	{REPO}/build/fdtd_2d/cuda	-	1800
+fdtd_2d	size4000	size4000	1	{REPO}/build/fdtd_2d/cuda/fdtd_2d_cuda	4000 320	{REPO}/build/fdtd_2d/cuda	-	1800
+fir	y1024-x4096	y1024-x4096	1	{REPO}/build/fir/cuda/fir_cuda	-y 1024 -x 4096	{REPO}/build/fir/cuda	-	1800
+fir	y4096-x4096	y4096-x4096	1	{REPO}/build/fir/cuda/fir_cuda	-y 4096 -x 4096	{REPO}/build/fir/cuda	-	1800
+fir	y16384-x4096	y16384-x4096	1	{REPO}/build/fir/cuda/fir_cuda	-y 16384 -x 4096	{REPO}/build/fir/cuda	-	1800
+floyd_warshall	size1000	size1000	1	{REPO}/build/floyd_warshall/cuda/floyd_warshall_cuda	-	{REPO}/build/floyd_warshall/cuda	-	1800
+floyd_warshall	size2000	size2000	1	{REPO}/build/floyd_warshall/cuda/floyd_warshall_cuda	2000 8	{REPO}/build/floyd_warshall/cuda	-	1800
+ft	class-b	class-b	1	{REPO}/build/ft/cuda/ft_cuda	-	{REPO}/build/ft/cuda	-	1800
+ft	class-a	class-a	1	{REPO}/build/ft/cuda-classA/ft_cuda	-	{REPO}/build/ft/cuda-classA	-	1800
+ft	class-c	class-c	1	{REPO}/build/ft/cuda-classC/ft_cuda	-	{REPO}/build/ft/cuda-classC	-	1800
+gaussian_elimination	matrix208	matrix208	1	{REPO}/build/gaussian_elimination/cuda/gaussian_elimination_cuda	-f '{REPO}/level1/gaussian_elimination/data/matrix208.txt'	{REPO}/build/gaussian_elimination/cuda	-	1800
+gaussian_elimination	s1024	s1024	1	{REPO}/build/gaussian_elimination/cuda/gaussian_elimination_cuda	-s 1024	{REPO}/build/gaussian_elimination/cuda	-	1800
+gaussian_elimination	s4096	s4096	1	{REPO}/build/gaussian_elimination/cuda/gaussian_elimination_cuda	-s 4096	{REPO}/build/gaussian_elimination/cuda	-	1800
+graph_coloring	nv200000	nv200000	1	{REPO}/build/graph_coloring/cuda/graph_coloring_cuda	-	{REPO}/build/graph_coloring/cuda	-	1800
+graph_coloring	nv1000000	nv1000000	1	{REPO}/build/graph_coloring/cuda/graph_coloring_cuda	--nv 1000000	{REPO}/build/graph_coloring/cuda	-	1800
+histogram	w1920-h1080	w1920-h1080	1	{REPO}/build/histogram/cuda/histogram_cuda	--i=100	{REPO}/build/histogram/cuda	-	1800
+histogram	w3840-h2160	w3840-h2160	1	{REPO}/build/histogram/cuda/histogram_cuda	--i=100 --width=3840 --height=2160	{REPO}/build/histogram/cuda	-	1800
+histogram	w7680-h4320	w7680-h4320	1	{REPO}/build/histogram/cuda/histogram_cuda	--i=100 --width=7680 --height=4320	{REPO}/build/histogram/cuda	-	1800
+hotspot	g512-p2-t2	g512-p2-t2	1	{REPO}/build/hotspot/cuda/hotspot_cuda	512 2 2 '{REPO}/level1/hotspot/data/temp_512' '{REPO}/level1/hotspot/data/power_512' output.out	{REPO}/build/hotspot/cuda	-	1800
+hotspot	g512-p2-t20	g512-p2-t20	1	{REPO}/build/hotspot/cuda/hotspot_cuda	512 2 20 '{REPO}/level1/hotspot/data/temp_512' '{REPO}/level1/hotspot/data/power_512' output.out	{REPO}/build/hotspot/cuda	-	1800
+hotspot	g512-p2-t200	g512-p2-t200	1	{REPO}/build/hotspot/cuda/hotspot_cuda	512 2 200 '{REPO}/level1/hotspot/data/temp_512' '{REPO}/level1/hotspot/data/power_512' output.out	{REPO}/build/hotspot/cuda	-	1800
+hotspot_3d	g64-l8-i100	g64-l8-i100	1	{REPO}/build/hotspot_3d/cuda/hotspot_3d_cuda	64 8 100 '{REPO}/level1/hotspot_3d/data/power_64x8' '{REPO}/level1/hotspot_3d/data/temp_64x8' output.out	{REPO}/build/hotspot_3d/cuda	-	1800
+hotspot_3d	g64-l8-i1000	g64-l8-i1000	1	{REPO}/build/hotspot_3d/cuda/hotspot_3d_cuda	64 8 1000 '{REPO}/level1/hotspot_3d/data/power_64x8' '{REPO}/level1/hotspot_3d/data/temp_64x8' output.out	{REPO}/build/hotspot_3d/cuda	-	1800
+hotspot_3d	g64-l8-i10000	g64-l8-i10000	1	{REPO}/build/hotspot_3d/cuda/hotspot_3d_cuda	64 8 10000 '{REPO}/level1/hotspot_3d/data/power_64x8' '{REPO}/level1/hotspot_3d/data/temp_64x8' output.out	{REPO}/build/hotspot_3d/cuda	-	1800
+is	class-b	class-b	1	{REPO}/build/is/cuda/is_cuda	-	{REPO}/build/is/cuda	-	1800
+is	class-a	class-a	1	{REPO}/build/is/cuda-classA/is_cuda	-	{REPO}/build/is/cuda-classA	-	1800
+is	class-c	class-c	1	{REPO}/build/is/cuda-classC/is_cuda	-	{REPO}/build/is/cuda-classC	-	1800
+jacobi_2d	size1002	size1002	1	{REPO}/build/jacobi_2d/cuda/jacobi_2d_cuda	-	{REPO}/build/jacobi_2d/cuda	-	1800
+jacobi_2d	size2004	size2004	1	{REPO}/build/jacobi_2d/cuda/jacobi_2d_cuda	2004 2000	{REPO}/build/jacobi_2d/cuda	-	1800
+jacobi_2d	size4008	size4008	1	{REPO}/build/jacobi_2d/cuda/jacobi_2d_cuda	4008 2000	{REPO}/build/jacobi_2d/cuda	-	1800
+ltimes	size1000000	size1000000	1	{REPO}/build/ltimes/cuda/ltimes_cuda	-	{REPO}/build/ltimes/cuda	-	1800
+ltimes	size4000000	size4000000	1	{REPO}/build/ltimes/cuda/ltimes_cuda	4000000 50	{REPO}/build/ltimes/cuda	-	1800
+ltimes	size16000000	size16000000	1	{REPO}/build/ltimes/cuda/ltimes_cuda	16000000 50	{REPO}/build/ltimes/cuda	-	1800
+lud	s256	s256	1	{REPO}/build/lud/cuda/lud_cuda	-s 256 -v	{REPO}/build/lud/cuda	-	1800
+lud	s2048	s2048	1	{REPO}/build/lud/cuda/lud_cuda	-s 2048 -v	{REPO}/build/lud/cuda	-	1800
+lud	s8192	s8192	1	{REPO}/build/lud/cuda/lud_cuda	-s 8192 -v	{REPO}/build/lud/cuda	-	1800
+mat_mat_shared	size1000	size1000	1	{REPO}/build/mat_mat_shared/cuda/mat_mat_shared_cuda	-	{REPO}/build/mat_mat_shared/cuda	-	1800
+mat_mat_shared	size2000	size2000	1	{REPO}/build/mat_mat_shared/cuda/mat_mat_shared_cuda	2000 5	{REPO}/build/mat_mat_shared/cuda	-	1800
+mat_mat_shared	size4000	size4000	1	{REPO}/build/mat_mat_shared/cuda/mat_mat_shared_cuda	4000 5	{REPO}/build/mat_mat_shared/cuda	-	1800
+matvec_3d_stencil	size1000000	size1000000	1	{REPO}/build/matvec_3d_stencil/cuda/matvec_3d_stencil_cuda	-	{REPO}/build/matvec_3d_stencil/cuda	-	1800
+matvec_3d_stencil	size4000000	size4000000	1	{REPO}/build/matvec_3d_stencil/cuda/matvec_3d_stencil_cuda	4000000 100	{REPO}/build/matvec_3d_stencil/cuda	-	1800
+matvec_3d_stencil	size16000000	size16000000	1	{REPO}/build/matvec_3d_stencil/cuda/matvec_3d_stencil_cuda	16000000 100	{REPO}/build/matvec_3d_stencil/cuda	-	1800
+mg	class-b	class-b	1	{REPO}/build/mg/cuda/mg_cuda	-	{REPO}/build/mg/cuda	-	1800
+mg	class-a	class-a	1	{REPO}/build/mg/cuda-classA/mg_cuda	-	{REPO}/build/mg/cuda-classA	-	1800
+mg	class-c	class-c	1	{REPO}/build/mg/cuda-classC/mg_cuda	-	{REPO}/build/mg/cuda-classC	-	1800
+murmurhash3	k100000	k100000	1	{REPO}/build/murmurhash3/cuda/murmurhash3_cuda	100000 100	{REPO}/build/murmurhash3/cuda	-	1800
+murmurhash3	k200000	k200000	1	{REPO}/build/murmurhash3/cuda/murmurhash3_cuda	200000 100	{REPO}/build/murmurhash3/cuda	-	1800
+murmurhash3	k400000	k400000	1	{REPO}/build/murmurhash3/cuda/murmurhash3_cuda	400000 100	{REPO}/build/murmurhash3/cuda	-	1800
+nbody	n16000-s10	n16000-s10	1	{REPO}/build/nbody/cuda/nbody_cuda	16000 10	{REPO}/build/nbody/cuda	-	1800
+nbody	n64000-s10	n64000-s10	1	{REPO}/build/nbody/cuda/nbody_cuda	64000 10	{REPO}/build/nbody/cuda	-	1800
+nbody	n32000-s10	n32000-s10	1	{REPO}/build/nbody/cuda/nbody_cuda	32000 10	{REPO}/build/nbody/cuda	-	1800
+nearest_neighbor	cane4-k5	cane4-k5	1	{REPO}/build/nearest_neighbor/cuda/nearest_neighbor_cuda	'{REPO}/build/nearest_neighbor/cuda/filelist_4' -r 5 -lat 30 -lng 90	{REPO}/build/nearest_neighbor/cuda	-	1800
+needleman_wunsch	n2048-p10	n2048-p10	1	{REPO}/build/needleman_wunsch/cuda/needleman_wunsch_cuda	2048 10	{REPO}/build/needleman_wunsch/cuda	-	1800
+needleman_wunsch	n8192-p10	n8192-p10	1	{REPO}/build/needleman_wunsch/cuda/needleman_wunsch_cuda	8192 10	{REPO}/build/needleman_wunsch/cuda	-	1800
+needleman_wunsch	n16384-p10	n16384-p10	1	{REPO}/build/needleman_wunsch/cuda/needleman_wunsch_cuda	16384 10	{REPO}/build/needleman_wunsch/cuda	-	1800
+pagerank	nodes16384	nodes16384	1	{REPO}/build/pagerank/cuda/pagerank_cuda	-i '{REPO}/build/pagerank/cuda/data/16384.data'	{REPO}/build/pagerank/cuda	-	1800
+pagerank	nodes4096	nodes4096	1	{REPO}/build/pagerank/cuda/pagerank_cuda	-i '{REPO}/build/pagerank/cuda/data/4096.data'	{REPO}/build/pagerank/cuda	-	1800
+pagerank	nodes1024	nodes1024	1	{REPO}/build/pagerank/cuda/pagerank_cuda	-i '{REPO}/build/pagerank/cuda/data/1024.data'	{REPO}/build/pagerank/cuda	-	1800
+pathfinder	c100000-r100-p20	c100000-r100-p20	1	{REPO}/build/pathfinder/cuda/pathfinder_cuda	100000 100 20	{REPO}/build/pathfinder/cuda	-	1800
+pathfinder	c1000000-r100-p20	c1000000-r100-p20	1	{REPO}/build/pathfinder/cuda/pathfinder_cuda	1000000 100 20	{REPO}/build/pathfinder/cuda	-	1800
+pathfinder	c100000-r1000-p20	c100000-r1000-p20	1	{REPO}/build/pathfinder/cuda/pathfinder_cuda	100000 1000 20	{REPO}/build/pathfinder/cuda	-	1800
+pressure	size1000000	size1000000	1	{REPO}/build/pressure/cuda/pressure_cuda	-	{REPO}/build/pressure/cuda	-	1800
+pressure	size4000000	size4000000	1	{REPO}/build/pressure/cuda/pressure_cuda	4000000 700	{REPO}/build/pressure/cuda	-	1800
+pressure	size16000000	size16000000	1	{REPO}/build/pressure/cuda/pressure_cuda	16000000 700	{REPO}/build/pressure/cuda	-	1800
+spadd	m10000	m10000	1	{REPO}/build/spadd/cuda/spadd_cuda	-	{REPO}/build/spadd/cuda	-	1800
+spadd	m100000	m100000	1	{REPO}/build/spadd/cuda/spadd_cuda	--m 100000 --n 100000	{REPO}/build/spadd/cuda	-	1800
+spgemm	m10000	m10000	1	{REPO}/build/spgemm/cuda/spgemm_cuda	-	{REPO}/build/spgemm/cuda	-	1800
+spgemm	m100000	m100000	1	{REPO}/build/spgemm/cuda/spgemm_cuda	--m 100000	{REPO}/build/spgemm/cuda	-	1800
+spmv	s110503	s110503	1	{REPO}/build/spmv/cuda/spmv_cuda	-	{REPO}/build/spmv/cuda	-	1800
+spmv	s442012	s442012	1	{REPO}/build/spmv/cuda/spmv_cuda	-s 442012	{REPO}/build/spmv/cuda	-	1800
+spmv	s1768048	s1768048	1	{REPO}/build/spmv/cuda/spmv_cuda	-s 1768048	{REPO}/build/spmv/cuda	-	1800
+srad_v1	iter100	iter100	1	{REPO}/build/srad_v1/cuda/srad_v1_cuda	100 0.5 502 458 '{REPO}/level1/srad_v1/data/image.pgm'	{REPO}/build/srad_v1/cuda	-	1800
+srad_v1	iter500	iter500	1	{REPO}/build/srad_v1/cuda/srad_v1_cuda	500 0.5 502 458 '{REPO}/level1/srad_v1/data/image.pgm'	{REPO}/build/srad_v1/cuda	-	1800
+srad_v1	iter2000	iter2000	1	{REPO}/build/srad_v1/cuda/srad_v1_cuda	2000 0.5 502 458 '{REPO}/level1/srad_v1/data/image.pgm'	{REPO}/build/srad_v1/cuda	-	1800

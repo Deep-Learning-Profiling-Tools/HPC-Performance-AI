@@ -138,6 +138,15 @@ upstream/derived/custom, input forms, selector, native timing status, measured
 inputs, correctness status, blocker) plus the SINGLE_INPUT / BLOCKED /
 derived-custom / not-measured lists and the totals.
 
+## Runtime measurement (tools/timing)
+
+Runtime is measured by `tools/timing` over each benchmark's marked region of interest; the registered
+inputs are measured with `tools/timing/measure_level<N>.sh --registry` (see `tools/timing/README.md`,
+"Registered inputs"). `hpcperf_inputs.py identity <bench_dir> <input_id>` prints the identity that
+links such a measurement to its registry entry (exit 3 when it cannot be established: a named file is
+missing or a compile-time input is not materialized). The `measure` command below is the earlier
+native-timer protocol (benchmark's own timer) and stays available for correctness baselines.
+
 ## Commands
 
 ```bash

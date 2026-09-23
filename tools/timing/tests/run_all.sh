@@ -42,9 +42,9 @@ fi
 mkdir -p "$TMP/fb/level1"
 rows="$(python3 "$TOOLS/cases.py" resolve --level 1 --build-root "$TMP/fb" --no-env-check all 2>&1 | noise)"
 n1="$(printf '%s\n' "$rows" | /usr/bin/grep -c .)"
-nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=17' | wc -l)"
+nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=18' | wc -l)"
 nbm="$(ls -d "$REPO"/level1/*/CMakeLists.txt 2>/dev/null | wc -l)"
-if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 17 fields ($nbm benchmarks)"
+if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 18 fields ($nbm benchmarks)"
 else bad "1c: level 1 resolve: $n1 rows, $nbad malformed"; fi
 if printf '%s\n' "$rows" | awk -F'\t' '$9 ~ /verify\.py|python/' | /usr/bin/grep -q .; then
     bad "1d: a Level 1 case runs a python wrapper instead of the binary"
@@ -110,6 +110,120 @@ if not refused(cases.level2_rows, "CUDA"):
     bad.append("an empty field was accepted")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+
+echo
+echo "=== 1r: registered inputs (inputs.yaml -> generated cases/level<N>_registry.tsv)"
+pycheck "1r1: registry tables: one case per registered input (counts from the registry), case == input_id, no drift" <<'PY'
+import os, subprocess, sys, glob
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+bad = []
+repo = os.environ["REPO"]
+for lvl, fn in ((1, cases.level1_registry_rows), (2, cases.level2_registry_rows)):
+    rows, _ = fn("CUDA")
+    n = 0
+    for f in glob.glob(os.path.join(repo, f"level{lvl}", "*", "inputs.yaml")):
+        out = subprocess.run([sys.executable, os.path.join(repo, "tools/inputs/hpcperf_inputs.py"), "list", os.path.dirname(f)],
+                             capture_output=True, text=True).stdout
+        n += len([l for l in out.splitlines() if l.strip()])
+    if len(rows) != n:
+        bad.append(f"level {lvl}: {len(rows)} registry cases for {n} registered inputs")
+    if any(r["case"] != r["input_id"] or not r["input_id"] for r in rows):
+        bad.append(f"level {lvl}: a registry case without its input id")
+if g.check():
+    bad.append("drift: " + "; ".join(g.check()))
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r2: registry Level 1: a compile-time input runs its OWN binary (NPB class A/C), generated data per input id" <<'PY'
+import os, sys, shlex
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+rows, _ = cases.level1_registry_rows("CUDA")
+by = {(r["app"], r["case"]): r for r in rows}
+bad = []
+for b in ("cg", "ep", "ft", "is", "mg"):
+    for cls, d in (("class-a", "cuda-classA"), ("class-c", "cuda-classC"), ("class-b", "cuda")):
+        exe = shlex.split(by[(b, cls)]["argv"])[0]
+        if not exe.endswith(f"/build/{b}/{d}/{b}_cuda"):
+            bad.append(f"{b}/{cls} runs {exe}")
+for app, iid, data in (("aes", "plaintext-4mib", "input_4MB.hex"), ("aes", "plaintext-16mib", "input_16MB.hex"),
+                       ("pagerank", "nodes4096", "4096.data"), ("pagerank", "nodes1024", "1024.data")):
+    argv = shlex.split(by[(app, iid)]["argv"])
+    if not any(a.endswith(data) and os.path.isabs(a) for a in argv):
+        bad.append(f"{app}/{iid}: {data} not passed as an absolute path: {argv}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r3: registry Level 2: selector allowed only as the registry declares it; stray / conflicting / hand-written selector and knobs refused" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+bad = []
+def refused(fn, *a):
+    try:
+        fn(*a); return False
+    except cases.CaseError:
+        return True
+rows, _ = cases.level2_registry_rows("CUDA")
+reg = cases.registry_l2()
+for r in rows:
+    sel = reg[r["app"]][0]
+    if r["env"] != f"{sel}={r['input_id']}":
+        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}")
+if "HPCPERF_XSBENCH_INPUT" not in cases.allowed_env("xsbench", ""):
+    bad.append("the registry selector of xsbench is not an allowed input variable")
+for internal in ("HPCPERF_INPUT_ARGS", "HPCPERF_INPUT_ID"):
+    if internal in cases.allowed_env("xsbench", ""):
+        bad.append(f"{internal} (set inside run.sh by the selector helper) is settable by a case")
+kz = [r for r in rows if r["app"] == "kripke" and r["case"] == "z64-g64-q128"]
+kd, _ = cases.level2_rows("CUDA")
+kd = [r for r in kd if r["app"] == "kripke"]
+if not refused(cases.refuse_undeclared, kd, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128"}):
+    bad.append("a selector in the shell was not refused for the hand-written kripke case")
+if not refused(cases.refuse_undeclared, kd, {"KRIPKE_ZONES": "8,8,8"}):
+    bad.append("a registry knob in the shell was not refused")
+if not refused(cases.refuse_undeclared, kz, {"HPCPERF_KRIPKE_INPUT": "z32-g32-q64"}):
+    bad.append("a conflicting selector value in the shell was not refused")
+try:
+    cases.refuse_undeclared(kz, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128", "UNRELATED": "1"})
+except cases.CaseError as e:
+    bad.append(f"an identical declared value was refused: {e}")
+if not refused(cases.parse_env, "HPCPERF_GITHUB_TOKEN=x", "t"):
+    bad.append("a credential-looking variable was accepted")
+tmp = os.path.join(os.environ["TMP"], "casedir_reg")
+os.makedirs(tmp, exist_ok=True)
+for f in ("level2_apps.tsv", "level2_registry.tsv"):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+with open(os.path.join(tmp, "level2_cases.tsv"), "w") as f:
+    f.write("kripke\tsneaky\t1\tHPCPERF_KRIPKE_INPUT=z64-g64-q128\t-\t-\t-\t-\n")
+orig = cases.CASES
+cases.CASES = tmp
+if not refused(cases.level2_rows, "CUDA"):
+    bad.append("a hand-written case that sets the registry selector was accepted")
+cases.CASES = orig
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r4: drift: a hand edit of a generated registry table is detected" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+tmp = os.path.join(os.environ["TMP"], "casedir_drift")
+os.makedirs(tmp, exist_ok=True)
+for f in os.listdir(cases.CASES):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+p = os.path.join(tmp, "level1_registry.tsv")
+text = open(p).read().replace("build/cg/cuda-classC/cg_cuda", "build/cg/cuda/cg_cuda", 1)
+open(p, "w").write(text)
+cases.CASES = tmp
+problems = g.check()
+print("ALLOK" if any("level1_registry.tsv" in m for m in problems) else f"not detected: {problems}")
+PY
+out="$(bash "$TOOLS/measure_level1.sh" --registry --dry-run --no-profile cg/class-a cg/class-c 2>&1 || true)"
+if printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classA/cg_cuda' && printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classC/cg_cuda' \
+   && printf '%s\n' "$out" | /usr/bin/grep -q 'input    class-a (registry level1/cg/inputs.yaml'; then
+    ok "1r5: registry dry run: class-a / class-c commands name their materialized binaries and the registry input"
+else
+    bad "1r5: registry dry run: $(printf '%s\n' "$out" | /usr/bin/grep -E 'command|input' | head -4 | tr '\n' ' ')"
+fi
 
 echo
 echo "=== 2: ROI log v2 and the vendor-neutral analysis"

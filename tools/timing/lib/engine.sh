@@ -29,7 +29,7 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${LEVEL:?}" "${CLEAN_RUNS:=1}" "${WARMUP_RUNS:=0}" "${PROFILED_RUNS:=1}"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
-: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}"
+: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${REGISTRY:=0}"
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
@@ -101,11 +101,11 @@ roi_where() {           # source locations of the ROI markers for this app (rela
 
 # ---------------------------------------------------------------- one case
 # fields: level app case backend gpus cwd timeout_s env argv fom_name fom_unit fom_better
-#         fom_source fom_regex roi_excludes verify_vs_roi notes
+#         fom_source fom_regex roi_excludes verify_vs_roi notes input_id
 measure_case() {
     local level="$1" app="$2" case="$3" backend="$4" gpus="$5" cwd="$6" tmo="$7" env="$8" argv="$9"
     local fom_name="${10}" fom_unit="${11}" fom_better="${12}" fom_source="${13}" fom_regex="${14}"
-    local roi_excl="${15}" verify="${16}" notes="${17}"
+    local roi_excl="${15}" verify="${16}" notes="${17}" input_id="${18:--}"
     local -a cmd case_env=() run_env=()
     local kv
     eval "cmd=( $argv )"                       # argv was shlex-quoted by cases.py
@@ -122,17 +122,45 @@ measure_case() {
     local out="$RAW_ROOT/level$level/$app/$case/$RUN_ID"
     local label; label=$(printf 'level%s %-34s' "$level" "$app/$case")
 
+    # A registry case measures one registered input: its workload identity (tools/inputs) is stored
+    # with the raw runs, and a case whose identity cannot be established -- or whose executable
+    # (a compile-time input's own build) does not exist -- is not run at all.
+    local ident_tmp="" ident_status="-"
+    if [ "$input_id" != "-" ]; then
+        ident_tmp="$(mktemp)"
+        python3 "$REPO/tools/inputs/hpcperf_inputs.py" identity "$REPO/level$level/$app" "$input_id" > "$ident_tmp" 2> "$ident_tmp.err"
+        case $? in
+            0) ident_status=ok ;;
+            3) ident_status=incomplete ;;
+            *) ident_status=failed ;;
+        esac
+    fi
+
     if [ "$DRY_RUN" = 1 ]; then
         echo "  $label"
+        [ "$input_id" != "-" ] && echo "    input    $input_id (registry level$level/$app/inputs.yaml; workload identity: $ident_status)"
         echo "    cwd      $cwd"
         echo "    env      env -i $(_allowed_pairs | cut -d= -f1 | tr '\n' ' ')${run_env[*]:+${run_env[*]} }HPCPERF_ROI_LOG=<run dir>/roi"
         [ -n "$ENV_SCRIPT_ABS" ] && echo "    source   ${ENV_SCRIPT_ABS#$REPO/} (inside the clean environment)"
         echo "    runs     warmup=$WARMUP_RUNS clean=$CLEAN_RUNS profiled=$PROFILED_RUNS collector=$COLLECTOR"
         echo "    command  timeout $tmo ${cmd[*]}"
+        [ -n "$ident_tmp" ] && rm -f "$ident_tmp" "$ident_tmp.err"
         return 0
     fi
 
     mkdir -p "$out" || return 1
+    local pre_status=""
+    if [ -n "$ident_tmp" ]; then
+        mv "$ident_tmp" "$out/workload_identity.json"
+        [ -s "$ident_tmp.err" ] && mv "$ident_tmp.err" "$out/workload_identity.err" || rm -f "$ident_tmp.err"
+        case "$ident_status" in
+            incomplete) pre_status="identity_incomplete" ;;
+            failed)     pre_status="identity_failed" ;;
+        esac
+        if [ -z "$pre_status" ] && [ "$level" = 1 ] && [ ! -x "${cmd[0]}" ]; then
+            pre_status="build_not_materialized"
+        fi
+    fi
     {
         echo "schema=hpcperf-timing-raw-2"
         echo "run_id=$RUN_ID"
@@ -154,6 +182,8 @@ measure_case() {
         echo "roi_excludes=$roi_excl"
         echo "verify_vs_roi=$verify"
         echo "notes=$notes"
+        echo "input_id=$input_id"
+        [ -f "$out/workload_identity.json" ] && echo "workload_identity_sha256=$(sha256sum "$out/workload_identity.json" | cut -d' ' -f1)"
         echo "roi_where=$(roi_where "$app")"
         echo "warmup_runs=$WARMUP_RUNS"
         echo "clean_runs=$CLEAN_RUNS"
@@ -172,6 +202,11 @@ measure_case() {
     } > "$out/run_meta.txt"
 
     local i t0 t1 rc d status=ok roi_s="-"
+    if [ -n "$pre_status" ]; then
+        echo "status=$pre_status" >> "$out/run_meta.txt"
+        echo "  $label FAIL ($pre_status: input $input_id not run; see ${out#$REPO/}/workload_identity.*)"
+        return 1
+    fi
     i=0
     while [ "$i" -lt "$WARMUP_RUNS" ]; do
         mkdir -p "$out/warmup.$i"
@@ -257,6 +292,7 @@ engine_setup() {
 
 engine_main() {
     local -a resolve=(python3 "$TOOLS/cases.py" resolve --level "$LEVEL" --backend "$BACKEND")
+    [ "$REGISTRY" = 1 ] && resolve+=(--registry)
     [ -n "$BUILD_ROOT" ] && resolve+=(--build-root "$BUILD_ROOT")
     local rows
     rows="$("${resolve[@]}" "$@")" || exit 2
@@ -273,7 +309,7 @@ engine_main() {
     local rc_all=0
     local -a f
     while IFS=$'\t' read -r -a f; do
-        [ "${#f[@]}" -eq 17 ] || engine_die "malformed case row (${#f[@]} fields)"
+        [ "${#f[@]}" -eq 18 ] || engine_die "malformed case row (${#f[@]} fields)"
         measure_case "${f[@]}" < /dev/null || rc_all=1
     done <<< "$rows"
     if [ "$DRY_RUN" != 1 ] && [ "$SUMMARIZE" = 1 ]; then

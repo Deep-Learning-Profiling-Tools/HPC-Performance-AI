@@ -339,6 +339,40 @@ assert d["summary"]["timing_status"] == "NEEDS_TIMING_SUPPORT" and d["summary"][
 PY
 python3 "$TOOL" measure "$TMP/tov/level1/tov" plain --out "$TMP/tov_plain" --warmup 1 --reps 2 --timeout 30 >/dev/null 2>&1
 python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['timing_override'] is False and abs(d['summary']['main_compute_s']['median']-4.0)<1e-9" "$TMP/tov_plain/measurement.json" && ok "per-input timing: inputs without an override keep the benchmark timer" || bad "benchmark timer changed by the override feature"
+# ---- 8o. identity: the registry-side identity tools/timing stores with every ROI measurement of an input
+python3 "$TOOL" identity "$R/level1/cg" class-c > "$TMP/id_c.json" 2>/dev/null; rc=$?
+python3 - "$TMP/id_c.json" <<'PY' && [ $rc -eq 0 ] && ok "identity: NPB class-c -> its own binary, build_config, class header sha256, registry sha/git blob, complete" || bad "identity class-c (rc=$rc)"
+import json, sys; d = json.load(open(sys.argv[1]))
+assert d["schema"] == "hpcperf-workload-identity-1" and d["input_id"] == "class-c" and d["benchmark"] == "cg"
+assert d["binary"] == "build/cg/cuda-classC/cg_cuda" and d["build_config"]["CLASS"] == "C"
+assert d["build_files_sha256"]["level1/cg/inputs/npbparams.C.hpp"] and d["registry"]["sha256"] and d["registry"]["git_blob"]
+assert d["workload"]["params"]["_build_config"]["CLASS"] == "C" and d["complete"] is True
+PY
+python3 "$TOOL" identity "$R/level2/sw4lite" pointsource-h0.02 > "$TMP/id_s.json" 2>/dev/null; rc=$?
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['selector']=='HPCPERF_SW4LITE_INPUT_ID' and d['workload']['files_sha256']['inputs/pointsource-h0p02.in'] and d['complete']" "$TMP/id_s.json" && [ $rc -eq 0 ] \
+    && ok "identity: a deck input records its selector and the deck's sha256" || bad "identity sw4lite deck (rc=$rc)"
+python3 "$TOOL" identity "$R/level2/sw4lite" no-such-input >/dev/null 2>&1; rc=$?
+[ $rc -eq 2 ] && ok "identity: an unknown input id is refused (exit 2)" || bad "identity unknown id rc=$rc"
+mkdir -p "$TMP/idmiss"; touch "$TMP/idmiss/hpcperf_env.sh"; mkdir -p "$TMP/idmiss/level1/m/data"
+cat > "$TMP/idmiss/level1/m/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: m
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/m/m_bin}
+timing: {scope: x, kind: total, unit: s, regex: '^time (?P<value>[0-9.]+) s$', select: only}
+baseline: {quantities: [{name: pass_marker, regex: '^PASS$', compare: {rule: present}}]}
+coverage: {status: SINGLE_INPUT, reason: test registry}
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: upstream-file, upstream: x}, params: {}, args: ["build/m/data/gone.bin"], backends_validated: [cuda]}
+  - {id: b, case: c, variant: build-config, input_form: compile-time, materialized: false, build_config: {CLASS: C}, source: {kind: upstream-parameterized, upstream: x}, params: {}, args: [], backends_validated: []}
+EOF
+python3 "$TOOL" identity "$TMP/idmiss/level1/m" a > "$TMP/id_m.json" 2>/dev/null; rc=$?
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['complete'] is False and d['arg_files_sha256']['build/m/data/gone.bin'] is None" "$TMP/id_m.json" && [ $rc -eq 3 ] \
+    && ok "identity: a missing argument file -> complete false, exit 3 (no timing result for that input)" || bad "identity missing file rc=$rc"
+python3 "$TOOL" identity "$TMP/idmiss/level1/m" b >/dev/null 2>&1; rc=$?
+[ $rc -eq 3 ] && ok "identity: an unmaterialized compile-time input -> exit 3" || bad "identity unmaterialized rc=$rc"
 # ---- 8l. repository-relative file arguments of a binary entry are passed as absolute paths (measure runs in the run dir)
 mkdir -p "$TMP/relarg/build/fake"; printf '#!/bin/sh\nexit 0\n' > "$TMP/relarg/build/fake/fake_bin"; chmod +x "$TMP/relarg/build/fake/fake_bin"
 mkdir -p "$TMP/relarg/level1/relarg/data"; echo x > "$TMP/relarg/level1/relarg/data/in.txt"

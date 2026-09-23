@@ -86,6 +86,7 @@ COLUMNS = [
     "host_cpu_model", "host_cpus_allowed", "host_loadavg_1m",
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
     "app_timer_s", "roi_vs_app_timer",
+    "input_id",
 ]
 OPS_COLUMNS = ["level", "app", "case", "platform", "run_id", "op", "category", "count",
                "total_s", "avg_s", "min_s", "max_s", "share"]
@@ -286,6 +287,26 @@ def build_record(raw):
     inputs = {"declared_env": declared_env, "declared_argv": dash(meta.get("argv")),
               "processes": procs, "exe_sha256": exe_sha}
 
+    # ---- registry input (a --registry case): the workload identity stored by the engine
+    registry = None
+    if dash(meta.get("input_id")):
+        ident, ident_path = None, os.path.join(raw, "workload_identity.json")
+        try:
+            with open(ident_path) as f:
+                ident = json.load(f)
+        except (OSError, ValueError):
+            pass
+        registry = {"input_id": meta["input_id"], "identity": ident,
+                    "identity_sha256": dash(meta.get("workload_identity_sha256")) or None,
+                    "identity_complete": bool(ident and ident.get("complete")
+                                              and ident.get("input_id") == meta["input_id"]
+                                              and ident.get("benchmark") == meta["app"])}
+        if not registry["identity_complete"]:
+            caveats.append("The registry input's workload identity could not be established: this record "
+                           "is not a result for that input.")
+            if status == "ok":
+                status = "identity_failed"
+
     # ---- FOM and launcher audit, from the first clean run
     clean0_log = os.path.join(runs[0]["dir"], "run.log") if runs else None
     fom = extract_fom(clean0_log, meta)
@@ -392,6 +413,7 @@ def build_record(raw):
             "notes": dash(meta.get("notes")) or None,
         },
         "inputs": inputs,
+        "registry": registry,
         "roi": roi,
         "device": device,
         "runtime_api": runtime,
@@ -474,6 +496,7 @@ def flatten(rec):
         "git_dirty": int(rec["provenance"]["git_dirty"]), "raw_dir": rec["provenance"]["raw_dir"],
         "app_timer_s": v((rec.get("app_timer") or {}).get("value_s")),
         "roi_vs_app_timer": v((rec.get("app_timer") or {}).get("roi_diff_frac")),
+        "input_id": v((rec.get("registry") or {}).get("input_id")),
     })
     for c in CATEGORIES:
         row[f"device_{c}_s"] = v(dev.get(f"{c}_s")) if dev else ""

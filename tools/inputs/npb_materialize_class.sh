@@ -23,6 +23,10 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     source "$R/hpcperf_env.sh" 2>/dev/null; set -eu
 fi
 OUT="$R/build/$B/cuda-class$X"; mkdir -p "$OUT/src"
+# The copied CMakeLists.txt finds the tools/timing ROI header through a path relative to the
+# vendored tree (../../tools/timing/roi), which does not exist next to the copy: put the header
+# directory on the compilers' include path instead (the mechanism tools/timing uses for Level 2).
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 rm -rf "$OUT/src/cuda" "$OUT/src/common"
 cp -r "$SRC/CMakeLists.txt" "$SRC/common" "$SRC/cuda" "$OUT/src/"
 cp "$HDR" "$OUT/src/cuda/npbparams.hpp"
