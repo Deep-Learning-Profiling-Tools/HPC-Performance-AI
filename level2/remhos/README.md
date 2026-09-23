@@ -44,8 +44,15 @@ is numerically identical, so that run works from `level2/remhos/data/` as well.
 
 ## Changes from upstream
 
-- None to the upstream files: every copied file is byte-identical to the
-  upstream commit and compiles, links and runs unmodified with CUDA 13.2 /
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in `remhos.cpp`:
+  the region of interest is the time loop (step prints included). Excluded inside it: visualization
+  and VisIt output. Pure insertions -- no upstream line changed or removed. The markers are a no-op
+  unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as
+  before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
+- Apart from the markers above, none to the upstream files: every other copied file is
+  byte-identical to the upstream commit and compiles, links and runs unmodified with CUDA 13.2 /
   GCC 13.3 / OpenMPI 5.0.10 against this repository's MFEM v4.10.
 - **Build system: the upstream GNU `makefile` is used, not the upstream
   `CMakeLists.txt`.** The task preferred CMake with `find_package(MFEM)`, but

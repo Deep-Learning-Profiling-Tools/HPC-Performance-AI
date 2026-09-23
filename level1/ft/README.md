@@ -53,6 +53,8 @@ Run it via:
 ctest --test-dir build/ft/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/ft.cu` and the HIP port: forward FFT + evolve/FFT/checksum iterations; not the set-up or verify(). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 1824 (8 source files, cloc, cuda/ + common/)

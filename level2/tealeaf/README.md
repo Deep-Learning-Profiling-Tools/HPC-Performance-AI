@@ -39,7 +39,13 @@ Added here: `build.sh`, `run.sh`, `validate.sh`, this `README.md`.
 
 ## Changes from upstream
 
-None to the source or CMake files -- everything under `driver/`, `src/`,
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `driver/diffuse.cpp`: the region of interest is the time steps, not the final checked field
+  summary. Pure insertions -- no upstream line changed or removed. The markers are a no-op unless
+  `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as before;
+  `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
+Apart from the markers above, none to the source or CMake files -- everything else under `driver/`, `src/`,
 `cmake/`, `CMakeLists.txt`, the decks and `tea.problems` is byte-identical to
 upstream. The only environment adaptation lives in `build.sh`:
 

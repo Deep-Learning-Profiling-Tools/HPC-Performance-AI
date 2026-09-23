@@ -28,6 +28,7 @@
 // checks that every vertex is colored and no edge connects two vertices of
 // the same color, and reports the number of colors used.
 //
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -244,6 +245,7 @@ int main(int argc, char** argv)
     const int max_iterations = 200;   // upstream max_number_of_iterations
     Ordinal numUncolored = nv;
     auto t0 = std::chrono::steady_clock::now();
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: one coloring (GPU phases + host conflict fallback), per repetition
     int iter = 0;
     for (; (iter < max_iterations) && (numUncolored > 0); iter++) {
       // colorGreedy: chunk size 8, or 1 for short worklists (upstream rule)
@@ -285,6 +287,7 @@ int main(int argc, char** argv)
       }
       GPU_CHECK(cudaMemcpy(d_colors, h_colors.data(), nv * sizeof(color_t), cudaMemcpyHostToDevice));
     }
+    HPCPERF_ROI_END_SYNC();
     total_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     iters_used = iter;
   }

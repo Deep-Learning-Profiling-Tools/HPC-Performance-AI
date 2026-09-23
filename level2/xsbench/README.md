@@ -24,6 +24,13 @@ command line.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `cuda/Main.cu`, `hip/Main.cpp`: the region of interest is the simulation (upstream's "section that
+  should be profiled"). Pure insertions -- no upstream line changed or removed. The markers are a
+  no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation
+  behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
 - `cuda/Makefile`: `-std=c++14` -> `-std=c++17` (one token). CUDA 13.2 ships
   CCCL 3.x, whose Thrust/CUB headers (included by `XSbench_header.cuh`) refuse
   to compile below C++17 (`#error libcu++ requires at least C++ 17`,

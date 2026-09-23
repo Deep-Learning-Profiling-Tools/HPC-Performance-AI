@@ -25,6 +25,14 @@ if(BACKEND STREQUAL "CUDA")
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     add_executable(ft_cuda cuda/ft.cu common/c_print_results.cpp
                    common/c_randdp.cpp common/c_timers.cu common/wtime.cpp)
+
+# Upstream ships a per-kernel timing table guarded by #if defined(PROFILING).
+# OFF by default so the default output -- and therefore ctest -- is unchanged;
+# tools/timing uses it to cross-check the nsys per-kernel numbers by name.
+option(HPCPERF_NPB_PROFILING "Enable the upstream NPB per-kernel timing table" OFF)
+if(HPCPERF_NPB_PROFILING)
+    target_compile_definitions(ft_cuda PRIVATE PROFILING)
+endif()
     target_include_directories(ft_cuda PRIVATE cuda common)
     # upstream ft.cu uses OpenMP on the host side
     find_package(OpenMP REQUIRED COMPONENTS CXX)
@@ -43,6 +51,9 @@ elseif(BACKEND STREQUAL "HIP")
 else()
     message(FATAL_ERROR "Unknown BACKEND '${BACKEND}'; expected CUDA or HIP")
 endif()
+
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
 
 if(BUILD_TESTING)
     add_test(NAME ft_run COMMAND ${_hpcperf_target})

@@ -20,6 +20,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in

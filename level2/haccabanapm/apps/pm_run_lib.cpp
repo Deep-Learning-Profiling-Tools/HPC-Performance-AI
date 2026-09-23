@@ -35,6 +35,7 @@
 //   8.  After loop: sym→non-sym + INIT→PHYSICAL, periodic-wrap, migrate,
 //       write final snapshot.
 
+#include "hpcperf_roi.h"
 #include "pm_run_lib.hpp"
 
 #include "io/IndatParser.hpp"
@@ -474,6 +475,8 @@ int pm_run_main(const std::string& input_path,
 
         const double uniform_mass = 1.0;
         std::size_t alive_idx = 0;
+        // tools/timing ROI: the DKD step loop; intermediate snapshot writes are excluded
+        HPCPERF_ROI_BEGIN_SYNC();
         for (int s = 0; s < nsteps; ++s) {
             double t_local = 0.0;
             if (timing) {
@@ -496,6 +499,7 @@ int pm_run_main(const std::string& input_path,
 
             while (alive_idx < alive_steps.size() &&
                    alive_steps[alive_idx] == s) {
+                HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
                 const std::string ip = intermediate_path(output_path, s);
                 write_intermediate_snapshot(ip, parts, grid, integ, state,
                                             rL, ng, np_axis, my_rank);
@@ -503,8 +507,10 @@ int pm_run_main(const std::string& input_path,
                 state.topology_dims[1] = ranks_per_dim[1];
                 state.topology_dims[2] = ranks_per_dim[2];
                 ++alive_idx;
+                HPCPERF_ROI_EXCLUDE_END();
             }
         }
+        HPCPERF_ROI_END_SYNC();
 
         if (timing && my_rank == 0) {
             // Summary over the timed window [warmup, nsteps): median + MAD.

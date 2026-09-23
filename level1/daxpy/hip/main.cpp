@@ -5,6 +5,7 @@
 // run with the upstream default problem size, rep count, and data
 // initialization. Validation: element-wise comparison of GPU vs CPU result.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream DAXPY.hpp
@@ -47,12 +48,14 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(dy, y, size * sizeof(Real_type), cudaMemcpyHostToDevice));
   GPU_CHECK(cudaMemcpy(dx, x, size * sizeof(Real_type), cudaMemcpyHostToDevice));
 
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, block_size);
     daxpy<<<grid_size, block_size>>>(dy, dx, a, iend);
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(y, dy, size * sizeof(Real_type), cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaFree(dx));
   GPU_CHECK(cudaFree(dy));

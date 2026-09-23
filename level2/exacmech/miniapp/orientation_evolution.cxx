@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include "ECMech_cases.h"
 #include "RAJA/RAJA.hpp"
 #include "RAJA/util/Timer.hpp"
@@ -369,6 +370,7 @@ int main(int argc, char *argv[]){
    RAJA::Timer run_time;
 
    run_time.start();
+   HPCPERF_ROI_BEGIN_SYNC();   // tools/timing ROI: the application's own run_time region
 
    for (int i = 0; i < nsteps; i++) {
       // set up our data in the correct format that the material model kernel expects
@@ -497,6 +499,7 @@ int main(int argc, char *argv[]){
       */
    }
 
+   HPCPERF_ROI_END_SYNC();
    run_time.stop();
 
    double time = run_time.elapsed();

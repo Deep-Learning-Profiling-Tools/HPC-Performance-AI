@@ -6,6 +6,7 @@
 #include <cstring>
 #include "bs_cuda_benchmark.h"
 #include "benchmark_runner.h"
+#include "hpcperf_measure.h"
 #include "time_measurement_impl.h"
 
 static void usage(const char *prog) {
@@ -28,7 +29,11 @@ int main(int argc, char **argv) {
   benchmark.SetGpuChunk(0);
   benchmark.SetQuietMode(true);
   runner.SetQuietMode(true);
-  runner.SetVerificationMode(true);  // always verify GPU result against CPU reference
+  runner.SetVerificationMode(!hpcperf_skip_verify());  // off in measurement mode
+  if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
+  // HPCPERF_L1_PHASE_TIMING=1 prints the six-phase summary the upstream
+  // BenchmarkRunner already computes (to stderr). Off by default.
+  runner.SetTimingMode(getenv("HPCPERF_L1_PHASE_TIMING") != nullptr);
   runner.Run();
   return 0;
 }

@@ -14,6 +14,7 @@
 // is the upstream Base_Seq loop nest, with upstream default sizes, reps, and
 // data initialization. Validation: element-wise comparison of phi.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 #define LTIMES_BODY \
@@ -77,6 +78,7 @@ int main(int argc, char** argv)
     dim3 nblocks((size_t)RP_DIVIDE_CEILING_INT(num_m, (Index_type)m_block_sz),
                  (size_t)RP_DIVIDE_CEILING_INT(num_g, (Index_type)g_block_sz),
                  (size_t)RP_DIVIDE_CEILING_INT(num_z, (Index_type)z_block_sz));
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       ltimes<<<nblocks, nthreads_per_block>>>(d_phi, d_ell, d_psi,
                                               num_d, num_m, num_g, num_z);
@@ -84,32 +86,40 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(phidat, d_phi, philen * sizeof(Real_type), cudaMemcpyDeviceToHost));
   cudaFree(d_phi); cudaFree(d_ell); cudaFree(d_psi);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr phi_r; Real_ptr ell_r; Real_ptr psi_r;
-  allocAndInitDataConst(phi_r, philen, Real_type(0.0));
-  allocAndInitData(ell_r, elllen);
-  allocAndInitData(psi_r, psilen);
-  {
-    Real_ptr phidat = phi_r; Real_ptr elldat = ell_r; Real_ptr psidat = psi_r;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type z = 0; z < num_z; ++z ) {
-        for (Index_type g = 0; g < num_g; ++g ) {
-          for (Index_type m = 0; m < num_m; ++m ) {
-            for (Index_type d = 0; d < num_d; ++d ) {
-              LTIMES_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr phi_r; Real_ptr ell_r; Real_ptr psi_r;
+    allocAndInitDataConst(phi_r, philen, Real_type(0.0));
+    allocAndInitData(ell_r, elllen);
+    allocAndInitData(psi_r, psilen);
+    {
+      Real_ptr phidat = phi_r; Real_ptr elldat = ell_r; Real_ptr psidat = psi_r;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type z = 0; z < num_z; ++z ) {
+          for (Index_type g = 0; g < num_g; ++g ) {
+            for (Index_type m = 0; m < num_m; ++m ) {
+              for (Index_type d = 0; d < num_d; ++d ) {
+                LTIMES_BODY;
+              }
             }
           }
         }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("phi", phi_r, phidat, philen, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("phi", phi_r, phidat, philen, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

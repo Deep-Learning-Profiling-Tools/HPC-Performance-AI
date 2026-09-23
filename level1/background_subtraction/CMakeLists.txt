@@ -37,6 +37,9 @@ else()
     message(FATAL_ERROR "Unknown BACKEND '${BACKEND}'; expected CUDA or HIP")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     add_test(NAME background_subtraction_run COMMAND ${_hpcperf_target} 4096 2048 0 102)
     set_tests_properties(background_subtraction_run PROPERTIES TIMEOUT 600

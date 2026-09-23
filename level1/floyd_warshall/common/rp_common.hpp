@@ -20,6 +20,28 @@ using Real_ptr = Real_type*;
 using Int_type = int;
 using Int_ptr = Int_type*;
 
+// ---------------------------------------------------------------------------
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+//
+// These benchmarks validate by recomputing the whole GPU workload on one CPU
+// core. That recomputation is correctness machinery, not part of the workload
+// being timed, so tools/timing/measure_level1.sh sets HPCPERF_SKIP_VERIFY=1 and
+// the driver then skips the CPU reference and its comparison, printing
+// SKIP_VERIFY instead of PASS/FAIL. ctest never sets the variable, so the
+// default path -- and every correctness result -- is unchanged.
+//
+// It elides only host-side verification: no kernel, no data initialization, no
+// tolerance and no algorithm is touched.
+// ---------------------------------------------------------------------------
+inline bool hpcperf_skip_verify()
+{
+  static const bool skip = []() {
+    const char* e = std::getenv("HPCPERF_SKIP_VERIFY");
+    return e != nullptr && *e != '\0' && *e != '0';
+  }();
+  return skip;
+}
+
 inline int& rp_data_init_count() { static int count = 0; return count; }
 inline void resetDataInitCount() { rp_data_init_count() = 0; }
 inline void incDataInitCount() { rp_data_init_count()++; }

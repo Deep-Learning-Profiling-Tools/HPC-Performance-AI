@@ -58,8 +58,15 @@ Not copied: `serial/` (the old serial/CPU-only version of Laghos), `amr/`
 
 ## Changes from upstream
 
-Copied code is byte-identical (`cmp` against `$R/_upstream/level2/Laghos`)
-except for one file:
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in `laghos.cpp`:
+  the region of interest is the time loop (step prints included). Excluded inside it: visualization,
+  VisIt, grid-function output and the `-chk` problem checks. Pure insertions -- no upstream line
+  changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
+Apart from the markers above, copied code is byte-identical (`cmp` against
+`$R/_upstream/level2/Laghos`) except for one file:
 
 - **`laghos_solver.cpp`** (function `QKernel<DIM,Q1D>`, the
   `UpdateQuadratureData` device kernels): `MFEM_UNROLL(1)` was inserted in

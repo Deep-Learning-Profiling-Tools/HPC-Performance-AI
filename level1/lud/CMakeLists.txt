@@ -27,6 +27,9 @@ else()
     message(FATAL_ERROR "BACKEND '${BACKEND}' not available: upstream Rodinia has no HIP implementation (HIP pending)")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(lud_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     add_test(NAME lud_run COMMAND lud_cuda -s 256 -v)
     set_tests_properties(lud_run PROPERTIES TIMEOUT 600

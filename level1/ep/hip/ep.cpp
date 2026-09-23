@@ -58,6 +58,7 @@
  * ------------------------------------------------------------------------------
  */
 
+#include "hpcperf_roi.h"
 #include <hip/hip_runtime.h>
 #include "npb.hpp"
 #include "npbparams.hpp"
@@ -161,6 +162,7 @@ int main(int argc, char** argv){
 
 	timer_clear(PROFILING_TOTAL_TIME);
 	timer_start(PROFILING_TOTAL_TIME);
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the EP kernel
 
 	gpu_kernel<<<blocks_per_grid, 
 		threads_per_block>>>(q_device,
@@ -168,6 +170,7 @@ int main(int argc, char** argv){
 				sy_device,
 				an);
 
+	HPCPERF_ROI_END_SYNC();  // NPB's own timer stops before the kernel finishes; this does not
 	timer_stop(PROFILING_TOTAL_TIME);
 	tm = timer_read(PROFILING_TOTAL_TIME);		
 

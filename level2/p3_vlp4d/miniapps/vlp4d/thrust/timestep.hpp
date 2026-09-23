@@ -1,6 +1,7 @@
 #ifndef __TIMESTEP_HPP__
 #define __TIMESTEP_HPP__
 
+#include "hpcperf_roi.h"
 #include "efield.hpp"
 #include "diags.hpp"
 #include "types.hpp"
@@ -61,7 +62,9 @@ void onetimestep(Config *conf, RealView4D &fn, RealView4D &fnp1, Efield *ef, Dia
 
   if(dom->fxvx_) {
     if(iter % dom->ifreq_ == 0) {
+      HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();   // tools/timing ROI: CSV output excluded
       Advection::print_fxvx(conf, fn, iter);
+      HPCPERF_ROI_EXCLUDE_END();
     }
   }
 }

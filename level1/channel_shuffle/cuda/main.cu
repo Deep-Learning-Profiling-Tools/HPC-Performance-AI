@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +58,7 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
   const int S = (HxW + NUM_THREADS - 1) / NUM_THREADS;
 
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   if (N <= GridDimMaxY) {
     const dim3 dim_grid(S, N, C);
@@ -71,6 +73,7 @@ bool ChannelShuffleNCHW (T *X, int N, int C, int G, int numel, T *Y,
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
@@ -88,6 +91,7 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   const int outer_size = N * HxW;
 
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   if (C <= 32) {
     for (int i = 0; i < repeat; i++)
@@ -104,10 +108,20 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
   return true;
+}
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
 }
 
 int main(int argc, char* argv[])
@@ -153,22 +167,32 @@ int main(int argc, char* argv[])
       cudaMemcpy(d_X, h_X, data_size_bytes, cudaMemcpyHostToDevice);
 
       ChannelShuffleNHWC (d_X, N, C, G, numel, d_Y, time, repeat);
-      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       cudaMemcpy(h_Y, d_Y, data_size_bytes, cudaMemcpyDeviceToHost);
+      if (hpcperf_skip_verify()) {
+        /* measurement mode: the NHWC CPU reference re-runs the host kernel
+           `repeat` times, which is verification cost, not the timed workload */
+      } else {
+      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       error = memcmp(h_Y, h_Y_ref, data_size_bytes);
       if (error)
         printf("Failed to pass channel shuffle (NHWC) check\n");
       else
         printf("Average time of channel shuffle (NHWC): %f (ms)\n", (time * 1e-6f) / repeat);
+      }
 
       ChannelShuffleNCHW (d_X, N, C, G, numel, d_Y, time, repeat);
-      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       cudaMemcpy(h_Y, d_Y, data_size_bytes, cudaMemcpyDeviceToHost);
+      if (hpcperf_skip_verify()) {
+        /* measurement mode: the NCHW CPU reference re-runs the host kernel
+           `repeat` times, which is verification cost, not the timed workload */
+      } else {
+      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       error = memcmp(h_Y, h_Y_ref, data_size_bytes);
       if (error)
         printf("Failed to pass channel shuffle (NCHW) check\n");
       else
         printf("Average time of channel shuffle (NCHW): %f (ms)\n", (time * 1e-6f) / repeat);
+      }
 
       cudaFree(d_X);
       cudaFree(d_Y);

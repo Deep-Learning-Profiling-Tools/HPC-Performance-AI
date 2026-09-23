@@ -47,6 +47,13 @@ Left out: the other programming models (`miniapps/vlp4d/{kokkos,openacc,openmp,s
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `miniapps/vlp4d/thrust/vlp4d.cpp`, `timestep.hpp`: the region of interest is the time-step loop
+  (upstream's `Total` timer). Excluded inside it: f(x,vx) CSV dumps (`fxvx`). Pure insertions -- no
+  upstream line changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a
+  profiler is attached, so build, run and validation behave as before; `build.sh` puts
+  `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 - `lib/thrust/View.hpp` (`View::swap`, lines 231/233): `thrust::swap(a, b)` on
   `thrust::host_vector` / `thrust::device_vector` replaced by the member call
   `a.swap(b)`. Reason: CUDA 13.2 ships CCCL 3.x, which removed the free-function

@@ -2,8 +2,9 @@
 # setup_level2_deps.sh). Upstream builds this executable only inside a Trilinos source build through TriBITS
 # (TRIBITS_ADD_EXECUTABLE); there is no standalone build system, so this file provides one against the exported
 # targets of the installed Trilinos (.deps/install/trilinos). main.cpp / MiniEM_helpers.* / decks/*.xml are
-# byte-identical to upstream (UPSTREAM_SHA256SUMS). Compiler: the same nvcc_wrapper-through-mpicxx recipe the
-# dependency was built with (build.sh exports OMPI_CXX), because the Panzer/Phalanx headers contain device code.
+# byte-identical to upstream (UPSTREAM_SHA256SUMS) except the tools/timing ROI marker lines in main.cpp.
+# Compiler: the same nvcc_wrapper-through-mpicxx recipe the dependency was built with (build.sh exports
+# OMPI_CXX), because the Panzer/Phalanx headers contain device code.
 cmake_minimum_required(VERSION 3.23)
 project(hpcperf_miniem CXX)
 

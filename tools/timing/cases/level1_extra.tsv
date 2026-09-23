@@ -1,0 +1,8 @@
+# tools/timing/cases/level1_extra.tsv -- extra Level 1 inputs that ctest does not define (hand-maintained).
+#
+# The executable and working directory come from the benchmark's default case (level1.tsv);
+# `args` REPLACES that case's arguments. Tab-separated, "-" = empty.
+#   env        NAME=VALUE;... -- only names listed in the benchmark's extra_env (level1_apps.tsv)
+#   timeout_s  "-" = the default case's
+#app	case	args	env	timeout_s	notes
+all_pairs_distance	n20000	20000	-	-	demonstration: twice the default point count (the default case is 10000)

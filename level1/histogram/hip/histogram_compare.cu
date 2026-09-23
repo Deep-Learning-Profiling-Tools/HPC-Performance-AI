@@ -25,6 +25,7 @@
  *
  ******************************************************************************/
 
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <map>
 #include <vector>
@@ -410,10 +411,12 @@ void RunTest(
     if (!g_report) printf("\t%s\n", compare ? "FAIL" : "PASS"); fflush(stdout);
 
     double elapsed_ms = 0;
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed iterations, not the verify/warm-up run before them
     for (int i = 0; i < timing_iterations; i++)
     {
         elapsed_ms += (*f)(d_pixels, width, height, d_hist, false);
     }
+    HPCPERF_ROI_END_SYNC();
     double avg_us = (elapsed_ms / timing_iterations) * 1000;    // average in us
     timings.push_back(std::pair<std::string, double>(short_name, avg_us));
 

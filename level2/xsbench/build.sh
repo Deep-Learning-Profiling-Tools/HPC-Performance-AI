@@ -16,6 +16,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 # Load the project toolchain (conda GCC 13.3 + system CUDA 13.2) unless the
 # calling shell already sourced it. hpcperf_env.sh is idempotent. It must run

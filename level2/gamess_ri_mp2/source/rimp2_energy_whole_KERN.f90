@@ -51,6 +51,7 @@
       program mp2CorrEng
       use rimp2_shared
       use rimp2_input
+      use hpcperf_roi
       implicit double precision(a-h,o-z)
 
       ! energy var
@@ -141,6 +142,8 @@
       print *, "time: ", omp_get_wtime()-st
       ! tic
       st=omp_get_wtime()
+      ! tools/timing ROI: the timed RI-MP2 energy evaluation (after the warm-up call)
+      call hpcperf_roi_begin_sync()
 
       ! corr energy accumulation
 #if defined(COMBINED_VERSION)
@@ -152,6 +155,7 @@
 #endif
 
       ! toc
+      call hpcperf_roi_end_sync()
       et=omp_get_wtime()
       dt_mpi = et - st
 

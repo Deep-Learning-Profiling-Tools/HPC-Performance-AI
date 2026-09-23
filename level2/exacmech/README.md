@@ -43,6 +43,13 @@ Left out: `README.md`, `DeveloperGuide.md`, `uncrustify.cfg`, `.github/`, `.giti
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `miniapp/orientation_evolution.cxx`: the region of interest is the application's own `run_time`
+  region (set-up, material and retrieve kernels over all steps). Pure insertions -- no upstream line
+  changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 - `snls/src/SNLS_device_forall.cxx` lines 98 and 107 (`Device::WaitFor`):
   `wait_for(event)` -> `wait_for(*event)` (two lines). Reason: camp v2026.07 changed
   `camp::resources::Resource::wait_for` to take `Event const&` instead of `Event*`; with the

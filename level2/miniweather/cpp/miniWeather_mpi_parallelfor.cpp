@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////////////////
 
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <mpi.h>
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
     ////////////////////////////////////////////////////
     yakl::fence();
     auto t1 = std::chrono::steady_clock::now();
+    HPCPERF_ROI_BEGIN();   // tools/timing ROI: the main time-step loop (output excluded)
     while (etime < sim_time) {
       //If the time step leads to exceeding the simulation time, shorten it for the last step
       if (etime + dt > sim_time) { dt = sim_time - etime; }
@@ -131,10 +133,13 @@ int main(int argc, char **argv) {
       //If it's time for output, reset the counter, and do output
       if (output_freq >= 0 && output_counter >= output_freq) {
         output_counter = output_counter - output_freq;
+        HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
         output(state,etime,num_out,fixed_data);
+        HPCPERF_ROI_EXCLUDE_END();
       }
     }
     yakl::fence();
+    HPCPERF_ROI_END();
     auto t2 = std::chrono::steady_clock::now();
     if (mainproc) {
       std::cout << "CPU Time: " << std::chrono::duration<double>(t2-t1).count() << " sec\n";

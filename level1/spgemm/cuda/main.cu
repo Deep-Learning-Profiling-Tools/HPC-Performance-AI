@@ -36,6 +36,7 @@
 // Validation (added): C recomputed on the host with a dense accumulator;
 // per-row entries sorted and compared (cols exact, values rel tol 1e-10).
 //
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -69,6 +70,16 @@ using Offset  = size_t;   // size_type
 #define SHFL_PTR(p) (p)  /* HIP: lockstep wavefront, lane 0 value broadcast via shared not needed */
 #else
 #include <cuda_runtime.h>
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 #define SYNCWARP() __syncwarp()
 #endif
 
@@ -418,6 +429,7 @@ int main(int argc, char** argv)
   dim3 block(vector_size, team_size);
   int league = (m + team_work_size - 1) / team_work_size;
   double numeric_time = 0;
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the GPU numeric phase (the symbolic phase is a host substitute, excluded)
   for (int rep = 0; rep < repeat; rep++) {
     auto t0 = std::chrono::steady_clock::now();
     kkmem_numeric<<<league, block, shared_memory_size>>>(
@@ -428,52 +440,57 @@ int main(int argc, char** argv)
     GPU_CHECK(cudaDeviceSynchronize());
     numeric_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   }
+  HPCPERF_ROI_END_SYNC();
   printf("mm_time: %f (numeric phase, %d repeats)\n", numeric_time / repeat, repeat);
 
-  // ---- validation (added): host dense-accumulator reference ----
-  std::vector<Ordinal> Ccol(nnzC); std::vector<Scalar> Cval(nnzC);
-  GPU_CHECK(cudaMemcpy(Ccol.data(), dCcol, nnzC * sizeof(Ordinal), cudaMemcpyDeviceToHost));
-  GPU_CHECK(cudaMemcpy(Cval.data(), dCval, nnzC * sizeof(Scalar), cudaMemcpyDeviceToHost));
   bool ok = true;
-  {
-    std::vector<Scalar> acc(n, 0.0);
-    std::vector<char> marker(n, 0);
-    std::vector<Ordinal> touched;
-    std::vector<std::pair<Ordinal, Scalar>> gpu_row;
-    for (Ordinal i = 0; i < m && ok; i++) {
-      touched.clear();
-      for (Offset ka = Arow[i]; ka < Arow[i + 1]; ka++) {
-        Ordinal j = Acol[ka]; Scalar va = Aval[ka];
-        for (Offset kb = Arow[j]; kb < Arow[j + 1]; kb++) {
-          Ordinal c = Acol[kb];
-          if (!marker[c]) { marker[c] = 1; touched.push_back(c); acc[c] = 0.0; }
-          acc[c] += va * Aval[kb];
+  if (hpcperf_skip_verify()) {
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ---- validation (added): host dense-accumulator reference ----
+    std::vector<Ordinal> Ccol(nnzC); std::vector<Scalar> Cval(nnzC);
+    GPU_CHECK(cudaMemcpy(Ccol.data(), dCcol, nnzC * sizeof(Ordinal), cudaMemcpyDeviceToHost));
+    GPU_CHECK(cudaMemcpy(Cval.data(), dCval, nnzC * sizeof(Scalar), cudaMemcpyDeviceToHost));
+      {
+      std::vector<Scalar> acc(n, 0.0);
+      std::vector<char> marker(n, 0);
+      std::vector<Ordinal> touched;
+      std::vector<std::pair<Ordinal, Scalar>> gpu_row;
+      for (Ordinal i = 0; i < m && ok; i++) {
+        touched.clear();
+        for (Offset ka = Arow[i]; ka < Arow[i + 1]; ka++) {
+          Ordinal j = Acol[ka]; Scalar va = Aval[ka];
+          for (Offset kb = Arow[j]; kb < Arow[j + 1]; kb++) {
+            Ordinal c = Acol[kb];
+            if (!marker[c]) { marker[c] = 1; touched.push_back(c); acc[c] = 0.0; }
+            acc[c] += va * Aval[kb];
+          }
         }
-      }
-      std::sort(touched.begin(), touched.end());
-      // gather + sort the GPU row
-      gpu_row.clear();
-      for (Offset k = Crow[i]; k < Crow[i + 1]; k++) gpu_row.push_back({Ccol[k], Cval[k]});
-      std::sort(gpu_row.begin(), gpu_row.end());
-      if ((Offset)touched.size() != Crow[i + 1] - Crow[i]) {
-        printf("row %d: size mismatch gpu %zu vs ref %zu\n", i,
-               (size_t)(Crow[i + 1] - Crow[i]), touched.size());
-        ok = false;
-      }
-      for (size_t k = 0; k < touched.size() && ok; k++) {
-        if (gpu_row[k].first != touched[k]) {
-          printf("row %d entry %zu: col %d vs ref %d\n", i, k, gpu_row[k].first, touched[k]);
-          ok = false;
-        } else if (std::fabs(gpu_row[k].second - acc[touched[k]]) >
-                   1e-10 * (1.0 + std::fabs(acc[touched[k]]))) {
-          printf("row %d col %d: val %.17g vs ref %.17g\n", i, touched[k],
-                 gpu_row[k].second, acc[touched[k]]);
+        std::sort(touched.begin(), touched.end());
+        // gather + sort the GPU row
+        gpu_row.clear();
+        for (Offset k = Crow[i]; k < Crow[i + 1]; k++) gpu_row.push_back({Ccol[k], Cval[k]});
+        std::sort(gpu_row.begin(), gpu_row.end());
+        if ((Offset)touched.size() != Crow[i + 1] - Crow[i]) {
+          printf("row %d: size mismatch gpu %zu vs ref %zu\n", i,
+                 (size_t)(Crow[i + 1] - Crow[i]), touched.size());
           ok = false;
         }
+        for (size_t k = 0; k < touched.size() && ok; k++) {
+          if (gpu_row[k].first != touched[k]) {
+            printf("row %d entry %zu: col %d vs ref %d\n", i, k, gpu_row[k].first, touched[k]);
+            ok = false;
+          } else if (std::fabs(gpu_row[k].second - acc[touched[k]]) >
+                     1e-10 * (1.0 + std::fabs(acc[touched[k]]))) {
+            printf("row %d col %d: val %.17g vs ref %.17g\n", i, touched[k],
+                   gpu_row[k].second, acc[touched[k]]);
+            ok = false;
+          }
+        }
+        for (Ordinal c : touched) marker[c] = 0;
       }
-      for (Ordinal c : touched) marker[c] = 0;
     }
+    printf("%s\n", ok ? "PASS" : "FAIL");
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
-  return ok ? 0 : 1;
+  return hpcperf_skip_verify() ? 0 : (ok ? 0 : 1);
 }

@@ -1,0 +1,118 @@
+{
+  "platform": "nvidia-b200.cuda13.2",
+  "conformance": {
+    "status": "pass",
+    "date_utc": "2026-09-22T21:38:49Z",
+    "collector": "nvidia_nsys",
+    "collector_version": "2025.6.3.541-256337736014v0",
+    "probe": "tools/timing/probes/conformance/probe.cu",
+    "raw_dir": "build/timing/level0/probe/default/20260922T213841Z-1624899",
+    "checks": [
+      {
+        "check": "run status",
+        "ok": true,
+        "detail": "ok"
+      },
+      {
+        "check": "clean ROI entries",
+        "ok": true,
+        "detail": "entries=1"
+      },
+      {
+        "check": "exclude carved out",
+        "ok": true,
+        "detail": "excluded_s=0.000444412"
+      },
+      {
+        "check": "inside ROI compute_ops",
+        "ok": true,
+        "detail": "20 (expected 20)"
+      },
+      {
+        "check": "inside ROI copy_d2d_ops",
+        "ok": true,
+        "detail": "1 (expected 1)"
+      },
+      {
+        "check": "inside ROI copy_h2d_ops",
+        "ok": true,
+        "detail": "0 (expected 0)"
+      },
+      {
+        "check": "inside ROI copy_d2h_ops",
+        "ok": true,
+        "detail": "0 (expected 0)"
+      },
+      {
+        "check": "inside ROI fill_ops",
+        "ok": true,
+        "detail": "0 (expected 0)"
+      },
+      {
+        "check": "whole process compute_ops",
+        "ok": true,
+        "detail": "36 (expected 36)"
+      },
+      {
+        "check": "whole process copy_h2d_ops",
+        "ok": true,
+        "detail": "1 (expected 1)"
+      },
+      {
+        "check": "whole process copy_d2d_ops",
+        "ok": true,
+        "detail": "1 (expected 1)"
+      },
+      {
+        "check": "whole process copy_d2h_ops",
+        "ok": true,
+        "detail": "1 (expected 1)"
+      },
+      {
+        "check": "whole process fill_ops",
+        "ok": true,
+        "detail": "1 (expected 1)"
+      },
+      {
+        "check": "profiled vs clean ROI",
+        "ok": true,
+        "detail": "profiled 0.006576 s, clean 0.006573 s, limit 0.020000"
+      },
+      {
+        "check": "trace ROI vs marker log (same run)",
+        "ok": true,
+        "detail": "trace 0.006576 s, markers 0.006574 s -- one timeline"
+      },
+      {
+        "check": "caller environment isolated from the profiler output",
+        "ok": true,
+        "detail": "sentinel absent; the profiler recorded 26 variable names"
+      }
+    ]
+  },
+  "device": {
+    "vendor": "nvidia",
+    "product": "B200",
+    "arch": "sm_100",
+    "uuid": "GPU-76fdb436-684f-79c7-5f3b-f742c09ba8c9",
+    "count_visible": 1,
+    "memory_total_mib": 183359,
+    "core_clock_mhz": 1965,
+    "core_clock_max_mhz": 1965,
+    "mem_clock_mhz": 3996,
+    "mem_clock_max_mhz": 3996,
+    "power_limit_w": 1000,
+    "temperature_c": 26,
+    "driver_version": "595.58.03",
+    "runtime": {
+      "name": "cuda",
+      "version": "13.2"
+    },
+    "vendor_extras": {
+      "compute_capability": "10.0",
+      "persistence_mode": "Enabled",
+      "pci_bus_id": "00000000:1B:00.0"
+    },
+    "platform_id": "nvidia-b200.cuda13.2"
+  }
+}

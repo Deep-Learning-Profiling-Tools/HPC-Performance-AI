@@ -33,6 +33,7 @@
  *
  */
 
+#include "hpcperf_roi.h"
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
@@ -40,6 +41,18 @@
 #include <chrono>
 #include <iostream>
 #include <cuda.h>
+
+#include <cstdlib>
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 
 #if DOUBLE_PRECISION
@@ -249,12 +262,14 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   XYZ *cpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
   XYZ *gpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
 
-  // CPU run
+  // CPU run -- reference for the verification below; skipped in measurement mode
+  if (!hpcperf_skip_verify()) {
   auto start = std::chrono::steady_clock::now();
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::cout << "host execution time: " << time << " ms" << std::endl;
+  }
 
   // Device run
 
@@ -273,19 +288,27 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 
   cudaDeviceSynchronize();
   auto kstart = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   BezierGPU <<< grid, block >>> (d_in, d_out, in_size_i, in_size_j, out_size_i, out_size_j);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto kend = std::chrono::steady_clock::now();
   auto ktime = std::chrono::duration_cast<std::chrono::milliseconds>(kend - kstart).count();
   std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
 
   cudaMemcpy(gpu_out, d_out, out_size, cudaMemcpyDeviceToHost);
 
-  // Verify
-  int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
-  printf("%s\n", (status == 0) ? "PASS" : "FAIL");
+  if (hpcperf_skip_verify()) {
+    /* measurement mode: host-side verification is not part of the timed work */
+    printf("SKIP_VERIFY\n");
+  } else {
+    // Verify
+    int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
+    printf("%s\n", (status == 0) ? "PASS" : "FAIL");
+  }
+
 
   free(cpu_out);
   free(gpu_out);

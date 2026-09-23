@@ -16,6 +16,7 @@
  * =====================================================================================
  */
 
+#include "hpcperf_roi.h"
 #include <cuda.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -36,6 +37,14 @@
 #endif
 
 static int do_verify = 0;
+
+/* HPC-Performance-AI measurement switch (default OFF): HPCPERF_SKIP_VERIFY=1 turns
+   off the -v verification (lud_verify recombines L*U on the host) so the timing
+   reflects the GPU path only. ctest still passes -v and is unchanged. */
+static int hpcperf_skip_verify(void) {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != NULL && *e != '\0' && *e != '0';
+}
 
 static struct option long_options[] = {
   /* name, has_arg, flag, val */
@@ -95,6 +104,9 @@ main ( int argc, char *argv[] )
     exit(EXIT_FAILURE);
   }
 
+  /* measurement mode: drop the host-side L*U verification, keep everything else */
+  if (hpcperf_skip_verify()) { do_verify = 0; printf("SKIP_VERIFY\n"); }
+
   if (input_file) {
     printf("Reading matrix from file %s\n", input_file);
     ret = create_matrix_from_file(&m, input_file, &matrix_dim);
@@ -134,8 +146,10 @@ main ( int argc, char *argv[] )
   cudaMemcpy(d_m, m, matrix_dim*matrix_dim*sizeof(float), 
 	     cudaMemcpyHostToDevice);
 
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: lud_cuda (the blocked decomposition), not the copies inside the upstream stopwatch
   lud_cuda(d_m, matrix_dim);
 
+  HPCPERF_ROI_END_SYNC();
   cudaMemcpy(m, d_m, matrix_dim*matrix_dim*sizeof(float), 
 	     cudaMemcpyDeviceToHost);
 

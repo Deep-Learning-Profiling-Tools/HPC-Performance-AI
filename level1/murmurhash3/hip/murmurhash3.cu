@@ -3,6 +3,7 @@
 // domain. The author hereby disclaims copyright to this source code.
 //-------------------------------------------------------------------------
 
+#include "hpcperf_roi.h"
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -204,12 +205,14 @@ int main(int argc, char** argv)
 
   hipDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (uint32_t n = 0; n < repeat; n++)  
     MurmurHash3_x64_128_kernel<<<gridDim, blockDim>>>(
       dev_keys, dev_length, key_length, dev_out, numKeys);
 
   hipDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);

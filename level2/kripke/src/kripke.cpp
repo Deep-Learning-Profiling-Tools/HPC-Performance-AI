@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: (BSD-3-Clause)
 //
   
+#include "hpcperf_roi.h"
 #include <Kripke.h>
 #include <Kripke/Core/Comm.h>
 #include <Kripke/Core/MemoryManager.h>
@@ -506,7 +507,9 @@ int main(int argc, char **argv) {
   Kripke::generateProblem(data_store, vars);
 
   // Run the solver
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the steady-state solve
   Kripke::SteadyStateSolver(data_store, vars.niter, vars.parallel_method == PMETHOD_BJ);
+  HPCPERF_ROI_END_SYNC();
 
   // Print Timing Info
   auto &timing = data_store.getVariable<Kripke::Timing>("timing");

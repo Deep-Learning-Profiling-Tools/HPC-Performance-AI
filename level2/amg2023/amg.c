@@ -26,6 +26,7 @@
                  preconditioners.
  *--------------------------------------------------------------------------*/
 
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -548,6 +549,7 @@ main( hypre_int argc,
       CALI_MARK_BEGIN("Setup");
 #endif
       hypre_BeginTiming(time_index);
+      HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: AMG setup or solve (this problem's FOM denominator)
       HYPRE_ParCSRPCGCreate(comm, &pcg_solver);
       HYPRE_PCGSetMaxIter(pcg_solver, max_iter);
       HYPRE_PCGSetTol(pcg_solver, tol);
@@ -596,6 +598,7 @@ main( hypre_int argc,
                      (HYPRE_Vector)b, (HYPRE_Vector)x);
 
       hypre_MPI_Barrier(comm);
+      HPCPERF_ROI_END_SYNC();
       hypre_EndTiming(time_index);
 #ifdef USE_CALIPER
       CALI_MARK_END("Setup");
@@ -625,11 +628,13 @@ main( hypre_int argc,
       CALI_MARK_BEGIN("Solve");
 #endif
       hypre_BeginTiming(time_index);
+      HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: AMG setup or solve (this problem's FOM denominator)
 
       HYPRE_PCGSolve(pcg_solver, (HYPRE_Matrix)parcsr_A,
                      (HYPRE_Vector)b, (HYPRE_Vector)x);
 
       hypre_MPI_Barrier(comm);
+      HPCPERF_ROI_END_SYNC();
       hypre_EndTiming(time_index);
 #ifdef USE_CALIPER
       CALI_MARK_END("Solve");
@@ -687,6 +692,7 @@ main( hypre_int argc,
       CALI_MARK_BEGIN("Setup");
 #endif
       hypre_BeginTiming(time_index);
+      HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: AMG setup or solve (this problem's FOM denominator)
 
       HYPRE_ParCSRGMRESCreate(comm, &pcg_solver);
       HYPRE_GMRESSetKDim(pcg_solver, k_dim);
@@ -733,6 +739,7 @@ main( hypre_int argc,
       HYPRE_GMRESSetup (pcg_solver, (HYPRE_Matrix)parcsr_A, (HYPRE_Vector)b, (HYPRE_Vector)x);
 
       hypre_MPI_Barrier(comm);
+      HPCPERF_ROI_END_SYNC();
       hypre_EndTiming(time_index);
 #ifdef USE_CALIPER
       CALI_MARK_END("Setup");
@@ -761,10 +768,12 @@ main( hypre_int argc,
       CALI_MARK_BEGIN("Solve");
 #endif
       hypre_BeginTiming(time_index);
+      HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: AMG setup or solve (this problem's FOM denominator)
 
       HYPRE_GMRESSolve (pcg_solver, (HYPRE_Matrix)parcsr_A, (HYPRE_Vector)b, (HYPRE_Vector)x);
 
       hypre_MPI_Barrier(comm);
+      HPCPERF_ROI_END_SYNC();
       hypre_EndTiming(time_index);
 #ifdef USE_CALIPER
       CALI_MARK_END("Solve");

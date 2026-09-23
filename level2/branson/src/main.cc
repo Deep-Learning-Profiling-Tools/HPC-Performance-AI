@@ -9,6 +9,7 @@
  */
 //---------------------------------------------------------------------------//
 
+#include "hpcperf_roi.h"
 #include <iostream>
 #include <algorithm>
 #include <string>
@@ -199,6 +200,7 @@ int main(int argc, char **argv) {
     // TRT PHYSICS CALCULATION
     //--------------------------------------------------------------------------//
 
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the IMC transport calculation, not mesh set-up
     if (input.get_dd_mode() == PARTICLE_PASS) {
       if( input.get_particle_storage() == AOS) {
         timers.start_timer("particle pass aos");
@@ -236,6 +238,7 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
 
+    HPCPERF_ROI_END_SYNC();
     timers.stop_timer("Total");
 
 #ifdef caliper_FOUND

@@ -43,6 +43,13 @@ Added here: `build.sh`, `run.sh`, `validate.sh`, `validate_lj.py`, this
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/examinimd.cpp`: the region of interest is the timestep loop of `ExaMiniMD::run` (thermo
+  output included). Excluded inside it: binary dumps and the per-step correctness check. Pure
+  insertions -- no upstream line changed or removed. The markers are a no-op unless
+  `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as before;
+  `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 Upstream last built against Kokkos 3.x/4.0; the project's Kokkos is 5.2.1,
 which removed three things the code relied on. The fixes are the smallest
 edits that compile (no modernisation, no behaviour change):

@@ -43,6 +43,13 @@ Added here: `decks/hpcperf_weibel.cxx`, `build.sh`, `run.sh`, `validate.sh`, thi
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `example/example.cpp`: the region of interest is the PIC step loop, per-step energies included.
+  Excluded inside it: particle/field dumps (compiled out by `build.sh`). Pure insertions -- no
+  upstream line changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a
+  profiler is attached, so build, run and validation behave as before; `build.sh` puts
+  `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 Fixes needed to configure/build out of tree against Cabana 0.8.0 / Kokkos 5.2.1:
 
 - `src/CMakeLists.txt`: link `Cabana::Core` instead of `Cabana::cabanacore`.

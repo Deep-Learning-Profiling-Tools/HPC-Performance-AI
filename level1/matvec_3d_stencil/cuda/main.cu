@@ -8,6 +8,7 @@
 // default problem size, reps, and data initialization.
 // Validation: element-wise comparison of b.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -199,6 +200,7 @@ int main(int argc, char** argv)
 
 #define PASS_X(n) dm.x##n,
 #define PASS_M(n) dm.n,
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, (Index_type)block_size);
     matvec_3d<<<grid_size, block_size>>>(d_b,
@@ -210,35 +212,43 @@ int main(int argc, char** argv)
 #undef PASS_M
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(b, d_b, bytes, cudaMemcpyDeviceToHost));
   cudaFree(d_b); cudaFree(d_x); cudaFree(d_rz);
 #define DFREE(n) cudaFree(dm.n);
   MV3D_ALLOC(DFREE)
 #undef DFREE
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Real_ptr b_r, x_r; Ptrs mr; Index_ptr rz_r;
-  host_setup(b_r, x_r, mr, rz_r);
-  set_x_aliases(mr, x_r, domain.jp, domain.kp);
-  {
-    Real_ptr b = b_r;
-#define LOCAL_X(n) Real_ptr x##n = mr.x##n;
-#define LOCAL_M(n) Real_ptr n = mr.n;
-    MV3D_POS(LOCAL_X)
-    MV3D_POS(LOCAL_M)
-#undef LOCAL_X
-#undef LOCAL_M
-    Index_ptr real_zones = rz_r;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type ii = 0; ii < iend; ++ii ) {
-        MATVEC_3D_STENCIL_BODY_INDEX;
-        MATVEC_3D_STENCIL_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Real_ptr b_r, x_r; Ptrs mr; Index_ptr rz_r;
+    host_setup(b_r, x_r, mr, rz_r);
+    set_x_aliases(mr, x_r, domain.jp, domain.kp);
+    {
+      Real_ptr b = b_r;
+  #define LOCAL_X(n) Real_ptr x##n = mr.x##n;
+  #define LOCAL_M(n) Real_ptr n = mr.n;
+      MV3D_POS(LOCAL_X)
+      MV3D_POS(LOCAL_M)
+  #undef LOCAL_X
+  #undef LOCAL_M
+      Index_ptr real_zones = rz_r;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type ii = 0; ii < iend; ++ii ) {
+          MATVEC_3D_STENCIL_BODY_INDEX;
+          MATVEC_3D_STENCIL_BODY;
+        }
       }
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("b", b_r, b, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("b", b_r, b, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
