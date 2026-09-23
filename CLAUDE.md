@@ -226,8 +226,11 @@ Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contain
   grew 8.9% while the command grew 1.7x) -- which is why the headline is clean.
   No `--cuda-memory-usage` (MiniEM SIGSEGV in cudaFreeAsync).
 - Results go to `results/timing/`, raw evidence to `build/timing/` (both git-ignored):
-  **never commit measurement output**. `bash tools/timing/tests/run_all.sh` is CPU-only.
-  Formats: `tools/timing/SCHEMA.md`.
+  **never commit raw evidence, JSON or CSV**. Every measurement (and `summarize.py`)
+  regenerates the web page `results/timing/report/`; the ONE measurement output that
+  may be committed is the rendered snapshot `docs/timing/` (`tools/timing/report.py
+  --publish`), and only when the user wants it shown. `bash tools/timing/tests/run_all.sh`
+  is CPU-only. Formats: `tools/timing/SCHEMA.md`.
 
 ## Validation principles
 

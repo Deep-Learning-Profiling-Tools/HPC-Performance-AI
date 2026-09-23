@@ -23,6 +23,8 @@
 #   --backend B         CUDA (default) | HIP (UNTESTED)
 #   --keep-verify       do not set HPCPERF_SKIP_VERIFY
 #   --raw-root DIR      raw evidence root (default build/timing)
+#   --results-root DIR  records, CSVs and the web page (default results/timing)
+#   --no-summary        skip the summarize + report step after the runs
 #   --dry-run           print what would run
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,6 +43,8 @@ while [ $# -gt 0 ]; do
         --backend)     BACKEND="${2:?}"; shift 2 ;;
         --keep-verify) SKIP_VERIFY=0; shift ;;
         --raw-root)    RAW_ROOT="${2:?}"; shift 2 ;;
+        --results-root) RESULTS_ROOT="${2:?}"; shift 2 ;;
+        --no-summary)  SUMMARIZE=0; shift ;;
         --dry-run)     DRY_RUN=1; shift ;;
         -h|--help)     awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*)            die "unknown option '$1' (try --help)" ;;

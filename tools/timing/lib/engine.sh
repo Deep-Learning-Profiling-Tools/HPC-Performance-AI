@@ -17,7 +17,8 @@
 #   warmup.<i>/run.log        discarded
 #   clean.<i>/{run.log,run.txt,roi.<pid>}
 #   prof/{run.log,run.txt,roi.<pid>,trace.*}
-# tools/timing/summarize.py turns it into results/timing/.
+# After the cases, the engine runs tools/timing/summarize.py on this run (JSON per case,
+# the per-level CSVs and the web page results/timing/report/) unless SUMMARIZE=0.
 
 ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS="$(cd "$ENGINE_DIR/.." && pwd)"
@@ -28,9 +29,11 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${LEVEL:?}" "${CLEAN_RUNS:=1}" "${WARMUP_RUNS:=0}" "${PROFILED_RUNS:=1}"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
+: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}"
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
+case "$RESULTS_ROOT" in /*) ;; *) RESULTS_ROOT="$PWD/$RESULTS_ROOT" ;; esac
 
 BASE_ALLOW="PATH HOME USER LOGNAME SHELL TERM LANG LC_ALL TMPDIR TZ LD_LIBRARY_PATH
             SLURM_JOB_ID SLURM_JOB_NODELIST SLURM_JOB_NUM_NODES SLURM_JOB_GPUS SLURM_GPUS_ON_NODE
@@ -273,5 +276,10 @@ engine_main() {
         [ "${#f[@]}" -eq 17 ] || engine_die "malformed case row (${#f[@]} fields)"
         measure_case "${f[@]}" < /dev/null || rc_all=1
     done <<< "$rows"
+    if [ "$DRY_RUN" != 1 ] && [ "$SUMMARIZE" = 1 ]; then
+        echo "measure_level${LEVEL}: summarizing run $RUN_ID -> ${RESULTS_ROOT#$REPO/} (JSON, CSV, report/index.html)"
+        python3 "$TOOLS/summarize.py" --raw-root "$RAW_ROOT" --out-root "$RESULTS_ROOT" --run-id "$RUN_ID" \
+            || { echo "measure_level${LEVEL}: summarize failed (raw data kept in ${RAW_ROOT#$REPO/})"; rc_all=1; }
+    fi
     return $rc_all
 }

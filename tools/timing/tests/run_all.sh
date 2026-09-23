@@ -830,5 +830,93 @@ print("ALLOK" if not bad else "\n".join(bad))
 PY
 
 echo
+echo "=== 12: the web page generator (report.py) and the application timer"
+python3 - <<'PY'
+import json, os, glob
+tmp = os.environ["TMP"]
+src = glob.glob(os.path.join(tmp, "res", "level2", "appa", "default", "*.json"))[0]
+r = json.load(open(src))
+r["run_id"] = "r2"
+r["utc"] = "2026-09-23T00:00:00Z"
+r["roi"]["wall_s"] *= 1.10
+r["ops"] = [{"name": "k<int>(float*) <script>alert(1)</script>", "category": "compute", "count": 1,
+             "total_s": 1e-3, "avg_s": 1e-3, "min_s": 1e-3, "max_s": 1e-3, "share": 1.0}]
+json.dump(r, open(os.path.join(os.path.dirname(src), "r2.json"), "w"))
+PY
+R="$TOOLS/report.py"
+python3 "$R" --results-root "$TMP/res" --out "$TMP/rep" >/dev/null 2>&1
+python3 "$R" --results-root "$TMP/res" --out "$TMP/rep2" >/dev/null 2>&1
+if cmp -s "$TMP/rep/index.html" "$TMP/rep2/index.html" && cmp -s "$TMP/rep/README.md" "$TMP/rep2/README.md"; then
+    ok "12a: the same records give byte-identical pages (no wall-clock time in them)"
+else
+    bad "12a: report output is not deterministic"
+fi
+pycheck "12b: latest successful run, change vs previous, escaping, empty-not-zero, attention, Markdown twin" <<'PY'
+import os, re
+tmp = os.environ["TMP"]
+h = open(os.path.join(tmp, "rep", "index.html")).read()
+md = open(os.path.join(tmp, "rep", "README.md")).read()
+bad = []
+if "+10.0%" not in h or "+10.0%" not in md:
+    bad.append("the change against the previous run is not shown")
+if "<script>alert" in h or "&lt;script&gt;" not in h and "alert(1)" in h:
+    bad.append("an operation name was not escaped in the HTML")
+if "<script>alert" in md:
+    bad.append("an operation name was not escaped in the Markdown")
+row = re.search(r'<tr data-key="appa default [^"]*">(.*?)</tr>', h, re.S)
+if not row:
+    bad.append("no appa row")
+else:
+    cells = re.findall(r'<td[^>]*data-v="([^"]*)"', row.group(1))
+    # ROI, share, device busy, host gap, kernels: device columns must be empty with the none collector
+    if cells[2] != "" or cells[3] != "" or cells[4] != "":
+        bad.append(f"device cells of a none-collector run are not empty: {cells[:6]}")
+if "appb" not in h or "roi_missing" not in h:
+    bad.append("a case without a successful run is not listed with its status")
+if not re.search(r"\*\*fail\*\* L2 appb -- latest run .* roi_missing; there is no successful run", md):
+    bad.append("the failure is not in the Markdown attention list")
+if not re.search(r"^\| appa \| .* \| 2 \| \+10\.0% \|$", md, re.M):
+    bad.append("the Markdown row for appa is missing its run count / change")
+if "../../../" in h and "tools/timing" not in h:
+    bad.append("method links")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "12c: application timer: unit scaling, last match wins, ROI difference, missing log" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import summarize
+tmp = os.environ["TMP"]
+p = os.path.join(tmp, "timer.log")
+open(p, "w").write("main    1   9.000e+06\nmain    1   7.402e+06\n")
+bad = []
+t = summarize.extract_app_timer(p, (r"^main\s+1\s+([0-9.eE+-]+)", 1e-6))
+if t["status"] != "ok" or abs(t["value_s"] - 7.402) > 1e-9:
+    bad.append(f"extraction {t}")
+if summarize.extract_app_timer(p, None) is not None:
+    bad.append("an app without a timer pattern got a timer block")
+if summarize.extract_app_timer(os.path.join(tmp, "nope.log"), ("x(1)", 1.0))["status"] != "log_missing":
+    bad.append("missing log")
+import cases
+try:
+    cases.check_app_timer({"app_timer_regex": "(a)(b)", "app_timer_unit": "s", "_where": "t"})
+    bad.append("two capture groups accepted")
+except cases.CaseError:
+    pass
+try:
+    cases.check_app_timer({"app_timer_regex": "(a)", "app_timer_unit": "min", "_where": "t"})
+    bad.append("unknown unit accepted")
+except cases.CaseError:
+    pass
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+out="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res3" --run-id nope --no-report 2>&1 | noise)"
+case "$out" in *"json_written=0 "*) ok "12d: summarize --run-id processes only the named run" ;;
+               *) bad "12d: --run-id filter: $out" ;; esac
+[ ! -e "$TMP/res3/report" ] && ok "12e: --no-report writes no page" || bad "12e: --no-report still wrote report/"
+out="$(bash "$TOOLS/measure_level1.sh" --build-root "$TMP/fb" --dry-run --collector none daxpy 2>&1 | noise)"
+case "$out" in *summarizing*) bad "12f: a dry run summarized" ;;
+               *) ok "12f: a dry run neither measures nor summarizes" ;; esac
+
+echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

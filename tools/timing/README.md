@@ -7,9 +7,13 @@ hardware platforms are added.
 ```bash
 tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 50 benchmarks
 tools/timing/measure_level2.sh all                               # Level 2: 24 applications
-python3 tools/timing/summarize.py                                # JSON per run + CSV per level
+python3 tools/timing/report.py --publish                         # copy the web page into docs/timing/
 bash tools/timing/tests/run_all.sh                               # self-tests, CPU only
 ```
+
+Each measurement ends by summarizing its own run (JSON per case, CSV per level) and
+regenerating the web page `results/timing/report/index.html`; `summarize.py` does the
+same by hand for all raw data.
 
 Requires `bash`, `python3` (standard library only) and a built tree; a profiler
 is optional (NVIDIA: `nsys`, shipped with the CUDA toolkit). Results land in
@@ -81,6 +85,34 @@ A device column is **empty when the platform cannot observe it** (no collector, 
 a category outside the collector's capabilities) -- never 0. A 0 means observed
 and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 
+## The web page
+
+`report.py` renders `results/timing/` as one self-contained page (`index.html`,
+inline CSS and a small sort/filter script; fonts from Google Fonts with system
+fallbacks) plus a Markdown twin (`README.md`) that the repository browser displays.
+Per (level, app, case, platform) it shows the **latest successful run** with the
+columns above, how its ROI changed against the previous successful run, a bar per
+case splitting the process into before-ROI / ROI busy / ROI host gap / excluded /
+after-ROI, the ROI against the application's own timer, the platforms with their
+conformance record and the collectors, and a **Needs attention** list: a latest run
+that failed (the table keeps showing the last good one and says so), a dirty launcher
+audit, ROI vs own timer above 2%, clean-run spread above 5%, a FOM pattern that found
+nothing, a change above 5% against the previous run, profiler inflation above 1.2 and
+set-up dominated Level 2 inputs (ROI under 10% of the process). The output depends only
+on the records, so the same data gives the same bytes.
+
+* **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every
+  `summarize.py` rewrite `results/timing/report/` (git-ignored).
+* **In the repository**: `python3 tools/timing/report.py --publish` writes the same page
+  to `docs/timing/`; committing it is the deliberate step that shows it. That snapshot is
+  the only measurement output that enters git -- raw evidence, JSON and CSV never do.
+  GitHub shows `docs/timing/README.md`; `index.html` needs a browser (or GitHub Pages
+  serving `docs/`).
+
+The "vs own timer" column comes from `app_timer_regex` / `app_timer_unit` in
+`cases/level2_apps.tsv`: the timer an application prints for exactly the region its
+markers enclose (8 applications). It checks the marker placement; it is not a metric.
+
 ## Cases: many inputs per application, new applications
 
 A measurement's identity is `(level, app, case, platform)`. Cases live in
@@ -92,7 +124,7 @@ tabs); `cases.py` resolves them into the rows the engine runs:
 | `level1.tsv` | generated from ctest by `gen_cases.py` -- one case per ctest test (`default` when a benchmark has one) |
 | `level1_extra.tsv` | Level 1 inputs ctest does not know (e.g. `all_pairs_distance/n20000`) |
 | `level1_apps.tsv` | per benchmark: suite, backends, `roi_excludes`, `verify_vs_roi` |
-| `level2_apps.tsv` | per application: backends, timeout, FOM pattern, `roi_excludes` |
+| `level2_apps.tsv` | per application: backends, timeout, FOM pattern, `roi_excludes`, own-timer pattern |
 | `level2_cases.tsv` | Level 2 cases: GPUs, input variables, arguments, timeout, FOM override |
 
 * **Inputs are explicit.** A case sets only variables its `run.sh` reads
@@ -219,7 +251,10 @@ C11 / gnu11 / C++17 / ROCTX / no-annotation modes with nesting, cross-file state
 flushing past the buffer and default-off, the Fortran and Python APIs, that every
 Level 1/2 source carries markers and every build sees the header, the front-ends,
 the clean environment and deny rule with planted credentials, that AMD/TPU
-interfaces refuse instead of guessing, `gen_cases.py`, and FOM extraction.
+interfaces refuse instead of guessing, `gen_cases.py`, FOM extraction, and the web
+page (byte-identical for the same records, latest-run selection, change against the
+previous run, HTML/Markdown escaping, empty-not-zero cells, the application timer,
+`--run-id`, no summary on a dry run) -- 44 checks.
 
 ## Scope and what is UNVERIFIED
 

@@ -4,11 +4,13 @@
     tools/timing/summarize.py                   # scan build/timing, write results/timing
     tools/timing/summarize.py --raw-root DIR --out-root DIR
     tools/timing/summarize.py --csv-only        # rebuild the CSVs from existing JSONs
+    tools/timing/summarize.py --run-id ID       # only that run's raw data (the engine does this)
 
 Input : <raw-root>/level<L>/<app>/<case>/<run_id>/   (tools/timing/lib/engine.sh)
 Output: <out-root>/level<L>/<app>/<case>/<run_id>.json   schema hpcperf-timing-2
         <out-root>/summary_level<L>.csv  one row per run      (regenerated, never appended)
         <out-root>/ops_level<L>.csv      one row per (run, device op inside the ROI)
+        <out-root>/report/               the web page + Markdown twin (report.py), unless --no-report
 
 Levels are kept in separate files so runs measured under different protocols are never
 averaged by accident. Level 0 is the conformance probe (probes/conformance/).
@@ -47,7 +49,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import analysis  # noqa: E402
+import cases as case_tables  # noqa: E402
 import collectors  # noqa: E402
+import report  # noqa: E402
 from collectors import CATEGORIES, COPY_CATEGORIES  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -55,6 +59,7 @@ SCHEMA = "hpcperf-timing-2"
 RAW_SCHEMA = "hpcperf-timing-raw-2"
 PLATFORMS = os.path.join(HERE, "platforms")
 INFLATION_NOTE = 1.2      # profiled ROI / clean ROI above this gets a caveat
+APP_TIMER_NOTE = 0.02     # ROI vs the application's own timer for the same region
 HOST_GAP_TOLERANCE = 0.01  # a negative host gap within 1% of the ROI is timing noise
 
 COLUMNS = [
@@ -80,11 +85,13 @@ COLUMNS = [
     "collector", "collector_version", "conformance",
     "host_cpu_model", "host_cpus_allowed", "host_loadavg_1m",
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
+    "app_timer_s", "roi_vs_app_timer",
 ]
 OPS_COLUMNS = ["level", "app", "case", "platform", "run_id", "op", "category", "count",
                "total_s", "avg_s", "min_s", "max_s", "share"]
 
 finite = analysis.finite
+APP_TIMERS = case_tables.app_timers()
 
 
 # ----------------------------------------------------------------- small helpers
@@ -153,6 +160,24 @@ def extract_fom(log_path, meta):
         return out
     out["value"] = finite("fom", float(matches[-1].replace(",", "")))   # xsbench prints 1,234,567
     out["status"] = "ok"
+    return out
+
+
+def extract_app_timer(log_path, spec):
+    """The application's own timer for the region its ROI marks (cases/level2_apps.tsv).
+    A cross-check of the marker placement, not a metric: None when the app has none."""
+    if not spec:
+        return None
+    regex, scale = spec
+    out = {"regex": regex, "value_s": None, "roi_diff_frac": None, "status": "not_matched"}
+    if not log_path or not os.path.isfile(log_path):
+        out["status"] = "log_missing"
+        return out
+    with open(log_path, errors="replace") as f:
+        matches = re.findall(regex, f.read(), re.M)
+    if matches:
+        out["value_s"] = finite("app timer", float(matches[-1].replace(",", "")) * scale)
+        out["status"] = "ok"
     return out
 
 
@@ -265,6 +290,13 @@ def build_record(raw):
     clean0_log = os.path.join(runs[0]["dir"], "run.log") if runs else None
     fom = extract_fom(clean0_log, meta)
     audit, audit_ok = launcher_audit(clean0_log)
+    app_timer = extract_app_timer(clean0_log, APP_TIMERS.get(meta["app"])) if level == 2 else None
+    if app_timer and app_timer["value_s"] and roi["wall_s"]:
+        diff = finite("roi vs app timer", (roi["wall_s"] - app_timer["value_s"]) / app_timer["value_s"])
+        app_timer["roi_diff_frac"] = diff
+        if abs(diff) > APP_TIMER_NOTE:
+            caveats.append(f"The ROI ({roi['wall_s']:.6f} s) differs by {100 * diff:+.2f}% from the application's "
+                           f"own timer for the same region ({app_timer['value_s']:.6f} s): check the markers.")
     if fom["status"] == "not_matched":
         caveats.append(f"The case expects a FOM named {fom['name']!r} but its pattern did not match the "
                        f"clean run's output; left empty rather than guessed.")
@@ -366,6 +398,7 @@ def build_record(raw):
         "ops": ops,
         "context": dict(context, whole_process=whole),
         "fom": fom,
+        "app_timer": app_timer,
         "launcher": {"audit": audit, "audit_ok": audit_ok},
         "platform_info": {"device": device_info, "host": host_info, "conformance": conformance},
         "profiler": {k: v for k, v in prof_info.items() if k != "recorded_env_names"} |
@@ -439,6 +472,8 @@ def flatten(rec):
         "host_loadavg_1m": v(host.get("loadavg_1m")),
         "exe_sha256": v(rec["inputs"]["exe_sha256"]), "git_commit": v(rec["provenance"]["git_commit"]),
         "git_dirty": int(rec["provenance"]["git_dirty"]), "raw_dir": rec["provenance"]["raw_dir"],
+        "app_timer_s": v((rec.get("app_timer") or {}).get("value_s")),
+        "roi_vs_app_timer": v((rec.get("app_timer") or {}).get("roi_diff_frac")),
     })
     for c in CATEGORIES:
         row[f"device_{c}_s"] = v(dev.get(f"{c}_s")) if dev else ""
@@ -508,6 +543,8 @@ def main(argv=None):
     ap.add_argument("--raw-root", default=os.path.join(REPO, "build", "timing"))
     ap.add_argument("--out-root", default=os.path.join(REPO, "results", "timing"))
     ap.add_argument("--csv-only", action="store_true", help="rebuild the CSVs from existing JSONs")
+    ap.add_argument("--run-id", action="append", default=[], help="only these runs' raw data (repeatable)")
+    ap.add_argument("--no-report", action="store_true", help="do not regenerate <out-root>/report/")
     a = ap.parse_args(argv)
 
     written = failed = 0
@@ -516,6 +553,8 @@ def main(argv=None):
             print(f"summarize: no raw directory {a.raw_root}", file=sys.stderr)
             return 1
         for raw in raw_dirs(a.raw_root):
+            if a.run_id and os.path.basename(raw) not in a.run_id:
+                continue
             try:
                 rec = build_record(raw)
             except Exception as exc:  # noqa: BLE001 -- report and keep going
@@ -542,6 +581,8 @@ def main(argv=None):
         ok = sum(1 for r in recs if r["status"] == "ok")
         fom = sum(1 for r in recs if r["fom"]["status"] == "ok")
         print(f"           level{level}: {len(recs)} runs, {ok} ok, {len(recs) - ok} not ok, fom_ok={fom}")
+    if not a.no_report:
+        outs += report.write(a.out_root, os.path.join(a.out_root, "report"))
     for p in outs:
         print(f"           {os.path.relpath(p, REPO)}")
     return 1 if failed else 0

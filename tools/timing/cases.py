@@ -83,7 +83,8 @@ L1_CASE_COLS = ("app", "case", "exe", "args", "cwd", "timeout_s", "wrapper", "pa
 L1_EXTRA_COLS = ("app", "case", "args", "env", "timeout_s", "notes")
 L1_APP_COLS = ("app", "suite", "backends", "roi_excludes", "verify_vs_roi", "extra_env", "notes")
 L2_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_better", "fom_source",
-               "fom_regex", "extra_env", "roi_excludes", "notes")
+               "fom_regex", "extra_env", "roi_excludes", "app_timer_regex", "app_timer_unit", "notes")
+APP_TIMER_UNITS = {"s": 1.0, "ms": 1e-3, "us": 1e-6}
 L2_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "notes")
 
 
@@ -212,8 +213,36 @@ def level1_rows(build_root, backend):
 
 # ----------------------------------------------------------------- level 2
 
+def check_app_timer(app):
+    """The application's own timer for the region its ROI marks: one capture group, a known unit."""
+    rx, unit = app["app_timer_regex"], app["app_timer_unit"]
+    if not rx and not unit:
+        return
+    if not rx or unit not in APP_TIMER_UNITS:
+        raise CaseError(f"{app['_where']}: app_timer_regex and app_timer_unit ({'|'.join(APP_TIMER_UNITS)}) "
+                        f"go together")
+    try:
+        groups = re.compile(rx, re.M).groups
+    except re.error as exc:
+        raise CaseError(f"{app['_where']}: app_timer_regex does not compile: {exc}")
+    if groups != 1:
+        raise CaseError(f"{app['_where']}: app_timer_regex needs exactly one capture group")
+
+
+def app_timers():
+    """{app: (regex, seconds per unit)} for the Level 2 applications that print a timer for their ROI."""
+    out = {}
+    for r in read_table("level2_apps.tsv", L2_APP_COLS):
+        check_app_timer(r)
+        if r["app_timer_regex"]:
+            out[r["app"]] = (r["app_timer_regex"], APP_TIMER_UNITS[r["app_timer_unit"]])
+    return out
+
+
 def level2_rows(backend):
     apps = {r["app"]: r for r in read_table("level2_apps.tsv", L2_APP_COLS)}
+    for app in apps.values():
+        check_app_timer(app)
     cases = read_table("level2_cases.tsv", L2_CASE_COLS)
     out, seen = [], set()
     for r in cases:

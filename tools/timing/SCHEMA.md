@@ -10,7 +10,8 @@ than guessing; a change of meaning is a new version.
 | canonical activity model | (code: `collectors/__init__.py`) | collector adapters | `analysis.py` |
 | device descriptor | `hpcperf-device-1` | `probes/device.py` | the engine, `summarize.py` |
 | platform record | (`platforms/<platform>.json`) | `probes/conformance/check.py` | `summarize.py` |
-| run record | `hpcperf-timing-2` | `summarize.py` | you |
+| run record | `hpcperf-timing-2` | `summarize.py` | you, `report.py` |
+| web page | (`index.html` + `README.md`) | `report.py` | a browser / the repository browser |
 
 ## ROI log, version 2
 
@@ -131,6 +132,7 @@ the collector must reproduce it exactly (`expected.json`).
 | `ops` | per device operation inside the ROI: name, category, count, total / avg / min / max, share |
 | `context` | `process_wall_s`, `pre_roi_s`, `post_roi_s`, `whole_process` (device activity of the whole run) -- context only, never the headline |
 | `fom` | the application's own metric from the clean run: name, value, unit, better, source, regex, status (`ok`, `none`, `not_matched`, `log_missing`) |
+| `app_timer` | Level 2 only, null when the application prints no timer for its ROI region: `regex` (from `cases/level2_apps.tsv` at summarize time), `value_s` (clean run, last match), `roi_diff_frac` = (ROI - timer) / timer, `status`; a difference above 2% is caveated |
 | `launcher` | the common launcher's GPU-binding audit line and whether it is clean |
 | `platform_info` | device descriptor, host, conformance record |
 | `profiler` | collector metadata; `recorded_env_name_count` (names only -- values are never read) |
@@ -138,6 +140,7 @@ the collector must reproduce it exactly (`expected.json`).
 | `caveats` | every condition that limits how a number may be read, in words |
 
 `summary_level<L>.csv` flattens one record per row with a fixed column list
-(`summarize.py: COLUMNS`); `ops_level<L>.csv` has one row per (run, operation).
+(`summarize.py: COLUMNS`, new columns are only ever appended: `app_timer_s`,
+`roi_vs_app_timer`); `ops_level<L>.csv` has one row per (run, operation).
 Levels are separate files so runs under different protocols are never averaged
 together. Both are regenerated from the JSONs, never appended.
