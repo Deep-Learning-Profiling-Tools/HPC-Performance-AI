@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hpcperf_roi.h"
 #include "../bude.h"
 #include "hip/hip_runtime.h"
 #include <iostream>
@@ -237,6 +238,7 @@ public:
     size_t shared = p.ntypes() * sizeof(FFParams);
 
     for (size_t i = 0; i < p.totalIterations(); ++i) {
+      if (i == p.warmupIterations) HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed iterations, not the warm-up ones
       auto kernelStart = now();
       hipLaunchKernelGGL(HIP_KERNEL_NAME(fasten_main<PPWI>), dim3(global), dim3(local), shared, 0,           //
                          p.natlig(), p.natpro(), protein, ligand,                                            //
@@ -246,6 +248,7 @@ public:
       auto kernelEnd = now();
       sample.kernelTimes.emplace_back(kernelStart, kernelEnd);
     }
+    HPCPERF_ROI_END_SYNC();
 
     checkError(
         hipMemcpy(sample.energies.data(), results, sample.energies.size() * sizeof(float), hipMemcpyDeviceToHost));

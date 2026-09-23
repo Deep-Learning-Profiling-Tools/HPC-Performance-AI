@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -5,6 +6,16 @@
 #include <random>
 #include <cuda.h>
 #include "reference.h"
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 #define BLOCK_SIZE 256
 
@@ -122,11 +133,14 @@ int main(int argc, char* argv[]) {
 
   long time = 0;
 
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the frame loop; frame generation and CPU reference excluded
   for (int i = 0; i < repeat; i++) {
 
+    HPCPERF_ROI_EXCLUDE_BEGIN();  // synthetic frame generation (a camera in real use)
     for (int j = 0; j < imgSize; j++) {
       Img[j] = distribute(generator);
     }
+    HPCPERF_ROI_EXCLUDE_END();
 
     cudaMemcpy(d_Img, Img, imgSize_bytes, cudaMemcpyHostToDevice);
 
@@ -160,9 +174,13 @@ int main(int argc, char* argv[]) {
         auto end = std::chrono::steady_clock::now();
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
-      merge_ref ( imgSize, Img, Img1, Img2, Tn_ref, Bn_ref );
+  HPCPERF_ROI_EXCLUDE_BEGIN();  // the CPU reference is not the computation
+  if (!hpcperf_skip_verify())
+  merge_ref ( imgSize, Img, Img1, Img2, Tn_ref, Bn_ref );
+  HPCPERF_ROI_EXCLUDE_END();
     }
   }
+  HPCPERF_ROI_END_SYNC();
 
   float kernel_time = (repeat <= 2) ? 0 : (time * 1e-3f) / (repeat - 2);
   printf("Average kernel execution time: %f (us)\n", kernel_time);
@@ -170,6 +188,9 @@ int main(int argc, char* argv[]) {
   cudaMemcpy(Tn, d_Tn, imgSize_bytes, cudaMemcpyDeviceToHost);
   cudaMemcpy(Bn, d_Bn, imgSize_bytes, cudaMemcpyDeviceToHost);
 
+  if (hpcperf_skip_verify()) {
+    printf("SKIP_VERIFY\n");
+  } else {
   // verification
   int max_error = 0;
   for (int i = 0; i < imgSize; i++) {
@@ -183,6 +204,7 @@ int main(int argc, char* argv[]) {
   printf("Max error is %d\n", max_error);
 
   printf("%s\n", max_error ? "FAIL" : "PASS");
+  }
 
   free(Img);
   free(Img1);

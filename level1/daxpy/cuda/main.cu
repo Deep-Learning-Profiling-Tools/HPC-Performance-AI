@@ -5,6 +5,7 @@
 // run with the upstream default problem size, rep count, and data
 // initialization. Validation: element-wise comparison of GPU vs CPU result.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream DAXPY.hpp
@@ -47,16 +48,24 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(dy, y, size * sizeof(Real_type), cudaMemcpyHostToDevice));
   GPU_CHECK(cudaMemcpy(dx, x, size * sizeof(Real_type), cudaMemcpyHostToDevice));
 
+  HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
   for (Index_type irep = 0; irep < run_reps; ++irep) {
     const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, block_size);
     daxpy<<<grid_size, block_size>>>(dy, dx, a, iend);
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(y, dy, size * sizeof(Real_type), cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaFree(dx));
   GPU_CHECK(cudaFree(dy));
 
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
   // ------------------------ CPU (upstream Base_Seq) ------------------------
   resetDataInitCount();
   Real_ptr y_ref; Real_ptr x_ref; Real_type a_ref;
@@ -73,10 +82,12 @@ int main(int argc, char** argv)
   }
 
   // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("y", y_ref, y, size, 1.0e-10);
+  ok = compareArrays("y", y_ref, y, size, 1.0e-10);
   printf("%s\n", ok ? "PASS" : "FAIL");
 
-  deallocData(y); deallocData(x);
   deallocData(y_ref); deallocData(x_ref);
+  }
+
+  deallocData(y); deallocData(x);
   return ok ? 0 : 1;
 }

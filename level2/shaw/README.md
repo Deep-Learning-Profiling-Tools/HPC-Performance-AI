@@ -59,6 +59,13 @@ Added here: `build.sh`, `run.sh`, `validate.sh`, this `README.md`.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/kokkos/fom_run.hpp`: the region of interest is the time loop (upstream's `loopTime`).
+  Excluded inside it: snapshot/seismogram data collection (device-to-host copies and storage). Pure
+  insertions -- no upstream line changed or removed. The markers are a no-op unless
+  `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as before;
+  `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 Source (needed to compile against Kokkos / Kokkos Kernels 5.2.1 with CUDA;
 upstream targeted Kokkos 3.x):
 

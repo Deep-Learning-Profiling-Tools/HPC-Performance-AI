@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 // =============================================================
 
+#include "hpcperf_roi.h"
 #include <cuda.h>
 #include "GSimulation.hpp"
 #include "GSimulationKernels.hpp"
@@ -115,6 +116,7 @@ void GSimulation::Start() {
   TimeInterval t0;
   int nsteps = get_nsteps();
   // Looping across integration steps
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: all integration steps
   for (int s = 1; s <= nsteps; ++s) {
     TimeInterval ts0;
 
@@ -146,6 +148,7 @@ void GSimulation::Start() {
       }
     }
   }  // end of the time step loop
+  HPCPERF_ROI_END_SYNC();
   total_time_ = t0.Elapsed();
   total_flops_ = gflops * get_nsteps();
   av /= (double)(nf - 2);

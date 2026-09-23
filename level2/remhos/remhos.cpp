@@ -29,6 +29,7 @@
 //
 // Sample runs: see README.md, section 'Verification of Results'.
 
+#include "hpcperf_roi.h"
 #include "mfem.hpp"
 #include <fstream>
 #include <iostream>
@@ -1131,6 +1132,8 @@ MFEM_EXPORT int remhos(int argc, char *argv[], double &final_mass_u)
 #ifdef REMHOS_USE_CALIPER
    CALI_CXX_MARK_LOOP_BEGIN(mainloop, "rem.mainloop");
 #endif
+   // tools/timing ROI: the time loop (step prints inside; visualization and VisIt excluded)
+   HPCPERF_ROI_BEGIN_SYNC();
    while (done == false)
    {
 #ifdef REMHOS_USE_CALIPER
@@ -1293,6 +1296,7 @@ MFEM_EXPORT int remhos(int argc, char *argv[], double &final_mass_u)
 
          if (visualization)
          {
+            HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             int Wx = 0, Wy = 0; // window position
             int Ww = 400, Wh = 400; // window size
             VisualizeField(sout, vishost, visport, u, "Solution",
@@ -1306,16 +1310,20 @@ MFEM_EXPORT int remhos(int argc, char *argv[], double &final_mass_u)
                VisualizeField(vis_us, vishost, visport, us, "Solution u_s",
                               Wx + 2*Ww, Wy, Ww, Wh);
             }
+            HPCPERF_ROI_EXCLUDE_END();
          }
 
          if (visit)
          {
+            HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             dc->SetCycle(ti);
             dc->SetTime(t);
             dc->Save();
+            HPCPERF_ROI_EXCLUDE_END();
          }
       }
    }
+   HPCPERF_ROI_END_SYNC();
 #ifdef REMHOS_USE_CALIPER
    CALI_CXX_MARK_LOOP_END(mainloop);
 #endif

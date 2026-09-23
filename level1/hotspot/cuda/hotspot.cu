@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -325,8 +326,10 @@ void run(int argc, char** argv)
     cudaMalloc((void**)&MatrixPower, sizeof(float)*size);
     cudaMemcpy(MatrixPower, FilesavingPower, sizeof(float)*size, cudaMemcpyHostToDevice);
     printf("Start computing the transient temperature\n");
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: compute_tran_temp (all simulation iterations)
     int ret = compute_tran_temp(MatrixPower,MatrixTemp,grid_cols,grid_rows, \
 	 total_iterations,pyramid_height, blockCols, blockRows, borderCols, borderRows);
+    HPCPERF_ROI_END_SYNC();
 	printf("Ending simulation\n");
     cudaMemcpy(MatrixOut, MatrixTemp[ret], sizeof(float)*size, cudaMemcpyDeviceToHost);
 

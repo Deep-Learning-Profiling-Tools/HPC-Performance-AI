@@ -3,6 +3,7 @@
 // domain. The author hereby disclaims copyright to this source code.
 //-------------------------------------------------------------------------
 
+#include "hpcperf_roi.h"
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -10,6 +11,16 @@
 #include <cassert>
 #include <chrono>
 #include <cuda.h>
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 #define BLOCK_SIZE 256
 
@@ -154,7 +165,8 @@ int main(int argc, char** argv)
     for (uint32_t c = 0; c < length[i]; c++) {
       keys[i][c] = c % 256;
     }
-    MurmurHash3_x64_128 (keys[i], length[i], i, out[i]);
+    if (!hpcperf_skip_verify())
+      MurmurHash3_x64_128 (keys[i], length[i], i, out[i]);  /* host reference only */
 #ifdef DEBUG
     printf("%lu %lu\n", out[i][0], out[i][1]);
 #endif
@@ -204,18 +216,23 @@ int main(int argc, char** argv)
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (uint32_t n = 0; n < repeat; n++)  
     MurmurHash3_x64_128_kernel<<<gridDim, blockDim>>>(
       dev_keys, dev_length, key_length, dev_out, numKeys);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   cudaMemcpy(d_out, dev_out, sizeof(uint64_t)*(numKeys*2), cudaMemcpyDeviceToHost);
 
+  if (hpcperf_skip_verify()) {
+    printf("SKIP_VERIFY\n");
+  } else {
   // verify
   bool error = false;
   for (uint32_t i = 0; i < numKeys; i++) {
@@ -226,6 +243,7 @@ int main(int argc, char** argv)
   }
   if (error) printf("FAIL\n");
   else printf("SUCCESS\n");
+  }
 
   for (uint32_t i = 0; i < numKeys; i++) {
     free(out[i]);

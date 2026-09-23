@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <Cabana_Core.hpp>
 #include <Cabana_AoSoA.hpp>
 #include <Cabana_Sort.hpp> // is this needed if we already have core?
@@ -225,6 +226,8 @@ int main( int argc, char* argv[] )
         }
 
         // Main loop
+        // tools/timing ROI: the PIC step loop (per-step energies inside; particle/field dumps excluded)
+        HPCPERF_ROI_BEGIN_SYNC();
         for (int step = 1; step <= num_steps; step++)
         {
             //printf("Step %d \n", step);
@@ -286,14 +289,17 @@ int main( int argc, char* argv[] )
 #if PARTICLE_DUMP_INTERVAL > 0
             if( step % PARTICLE_DUMP_INTERVAL == 0 )
             {
+            HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             fprintf(fpfd,"#step=%d\n",step);
             field_solver.dump_fields(fpfd,fields, 0, 0, 0, dx,dy,dz,nx,ny,nz,num_ghosts );
             fprintf(fptr,"#step=%d\n%e ",step,step*dt);
             dump_particles( fptr, particles, 0, 0, 0, dx,dy,dz,nx,ny,nz,num_ghosts );
+            HPCPERF_ROI_EXCLUDE_END();
             }
 #endif
 
         }
+        HPCPERF_ROI_END_SYNC();
 
         fclose(fptr);
         fclose(fpfd);

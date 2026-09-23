@@ -26,6 +26,9 @@ else()
     message(FATAL_ERROR "BACKEND '${BACKEND}' not available: upstream Rodinia has no HIP implementation (HIP pending)")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(backprop_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     add_test(NAME backprop_run COMMAND backprop_cuda 65536)
     set_tests_properties(backprop_run PROPERTIES TIMEOUT 600

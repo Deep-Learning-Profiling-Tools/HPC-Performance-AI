@@ -49,6 +49,7 @@
 #ifndef LEAP_FROG_RUN_FOM_HPP_
 #define LEAP_FROG_RUN_FOM_HPP_
 
+#include "hpcperf_roi.h"
 #include "fom_update_kernels.hpp"
 #include "fom_complexities.hpp"
 
@@ -93,6 +94,8 @@ void runFom(const step_t & numSteps,
 
   //****** LOOP ******//
   const auto startTime  = std::chrono::high_resolution_clock::now();
+  // tools/timing ROI: the time loop; snapshot/seismogram data collection is excluded
+  HPCPERF_ROI_BEGIN_SYNC();
   sc_t timeVp = constants<sc_t>::zero();
   for (auto iStep = 1; iStep<=numSteps; ++iStep)
   {
@@ -111,6 +114,7 @@ void runFom(const step_t & numSteps,
     const double ct2 = timer.seconds();
     timer.reset();
     if (snapshotsCollectionEnabled or seismogramEnabled){
+      HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
       // deep copy already fences so no need to explicitly fence
       Kokkos::deep_copy(xVp_h, xVp_d);
     }
@@ -119,6 +123,7 @@ void runFom(const step_t & numSteps,
     }
     observerObj.observe(dofId::vp, iStep, xVp_h);
     seismoObj.storeVelocitySignalAtReceivers(iStep, xVp_h);
+    HPCPERF_ROI_EXCLUDE_END();   // no-op when collection is disabled
     dataCollectionTime += timer.seconds();
 
     // update time
@@ -132,12 +137,14 @@ void runFom(const step_t & numSteps,
     const double ct3 = timer.seconds();
     timer.reset();
     if (snapshotsCollectionEnabled){
+      HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
       Kokkos::deep_copy(xSp_h, xSp_d);
     }
     else{
       Kokkos::fence();
     }
     observerObj.observe(dofId::sp, iStep, xSp_h);
+    HPCPERF_ROI_EXCLUDE_END();   // no-op when collection is disabled
     dataCollectionTime += timer.seconds();
 
     // ----------------
@@ -148,6 +155,7 @@ void runFom(const step_t & numSteps,
     perfTimes[2] += time;
   }
 
+  HPCPERF_ROI_END_SYNC();
   const auto finishTime = std::chrono::high_resolution_clock::now();
   const std::chrono::duration<double> elapsed = finishTime - startTime;
   std::cout << "\nloopTime = " << std::fixed << std::setprecision(10) << elapsed.count();

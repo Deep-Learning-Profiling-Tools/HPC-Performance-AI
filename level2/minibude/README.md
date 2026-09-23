@@ -33,6 +33,14 @@ model's directory is ever read, so `-DMODEL=cuda|hip` works with this reduced tr
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/{cuda,hip}/fasten.hpp`: the region of interest is the timed iterations after
+  `warmupIterations` (BEGIN sits in the loop at `i == p.warmupIterations`; the default `-p all` runs
+  8 PPWI variants, so a run has 8 ROI entries whose times add up). Pure insertions -- no upstream
+  line changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 - `src/cuda/model.cmake` (macro `setup`): `cmake_policy(SET CMP0104 OLD)` replaced by
   `cmake_policy(SET CMP0104 NEW)` plus `set(CMAKE_CUDA_ARCHITECTURES OFF CACHE STRING ...)`.
   Reason: with CMake 3.28 the OLD policy emits a "CMake Deprecation Warning" at configure time. The

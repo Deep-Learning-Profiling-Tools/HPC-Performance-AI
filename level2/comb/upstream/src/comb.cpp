@@ -13,6 +13,7 @@
 // Please also see the LICENSE file for MIT license.
 //////////////////////////////////////////////////////////////////////////////
 
+#include "hpcperf_roi.h"
 #include "comb.hpp"
 #include "CommFactory.hpp"
 
@@ -907,6 +908,7 @@ int main(int argc, char** argv)
 
   // warm-up memory pools
   COMB::warmup(exec, alloc, tm, num_vars+1, info.totallen);
+  HPCPERF_ROI_BEGIN_SYNC();   // tools/timing ROI: the copy test and the communication cycles
 
   COMB::test_copy(comminfo, exec, alloc, tm, num_vars, info.totallen, ncycles);
 
@@ -951,6 +953,7 @@ int main(int argc, char** argv)
 
   }
 
+  HPCPERF_ROI_END_SYNC();
 #ifdef COMB_ENABLE_CALIPER
   CALI_MARK_FUNCTION_END;
   mgr.flush();

@@ -99,6 +99,10 @@ timing protocol, not a deletion gate. Raw runs:
 `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level1-background_subtraction/`
 (the 5-run re-measurement is `w4096-h2048-merged0-r102.remeasure-5reps/`).
 
+**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: the frame loop; frame generation and CPU reference excluded. The synthetic frame generation and the CPU reference (`merge_ref`) inside the frame loop are excluded. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 180 (2 source files, cloc, cuda/ + common/)

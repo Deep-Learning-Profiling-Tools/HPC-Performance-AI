@@ -29,6 +29,13 @@ used for validation). Output is HDF5 + XDMF particle dumps.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/ExaMPM_Solver.hpp`: the region of interest is the time loop of `Solver::solve`. Excluded
+  inside it: the initial and the periodic particle output. Pure insertions -- no upstream line
+  changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 One source change, needed to compile against Cabana 0.8.0 (upstream targets
 Cabana >= 0.6.1, where `createLocalMesh` still accepted an execution space or
 device type; Cabana 0.8's `LocalMesh` has

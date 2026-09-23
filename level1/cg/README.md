@@ -53,6 +53,8 @@ Run it via:
 ctest --test-dir build/cg/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/cg.cu` and the HIP port: the timed power-method iterations (NPB's timed region). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 1741 (8 source files, cloc, cuda/ + common/)

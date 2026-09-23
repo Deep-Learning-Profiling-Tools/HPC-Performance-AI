@@ -4,6 +4,7 @@
  *
  */
 
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <sys/time.h>
 #include <float.h>
@@ -145,6 +146,7 @@ int main(int argc, char* argv[])
     /**
     * Execute kernel
     */
+    HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: distance kernel, copy back, host k-nearest selection
     euclid<<< gridDim, threadsPerBlock >>>(d_locations,d_distances,numRecords,lat,lng);
     cudaDeviceSynchronize();
 
@@ -153,6 +155,7 @@ int main(int argc, char* argv[])
 
 	// find the resultsCount least distances
     findLowest(records,distances,numRecords,resultsCount);
+    HPCPERF_ROI_END_SYNC();
 
     // print out results
     if (!quiet)

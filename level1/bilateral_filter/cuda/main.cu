@@ -1,9 +1,20 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
 #include <chrono>
 #include "reference.h"
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 template<int R>
 __global__ void bilateralFilter(
@@ -115,12 +126,14 @@ int main(int argc, char *argv[]) {
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<3><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
@@ -129,6 +142,7 @@ int main(int argc, char *argv[]) {
 
   // verify
   bool ok = true;
+  if (!hpcperf_skip_verify()) {
   reference<3>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
@@ -136,21 +150,25 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
+  }
 
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<6><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
+  if (!hpcperf_skip_verify()) {
   reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
@@ -158,21 +176,25 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
+  }
 
   cudaDeviceSynchronize();
   start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     bilateralFilter<9><<<blocks, threads>>>(
         d_src, d_dst, w, h, a_square, variance_I, variance_spatial);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   end = std::chrono::steady_clock::now();
   time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
 
+  if (!hpcperf_skip_verify()) {
   reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
@@ -180,7 +202,8 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
+  }
+  printf("%s\n", hpcperf_skip_verify() ? "SKIP_VERIFY" : (ok ? "PASS" : "FAIL"));
 
   free(h_dst);
   free(r_dst);

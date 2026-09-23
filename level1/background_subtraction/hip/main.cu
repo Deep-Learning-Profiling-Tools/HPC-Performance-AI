@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -122,11 +123,14 @@ int main(int argc, char* argv[]) {
 
   long time = 0;
 
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the frame loop; frame generation and CPU reference excluded
   for (int i = 0; i < repeat; i++) {
 
+    HPCPERF_ROI_EXCLUDE_BEGIN();  // synthetic frame generation (a camera in real use)
     for (int j = 0; j < imgSize; j++) {
       Img[j] = distribute(generator);
     }
+    HPCPERF_ROI_EXCLUDE_END();
 
     hipMemcpy(d_Img, Img, imgSize_bytes, hipMemcpyHostToDevice);
 
@@ -160,9 +164,12 @@ int main(int argc, char* argv[]) {
         auto end = std::chrono::steady_clock::now();
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
+      HPCPERF_ROI_EXCLUDE_BEGIN();  // the CPU reference is not the computation
       merge_ref ( imgSize, Img, Img1, Img2, Tn_ref, Bn_ref );
+      HPCPERF_ROI_EXCLUDE_END();
     }
   }
+  HPCPERF_ROI_END_SYNC();
 
   float kernel_time = (repeat <= 2) ? 0 : (time * 1e-3f) / (repeat - 2);
   printf("Average kernel execution time: %f (us)\n", kernel_time);

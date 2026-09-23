@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 */
 
 
+#include "hpcperf_roi.h"
 #include "hip/hip_runtime.h"
 #include <iostream>
 #include "utils.hh"
@@ -118,6 +119,7 @@ int main(int argc, char** argv)
    }
    hipMemcpy(tallies_d,tallies,sizeof(uint64_cu)*NUM_TALLIES*replications,hipMemcpyHostToDevice);
 
+   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: all nSteps cycles
    for (int ii=0; ii<nSteps; ++ii)
    {
       cycleInit( bool(loadBalance) );
@@ -133,6 +135,7 @@ int main(int argc, char** argv)
    }
 
 
+   HPCPERF_ROI_END_SYNC();
    MC_FASTTIMER_STOP(MC_Fast_Timer::main);
 
    gameOver();

@@ -33,6 +33,12 @@ and upstream CI files were not copied.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `source/{cuda,hip}/main.cc`: the region of interest is the `nSteps` cycle loop. Pure insertions --
+  no upstream line changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a
+  profiler is attached, so build, run and validation behave as before; `build.sh` puts
+  `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 1. `source/{cuda,hip}/EnergySpectrum.hh` and
    `source/{cuda,hip}/Parameters.hh` include `<cstdint>` explicitly. This
    fixes modern compiler failures for fixed-width integer types. Numerical

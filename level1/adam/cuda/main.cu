@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -5,6 +6,16 @@
 #include <chrono>
 #include <random>
 #include "reference.h"
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 template <typename T, typename G>
 __global__
@@ -102,6 +113,7 @@ int main(int argc, char* argv[])
 
   cudaDeviceSynchronize();
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++) {
     adam<float, float><<<grids, blocks>>> (
@@ -117,6 +129,7 @@ int main(int argc, char* argv[])
   }
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (ms)\n", time * 1e-6f / repeat);
@@ -128,6 +141,10 @@ int main(int argc, char* argv[])
   cudaFree(d_v);
   cudaFree(d_g);
 
+  if (hpcperf_skip_verify()) {
+    // measurement mode: reference() re-runs the whole update on the host
+    printf("SKIP_VERIFY\n");
+  } else {
   // verify
   reference<float, float>(
     repeat,
@@ -153,6 +170,7 @@ int main(int argc, char* argv[])
 
   printf("%s\n", ok ? "PASS" : "FAIL");
   printf("Checksum: %lf %lf\n", cr / vector_size, cp / vector_size);
+  }
 
   free(p);
   free(m);

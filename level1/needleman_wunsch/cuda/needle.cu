@@ -1,4 +1,5 @@
 #define LIMIT -999
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -150,6 +151,7 @@ void runTest( int argc, char** argv)
 
 	printf("Processing top-left matrix\n");
 	//process top-left matrix
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: both anti-diagonal sweeps
 	for( int i = 1 ; i <= block_width ; i++){
 		dimGrid.x = i;
 		dimGrid.y = 1;
@@ -166,6 +168,7 @@ void runTest( int argc, char** argv)
 	}
 
 
+	HPCPERF_ROI_END_SYNC();
     cudaMemcpy(output_itemsets, matrix_cuda, sizeof(int) * size, cudaMemcpyDeviceToHost);
 	
 //#define TRACEBACK

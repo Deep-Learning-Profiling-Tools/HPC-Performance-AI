@@ -1,0 +1,41 @@
+# tools/timing/cases/level2_cases.tsv -- Level 2 measurement cases (hand-maintained).
+#
+# One row per case; a case is (app, case) and must be unique. Tab-separated, "-" = empty.
+#   gpus       HPCPERF_GPUS for the run (one MPI rank per GPU through the common launcher)
+#   env        NAME=VALUE;NAME=VALUE -- only variables the application's run.sh reads
+#              (`tools/timing/cases.py allowed-env <app>` lists them). A variable set in your
+#              shell but not declared here is REFUSED: every run starts from `env -i`.
+#   sweep      one variable may take several values NAME=a|b|c; the case name needs {} for it
+#   args       extra arguments appended to run.sh
+#   timeout_s  "-" = the application's default
+#   fom_regex  "-" = the application's pattern
+#
+# "default" is the case run.sh runs with no input set. The n{}/p{} rows are small
+# demonstration sweeps that exercise the multi-input path end to end.
+#app	case	gpus	env	args	timeout_s	fom_regex	notes
+amg2023	default	1	-	-	-	-	-
+branson	default	1	-	-	-	-	-
+cabanapic	default	1	-	-	-	-	-
+cloverleaf	default	1	-	-	-	-	-
+comb	default	1	-	-	-	-	-
+exacmech	default	1	-	-	-	-	-
+examinimd	default	1	-	-	-	-	-
+exampm	default	1	-	-	-	-	-
+gamess_ri_mp2	default	1	-	-	-	-	-
+haccabanapm	default	1	-	-	-	-	-
+hipbone	default	1	-	-	-	-	-
+kripke	default	1	-	-	-	-	-
+laghos	default	1	-	-	-	-	-
+minibude	default	1	-	-	-	-	-
+miniem	default	1	-	-	-	-	-
+miniweather	default	1	-	-	-	-	-
+p3_heat3d	default	1	-	-	-	-	-
+p3_vlp4d	default	1	-	-	-	-	-
+quicksilver	default	1	-	-	-	-	-
+remhos	default	1	-	-	-	-	-
+shaw	default	1	-	-	-	-	-
+sw4lite	default	1	-	-	-	-	-
+tealeaf	default	1	-	-	-	-	-
+xsbench	default	1	-	-	-	-	-
+amg2023	n{}	1	HPCPERF_AMG_N=128|192	-	-	-	demonstration sweep: local grid per rank (default case is 256^3)
+quicksilver	p{}	1	HPCPERF_QUICKSILVER_PARTICLES_PER_RANK=50000|200000	-	-	-	demonstration sweep: particles per rank (default case is 100000)

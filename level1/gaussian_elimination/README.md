@@ -46,6 +46,8 @@ Run it via:
 ctest --test-dir build/gaussian_elimination/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/gaussian.cu`: the Fan1/Fan2 elimination loop. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 302 (1 source files, cloc, cuda/ + common/)

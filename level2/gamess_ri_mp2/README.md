@@ -34,6 +34,15 @@ metadata, and generated build products were not copied.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `source/rimp2_energy_whole_KERN.f90` (`use hpcperf_roi`, `call hpcperf_roi_begin_sync()` /
+  `end_sync()`): the region of interest is the timed RI-MP2 energy evaluation (the second call,
+  after upstream's warm-up call); `build.sh` compiles `tools/timing/roi/hpcperf_roi.f90` and
+  `hpcperf_roi_fortran.c` and links them. Pure insertions -- no upstream line changed or removed.
+  The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run
+  and validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
 1. `source/rimp2_energy_whole_KERN.f90`: the CUDA-only
    `HPCPERF_MINIMAL_MPIF` path includes Open MPI handle declarations without
    its generated high-rank generic interfaces. This works around an

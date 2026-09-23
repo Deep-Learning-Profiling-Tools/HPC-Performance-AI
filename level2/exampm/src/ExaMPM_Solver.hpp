@@ -12,6 +12,7 @@
 #ifndef EXAMPM_SOLVER_HPP
 #define EXAMPM_SOLVER_HPP
 
+#include "hpcperf_roi.h"
 #include <ExaMPM_BoundaryConditions.hpp>
 #include <ExaMPM_Mesh.hpp>
 #include <ExaMPM_ProblemManager.hpp>
@@ -77,6 +78,8 @@ class Solver : public SolverBase
         // Output initial state.
         outputParticles();
 
+        // tools/timing ROI: the time loop; the initial and the periodic particle output are excluded
+        HPCPERF_ROI_BEGIN_SYNC();
         while ( _time < t_final )
         {
             if ( 0 == _rank && 0 == _step % write_freq )
@@ -96,9 +99,13 @@ class Solver : public SolverBase
             _step++;
 
             // Output particles periodically.
+            const bool hpcperf_output = ( 0 == ( _step ) % write_freq );
+            if ( hpcperf_output ) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             if ( 0 == ( _step ) % write_freq )
                 outputParticles();
+            if ( hpcperf_output ) HPCPERF_ROI_EXCLUDE_END();
         }
+        HPCPERF_ROI_END_SYNC();
     }
 
     void outputParticles()

@@ -5,6 +5,8 @@ R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null
 set -euo pipefail
+# tools/timing ROI markers (header-only; a no-op unless measured): tools/timing/roi/README.md
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="${1:-CUDA}"
 BACKEND="${BACKEND^^}"

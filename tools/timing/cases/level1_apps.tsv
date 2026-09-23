@@ -1,0 +1,65 @@
+# tools/timing/cases/level1_apps.tsv -- per-benchmark facts for Level 1 (hand-maintained).
+#
+# Tab-separated, "-" = empty.
+#   suite          upstream suite the benchmark was extracted from
+#   backends       cuda, or cuda,hip when a hip/ port exists (HIP is UNTESTED: no ROCm)
+#   roi_excludes   what HPCPERF_ROI_EXCLUDE_* carves out INSIDE the ROI ("-" = nothing); set-up,
+#                  warm-up and the final check are simply outside the ROI and not listed
+#   verify_vs_roi  where the benchmark's own correctness check sits relative to the ROI:
+#                  outside   entirely before/after the ROI (the normal case)
+#                  excluded  inside the ROI, carved out with HPCPERF_ROI_EXCLUDE_*
+#                  inside    inside the ROI and inseparable (it runs within a timed kernel)
+#                  none      the benchmark has no check in the binary
+#   extra_env      variables a level1_extra.tsv case may set (Level 1 binaries read none by default)
+#   notes          free text
+#app	suite	backends	roi_excludes	verify_vs_roi	extra_env	notes
+adam	HeCBench	cuda,hip	-	outside	-	-
+aes	Hetero-Mark	cuda,hip	-	outside	-	-
+all_pairs_distance	HeCBench	cuda,hip	-	outside	-	-
+ao_bench	HeCBench	cuda,hip	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+atomic_reduction	HeCBench	cuda,hip	-	outside	-	-
+background_subtraction	HeCBench	cuda,hip	synthetic frame generation; CPU reference (merge_ref)	excluded	-	-
+backprop	Rodinia	cuda	-	outside	-	-
+bezier_surface	HeCBench	cuda,hip	-	outside	-	-
+bfs	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+bilateral_filter	HeCBench	cuda,hip	-	outside	-	-
+binary_search	HeCBench	cuda,hip	-	none	-	-
+bitonic_sort	HeCBench	cuda,hip	-	outside	-	-
+black_scholes	Hetero-Mark	cuda,hip	-	outside	-	-
+block_scan	HeCBench	cuda,hip	-	outside	-	-
+burgers_equation	HeCBench	cuda,hip	-	outside	-	-
+burrows_wheeler_transform	HeCBench	cuda,hip	-	outside	-	-
+cg	NPB-GPU	cuda,hip	-	outside	-	-
+channel_shuffle	HeCBench	cuda,hip	-	outside	-	-
+color_histogram	Hetero-Mark	cuda,hip	-	outside	-	-
+daxpy	RAJAPerf	cuda,hip	-	outside	-	-
+del_dot_vec_2d	RAJAPerf	cuda,hip	-	outside	-	-
+energy	RAJAPerf	cuda,hip	-	outside	-	-
+ep	NPB-GPU	cuda,hip	-	outside	-	-
+fdtd_2d	RAJAPerf	cuda,hip	-	outside	-	-
+fir	Hetero-Mark	cuda,hip	-	outside	-	-
+floyd_warshall	RAJAPerf	cuda,hip	-	outside	-	-
+ft	NPB-GPU	cuda,hip	-	outside	-	-
+gaussian_elimination	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+graph_coloring	Kokkos-Kernels	cuda,hip	-	outside	-	-
+histogram	HeCBench	cuda,hip	-	outside	-	-
+hotspot	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+hotspot_3d	Rodinia	cuda	-	outside	-	-
+is	NPB-GPU	cuda,hip	-	inside	-	partial verification runs as a device kernel (rank_gpu_kernel_7) inside every timed iteration; inseparable without editing an upstream kernel
+jacobi_2d	RAJAPerf	cuda,hip	-	outside	-	-
+ltimes	RAJAPerf	cuda,hip	-	outside	-	-
+lud	Rodinia	cuda	-	outside	-	-
+mat_mat_shared	RAJAPerf	cuda,hip	-	outside	-	-
+matvec_3d_stencil	RAJAPerf	cuda,hip	-	outside	-	-
+mg	NPB-GPU	cuda,hip	-	outside	-	-
+murmurhash3	HeCBench	cuda,hip	-	outside	-	-
+nbody	HeCBench	cuda,hip	-	outside	-	-
+nearest_neighbor	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+needleman_wunsch	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+pagerank	Hetero-Mark	cuda,hip	-	outside	-	-
+pathfinder	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+pressure	RAJAPerf	cuda,hip	-	outside	-	-
+spadd	Kokkos-Kernels	cuda,hip	-	outside	-	-
+spgemm	Kokkos-Kernels	cuda,hip	-	outside	-	-
+spmv	Kokkos-Kernels	cuda,hip	-	outside	-	-
+srad_v1	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)

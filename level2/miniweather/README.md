@@ -39,6 +39,13 @@ scripts, documentation/images, CI files, and YAKL's `unit/` tests,
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `cpp/miniWeather_mpi_parallelfor.cpp`: the region of interest is the main time-step loop between
+  upstream's `t1` / `t2`. Excluded inside it: NetCDF output. Pure insertions -- no upstream line
+  changed or removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is
+  attached, so build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on
+  `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 - `cpp/CMakeLists.txt`: removed the three target blocks for variants whose
   sources are not copied (`serial`/`serial_test`, `mpi`/`mpi_test`,
   `parallelfor_simd_x`/`parallelfor_simd_x_test`), the matching

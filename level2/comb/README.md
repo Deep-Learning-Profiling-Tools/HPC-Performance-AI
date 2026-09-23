@@ -30,6 +30,13 @@ Copied into this directory:
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `upstream/src/comb.cpp`: the region of interest is after the memory-pool warm-up: the copy test
+  and the communication cycle tests. Pure insertions -- no upstream line changed or removed. The
+  markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and
+  validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
 1. `upstream/include/exec_utils_cuda.hpp`: made NVTX optional and adapted the
    integer device ordinal to CUDA 13's `cudaMemLocation` API. Runtime semantics
    are unchanged; upstreamable.

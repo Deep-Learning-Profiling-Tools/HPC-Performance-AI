@@ -21,6 +21,7 @@
 //	DEFINE / INCLUDE
 //====================================================================================================100
 
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -294,6 +295,7 @@ int main(int argc, char *argv []){
 	// 	SCALE IMAGE DOWN FROM 0-255 TO 0-1 AND EXTRACT
 	//================================================================================80
 
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: extract, the SRAD iterations, compress
 	extract<<<blocks, threads>>>(	Ne,
 									d_I);
 
@@ -425,6 +427,7 @@ int main(int argc, char *argv []){
 									d_I);
 
 	checkCUDAError("compress");
+	HPCPERF_ROI_END_SYNC();
 
 	time9 = get_time();
 

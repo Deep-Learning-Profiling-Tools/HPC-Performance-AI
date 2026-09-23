@@ -20,12 +20,23 @@
    THE SOFTWARE.
  */
 
+#include "hpcperf_roi.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <chrono>
 #include <cuda.h>
 #include "kernels.h"
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 int main(int argc, char** argv)
 {
@@ -78,17 +89,21 @@ int main(int argc, char** argv)
 
 #define benchmark(kernel_name, grid_size) \
     t1 = std::chrono::high_resolution_clock::now(); \
+    HPCPERF_ROI_BEGIN_SYNC(); \
     for(int i=0;i<N;i++) { \
       cudaMemset(out,0,sizeof(int)); \
       kernel_name<<< dim3(grid_size), dim3(block_size) >>>(in,out,arrayLength); \
     } \
     cudaDeviceSynchronize(); \
+    HPCPERF_ROI_END_SYNC(); \
     t2 = std::chrono::high_resolution_clock::now(); \
     times =  std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count(); \
     std::cout << "Thread block size: " <<  block_size << ", "; \
     std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl; \
     cudaMemcpy(&sum,out,sizeof(int),cudaMemcpyDeviceToHost); \
-    if(sum==checksum) \
+    if(hpcperf_skip_verify()) \
+      std::cout<<"SKIP_VERIFY"<<std::endl<<std::endl; \
+    else if(sum==checksum) \
       std::cout<<"VERIFICATION: PASS"<<std::endl<<std::endl; \
     else \
       std::cout<<"VERIFICATION: FAIL!!"<<std::endl<<std::endl; \

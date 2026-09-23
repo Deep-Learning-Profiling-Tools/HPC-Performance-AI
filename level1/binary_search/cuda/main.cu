@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
@@ -125,11 +126,13 @@ void bs ( const size_t aSize,
   dim3 grids ((zSize + 255) / 256);
   dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     kernel_BS<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time (bs1) " << (time * 1e-9f) / repeat << " (s)\n";
@@ -147,11 +150,13 @@ void bs2 ( const size_t aSize,
   dim3 grids ((zSize + 255) / 256);
   dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     kernel_BS2<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time (bs2) " << (time * 1e-9f) / repeat << " (s)\n";
@@ -169,11 +174,13 @@ void bs3 ( const size_t aSize,
   dim3 grids ((zSize + 255) / 256);
   dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     kernel_BS3<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time (bs3) " << (time * 1e-9f) / repeat << " (s)\n";
@@ -191,11 +198,13 @@ void bs4 ( const size_t aSize,
   dim3 grids ((zSize + 255) / 256);
   dim3 blocks (256);
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
 
   for (int i = 0; i < repeat; i++)
     kernel_BS4<<<grids, blocks>>>(d_a, d_z, d_r, zSize, n);
 
   cudaDeviceSynchronize();
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   std::cout << "Average kernel execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";

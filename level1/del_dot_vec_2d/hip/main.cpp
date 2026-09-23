@@ -8,6 +8,7 @@
 // with upstream default problem size, reps, and data initialization.
 // Validation: element-wise comparison of div.
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -188,6 +189,7 @@ int main(int argc, char** argv)
     NDSET2D(domain.jp, d_y, y1,y2,y3,y4) ;
     NDSET2D(domain.jp, d_xdot, fx1,fx2,fx3,fx4) ;
     NDSET2D(domain.jp, d_ydot, fy1,fy2,fy3,fy4) ;
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       const size_t grid_size = RP_DIVIDE_CEILING_INT(iend, (Index_type)block_size);
       deldotvec2d<<<grid_size, block_size>>>(d_div,
@@ -198,6 +200,7 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.div, d_div, rbytes, cudaMemcpyDeviceToHost));
   cudaFree(d_x); cudaFree(d_y); cudaFree(d_xdot); cudaFree(d_ydot);
   cudaFree(d_div); cudaFree(d_rz);

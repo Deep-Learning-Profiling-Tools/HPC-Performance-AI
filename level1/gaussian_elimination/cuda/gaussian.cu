@@ -12,6 +12,7 @@
  ** Modified by Chris Gregg for CUDA, 07/20/2009
  **-----------------------------------------------------------
  */
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -361,6 +362,7 @@ void ForwardSub()
     // begin timing kernels
     struct timeval time_start;
     gettimeofday(&time_start, NULL);
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the Fan1/Fan2 elimination loop
 	for (t=0; t<(Size-1); t++) {
 		Fan1<<<dimGrid,dimBlock>>>(m_cuda,a_cuda,Size,t);
 		cudaDeviceSynchronize();
@@ -368,6 +370,7 @@ void ForwardSub()
 		cudaDeviceSynchronize();
 		checkCUDAError("Fan2");
 	}
+	HPCPERF_ROI_END_SYNC();
 	// end timing kernels
 	struct timeval time_end;
     gettimeofday(&time_end, NULL);

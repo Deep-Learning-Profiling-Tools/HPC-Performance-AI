@@ -53,6 +53,13 @@ Added here: `apps/demo/cmbM000.tf` (generated, see below),
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `apps/pm_run_lib.cpp`: the region of interest is the DKD step loop. Excluded inside it:
+  intermediate snapshot writes. Pure insertions -- no upstream line changed or removed. The markers
+  are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and
+  validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule:
+  `tools/timing/roi/README.md`.
+
 Source (one line, Cabana 0.8 API drift):
 
 - `src/Grid.cpp`: `params.setAllToAll(true)` -> `params.setAlltoAll(true)`.

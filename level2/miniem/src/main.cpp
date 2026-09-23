@@ -8,6 +8,7 @@
 // *****************************************************************************
 // @HEADER
 
+#include "hpcperf_roi.h"
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_TimeMonitor.hpp"
 #include "Teuchos_DefaultComm.hpp"
@@ -679,6 +680,9 @@ int main_(Teuchos::CommandLineProcessor &clp, int argc,char * argv[])
       Teuchos::TimeMonitor tMts(*Teuchos::TimeMonitor::getNewTimer(std::string("Mini-EM: timestepper")));
       auto time_step_timer = Teuchos::TimeMonitor::getNewTimer(std::string("Mini-EM: Advance Time Step"));
       auto response_timer = Teuchos::TimeMonitor::getNewTimer(std::string("Mini-EM: Compute responses"));
+      // tools/timing ROI: the time-step loop (assembly and solve); the response evaluation
+      // (L2 error against the analytic solution, with its assertion) and Exodus output excluded
+      HPCPERF_ROI_BEGIN_SYNC();
       for(int ts = 1; ts < numTimeSteps+1; ts++)
         {
           Teuchos::TimeMonitor adv_time_step_timer(*time_step_timer);
@@ -717,6 +721,7 @@ int main_(Teuchos::CommandLineProcessor &clp, int argc,char * argv[])
 
           // compute responses
           if (respOutArgs.Ng() > 0) {
+            HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             Teuchos::TimeMonitor response_tm(*response_timer);
 
             respInArgs.set_t(time);
@@ -736,12 +741,15 @@ int main_(Teuchos::CommandLineProcessor &clp, int argc,char * argv[])
                 strStream << elem.second << " = " << Thyra::get_ele(*g,0) << std::endl;
             }
             (*out) << strStream.str();
+            HPCPERF_ROI_EXCLUDE_END();
           }
 
           // write to an exodus file
           if (exodus_output) {
+            HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
             Teuchos::TimeMonitor tMexodus(*Teuchos::TimeMonitor::getNewTimer(std::string("Mini-EM: timestepper: writeToExodus")));
             writeToExodus<Scalar>(time,solution_vec,*physicsME,*stkIOResponseLibrary,*mesh);
+            HPCPERF_ROI_EXCLUDE_END();
           }
 
           {
@@ -752,6 +760,7 @@ int main_(Teuchos::CommandLineProcessor &clp, int argc,char * argv[])
             (*out) << strStream.str();
           }
         }
+        HPCPERF_ROI_END_SYNC();
     }
 
     // Collect FOM data before everything goes out of scope

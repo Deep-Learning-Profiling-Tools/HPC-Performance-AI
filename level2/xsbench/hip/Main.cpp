@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include "XSbench_header.h"
 
 int main( int argc, char* argv[] )
@@ -57,6 +58,7 @@ int main( int argc, char* argv[] )
 
 	// Start Simulation Timer
 	omp_start = get_time();
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the simulation (upstream: 'the section that should be profiled')
 
 	// Run simulation
 	if( in.simulation_method == EVENT_BASED )
@@ -96,6 +98,7 @@ int main( int argc, char* argv[] )
 	}
 
 	// End Simulation Timer
+	HPCPERF_ROI_END_SYNC();
 	omp_end = get_time();
 
 	// Final Hash Step

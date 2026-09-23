@@ -36,6 +36,14 @@ workload, and CI files were not copied.
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `source/{cuda,hip}/src/EW.C`: the region of interest is the time-stepping loop of
+  `EW::timesteploop` (set-up, initial data and the one-time host-to-device copies before it are
+  outside). Excluded inside it: checkpoint writes. Pure insertions -- no upstream line changed or
+  removed. The markers are a no-op unless `HPCPERF_ROI_LOG` is set or a profiler is attached, so
+  build, run and validation behave as before; `build.sh` puts `tools/timing/roi` on `CPATH`.
+  Placement rule: `tools/timing/roi/README.md`.
+
 1. `source/cuda/CMakeLists.txt`: uses the retained production-kernel include
    directory `src/double` instead of the omitted standalone
    `tests/testil` directory. Numerical kernels are unchanged; upstreamable as

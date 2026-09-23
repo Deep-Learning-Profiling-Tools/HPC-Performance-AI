@@ -57,6 +57,7 @@
  * ------------------------------------------------------------------------------
  */
 
+#include "hpcperf_roi.h"
 #include <omp.h>
 #include <hip/hip_runtime.h>
 #include "npb.hpp"
@@ -386,6 +387,7 @@ int main(int argc, char** argv){
 	compute_initial_conditions_gpu(u1_device);
 	fft_init_gpu(MAXDIM);
 	hipDeviceSynchronize();
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: forward FFT + evolve/FFT/checksum iterations; not the set-up or verify()
 	fft_gpu(1, u1_device, u0_device);
 	for(iter=1; iter<=niter; iter++){
 		evolve_gpu(u0_device, u1_device, twiddle_device);
@@ -393,6 +395,7 @@ int main(int argc, char** argv){
 		checksum_gpu(iter, u1_device);
 	}
 
+	HPCPERF_ROI_END_SYNC();
 	hipMemcpy(sums, sums_device, size_sums_device, hipMemcpyDeviceToHost);
 	for(iter=1; iter<=niter; iter++){
 		printf("T = %5d     Checksum = %22.12e %22.12e\n", iter, sums[iter].real, sums[iter].imag);

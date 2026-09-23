@@ -5,6 +5,7 @@
 // variant, with upstream default problem size, reps, and data initialization.
 // Validation: element-wise comparison of hz (and ex, ey).
 //
+#include "hpcperf_roi.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_FDTD_2D.hpp
@@ -96,6 +97,7 @@ int main(int argc, char** argv)
     dim3 nthreads_per_block234(j_block_sz, i_block_sz, 1);
     dim3 nblocks234((size_t)RP_DIVIDE_CEILING_INT(ny, (Index_type)j_block_sz),
                     (size_t)RP_DIVIDE_CEILING_INT(nx, (Index_type)i_block_sz), 1);
+    HPCPERF_ROI_BEGIN();  // tools/timing ROI: the timed repetition loop
     for (Index_type irep = 0; irep < run_reps; ++irep) {
       const size_t grid_size1 = RP_DIVIDE_CEILING_INT(ny, (Index_type)block_size);
       poly_fdtd2d_1<<<grid_size1, block_size>>>(d_ey, d_fict, ny, t);
@@ -107,40 +109,48 @@ int main(int argc, char** argv)
   }
   GPU_CHECK(cudaGetLastError());
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(hz, d_hz, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ex, d_ex, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ey, d_ey, bytes, cudaMemcpyDeviceToHost));
   cudaFree(d_hz); cudaFree(d_ex); cudaFree(d_ey); cudaFree(d_fict);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr hz_r; Real_ptr ex_r; Real_ptr ey_r; Real_ptr fict_r;
-  allocAndInitDataConst(hz_r, len, 0.0);
-  allocAndInitData(ex_r, len);
-  allocAndInitData(ey_r, len);
-  allocAndInitData(fict_r, m_tsteps);
-  {
-    Real_ptr hz = hz_r; Real_ptr ex = ex_r; Real_ptr ey = ey_r; Real_ptr fict = fict_r;
-    Index_type t = 0;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY1; }
-      for (Index_type i = 1; i < nx; i++) {
-        for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY2; }
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // Measurement mode: the CPU reference below is correctness machinery, not
+    // part of the timed workload (see rp_common.hpp).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr hz_r; Real_ptr ex_r; Real_ptr ey_r; Real_ptr fict_r;
+    allocAndInitDataConst(hz_r, len, 0.0);
+    allocAndInitData(ex_r, len);
+    allocAndInitData(ey_r, len);
+    allocAndInitData(fict_r, m_tsteps);
+    {
+      Real_ptr hz = hz_r; Real_ptr ex = ex_r; Real_ptr ey = ey_r; Real_ptr fict = fict_r;
+      Index_type t = 0;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY1; }
+        for (Index_type i = 1; i < nx; i++) {
+          for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY2; }
+        }
+        for (Index_type i = 0; i < nx; i++) {
+          for (Index_type j = 1; j < ny; j++) { POLYBENCH_FDTD_2D_BODY3; }
+        }
+        for (Index_type i = 0; i < nx - 1; i++) {
+          for (Index_type j = 0; j < ny - 1; j++) { POLYBENCH_FDTD_2D_BODY4; }
+        }
+        t = (t+1) % m_tsteps;
       }
-      for (Index_type i = 0; i < nx; i++) {
-        for (Index_type j = 1; j < ny; j++) { POLYBENCH_FDTD_2D_BODY3; }
-      }
-      for (Index_type i = 0; i < nx - 1; i++) {
-        for (Index_type j = 0; j < ny - 1; j++) { POLYBENCH_FDTD_2D_BODY4; }
-      }
-      t = (t+1) % m_tsteps;
     }
-  }
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("hz", hz_r, hz, len, 1.0e-10)
-          & compareArrays("ex", ex_r, ex, len, 1.0e-10)
-          & compareArrays("ey", ey_r, ey, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("hz", hz_r, hz, len, 1.0e-10)
+            & compareArrays("ex", ex_r, ex, len, 1.0e-10)
+            & compareArrays("ey", ey_r, ey, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

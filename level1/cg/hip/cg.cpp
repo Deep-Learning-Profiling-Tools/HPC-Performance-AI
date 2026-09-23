@@ -57,6 +57,7 @@
  * ------------------------------------------------------------------------------
  */
 
+#include "hpcperf_roi.h"
 #include <hip/hip_runtime.h>
 #include "npb.hpp"
 #include "npbparams.hpp"
@@ -489,6 +490,7 @@ int main(int argc, char** argv){
 
 	setup_gpu();
 	timer_start(PROFILING_TOTAL_TIME);
+	HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed power-method iterations (NPB's timed region)
 
 	/*
 	 * --------------------------------------------------------------------
@@ -519,6 +521,7 @@ int main(int argc, char** argv){
 		gpu_kernel_eleven(norm_temp2);
 	} /* end of main iter inv pow meth */
 
+	HPCPERF_ROI_END_SYNC();
 	timer_stop(PROFILING_TOTAL_TIME);
 
 	/*

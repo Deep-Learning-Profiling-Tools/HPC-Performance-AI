@@ -36,6 +36,7 @@
 //  Questions? Contact Christian R. Trott (crtrott@sandia.gov)
 //************************************************************************
 
+#include "hpcperf_roi.h"
 #include <examinimd.h>
 #include <property_temperature.h>
 #include <property_kine.h>
@@ -189,6 +190,9 @@ void ExaMiniMD::run(int nsteps) {
   Kokkos::Timer timer,force_timer,comm_timer,neigh_timer,other_timer;
 
   // Timestep Loop
+  // tools/timing ROI: the timestep loop (thermo output inside; binary dumps and the
+  // correctness check excluded)
+  HPCPERF_ROI_BEGIN_SYNC();
   for(int step = 1; step <= nsteps; step++ ) {
 
     // Do first part of the verlet time step integration
@@ -266,14 +270,19 @@ void ExaMiniMD::run(int nsteps) {
       }
     }
 
+    if(input->dumpbinaryflag) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
     if(input->dumpbinaryflag)
       dump_binary(step);
+    if(input->dumpbinaryflag) HPCPERF_ROI_EXCLUDE_END();
 
+    if(input->correctnessflag) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
     if(input->correctnessflag)
       check_correctness(step);
+    if(input->correctnessflag) HPCPERF_ROI_EXCLUDE_END();
 
     other_time += other_timer.seconds();
   }
+  HPCPERF_ROI_END_SYNC();
 
   double time = timer.seconds();
   T_FLOAT T = temp.compute(system);

@@ -20,6 +20,7 @@
  *  @url    https://gitlab.maisondelasimulation.fr/GyselaX/vlp4d/tree/master
  */
 
+#include "hpcperf_roi.h"
 #include "types.hpp"
 #include "config.hpp"
 #include "efield.hpp"
@@ -56,10 +57,13 @@ int main (int argc, char* argv[]) {
   int iter = 0;
 
   timers[Total]->begin();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the time-step loop (upstream Total timer)
   field_rho(&conf, fn, ef);
   field_poisson(&conf, ef);
   dg->compute(&conf, ef, iter);
+  if(conf.dom_.fxvx_) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();   // tools/timing ROI: CSV output excluded
   if(conf.dom_.fxvx_) Advection::print_fxvx(&conf, fn, iter);
+  if(conf.dom_.fxvx_) HPCPERF_ROI_EXCLUDE_END();
   synchronize();
 
   while(iter < conf.dom_.nbiter_) {
@@ -70,6 +74,7 @@ int main (int argc, char* argv[]) {
     onetimestep(&conf, fn, fnp1, ef, dg, timers, iter);
     timers[MainLoop]->end();
   }
+  HPCPERF_ROI_END_SYNC();
   timers[Total]->end();
 
   finalize(&conf, &ef, &dg);

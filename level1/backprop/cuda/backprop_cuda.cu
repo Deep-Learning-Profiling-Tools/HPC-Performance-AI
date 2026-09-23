@@ -1,6 +1,7 @@
 
 
 // includes, system
+#include "hpcperf_roi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -120,6 +121,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 
   
   
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: one training step: GPU forward, host output layer/errors, GPU weight adjust
   bpnn_layerforward_CUDA<<< grid, threads >>>(input_cuda,
 	                                          output_hidden_cuda,
 											  input_hidden_cuda,
@@ -177,6 +179,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 												input_prev_weights_cuda
 												);
 
+  HPCPERF_ROI_END_SYNC();
   cudaMemcpy(net->input_units, input_cuda, (in + 1) * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(input_weights_one_dim, input_hidden_cuda, (in + 1) * (hid + 1) * sizeof(float), cudaMemcpyDeviceToHost);
     

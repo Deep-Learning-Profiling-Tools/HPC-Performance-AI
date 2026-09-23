@@ -69,6 +69,27 @@ site profile through the common launcher (next section), and the single-node
 shared-memory profile is opt-in (`HPCPERF_MPI_SINGLE_NODE=1`, cleanly
 reversible).
 
+## Runtime measurement
+
+The status table below is a correctness statement; it says nothing about speed.
+Runtime is measured over each application's **region of interest (ROI)** -- its
+time loop or solve, without start-up, set-up, warm-up, verification and bulk
+output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 24
+applications; pure insertions, a no-op unless measuring, recorded in each
+README's `## Changes from upstream`; `build.sh` puts the header on `CPATH`):
+
+```bash
+tools/timing/measure_level2.sh all       # 1 clean + 1 profiled run per case
+python3 tools/timing/summarize.py        # JSON per run + summary_level2.csv
+```
+
+`validate.sh` is never called and validation is unchanged. The headline
+`roi_wall_s` comes from the clean run (no profiler); the profiled run only adds
+the device picture, clipped to the same markers, and the application's own figure
+of merit is read from the clean run (16 of 24 print one; the other 8 are left
+blank, never filled with a derived number). Read `tools/timing/README.md` before
+using the numbers.
+
 ## MPI and multi-GPU
 
 The 4-GPU results below are **single-node multi-GPU correctness /

@@ -46,6 +46,8 @@ Run it via:
 ctest --test-dir build/hotspot/cuda --output-on-failure
 ```
 
+**Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/hotspot.cu`: compute_tran_temp (all simulation iterations). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
+
 ## LOC
 
 CUDA: 243 (1 source files, cloc, cuda/ + common/)

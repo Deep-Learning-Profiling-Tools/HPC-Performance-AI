@@ -39,6 +39,12 @@ Not copied: upstream `README.md`, `.gitignore`, `.gitmodules`, `run.sh`
 
 ## Changes from upstream
 
+- **tools/timing ROI markers (measurement only).** `hpcperf_roi.h` markers inserted in
+  `src/run.cpp`: the region of interest is the timed solve (upstream's `startTime` ... `endTime`).
+  Pure insertions -- no upstream line changed or removed. The markers are a no-op unless
+  `HPCPERF_ROI_LOG` is set or a profiler is attached, so build, run and validation behave as before;
+  `build.sh` puts `tools/timing/roi` on `CPATH`. Placement rule: `tools/timing/roi/README.md`.
+
 - `occa/src/occa/internal/modes/cuda/utils.cpp` (`advise()`, `prefetch()`):
   CUDA 13 removed the `CUdevice` overloads of `cuMemAdvise` and
   `cuMemPrefetchAsync` (the headers now map them to the `_v2` functions that

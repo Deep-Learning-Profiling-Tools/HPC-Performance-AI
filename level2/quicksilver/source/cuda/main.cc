@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <iostream>
 #include "utils.hh"
 #include "Parameters.hh"
@@ -52,6 +53,7 @@ int main(int argc, char** argv)
 
    const int nSteps = params.simulationParams.nSteps;
 
+   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: all nSteps cycles
    for (int ii=0; ii<nSteps; ++ii)
    {
       cycleInit( bool(loadBalance) );
@@ -66,6 +68,7 @@ int main(int argc, char** argv)
    }
 
 
+   HPCPERF_ROI_END_SYNC();
    MC_FASTTIMER_STOP(MC_Fast_Timer::main);
 
    gameOver();

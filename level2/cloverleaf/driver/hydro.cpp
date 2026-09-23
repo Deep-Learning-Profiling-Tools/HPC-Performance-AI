@@ -17,6 +17,7 @@
  CloverLeaf. If not, see http://www.gnu.org/licenses/.
  */
 
+#include "hpcperf_roi.h"
 #include "hydro.h"
 #include "PdV.h"
 #include "accelerate.h"
@@ -46,6 +47,7 @@ int maxloc(const std::vector<double> &totals, const int len) {
 void hydro(global_variables &globals, parallel_ &parallel) {
 
   double timerstart = timer();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the hydro time loop
 
   if (!globals.config.dumpDir.empty())
     clover::dump(globals, std::to_string(parallel.task) + "_" + std::to_string(globals.step) + "_05_hydro.txt");
@@ -93,7 +95,11 @@ void hydro(global_variables &globals, parallel_ &parallel) {
       if (globals.step % globals.config.summary_frequency == 0) field_summary(globals, parallel);
     }
     if (globals.config.visit_frequency != 0) {
+      // tools/timing ROI: VisIt output is excluded
+      const bool hpcperf_output = globals.step % globals.config.visit_frequency == 0;
+      if (hpcperf_output) HPCPERF_ROI_EXCLUDE_BEGIN_SYNC();
       if (globals.step % globals.config.visit_frequency == 0) visit(globals, parallel);
+      if (hpcperf_output) HPCPERF_ROI_EXCLUDE_END();
     }
 
     // Sometimes there can be a significant start up cost that appears in the first step.
@@ -108,6 +114,7 @@ void hydro(global_variables &globals, parallel_ &parallel) {
     if (globals.time + g_small > globals.config.end_time || globals.step >= globals.config.end_step) {
 
       globals.complete = true;
+      HPCPERF_ROI_END_SYNC();  // before the final field_summary (output/validation)
       field_summary(globals, parallel);
       if (globals.config.visit_frequency != 0) visit(globals, parallel);
 

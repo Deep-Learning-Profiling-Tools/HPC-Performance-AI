@@ -25,12 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******************************************************************************/
+#include "hpcperf_roi.h"
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_store.cuh>
 #include <cub/block/block_scan.cuh>
+
+#include <cstdlib>
+
+// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
+// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
+// does. No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
+}
+
 
 using namespace cub;
 
@@ -186,7 +199,9 @@ void Test()
         d_out);
 
     // Check results for the first warmup run
-    if (i == 0) {
+    if (i == 0 && hpcperf_skip_verify()) {
+      printf("SKIP_VERIFY\n");
+    } else if (i == 0) {
       printf("\tOutput items: ");
       int compare = CompareDeviceResults(h_reference, d_out, TILE_SIZE);
       printf("%s\n", compare ? "FAIL" : "PASS");
@@ -201,6 +216,7 @@ void Test()
 
   // Run this several times and average the performance results
   auto start = std::chrono::steady_clock::now();
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int i = 0; i < repeat; ++i)
   {
     // Run aggregate/prefix kernel
@@ -209,6 +225,7 @@ void Test()
         d_out);
   }
   GPU_CHECK(cudaDeviceSynchronize());
+  HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 

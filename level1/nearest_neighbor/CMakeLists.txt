@@ -27,6 +27,9 @@ else()
     message(FATAL_ERROR "BACKEND '${BACKEND}' not available: upstream Rodinia has no HIP implementation (HIP pending)")
 endif()
 
+# tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
+target_include_directories(nearest_neighbor_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     # verify.py runs the benchmark and validates its output against a

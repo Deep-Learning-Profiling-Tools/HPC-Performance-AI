@@ -1,3 +1,4 @@
+#include "hpcperf_roi.h"
 #include <iostream>
 #include <list>
 #include <cuda.h>
@@ -81,6 +82,7 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   char* d_sequence;
   cudaMalloc(&d_sequence, n * sizeof(char));
   cudaMemcpy(d_sequence, sequence.c_str(), n * sizeof(char), cudaMemcpyHostToDevice);
+  HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: bitonic sort of the rotations + reconstruct
   for (int k = 2; k <= table_size; k <<= 1) {
     for (int j = k >> 1; j > 0; j = j >> 1) {
       bitonic_sort_step<<<numBlocks,blockSize>>>(d_table, table_size, j, k, d_sequence, n);
@@ -91,6 +93,7 @@ std::pair<std::string,int*> bwt_with_suffix_array(const std::string sequence) {
   cudaMalloc(&d_transformed_sequence, seq_size_bytes);
   numBlocks = (n + blockSize - 1) / blockSize;
   reconstruct_sequence<<<numBlocks,blockSize>>>(d_table, d_sequence, d_transformed_sequence, n);
+  HPCPERF_ROI_END_SYNC();
   char* transformed_sequence_cstr = (char*) malloc(seq_size_bytes);
 
   cudaMemcpy(transformed_sequence_cstr, d_transformed_sequence, seq_size_bytes, cudaMemcpyDeviceToHost);
