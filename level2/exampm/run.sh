@@ -60,6 +60,8 @@ set -euo pipefail
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ $# -gt 0 ] && shift
+# a registered input's six problem arguments are parsed like caller arguments
+set -- ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 case "$BACKEND" in
     CUDA|HIP) ;;
@@ -77,7 +79,7 @@ fi
 if [ $# -eq 0 ]; then
     ARGS=(0.01 2 0 0.001 1.0 1000)
 elif [ $# -eq 6 ]; then
-    ARGS=(${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@")
+    ARGS=("$@")
 else
     echo "run.sh: give either no problem arguments or all six: cell_size ppc halo_cells dt t_final write_freq" >&2
     exit 2

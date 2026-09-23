@@ -339,6 +339,9 @@ assert d["summary"]["timing_status"] == "NEEDS_TIMING_SUPPORT" and d["summary"][
 PY
 python3 "$TOOL" measure "$TMP/tov/level1/tov" plain --out "$TMP/tov_plain" --warmup 1 --reps 2 --timeout 30 >/dev/null 2>&1
 python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['timing_override'] is False and abs(d['summary']['main_compute_s']['median']-4.0)<1e-9" "$TMP/tov_plain/measurement.json" && ok "per-input timing: inputs without an override keep the benchmark timer" || bad "benchmark timer changed by the override feature"
+# ---- 8p. the selector helper sourced a second time (run.sh -> hpcperf_launch_common.sh) keeps the input's arguments
+out="$(bash -c 'source "$1/tools/inputs/hpcperf_input_selector.sh"; HPCPERF_REMHOS_INPUT=cube-remap-rs1; hpcperf_apply_input "$1/level2/remhos" HPCPERF_REMHOS_INPUT || exit 9; source "$1/tools/inputs/hpcperf_input_selector.sh"; printf "%s " "${HPCPERF_INPUT_ARGS[@]}"' _ "$R" 2>/dev/null)"
+[ "$out" = "-rs 1 -dt 0.02 " ] && ok "selector helper: re-sourcing after hpcperf_apply_input keeps HPCPERF_INPUT_ARGS (remhos cube-remap-rs1: '$out')" || bad "selector helper re-source dropped the arguments: '$out'"
 # ---- 8o. identity: the registry-side identity tools/timing stores with every ROI measurement of an input
 python3 "$TOOL" identity "$R/level1/cg" class-c > "$TMP/id_c.json" 2>/dev/null; rc=$?
 python3 - "$TMP/id_c.json" <<'PY' && [ $rc -eq 0 ] && ok "identity: NPB class-c -> its own binary, build_config, class header sha256, registry sha/git blob, complete" || bad "identity class-c (rc=$rc)"

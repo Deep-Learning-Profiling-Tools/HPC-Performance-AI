@@ -90,6 +90,22 @@ cd "$RUN_DIR"
 
 ARGS=(-m "$HERE/data/cube01_hex.mesh" -p 10 -rs "$RS" -o "$ORDER" -dt "$DT" -tf "$TF"
       -ho 3 -lo 5 -fct 2 -pa -d "$DEVICE" -no-vis)
+# A registered input (inputs.yaml) sets some of these options itself; MFEM refuses an option given
+# twice, so a registered option REPLACES the default of the same name (all other defaults stay).
+if [ "${#HPCPERF_INPUT_ARGS[@]}" -gt 0 ]; then
+    _reg=" ${HPCPERF_INPUT_ARGS[*]} "
+    _kept=()
+    _i=0
+    while [ "$_i" -lt "${#ARGS[@]}" ]; do
+        _o="${ARGS[$_i]}"
+        case "$_o" in
+            -pa|-no-vis) _kept+=("$_o"); _i=$((_i + 1)) ;;             # flags without a value
+            *) case "$_reg" in *" $_o "*) ;; *) _kept+=("$_o" "${ARGS[$((_i + 1))]}") ;; esac
+               _i=$((_i + 2)) ;;
+        esac
+    done
+    ARGS=("${_kept[@]}")
+fi
 
 echo "# Remhos $BACKEND: ${LAUNCH[*]} $EXE ${ARGS[*]} $*"
 exec "${LAUNCH[@]}" "$EXE" "${ARGS[@]}" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

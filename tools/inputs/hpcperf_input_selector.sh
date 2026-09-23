@@ -8,7 +8,9 @@
 #   with: set -- "${HPCPERF_INPUT_ARGS[@]}" "$@"). A knob the registry sets that is ALREADY in the
 #   environment with another value is a conflict (nothing is silently overridden -> exit 2), an
 #   unknown id fails (exit 2), and without the selector nothing changes.
-HPCPERF_INPUT_ARGS=()
+# Initialise only once: run.sh sources this file directly and again through hpcperf_launch_common.sh
+# AFTER hpcperf_apply_input -- a second unconditional reset would drop the input's arguments.
+declare -p HPCPERF_INPUT_ARGS >/dev/null 2>&1 || HPCPERF_INPUT_ARGS=()
 hpcperf_apply_input() {
     local bench_dir="$1" var="$2" id="${!2:-}" tool root
     [ -n "$id" ] || return 0
@@ -28,7 +30,10 @@ hpcperf_apply_input() {
                    echo "run.sh: $var=$id sets $k=$v but $k=${!k} is already set -- a registered input is mutually exclusive with the knobs it defines" >&2; return 2
                fi
                export "$k=$v" ;;
-            A) HPCPERF_INPUT_ARGS+=("$k") ;;
+            A) # an argument naming a file of the benchmark directory (e.g. "data/periodic-cube.mesh") is
+               # passed as an absolute path: run.sh usually changes into its run directory first
+               case "$k" in /*|-*) ;; *) [ -e "$bench_dir/$k" ] && k="$(cd "$bench_dir" && pwd)/$k" ;; esac
+               HPCPERF_INPUT_ARGS+=("$k") ;;
         esac
     done <<< "$lines"
     export HPCPERF_INPUT_ID="$id"
