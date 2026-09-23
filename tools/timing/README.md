@@ -87,19 +87,34 @@ and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 
 ## The web page
 
-`report.py` renders `results/timing/` as one self-contained page (`index.html`,
-inline CSS and a small sort/filter script; fonts from Google Fonts with system
-fallbacks) plus a Markdown twin (`README.md`) that the repository browser displays.
-Per (level, app, case, platform) it shows the **latest successful run** with the
-columns above, how its ROI changed against the previous successful run, a bar per
-case splitting the process into before-ROI / ROI busy / ROI host gap / excluded /
-after-ROI, the ROI against the application's own timer, the platforms with their
-conformance record and the collectors, and a **Needs attention** list: a latest run
-that failed (the table keeps showing the last good one and says so), a dirty launcher
-audit, ROI vs own timer above 2%, clean-run spread above 5%, a FOM pattern that found
-nothing, a change above 5% against the previous run, profiler inflation above 1.2 and
-set-up dominated Level 2 inputs (ROI under 10% of the process). The output depends only
-on the records, so the same data gives the same bytes.
+`report.py` renders `results/timing/` as one self-contained interactive page
+(`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google
+Fonts with system fallbacks, light and dark theme) plus a Markdown twin (`README.md`)
+that the repository browser displays. The page holds only the Level 1 and Level 2
+timing results:
+
+1. **Level tab**, then **an application** from the list (each shows its number of
+   inputs and how many input x platform combinations were measured).
+2. The application's **inputs x platforms** grid: inputs are its cases from
+   `cases/` (with the variables and arguments that define them) plus anything
+   measured; platforms are every platform with a measurement or a conformance record.
+   A combination never measured shows `null`.
+3. Choosing a measured combination shows **that measurement** -- and only then: ROI
+   (median, min/max, every clean run, entries, excluded time), clean-run spread, device
+   busy and host gap inside the ROI, ROI share of the process with the process
+   breakdown bar, profiler inflation, device time / ops / bytes per category (`null`
+   where the collector cannot observe it), the top operations, runtime API calls, the
+   FOM, the application's own timer against the ROI, the launcher audit, the platform's
+   conformance, the input and command as run, the caveats, and every run of the
+   combination with its change against the previous one (the view shows the latest
+   successful run; a later failed run is flagged).
+
+The selection is kept in the URL hash (`index.html#L2/quicksilver/p200000/nvidia-b200.cuda13.2`),
+so a view can be linked. The Markdown twin lists the latest successful run of every
+measured combination as a Level 1 and a Level 2 table. Absolute paths of the checkout
+are written as `{REPO}`; host names, the environment and GPU UUIDs are not in the page.
+The output depends only on the records and the case tables, so the same data gives
+the same bytes.
 
 * **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every
   `summarize.py` rewrite `results/timing/report/` (git-ignored).
@@ -109,7 +124,7 @@ on the records, so the same data gives the same bytes.
   GitHub shows `docs/timing/README.md`; `index.html` needs a browser (or GitHub Pages
   serving `docs/`).
 
-The "vs own timer" column comes from `app_timer_regex` / `app_timer_unit` in
+The own-timer check comes from `app_timer_regex` / `app_timer_unit` in
 `cases/level2_apps.tsv`: the timer an application prints for exactly the region its
 markers enclose (8 applications). It checks the marker placement; it is not a metric.
 
@@ -252,9 +267,10 @@ flushing past the buffer and default-off, the Fortran and Python APIs, that ever
 Level 1/2 source carries markers and every build sees the header, the front-ends,
 the clean environment and deny rule with planted credentials, that AMD/TPU
 interfaces refuse instead of guessing, `gen_cases.py`, FOM extraction, and the web
-page (byte-identical for the same records, latest-run selection, change against the
-previous run, HTML/Markdown escaping, empty-not-zero cells, the application timer,
-`--run-id`, no summary on a dry run) -- 44 checks.
+page (byte-identical for the same records, inputs x platforms with `null` for
+unmeasured combinations, latest-run selection and history, inert embedding of kernel
+names, no absolute paths, the Markdown twin, the application timer, `--run-id`, no
+summary on a dry run) -- 44 checks.
 
 ## Scope and what is UNVERIFIED
 

@@ -839,7 +839,7 @@ r = json.load(open(src))
 r["run_id"] = "r2"
 r["utc"] = "2026-09-23T00:00:00Z"
 r["roi"]["wall_s"] *= 1.10
-r["ops"] = [{"name": "k<int>(float*) <script>alert(1)</script>", "category": "compute", "count": 1,
+r["ops"] = [{"name": "k<int>(float*) </script><script>alert(1)</script>", "category": "compute", "count": 1,
              "total_s": 1e-3, "avg_s": 1e-3, "min_s": 1e-3, "max_s": 1e-3, "share": 1.0}]
 json.dump(r, open(os.path.join(os.path.dirname(src), "r2.json"), "w"))
 PY
@@ -851,34 +851,49 @@ if cmp -s "$TMP/rep/index.html" "$TMP/rep2/index.html" && cmp -s "$TMP/rep/READM
 else
     bad "12a: report output is not deterministic"
 fi
-pycheck "12b: latest successful run, change vs previous, escaping, empty-not-zero, attention, Markdown twin" <<'PY'
-import os, re
-tmp = os.environ["TMP"]
+pycheck "12b: interactive page: inputs x platforms with null, latest run, history, escaping, no paths, Markdown" <<'PY'
+import json, os, re
+tmp, repo = os.environ["TMP"], os.environ["REPO"]
 h = open(os.path.join(tmp, "rep", "index.html")).read()
 md = open(os.path.join(tmp, "rep", "README.md")).read()
 bad = []
-if "+10.0%" not in h or "+10.0%" not in md:
-    bad.append("the change against the previous run is not shown")
-if "<script>alert" in h or "&lt;script&gt;" not in h and "alert(1)" in h:
-    bad.append("an operation name was not escaped in the HTML")
+m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', h, re.S)
+if not m:
+    print("no embedded data"); raise SystemExit
+D = json.loads(m.group(1))
+plats = [p["id"] for p in D["platforms"]]
+if "test-platform" not in plats or "nvidia-b200.cuda13.2" not in plats:
+    bad.append(f"platforms {plats} (measured ones and those with a conformance record)")
+apps2 = {a["app"]: a for a in D["levels"]["2"]}
+a = apps2.get("appa")
+cell = a and [c for c in a["cases"] if c["case"] == "default"][0]["cells"]
+if not cell or cell.get("nvidia-b200.cuda13.2") is not None:
+    bad.append("a platform without a measurement of appa is not null")
+c = (cell or {}).get("test-platform") or {}
+if [x["run_id"] for x in c.get("history", [])] != ["r1", "r2"] or c.get("run", {}).get("run_id") != "r2":
+    bad.append("the latest successful run / its history is wrong")
+if not c.get("prev") or abs(c["run"]["roi"]["wall_s"] / c["prev"]["roi_s"] - 1.1) > 1e-9:
+    bad.append("the previous successful run is not recorded")
+amg = apps2.get("amg2023")
+if not amg or sorted(x["case"] for x in amg["cases"]) != ["default", "n128", "n192"] \
+        or any(v is not None for x in amg["cases"] for v in x["cells"].values()):
+    bad.append("inputs from the case tables without a measurement are not all null")
+b = [x for x in apps2.get("appb", {}).get("cases", []) if x["case"] == "default"]
+if not b or (b[0]["cells"].get("test-platform") or {}).get("run", {}).get("status") != "roi_missing":
+    bad.append("a combination without a successful run does not carry its status")
+if len(D["levels"]["1"]) < 50:
+    bad.append("Level 1 benchmarks from the case tables are missing")
+if "</script><script>alert" in h or "alert(1)" not in h:
+    bad.append("an operation name was not kept as inert JSON text")
+if repo in h or repo in md:
+    bad.append("an absolute path of the checkout reached the page")
+for gone in ("Is the ROI the right region", "Platforms and collectors", "How to read and regenerate", "Needs attention"):
+    if gone in h or gone in md:
+        bad.append(f"section still present: {gone}")
+if not re.search(r"^\| appa \| default \| test-platform \| .* \| 2 \| \+10\.0% \|$", md, re.M):
+    bad.append("the Markdown row for appa is missing its run count / change")
 if "<script>alert" in md:
     bad.append("an operation name was not escaped in the Markdown")
-row = re.search(r'<tr data-key="appa default [^"]*">(.*?)</tr>', h, re.S)
-if not row:
-    bad.append("no appa row")
-else:
-    cells = re.findall(r'<td[^>]*data-v="([^"]*)"', row.group(1))
-    # ROI, share, device busy, host gap, kernels: device columns must be empty with the none collector
-    if cells[2] != "" or cells[3] != "" or cells[4] != "":
-        bad.append(f"device cells of a none-collector run are not empty: {cells[:6]}")
-if "appb" not in h or "roi_missing" not in h:
-    bad.append("a case without a successful run is not listed with its status")
-if not re.search(r"\*\*fail\*\* L2 appb -- latest run .* roi_missing; there is no successful run", md):
-    bad.append("the failure is not in the Markdown attention list")
-if not re.search(r"^\| appa \| .* \| 2 \| \+10\.0% \|$", md, re.M):
-    bad.append("the Markdown row for appa is missing its run count / change")
-if "../../../" in h and "tools/timing" not in h:
-    bad.append("method links")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 pycheck "12c: application timer: unit scaling, last match wins, ROI difference, missing log" <<'PY'
