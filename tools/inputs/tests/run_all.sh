@@ -715,5 +715,31 @@ m = au.load_measurement(sys.argv[1], 1, "fake", "a", sys.argv[2])
 assert m["invalidated"] and not m["run_completed"] and m["timing_status"] == "INVALIDATED" and m["baseline_verdict"] is None and m["native_check"] is None, m
 PY
 
+# ---- 14. a redefined input (remhos periodic-hexagon-p0: order 3 made explicit) ----
+printf 'Final mass u:  0.3884079556\nMax value u:   0.7994561099\nMass loss u:   1.0e-12\n' > "$TMP/rh_o2.log"
+python3 "$TOOL" extract "$R/level2/remhos" "$TMP/rh_o2.log" --input periodic-hexagon-p0 > "$TMP/rh_q.json" 2>/dev/null
+mkbase "$R/level2/remhos" periodic-hexagon-p0 "$TMP/rh_q.json" > "$TMP/rh_base_cur.json"
+python3 - "$TMP/rh_base_cur.json" > "$TMP/rh_base_o2.json" <<'PY'
+import json, sys; b = json.load(open(sys.argv[1])); w = b["workload"]
+assert w["args"][-2:] == ["-o", "3"], w["args"]
+w["args"] = w["args"][:-2]; w["params"].pop("o")          # the definition before order 3 was made explicit
+print(json.dumps(b))
+PY
+python3 "$TOOL" compare "$R/level2/remhos" "$TMP/rh_base_o2.json" "$TMP/rh_o2.log" --input periodic-hexagon-p0 >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "not the candidate's workload" "$TMP/e" && ok "redefined input: a baseline of the old (order 2) workload is refused for the order-3 input (exit 2)" || bad "redefined input: old baseline rc=$rc $(cat "$TMP/e")"
+if [ -x "$R/build/level2/remhos/cuda/remhos" ]; then
+    SH_DIR="$TMP/rh_shim"; mkdir -p "$SH_DIR"
+    for t in mpirun mpiexec srun; do printf '#!/bin/sh\necho "%s" >> "%s/hit"\nexit 97\n' "$t" "$SH_DIR" > "$SH_DIR/$t"; chmod +x "$SH_DIR/$t"; done
+    for id in periodic-hexagon-p0 periodic-square-p5; do
+        cmd="$(PATH="$SH_DIR:$PATH" HPCPERF_DRY_RUN=1 HPCPERF_REMHOS_INPUT=$id bash "$R/level2/remhos/run.sh" CUDA 2>&1 | grep 'command:')"
+        n_o="$(printf '%s\n' "$cmd" | tr ' ' '\n' | grep -c '^-o$')"
+        last="$(printf '%s\n' "$cmd" | tr ' ' '\n' | grep -A1 '^-o$' | tail -1)"
+        [ "$n_o" = 1 ] && [ "$last" = 3 ] && [ ! -e "$SH_DIR/hit" ] && ok "remhos run.sh $id: exactly one -o in the command, value 3 (dry run, nothing started)" \
+            || bad "remhos run.sh $id: $n_o x -o, value '$last', shims hit: $(cat "$SH_DIR/hit" 2>/dev/null)"
+    done
+else
+    skip=$((skip+1)); echo "skip remhos run.sh -o count (not built)"
+fi
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

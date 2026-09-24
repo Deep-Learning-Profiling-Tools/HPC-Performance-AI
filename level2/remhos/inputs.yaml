@@ -103,11 +103,12 @@ inputs:
     upstream:
       repo: CEED/Remhos
       version: see level2/<app>/README.md (Upstream commit)
-      path: 'README run 1: -m periodic-hexagon.mesh -p 0 -rs 2 -dt 0.005 -tf 10 (validate.sh GPU case)'
+      path: 'README run 1: -m periodic-hexagon.mesh -p 0 -rs 2 -dt 0.005 -tf 10; validate.sh GPU case -ho 3 -lo 5 -fct 2 -pa at Remhos'' default order 3 (remhos.cpp:229) -- set explicitly because run.sh defaults to -o 2'
   params:
     mesh: periodic-hexagon.mesh
     problem: 0
     rs: 2
+    o: 3
     dt: 0.005
     tf: 10
   args:
@@ -121,6 +122,8 @@ inputs:
   - '0.005'
   - -tf
   - '10'
+  - -o
+  - '3'
   runtime_config:
     gpus: 1
     ranks: 1
@@ -135,11 +138,12 @@ inputs:
     upstream:
       repo: CEED/Remhos
       version: see level2/<app>/README.md (Upstream commit)
-      path: 'README run 5: -m periodic-square.mesh -p 5 -rs 3 -dt 0.005 -tf 0.8'
+      path: 'README run 5: -m periodic-square.mesh -p 5 -rs 3 -dt 0.005 -tf 0.8; validate.sh GPU case -ho 3 -lo 5 -fct 2 -pa at Remhos'' default order 3 (remhos.cpp:229) -- set explicitly because run.sh defaults to -o 2'
   params:
     mesh: periodic-square.mesh
     problem: 5
     rs: 3
+    o: 3
     dt: 0.005
     tf: 0.8
   args:
@@ -153,6 +157,8 @@ inputs:
   - '0.005'
   - -tf
   - '0.8'
+  - -o
+  - '3'
   runtime_config:
     gpus: 1
     ranks: 1

@@ -1147,6 +1147,47 @@ ri["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}; json.dump(ri, open(f"{R}/{d['p
 expect("13o unevidenced knob", p, rules_plain, "INSUFFICIENT", "HPCPERF_RH_KNOB")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+# a changed input definition (remhos periodic-hexagon-p0: order 3 made explicit): a record of the old
+# workload is SUPERSEDED (kept, never a result of the current input); the current workload with ONE -o
+# passes; a second -o (run.sh default + registry) is refused -- MFEM is not last-wins
+pycheck "13q-13s: changed definition -> SUPERSEDED; single effective -o; duplicated -o refused (real remhos registry)" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "vq")
+doc = hi.load(os.path.join(R, "level2", "remhos")); inp = hi.get_input(doc, "periodic-hexagon-p0")
+cur = hi.registry_identity(doc, inp)
+bad = []
+if cur["workload"]["args"][-2:] != ["-o", "3"] or cur["workload"]["params"].get("o") != 3:
+    bad.append(f"registry does not state order 3: {cur['workload']['args']}")
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+echo = "   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {o}\n   --time-step 0.005\n"
+n = [0]
+def rec(wl, argv, o):
+    n[0] += 1; raw = f"{T}/raw/{n[0]}"; os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl)
+    for i in range(3):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}/build/level2/remhos/cuda/run\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(echo.format(o=o))
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "remhos", "case": "periodic-hexagon-p0", "status": "ok",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {cur["selector"]: "periodic-hexagon-p0"}},
+         "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/{n[0]}.json"; json.dump(r, open(p, "w")); return p
+rules = V.load_rules(os.path.join(os.environ["TOOLS"], "cases", "registry_evidence.yaml"))
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+for label, wl, argv, o, want in [
+        ("13q old order-2 record", old_wl, ["-o", "2"] + base, 2, "SUPERSEDED"),
+        ("13r current workload, one -o 3", cur["workload"], base + ["-o", "3"], 3, "PASS"),
+        ("13s run.sh -o 2 AND registry -o 3", cur["workload"], ["-o", "2"] + base + ["-o", "3"], 3, "FAIL")]:
+    v = V.verify_record(rec(wl, argv, o), R, rules)
+    if v["verdict"] != want:
+        bad.append(f"{label}: {v['verdict']} ({v['problems'] + v['gaps']}), want {want}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
 out="$(python3 "$TOOLS/verify_registry_runs.py" --repo "$TMP/vr/repo" "$TMP/vr/rec" 2>&1 | noise | tail -1)"
 case "$out" in *"records)"*) ok "13p: the command line verifies a directory of records ($out)" ;;
                *) bad "13p: verify_registry_runs.py cli: $out" ;; esac
