@@ -20,6 +20,10 @@
 #                 file's content differs by design -- the output templates must evidence the parameters
 #   copies        {registered file: argv path prefix of a byte-identical copy run.sh makes}; accepted only
 #                 when the copy's sha256 equals the registered file's
+#   copy_dirs     {benchmark-relative source dir: repository-relative copy dir}: a registered file's copy of the
+#                 same relative name that the program reads instead; accepted only with the registered sha256
+#   logged_reads  regex over the program's output naming files it read from its working directory (group 1);
+#                 such a file counts as reached when it is the registered file or its declared copy
 #   last_wins     source reference proving the program's parser keeps the LAST occurrence of an option;
 #                 required before a registered option may appear more than once in the argv (and the last
 #                 occurrence must then carry the registered value)
@@ -74,6 +78,8 @@ level2:
     argv: ['--deck \S*/data/{deck} ', '-i {iterations} ', '-w {wgsize} ', '-p {ppwi} ']
   miniem:                         # run.sh: --inputFile=<deck> (build's decks/), --numTimeSteps, --x/y/z-elements (weak/strong)
     covers: [HPCPERF_SCALE_MODE, HPCPERF_MINIEM_DECK]
+    copy_dirs: {src/decks: build/level2/miniem/cuda/decks}   # build.sh copies src/decks/ next to the driver (run cwd)
+    logged_reads: '^Loading solver config from (\S+)$'       # MiniEM_helpers.cpp:112, file read from the run cwd
     derive: {n: "int(str(elements).split('^')[0]) if deck == 'maxwell-large.xml' else None"}
     argv: ['(^| )--inputFile=\S*{deck} ', '--numTimeSteps={steps} ', '--x-elements={n} --y-elements={n} --z-elements={n} ']
   miniweather:                    # grid / initial condition / simulated time are compiled in (tagged build dir)

@@ -136,10 +136,14 @@ the top) whose numbers are never mixed with, or compared against, the current on
 
 What is current and how records pool is decided by `registry_view.py` (the same module gives the counts
 and `registry_current.csv`): only a record the run verifier accepts for the input's CURRENT definition
-can be a result; records of one input pool into one measurement only when platform, workload identity,
-executable sha256, source commit and protocol (warm-up, profiled runs, collector) are equal -- this is how
-an adaptive extension becomes one 5-sample result, while other campaigns, code, binaries or protocols
-stay separate measurements; the newest pooled measurement is current. Scientific correctness and
+(PASS, or INSUFFICIENT: timing valid, evidence incomplete -- shown as such) can be a result. Records of one
+input pool into one measurement **only through an explicit measurement group**: `measurement_groups.json`
+in the results directory (schema `hpcperf-timing-measurement-groups-1`: base run id, extension run ids,
+reason, evidence), written by whoever ran the extension. A group is used only when all its records are in
+that same results directory and are the same configuration (platform, workload identity, executable
+sha256, source commit, protocol apart from the clean-run count); otherwise it is rejected and shown.
+Equal configuration alone never pools: two independent runs -- in one campaign or in two -- stay two
+measurements, and a record provided twice counts once. The newest measurement is current. Scientific correctness and
 blocker notes come from `annotations.json` next to the records (schema `hpcperf-timing-annotations-1`,
 written by the campaign from evidence outside the timing runs); without it the page says "none".
 
@@ -264,8 +268,21 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more clean runs of the
   same configuration, run as a separate invocation (`measure_level2.sh --registry --no-profile
   --clean-runs 2 <app>/<input>`); the front-ends do not do this by themselves -- the campaign script
-  selects the inputs after the first pass. The report pools the two records (same configuration) into
-  one 5-sample result; all samples are kept, and an input still above 10 % is UNSTABLE.
+  selects the inputs after the first pass and records each extension as a measurement group with its
+  evidence (the campaign's decision line and both invocations' run ids and protocols). The report pools
+  a grouped base + extension into one 5-sample result; all samples are kept, and an input still above
+  10 % is UNSTABLE. Without a group the extension record stays a separate 2-run measurement.
+* **Input files read from copies or named only in the program's log.** `copy_dirs` in
+  `cases/registry_evidence.yaml` declares that a registered file is read from a copy of the same name
+  elsewhere (MiniEM reads `src/decks/*` from the build's `decks/`); the copy counts only with the
+  registered sha256. `logged_reads` names the output line through which the program reports a file it
+  read from its working directory (MiniEM: `Loading solver config from <file>`).
+* **Files registered after a run was measured.** When the registry names input files the record's
+  stored identity did not capture (everything else unchanged), the stored identity is not rewritten and
+  today's hash is not taken as the hash at measurement time: the record verifies INSUFFICIENT (file
+  identity) unless a `file_identity_supplement.json` next to the records (schema
+  `hpcperf-file-identity-supplement-1`) establishes, with its basis, the content the run read; the page
+  shows which inputs rest on such a supplement.
 * **Level 3** has no ROI markers: its registered inputs (43) keep their earlier native timing only and
   are not measured by these front-ends.
 * **Dry run** (`--dry-run`) is a static plan: the engine starts nothing -- not run.sh, not a benchmark,
@@ -383,10 +400,13 @@ unmeasured combinations, latest-run selection and history, inert embedding of ke
 names, no absolute paths, the Markdown twin, the application timer, `--run-id`, no
 summary on a dry run), the registry cases and their drift check, the run verifier with its negative
 cases (same-named file, relative / absolute path, copies, dropped and duplicated options, superseded
-definition, abort before the ROI), invalidated runs, the static dry run, and the registered-input
-report (pooling of an adaptive extension, INVALIDATED / SUPERSEDED never current, failed inputs listed,
-no-profile fields null, determinism; `tests/page_smoke.js` drives the page's own script with a minimal
-DOM when `node` is available) -- 58 checks.
+definition, abort before the ROI), invalidated runs, the static dry run, the registered-input report
+(INVALIDATED / SUPERSEDED never current, failed inputs listed, no-profile fields null, determinism;
+`tests/page_smoke.js` drives the page's own script with a minimal DOM when `node` is available), pooling
+only through explicit measurement groups (linked 3 + 2, unlinked or cross-campaign runs of one
+configuration kept apart, inconsistent groups refused, duplicate records counted once) and input-file
+identity through declared copies and logged reads (changed deck or solver configuration refused,
+supplementary identity only when it matches) -- 61 checks.
 
 ## Scope and what is UNVERIFIED
 

@@ -460,6 +460,11 @@
     box.appendChild(el("h2", {text: app.app + " · " + row.input_id + " · " + (plat.label || platId)}));
     var checks = kv([["ROI timing", statusPill(row.status)],
       ["run verification", el("span", {}, [verdictPill(row.run_verification), " did the run get this registered input (argv, cwd, executable, files)"])],
+      ["input-file identity", !row.file_identity ? nul("–") : row.file_identity.indexOf("insufficient") >= 0
+        ? pill("INSUFFICIENT: the files were not identified at measurement time", "warn")
+        : row.file_identity.indexOf("supplement") >= 0
+        ? el("span", {}, [pill("supplement", "warn"), " established after the measurement from the run's own argv / log and run-directory copies unchanged since before the run (the stored identity did not name these files)"])
+        : pill("recorded at measurement", "ok")],
       ["scientific correctness", el("span", {}, [verdictPill(row.correctness), " " + (row.correctness_basis || "")])]]);
     if (!run) {
       box.appendChild(el("div", {cls: "banner", text: row.blocker ? row.blocker :
@@ -492,7 +497,7 @@
               (pr.clean_runs || 0) + " clean, " + (pr.profiled_runs || 0) + " profiled)"];
     });
     box.appendChild(el("div", {cls: "panel two"}, [
-      el("div", {}, [el("h3", {text: "Clean-run samples" + (S.adaptive ? " (3 + 2 adaptive extension, pooled)" : "")}),
+      el("div", {}, [el("h3", {text: "Clean-run samples" + (S.adaptive ? " (3 + 2 adaptive extension, pooled by measurement group " + S.group.id + ")" : "")}),
         kv(sampleRows.concat([["median / min / max", fmtT(R.wall_s) + " / " + fmtT(R.wall_s_min) + " / " + fmtT(R.wall_s_max)],
           ["spread", "(max − min) / median = " + pct(S.spread, 2)], ["CV", "sample stddev / median = " + pct(S.cv, 2)]]))]),
       el("div", {}, [el("h3", {text: "Status"}), checks])]));
@@ -547,7 +552,8 @@
       return el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, h.map(function (x) { return el("th", {text: x}); }))]),
         el("tbody", {}, rows)])]);
     }
-    return el("div", {cls: "panel"}, [el("h3", {text: "Measurements of this input (pooled per configuration)"}),
+    var linkNote = (row.link_problems || []).length ? el("ul", {cls: "caveats"}, row.link_problems.map(function (p) { return el("li", {text: p}); })) : null;
+    return el("div", {cls: "panel"}, [el("h3", {text: "Measurements of this input (pooled only by an explicit measurement group)"}), linkNote,
       sets.length ? tbl(["runs", "UTC", "verdict", "workload", "samples", "median", "spread", "source", "vs previous (same workload)"], sets)
                   : el("p", {cls: "lede", text: "none"}),
       el("h3", {text: "Every attempt (record)"}),

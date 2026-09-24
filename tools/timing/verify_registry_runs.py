@@ -222,6 +222,25 @@ def verify_level1(c, repo, ident, rec, runs, rule):
     apply_templates(c, rule, wl.get("params"), runs, 1)
 
 
+def tok_paths(tok):
+    """The path candidates of one argv token: the token, and the value of an --option=value token."""
+    out = [tok]
+    if tok.startswith("-") and "=" in tok:
+        out.append(tok.split("=", 1)[1])
+    return out
+
+
+def dir_copies(rel, repo, rule):
+    """Declared copies of a registered file (benchmark-relative `rel`) under `copy_dirs`
+    ({source dir: copy dir}, benchmark-relative -> repository-relative): the same relative name."""
+    out = []
+    for src, dst in (rule.get("copy_dirs") or {}).items():
+        src = src.rstrip("/") + "/"
+        if rel.startswith(src):
+            out.append(os.path.realpath(os.path.join(repo, dst, rel[len(src):])))
+    return out
+
+
 def match_arg(tok, reg, cands, cwd, repo, rule, files_hash):
     """Does argv token `tok` (of a process in `cwd`) stand for registry argument `reg`?
     Returns (matched, note)."""
@@ -297,13 +316,35 @@ def verify_level2(c, repo, ident, rec, runs, rule):
                             else:
                                 c.ok(f"option {a} repeated; last occurrence is the registry's (last-wins: {last_wins})")
             # 3. registered files reached by the program
+            logged = set()
+            if rule.get("logged_reads") and r["output"] is not None:
+                logged = set(re.findall(rule["logged_reads"], r["output"], re.M))
             for tok in argv[1:]:
-                real = resolve(tok, cwd)
-                for f in files_hash:
-                    if real == f or (os.path.isdir(real) and f.startswith(real + os.sep)):
-                        reached.add((r["dir"], f, "argv"))
+                for t in tok_paths(tok):
+                    real = resolve(t, cwd)
+                    for f in files_hash:
+                        if real == f or (os.path.isdir(real) and f.startswith(real + os.sep)):
+                            reached.add((r["dir"], f, "argv"))
             for f in files_hash:
                 rel = os.path.relpath(f, bdir)
+                # a declared copy (copy_dirs) reached by the argv or named by the program's own log as read
+                # from its working directory: accepted only with the registered sha256
+                for cp in dir_copies(rel, repo, rule):
+                    via = []
+                    if any(resolve(t, cwd) == cp for tok in argv[1:] for t in tok_paths(tok)):
+                        via.append("argv (declared copy)")
+                    if os.path.basename(f) in logged and resolve(os.path.basename(f), cwd) == cp:
+                        via.append("logged read (declared copy)")
+                    if not via:
+                        continue
+                    if not os.path.isfile(cp) or sha(cp) != files_hash[f]:
+                        c.fail(f"{r['dir']}: {os.path.relpath(cp, repo)} is the declared copy of {rel} read by the run, "
+                               f"but its content does not hash to the identity's value")
+                    else:
+                        for v in via:
+                            reached.add((r["dir"], f, v))
+                if os.path.basename(f) in logged and resolve(os.path.basename(f), cwd) == f:
+                    reached.add((r["dir"], f, "logged read"))
                 if rel in (rule.get("cwd_files") or []) and os.path.realpath(cwd) == os.path.dirname(f):
                     reached.add((r["dir"], f, "cwd"))
                 for kind in ("copies", "generated"):
@@ -313,7 +354,7 @@ def verify_level2(c, repo, ident, rec, runs, rule):
                     for tok in argv[1:]:
                         real = resolve(tok, cwd)
                         if real.startswith(os.path.join(repo, prefix)) and os.path.isfile(real):
-                            if kind == "copies" and sha(real) != sha(f):
+                            if kind == "copies" and (sha(real) != sha(f) or sha(real) != files_hash[f]):
                                 c.fail(f"{tok} is declared a copy of {rel} but its sha256 differs")
                             else:
                                 reached.add((r["dir"], f, kind))
@@ -345,6 +386,33 @@ def verify_level2(c, repo, ident, rec, runs, rule):
 
 
 _current = {}
+SUPPLEMENT = "file_identity_supplement.json"
+
+
+def files_added(recorded, cur):
+    """{file: sha256} when the current definition differs from the recorded workload ONLY by input files
+    the record's identity did not name (every other field, and every recorded file hash, unchanged)."""
+    if not isinstance(cur, dict) or not isinstance(recorded, dict) or cur == recorded:
+        return None
+    if {k: v for k, v in cur.items() if k != "files_sha256"} != {k: v for k, v in recorded.items() if k != "files_sha256"}:
+        return None
+    old, new = recorded.get("files_sha256") or {}, cur.get("files_sha256") or {}
+    if any(new.get(k) != v for k, v in old.items()):
+        return None
+    return {k: v for k, v in new.items() if k not in old} or None
+
+
+def supplement_for(record_path, rec):
+    """The supplementary file-identity entry of this record: <results root>/file_identity_supplement.json
+    (schema hpcperf-file-identity-supplement-1), written next to the records by whoever established it."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(record_path)))))
+    p = os.path.join(root, SUPPLEMENT)
+    if not os.path.isfile(p):
+        return None
+    for e in json.load(open(p)).get("records") or []:
+        if (e.get("level"), e.get("app"), e.get("case"), e.get("run_id")) == (rec.get("level"), rec.get("app"), rec.get("case"), rec.get("run_id")):
+            return e
+    return None
 
 
 def current_workload(repo, level, app, iid):
@@ -394,20 +462,38 @@ def verify_record(path, repo, rules):
         for p in r["procs"]:
             if "argv" not in p or "cwd" not in p or "exe" not in p:
                 c.fail(f"{r['dir']}: ROI log {os.path.basename(p['log'])} lacks exe/cwd/argv")
+    cur = current_workload(repo, rec["level"], rec["app"], rec["case"])
+    used, file_identity = ident, "recorded"
+    added = files_added(ident.get("workload"), cur)
+    if added:
+        # The registry now names input files this record's identity did not capture. Those files are
+        # verified against the CURRENT registry hashes, but that is today's content: it counts for the
+        # measurement only through a separate supplement that establishes, with its basis, which content
+        # the run read (never by rewriting the stored identity).
+        used = json.loads(json.dumps(ident))
+        used["workload"].setdefault("files_sha256", {}).update(added)
+        sup = supplement_for(path, rec)
+        if sup and all((sup.get("files_sha256") or {}).get(k) == v for k, v in added.items()):
+            file_identity = "supplement"
+            c.ok(f"file identity of {', '.join(sorted(added))} from a supplementary verification: {sup.get('basis', '')}")
+        else:
+            file_identity = "insufficient"
+            c.gap(f"file identity of {', '.join(sorted(added))} was not captured when the run was measured and no "
+                  f"supplementary verification establishes it -- file identity INSUFFICIENT")
     if not c.problems:
         rule = rules.get(rec["level"], {}).get(rec["app"]) or {}
         try:
-            (verify_level1 if rec["level"] == 1 else verify_level2)(c, repo, ident, rec, runs, rule)
+            (verify_level1 if rec["level"] == 1 else verify_level2)(c, repo, used, rec, runs, rule)
         except (KeyError, OSError, re.error) as exc:
             c.fail(f"verifier error: {exc!r}")
     verdict = "FAIL" if c.problems else "INSUFFICIENT" if c.gaps else "PASS"
-    cur = current_workload(repo, rec["level"], rec["app"], rec["case"])
-    if verdict == "PASS" and cur is not None and cur != ident.get("workload"):
+    out["file_identity"] = file_identity
+    if verdict == "PASS" and cur is not None and cur != used.get("workload"):
         verdict = "SUPERSEDED"
         c.gaps.append("the registry's current definition of this input differs from the recorded workload "
                       + ("(input no longer registered)" if cur == "unregistered" else
                          "(" + ", ".join(k for k in sorted(set(cur) | set(ident["workload"]))
-                                         if cur.get(k) != ident["workload"].get(k)) + " changed)")
+                                         if cur.get(k) != used["workload"].get(k)) + " changed)")
                       + " -- a result of the old workload only")
     out.update(verdict=verdict, problems=c.problems, gaps=c.gaps, evidence=c.evidence, clean_runs=len(runs))
     return out

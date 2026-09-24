@@ -15,12 +15,18 @@ without a successful record is still listed (failed / not measured). For every r
   NOT_RUN     the program never reached the ROI (build missing, abort before the ROI) -> a failed attempt
   FAIL / INSUFFICIENT  the verifier found a contradiction / missing evidence -> never current
 
-Records of one input are POOLED into one measurement only when they are the same measurement
-configuration: same platform, same workload identity (sha256 of the stored identity), same executable
-(sha256), same source commit and the same protocol apart from the number of clean runs (warm-up runs,
-profiled runs, collector). This is how an adaptive extension (3 clean runs + 2 more of the same
-configuration) becomes one 5-sample result; records of different campaigns, code, binaries or protocols
-stay separate measurements. The current result of an input is its newest pooled PASS measurement.
+Records of one input are POOLED into one measurement only when an explicit association says they are
+one measurement: a measurement group in <results root>/measurement_groups.json (schema
+hpcperf-timing-measurement-groups-1) naming a base record and its extension records (the adaptive +2
+clean runs of a Level 2 input), written by whoever ran the extension, with its evidence. The group is
+used only when every member is found among the input's accepted records of THAT results root and all
+members are the same measurement configuration (platform, workload identity, executable sha256, source
+commit, protocol apart from the number of clean runs: warm-up runs, profiled runs, collector); otherwise it
+is rejected (reported) and its records stay separate. Equal configuration alone never pools records:
+two independent runs of the same configuration -- in one campaign or in two -- stay two measurements. A
+record provided twice (same level, application, input and run id) is counted once. The current result
+of an input is its newest measurement whose verdict is PASS or INSUFFICIENT (timing valid, verification
+incomplete -- reported as such).
 
 Statistics of a pooled measurement: median of all clean-run ROI samples; spread = (max - min) / median
 (the stability criterion: stable when <= 0.10); cv = sample standard deviation / median (reported, not
@@ -45,6 +51,8 @@ import verify_registry_runs as V  # noqa: E402
 SCHEMA = "hpcperf-timing-2"
 STABLE_SPREAD = 0.10
 ANNOTATIONS = "annotations.json"   # optional, per results root: correctness evidence and blockers (see load_annotations)
+GROUPS = "measurement_groups.json"  # optional, per results root: explicit measurement groups (see measurements)
+CONFIG_FIELDS = ("platform", "workload identity", "executable sha256", "source commit", "warm-up runs", "profiled runs", "collector")
 
 
 def workload_key(workload):
@@ -52,17 +60,35 @@ def workload_key(workload):
 
 
 def load_records(roots):
-    recs = []
+    """(records, duplicates): every timing record under the roots, each (level, app, case, run_id) once."""
+    recs, seen, dups = [], {}, []
     for root in roots:
+        rroot = os.path.realpath(root)
         for p in sorted(glob.glob(os.path.join(root, "level[0-9]", "*", "*", "*.json"))):
             try:
                 r = json.load(open(p))
             except (OSError, ValueError):
                 continue
-            if r.get("schema") == SCHEMA and r.get("level") in (1, 2):
-                r["_path"] = p
-                recs.append(r)
-    return recs
+            if r.get("schema") != SCHEMA or r.get("level") not in (1, 2):
+                continue
+            key = (r["level"], r["app"], r["case"], r["run_id"])
+            if key in seen:
+                dups.append({"record": p, "first": seen[key]})
+                continue
+            seen[key] = p
+            r["_path"], r["_root"] = p, rroot
+            recs.append(r)
+    return recs, dups
+
+
+def load_groups(roots):
+    out = []
+    for root in roots:
+        p = os.path.join(root, GROUPS)
+        if os.path.isfile(p):
+            for g in json.load(open(p)).get("groups") or []:
+                out.append(dict(g, _root=os.path.realpath(root)))
+    return out
 
 
 def classify(recs, repo=REPO, rules=None):
@@ -74,7 +100,7 @@ def classify(recs, repo=REPO, rules=None):
             r["_verdict"], r["_problems"] = "INVALIDATED", [json.load(open(os.path.join(raw, "INVALIDATED.json"))).get("reason", "")]
             continue
         v = V.verify_record(r["_path"], repo, rules)
-        r["_verdict"], r["_problems"] = v["verdict"], v["problems"] + v["gaps"]
+        r["_verdict"], r["_problems"], r["_file_identity"] = v["verdict"], v["problems"] + v["gaps"], v.get("file_identity")
     return recs
 
 
@@ -87,32 +113,60 @@ def _config(r):
             (m.get("collector") or {}).get("name"))
 
 
-def measurements(recs):
-    """Pool the ok records of one input into measurement sets (see the module docstring)."""
-    sets = {}
-    for r in sorted(recs, key=lambda r: r["run_id"]):
-        if r["status"] != "ok" or r["_verdict"] not in ("PASS", "SUPERSEDED"):
+def _make_set(rs, group=None):
+    s = [x for r in rs for x in (r.get("roi") or {}).get("runs_s") or []]
+    med = statistics.median(s)
+    verdicts = {r["_verdict"] for r in rs}
+    m = {"platform": _config(rs[0])[0], "records": rs, "run_ids": [r["run_id"] for r in rs], "samples": s,
+         "median": med, "min": min(s), "max": max(s),
+         "spread": (max(s) - min(s)) / med if med else None,
+         "cv": statistics.stdev(s) / med if (med and len(s) > 1) else None,
+         "verdict": "SUPERSEDED" if "SUPERSEDED" in verdicts else "INSUFFICIENT" if "INSUFFICIENT" in verdicts else "PASS",
+         "file_identity": sorted({r.get("_file_identity") or "recorded" for r in rs}),
+         "recorded_workload_key": workload_key(((rs[0].get("registry") or {}).get("identity") or {}).get("workload")),
+         "utc_first": min(r.get("utc") or "" for r in rs), "utc_last": max(r.get("utc") or "" for r in rs),
+         "git_commit": _config(rs[0])[3], "exe_sha256": _config(rs[0])[2],
+         "protocol": [(r.get("measurement") or {}).get("protocol") for r in rs],
+         "group": None if group is None else {k: group.get(k) for k in ("id", "reason", "evidence")},
+         "root": rs[0]["_root"]}
+    m["stable"] = m["spread"] is not None and m["spread"] <= STABLE_SPREAD
+    m["adaptive"] = group is not None
+    return m
+
+
+def measurements(recs, groups=()):
+    """(measurement sets, problems) of ONE input: explicit groups pooled (see the module docstring), every
+    other accepted ok record its own measurement."""
+    elig = [r for r in sorted(recs, key=lambda r: r["run_id"])
+            if r["status"] == "ok" and r["_verdict"] in ("PASS", "INSUFFICIENT", "SUPERSEDED") and (r.get("roi") or {}).get("runs_s")]
+    by_run = {(r["_root"], r["run_id"]): r for r in elig}
+    sets, problems, used = [], [], set()
+    for g in groups:
+        ids = [g.get("base_run_id")] + list(g.get("extension_run_ids") or [])
+        members = [by_run.get((g["_root"], i)) for i in ids]
+        missing = [i for i, m in zip(ids, members) if m is None]
+        if missing:
+            problems.append(f"group {g.get('id')}: record(s) {', '.join(missing)} not among this input's accepted records "
+                            f"in the same results directory -- not pooled")
             continue
-        sets.setdefault(_config(r), []).append(r)
-    out = []
-    for cfg, rs in sets.items():
-        s = [x for r in rs for x in (r.get("roi") or {}).get("runs_s") or []]
-        if not s:
+        cfgs = [_config(m) for m in members]
+        diff = [CONFIG_FIELDS[i] for i in range(len(CONFIG_FIELDS)) if len({c[i] for c in cfgs}) > 1]
+        if diff:
+            problems.append(f"group {g.get('id')}: linked records differ in {', '.join(diff)} -- not pooled")
             continue
-        med = statistics.median(s)
-        out.append({"platform": cfg[0], "records": rs, "run_ids": [r["run_id"] for r in rs], "samples": s,
-                    "median": med, "min": min(s), "max": max(s),
-                    "spread": (max(s) - min(s)) / med if med else None,
-                    "cv": statistics.stdev(s) / med if (med and len(s) > 1) else None,
-                    "verdict": "SUPERSEDED" if any(r["_verdict"] == "SUPERSEDED" for r in rs) else "PASS",
-                    "workload_key": workload_key(((rs[0].get("registry") or {}).get("identity") or {}).get("workload")),
-                    "utc_first": min(r.get("utc") or "" for r in rs), "utc_last": max(r.get("utc") or "" for r in rs),
-                    "git_commit": cfg[3], "exe_sha256": cfg[2], "protocol": [(r.get("measurement") or {}).get("protocol") for r in rs]})
-    out.sort(key=lambda m: m["run_ids"][-1])
-    for m in out:
-        m["stable"] = m["spread"] is not None and m["spread"] <= STABLE_SPREAD
-        m["adaptive"] = len(m["records"]) > 1
-    return out
+        if len({m["_verdict"] == "SUPERSEDED" for m in members}) > 1:
+            problems.append(f"group {g.get('id')}: linked records are of different input definitions -- not pooled")
+            continue
+        if any((g["_root"], i) in used for i in ids):
+            problems.append(f"group {g.get('id')}: a record already belongs to another group -- not pooled")
+            continue
+        sets.append(_make_set(members, g))
+        used.update((g["_root"], i) for i in ids)
+    for r in elig:
+        if (r["_root"], r["run_id"]) not in used:
+            sets.append(_make_set([r]))
+    sets.sort(key=lambda m: m["run_ids"][-1])
+    return sets, problems
 
 
 def registered_inputs(repo=REPO):
@@ -150,8 +204,11 @@ def load_annotations(roots):
 
 def current_view(roots, repo=REPO):
     """One row per registered input: status, current pooled measurement, history of every attempt."""
-    recs = classify(load_records(roots), repo)
+    recs, dups = load_records(roots)
+    recs = classify(recs, repo)
+    groups = load_groups(roots)
     ann, meta = load_annotations(roots)
+    meta["duplicate_records_ignored"] = dups
     by = {}
     for r in recs:
         by.setdefault((r["level"], r["app"], r["case"]), []).append(r)
@@ -164,9 +221,12 @@ def current_view(roots, repo=REPO):
                                    "git_commit": ((r.get("provenance") or {}).get("git_commit") or "")[:10],
                                    "workload_key": workload_key(((r.get("registry") or {}).get("identity") or {}).get("workload")),
                                    "problems": r["_problems"]} for r in mine])
-        sets = measurements(mine)
-        cur = [m for m in sets if m["verdict"] == "PASS" and m["workload_key"] == inp["workload_key"]]
+        sets, link_problems = measurements(mine, [g for g in groups if (g.get("level"), g.get("app"), g.get("case")) == key])
+        for m in sets:      # the definition a measurement belongs to, as the verifier decided it
+            m["workload_key"] = m["recorded_workload_key"] if m["verdict"] == "SUPERSEDED" else inp["workload_key"]
+        cur = [m for m in sets if m["verdict"] in ("PASS", "INSUFFICIENT")]
         row["history_sets"] = sets
+        row["link_problems"] = link_problems
         row["current_by_platform"] = {}
         for m in cur:                                   # sets are ordered oldest -> newest
             row["current_by_platform"][m["platform"]] = m
@@ -179,7 +239,8 @@ def current_view(roots, repo=REPO):
             row["status"] = "RUN_FAILED"
         else:
             row["status"] = "NOT_MEASURED"
-        row["run_verification"] = "PASS" if row["current"] else (mine[-1]["_verdict"] if mine else None)
+        row["run_verification"] = row["current"]["verdict"] if row["current"] else (mine[-1]["_verdict"] if mine else None)
+        row["file_identity"] = row["current"]["file_identity"] if row["current"] else None
         row.update(ann.get(key, {}))
         rows.append(row)
     orphans = sorted(f"L{k[0]} {k[1]}/{k[2]}" for k in by)       # records of names that are not registered inputs
@@ -197,6 +258,9 @@ def counts(rows, recs, orphans=()):
         "not_measured": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "NOT_MEASURED"),
         "roi_not_supported_level3": n(lambda r: r["status"] == "ROI_NOT_SUPPORTED"),
         "run_verification_pass": n(lambda r: r["run_verification"] == "PASS"),
+        "run_verification_insufficient": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["current"] and r["run_verification"] == "INSUFFICIENT"),
+        "file_identity_from_supplement": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if "supplement" in (r.get("file_identity") or [])),
+        "pooling_rejected": sorted(f"{r['benchmark']}/{r['input_id']}: {p}" for r in rows for p in r.get("link_problems") or []),
         "unstable": sorted(f"L{r['level']} {r['benchmark']}/{r['input_id']}" for r in rows if r["current"] and not r["current"]["stable"]),
         "adaptive": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["current"] and r["current"]["adaptive"]),
         "clean_samples_current": sum(len(r["current"]["samples"]) for r in rows if r["current"]),

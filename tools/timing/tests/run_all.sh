@@ -1287,6 +1287,9 @@ rec("run02", cur["workload"], ["-o", "2"] + base, [1.40, 1.41, 1.42], invalid=Tr
 rec("run03", cur["workload"], base + ["-o", "3"], [2.72, 2.40, 2.38])                               # current, 3 runs
 rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                                     # adaptive +2, same config
 rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
+json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
+           "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
+          open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
 ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "maxwell-bdot-small"))
 rec("run06", mcur["workload"], [], [], app="miniem", case="maxwell-bdot-small", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
 bad = []
@@ -1327,6 +1330,144 @@ if command -v node >/dev/null 2>&1; then
                  || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"
 else
     skip "15i: node not available for the page smoke test"
+fi
+
+echo "=== 16: pooling needs an explicit measurement group"
+pycheck "16a-16e: linked 3+2 -> 5; unlinked 3+3 -> 2; other campaign -> 2; linked but inconsistent -> refused; duplicate record -> once" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import registry_view as RV
+T = os.path.join(os.environ["TMP"], "rg")
+def rec(root, run_id, runs, exe="aa", ident="id1", warm=0, verdict="PASS"):
+    return {"schema": "hpcperf-timing-2", "level": 2, "app": "app", "case": "in", "run_id": run_id, "status": "ok", "utc": run_id,
+            "platform": "p", "registry": {"identity_sha256": ident, "identity": {"workload": {"k": ident}}},
+            "inputs": {"exe_sha256": exe}, "provenance": {"git_commit": "c"},
+            "measurement": {"protocol": {"warmup_runs": warm, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+            "roi": {"runs_s": runs}, "_root": os.path.realpath(root), "_verdict": verdict, "_path": os.path.join(root, run_id)}
+def grp(root, base, ext):
+    return {"id": f"{base}+{ext}", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": [ext],
+            "_root": os.path.realpath(root)}
+A, B = os.path.join(T, "campaignA"), os.path.join(T, "campaignB")
+bad = []
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])], [grp(A, "r1", "r2")])
+if [len(m["samples"]) for m in sets] != [5] or not sets[0]["adaptive"] or pr:
+    bad.append(f"16a linked 3+2: {[m['run_ids'] for m in sets]} {pr}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r3", [1.0, 1.1, 1.2])], [])
+if [len(m["samples"]) for m in sets] != [3, 3] or any(m["adaptive"] for m in sets):
+    bad.append(f"16b unlinked, same configuration, same campaign: {[m['run_ids'] for m in sets]}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(B, "r9", [1.0, 1.1, 1.2])], [grp(A, "r1", "r9")])
+if [len(m["samples"]) for m in sets] != [3, 3] or not pr:
+    bad.append(f"16c other campaign, same configuration (even with a cross-directory link): {[m['run_ids'] for m in sets]} {pr}")
+for label, other in (("binary", dict(exe="bb")), ("workload", dict(ident="id2")), ("protocol", dict(warm=1))):
+    sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r2", [1.1, 1.1], **other)], [grp(A, "r1", "r2")])
+    if [len(m["samples"]) for m in sets] != [3, 2] or not pr or "not pooled" not in pr[0]:
+        bad.append(f"16d linked but different {label}: {[m['run_ids'] for m in sets]} {pr}")
+# the same record under two roots (a copied results directory): loaded once
+for root in (A, B):
+    d = os.path.join(root, "level2", "app", "in"); os.makedirs(d, exist_ok=True)
+    r = rec(root, "r1", [1.0, 1.1, 1.2])
+    for k in ("_root", "_verdict", "_path"):
+        r.pop(k)
+    json.dump(r, open(os.path.join(d, "r1.json"), "w"))
+recs, dups = RV.load_records([A, B])
+if len(recs) != 1 or len(dups) != 1:
+    bad.append(f"16e duplicate record: {len(recs)} loaded, {len(dups)} duplicates")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 17: input-file identity through declared copies and logged reads (MiniEM-like)"
+pycheck "17a-17e: copies with the registered content pass; changed deck / changed solver config / unlogged config do not" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "fi"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/me/src/decks/deck.xml", "<deck/>\n"); w(f"{R}/level2/me/src/decks/solver.xml", "<solver/>\n")
+w(f"{R}/build/level2/me/exe", "")
+rules = {1: {}, 2: {"me": {"copy_dirs": {"src/decks": "build/level2/me/decks"}, "logged_reads": r"^Loading solver config from (\S+)$"}}}
+files = {"src/decks/deck.xml": V.sha(f"{R}/level2/me/src/decks/deck.xml"), "src/decks/solver.xml": V.sha(f"{R}/level2/me/src/decks/solver.xml")}
+n = [0]
+def case(deck, solver, logged=True):
+    n[0] += 1
+    w(f"{R}/build/level2/me/decks/deck.xml", deck); w(f"{R}/build/level2/me/decks/solver.xml", solver)
+    V._sha_cache.clear()
+    raw = f"{T}/raw/{n[0]}"; cwd = f"{R}/build/level2/me/decks"
+    ident = {"benchmark": "me", "input_id": "x", "complete": True, "selector": "SEL", "arg_files_sha256": {},
+             "workload": {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": files}}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{i}", f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {R}/build/level2/me/exe\ncwd {cwd}\n"
+          f"argv {json.dumps([R + '/build/level2/me/exe', '--inputFile=deck.xml'])}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "Loading solver config from solver.xml\n" if logged else "\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "me", "case": "x", "status": "ok", "run_id": f"r{n[0]}",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"SEL": "x"}},
+         "roi": {"runs_s": [1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(r))
+    return V.verify_record(p, R, rules)
+bad = []
+v = case("<deck/>\n", "<solver/>\n")
+if v["verdict"] != "PASS" or not any("declared copy" in e for e in v["evidence"]):
+    bad.append(f"17a identical copies: {v['verdict']} {v['problems'] + v['gaps']}")
+v = case("<deck changed='1'/>\n", "<solver/>\n")
+if v["verdict"] != "FAIL" or "deck.xml" not in " ".join(v["problems"]):
+    bad.append(f"17b changed deck, same name and argv: {v['verdict']}")
+v = case("<deck/>\n", "<solver changed='1'/>\n")
+if v["verdict"] != "FAIL" or "solver.xml" not in " ".join(v["problems"]):
+    bad.append(f"17c changed solver config: {v['verdict']}")
+v = case("<deck/>\n", "<solver/>\n", logged=False)
+if v["verdict"] != "INSUFFICIENT" or "solver.xml" not in " ".join(v["gaps"]):
+    bad.append(f"17d solver config not named by the run: {v['verdict']}")
+old = {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": {}}
+if V.files_added(old, dict(old, files_sha256=files)) != files or V.files_added(old, dict(old, params={"a": 1})) is not None:
+    bad.append("17e files_added does not isolate an added-files-only change")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if [ -f "$REPO/build/level2/miniem/cuda/decks/maxwell-large.xml" ]; then
+pycheck "17f: MiniEM record measured before its files were registered: INSUFFICIENT without a supplement, PASS only with a matching one" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "fm"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "miniem")); cur = hi.registry_identity(doc, hi.get_input(doc, "maxwell-large-weak48"))
+ident = json.loads(json.dumps(cur)); ident["workload"]["files_sha256"] = {}          # as captured before the files were registered
+exe = f"{R}/build/level2/miniem/cuda/PanzerMiniEM_BlockPrec"; cwd = f"{R}/build/level2/miniem/cuda/decks"
+raw = os.path.join(T, "raw")
+for i in range(3):
+    d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+    open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {cwd}\nargv " + json.dumps([exe,
+        "--inputFile=maxwell-large.xml", "--solver=MueLu", "--linAlgebra=Tpetra", "--numTimeSteps=3", "--x-elements=48",
+        "--y-elements=48", "--z-elements=48", "--stacked-timer"]) + "\nB 1 1\nE 2 2\n")
+    open(f"{d}/run.log", "w").write("Loading solver config from solverMueLu.xml\nLoading solver config from solverMueLuCuda.xml\n")
+json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+os.makedirs(f"{root}/level2/miniem/maxwell-large-weak48", exist_ok=True)
+p = f"{root}/level2/miniem/maxwell-large-weak48/rX.json"
+json.dump({"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-large-weak48", "status": "ok", "run_id": "rX",
+           "registry": {"identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-large-weak48"}},
+           "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}, open(p, "w"))
+rules = V.load_rules(V.DEFAULT_RULES)
+bad = []
+v = V.verify_record(p, R, rules)
+if v["verdict"] != "INSUFFICIENT" or v["file_identity"] != "insufficient":
+    bad.append(f"no supplement: {v['verdict']} {v['file_identity']}")
+sup = {"schema": "hpcperf-file-identity-supplement-1", "records": [{"level": 2, "app": "miniem", "case": "maxwell-large-weak48",
+       "run_id": "rX", "files_sha256": dict(cur["workload"]["files_sha256"], **{"src/decks/solverMueLu.xml": "0" * 64}), "basis": "test"}]}
+json.dump(sup, open(f"{root}/{V.SUPPLEMENT}", "w"))
+v = V.verify_record(p, R, rules)
+if v["verdict"] == "PASS":
+    bad.append("a supplement whose hashes do not match the registry was accepted")
+sup["records"][0]["files_sha256"] = cur["workload"]["files_sha256"]
+json.dump(sup, open(f"{root}/{V.SUPPLEMENT}", "w"))
+v = V.verify_record(p, R, rules)
+if v["verdict"] != "PASS" or v["file_identity"] != "supplement":
+    bad.append(f"matching supplement: {v['verdict']} {v['problems'] + v['gaps']}")
+if json.load(open(f"{raw}/workload_identity.json"))["workload"]["files_sha256"] != {}:
+    bad.append("the stored identity was changed")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+else
+    skip "17f: MiniEM build decks not present"
 fi
 
 echo

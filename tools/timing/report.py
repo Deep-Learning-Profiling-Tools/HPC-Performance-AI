@@ -12,8 +12,8 @@ Two kinds of results are rendered, both from the same records:
   The current result of each input and its history are chosen by tools/timing/registry_view.py -- the
   same rules as every other summary: only records the run verifier accepts for the input's CURRENT
   definition count; INVALIDATED records (the run got another workload) and SUPERSEDED records (an
-  older definition of the input) are history; an adaptive extension (+2 clean runs of the same
-  configuration) is pooled with its 3 runs into one 5-sample result; "vs previous" is only computed
+  older definition of the input) are history; an adaptive extension (+2 clean runs) is pooled with
+  its 3 runs into one 5-sample result only through an explicit measurement group (measurement_groups.json); "vs previous" is only computed
   between measurements of the same workload. Scientific correctness and blocker notes come from
   annotations.json next to the records (evidence from outside the timing runs), never from a ROI run.
 * Case-table results (measure_level<N>.sh without --registry): the cases of tools/timing/cases/ against
@@ -245,7 +245,7 @@ def _measurement(m):
     run["roi"].update({"wall_s": m["median"], "runs_s": s, "wall_s_min": m["min"], "wall_s_max": m["max"],
                        "wall_s_stddev": m["cv"] * m["median"] if m["cv"] is not None else None})
     run["set"] = scrub({"run_ids": m["run_ids"], "n": len(s), "spread": m["spread"], "cv": m["cv"], "stable": m["stable"],
-                        "adaptive": m["adaptive"], "utc_first": m["utc_first"], "utc_last": m["utc_last"],
+                        "adaptive": m["adaptive"], "group": m.get("group"), "utc_first": m["utc_first"], "utc_last": m["utc_last"],
                         "git_commit": (m["git_commit"] or "")[:10], "exe_sha256": (m["exe_sha256"] or "")[:16],
                         "per_record": [{"run_id": r["run_id"], "runs_s": (r.get("roi") or {}).get("runs_s") or [],
                                         "protocol": (r.get("measurement") or {}).get("protocol")} for r in m["records"]]})
@@ -278,6 +278,7 @@ def build_registry(roots):
                 "input_id": row["input_id"], "case": row["case"], "variant": row["variant"], "source_kind": row["source_kind"],
                 "input_form": row["input_form"], "params": row["params"], "args": row["args"], "env": row["env"],
                 "status": row["status"], "run_verification": row["run_verification"],
+                "file_identity": row.get("file_identity"), "link_problems": row.get("link_problems") or [],
                 "correctness": row.get("correctness"), "correctness_basis": row.get("correctness_basis"),
                 "blocker": row.get("blocker"), "cells": cells, "sets": hist,
                 "attempts": [{k: a[k] for k in ("run_id", "utc", "status", "verdict", "roi_s", "clean_runs", "git_commit")}
@@ -429,8 +430,8 @@ def render_md_registry(c):
         if camp.get(key):
             out.append(f"- {camp[key]}")
     out += ["- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); "
-            "CV = sample stddev / median. An adaptive extension (+2 runs of the same configuration) is pooled "
-            "with its 3 runs.",
+            "CV = sample stddev / median. An adaptive extension (+2 runs) is pooled with its 3 runs only through "
+            "an explicit measurement group; runs of the same configuration without one stay separate measurements.",
             "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification "
             "(did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness "
             "(evidence from outside the timing runs; its basis is given per input in index.html).", ""]
@@ -464,6 +465,29 @@ def render_md_registry(c):
                         ("yes" if st["stable"] else "UNSTABLE") if st else "-",
                         str(i["run_verification"] or "-"), str(i["correctness"] or "none"),
                         st["git_commit"] if st else "-"]) + " |")
+        out.append("")
+    sup = [(a["app"], i["input_id"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+           if "supplement" in (i.get("file_identity") or [])]
+    ins = [(a["app"], i["input_id"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+           if i.get("run_verification") == "INSUFFICIENT"]
+    groups = [(a["app"], i["input_id"], run["set"]["group"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+              for run in i["cells"].values() if run and run["set"].get("group")]
+    rejected = [(a["app"], i["input_id"], p) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+                for p in i.get("link_problems") or []]
+    if groups or rejected or sup or ins:
+        out += ["### Pooled measurements and input-file identity", ""]
+        for app, iid, g in groups:
+            out.append(f"- pooled by measurement group `{md_cell(g['id'])}` ({md_cell(app)} / {md_cell(iid)}): "
+                       + md_cell("; ".join(g.get("evidence") or [])))
+        for app, iid, p in rejected:
+            out.append(f"- NOT pooled, {md_cell(app)} / {md_cell(iid)}: {md_cell(p)}")
+        if sup:
+            out.append("- input-file identity established after the measurement by a supplementary verification (the "
+                       "run's own argv / log and run-directory copies unchanged since before the run; the stored identity "
+                       "did not name these files): " + ", ".join(f"{md_cell(a)} / {md_cell(i)}" for a, i in sup))
+        if ins:
+            out.append("- run verification INSUFFICIENT (timing kept, evidence incomplete): " +
+                       ", ".join(f"{md_cell(a)} / {md_cell(i)}" for a, i in ins))
         out.append("")
     fails = [(a["app"], i) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"] if i["status"] != "SUCCESS"]
     if fails:
