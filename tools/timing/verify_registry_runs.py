@@ -402,17 +402,40 @@ def files_added(recorded, cur):
     return {k: v for k, v in new.items() if k not in old} or None
 
 
+SUPPLEMENT_SCHEMA = "hpcperf-file-identity-supplement-1"
+
+
 def supplement_for(record_path, rec):
-    """The supplementary file-identity entry of this record: <results root>/file_identity_supplement.json
-    (schema hpcperf-file-identity-supplement-1), written next to the records by whoever established it."""
+    """(entry, None) for an acceptable supplementary file-identity entry of this record, else (None, why).
+    <results root>/file_identity_supplement.json (schema hpcperf-file-identity-supplement-1). An entry is
+    acceptable only with: the record's identity (level, app, case, run_id); files_sha256; a non-empty
+    `basis` (why the files are those the run read); a non-empty `evidence` list naming the sources it rests
+    on (logs, ROI logs, file-status observations); and a binding to exactly this measurement record --
+    `record_sha256` of the record file and its `raw_dir`. Anything less leaves the file identity
+    INSUFFICIENT."""
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(record_path)))))
     p = os.path.join(root, SUPPLEMENT)
     if not os.path.isfile(p):
-        return None
-    for e in json.load(open(p)).get("records") or []:
-        if (e.get("level"), e.get("app"), e.get("case"), e.get("run_id")) == (rec.get("level"), rec.get("app"), rec.get("case"), rec.get("run_id")):
-            return e
-    return None
+        return None, "no supplementary verification"
+    doc = json.load(open(p))
+    if doc.get("schema") != SUPPLEMENT_SCHEMA:
+        return None, f"{SUPPLEMENT} has schema {doc.get('schema')!r}, not {SUPPLEMENT_SCHEMA}"
+    for e in doc.get("records") or []:
+        if (e.get("level"), e.get("app"), e.get("case"), e.get("run_id")) != (rec.get("level"), rec.get("app"), rec.get("case"), rec.get("run_id")):
+            continue
+        if not isinstance(e.get("files_sha256"), dict) or not e["files_sha256"]:
+            return None, "supplement entry without files_sha256"
+        if not isinstance(e.get("basis"), str) or not e["basis"].strip():
+            return None, "supplement entry without a basis"
+        ev = e.get("evidence")
+        if not isinstance(ev, list) or not ev or any(not isinstance(x, str) or not x.strip() for x in ev):
+            return None, "supplement entry without traceable evidence sources"
+        if e.get("record_sha256") != sha(record_path):
+            return None, "supplement entry is not bound to this record (record_sha256 differs or is missing)"
+        if e.get("raw_dir") != (rec.get("provenance") or {}).get("raw_dir"):
+            return None, "supplement entry is not bound to this record's raw runs (raw_dir differs or is missing)"
+        return e, None
+    return None, "no supplementary verification for this record"
 
 
 def current_workload(repo, level, app, iid):
@@ -472,14 +495,16 @@ def verify_record(path, repo, rules):
         # the run read (never by rewriting the stored identity).
         used = json.loads(json.dumps(ident))
         used["workload"].setdefault("files_sha256", {}).update(added)
-        sup = supplement_for(path, rec)
-        if sup and all((sup.get("files_sha256") or {}).get(k) == v for k, v in added.items()):
+        sup, why = supplement_for(path, rec)
+        if sup and not all(sup["files_sha256"].get(k) == v for k, v in added.items()):
+            sup, why = None, "the supplement's file hashes differ from the registry's"
+        if sup:
             file_identity = "supplement"
-            c.ok(f"file identity of {', '.join(sorted(added))} from a supplementary verification: {sup.get('basis', '')}")
+            c.ok(f"file identity of {', '.join(sorted(added))} from a supplementary verification: {sup['basis']}")
         else:
             file_identity = "insufficient"
-            c.gap(f"file identity of {', '.join(sorted(added))} was not captured when the run was measured and no "
-                  f"supplementary verification establishes it -- file identity INSUFFICIENT")
+            c.gap(f"file identity of {', '.join(sorted(added))} was not captured when the run was measured and not "
+                  f"established afterwards ({why}) -- file identity INSUFFICIENT")
     if not c.problems:
         rule = rules.get(rec["level"], {}).get(rec["app"]) or {}
         try:

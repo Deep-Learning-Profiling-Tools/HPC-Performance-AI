@@ -463,7 +463,7 @@
       ["input-file identity", !row.file_identity ? nul("–") : row.file_identity.indexOf("insufficient") >= 0
         ? pill("INSUFFICIENT: the files were not identified at measurement time", "warn")
         : row.file_identity.indexOf("supplement") >= 0
-        ? el("span", {}, [pill("supplement", "warn"), " established after the measurement from the run's own argv / log and run-directory copies unchanged since before the run (the stored identity did not name these files)"])
+        ? el("span", {}, [pill("supplement", "warn"), " supplementary, conditional evidence established after the measurement (not captured at measurement time): the run's own argv / log name the files, the run read the declared run-directory copies, their content hashes to the registry value and their status-change time (ctime) precedes the run -- taken together, on the premise that ctime was not reset"])
         : pill("recorded at measurement", "ok")],
       ["scientific correctness", el("span", {}, [verdictPill(row.correctness), " " + (row.correctness_basis || "")])]]);
     if (!run) {

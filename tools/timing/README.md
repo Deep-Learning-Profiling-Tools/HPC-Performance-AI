@@ -281,8 +281,17 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   stored identity did not capture (everything else unchanged), the stored identity is not rewritten and
   today's hash is not taken as the hash at measurement time: the record verifies INSUFFICIENT (file
   identity) unless a `file_identity_supplement.json` next to the records (schema
-  `hpcperf-file-identity-supplement-1`) establishes, with its basis, the content the run read; the page
-  shows which inputs rest on such a supplement.
+  `hpcperf-file-identity-supplement-1`) establishes the content the run read. An entry is accepted only
+  with the record's identity, the file hashes (equal to the registry's), a non-empty `basis`, a non-empty
+  `evidence` list of the sources it rests on, and a binding to exactly that record (`record_sha256` of the
+  record file, `raw_dir`). Such a supplement is conditional evidence gathered after the measurement -- for
+  MiniEM: the run's own argv / log name the files, the run read the declared run-directory copies, their
+  content hashes to the registry value, and their status-change time (ctime) precedes the run, on the
+  premise that ctime was not reset; not a proof from ctime alone. The page shows which inputs rest on a
+  supplement rather than on the identity recorded at measurement time.
+* **Measurement groups are checked, not repaired.** A group with a missing or empty base id, a missing,
+  empty or non-list extension list, an extension id listed twice, or the base id among the extensions
+  is rejected as a whole (shown on the page); its records stay separate measurements.
 * **Level 3** has no ROI markers: its registered inputs (43) keep their earlier native timing only and
   are not measured by these front-ends.
 * **Dry run** (`--dry-run`) is a static plan: the engine starts nothing -- not run.sh, not a benchmark,
@@ -404,9 +413,10 @@ definition, abort before the ROI), invalidated runs, the static dry run, the reg
 (INVALIDATED / SUPERSEDED never current, failed inputs listed, no-profile fields null, determinism;
 `tests/page_smoke.js` drives the page's own script with a minimal DOM when `node` is available), pooling
 only through explicit measurement groups (linked 3 + 2, unlinked or cross-campaign runs of one
-configuration kept apart, inconsistent groups refused, duplicate records counted once) and input-file
-identity through declared copies and logged reads (changed deck or solver configuration refused,
-supplementary identity only when it matches) -- 61 checks.
+configuration kept apart, inconsistent or malformed groups refused, duplicate records counted once) and
+input-file identity through declared copies and logged reads (changed deck or solver configuration
+refused; a supplementary identity only when complete -- basis, evidence sources, bound to its record --
+and matching) -- 61 checks.
 
 ## Scope and what is UNVERIFIED
 

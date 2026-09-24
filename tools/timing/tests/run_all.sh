@@ -1333,7 +1333,7 @@ else
 fi
 
 echo "=== 16: pooling needs an explicit measurement group"
-pycheck "16a-16e: linked 3+2 -> 5; unlinked 3+3 -> 2; other campaign -> 2; linked but inconsistent -> refused; duplicate record -> once" <<'PY'
+pycheck "16a-16h: linked 3+2 -> 5; unlinked 3+3 -> 2; other campaign -> 2; inconsistent or malformed group refused; duplicate record -> once" <<'PY'
 import json, os, sys
 sys.path.insert(0, os.environ["TOOLS"])
 import registry_view as RV
@@ -1362,6 +1362,18 @@ for label, other in (("binary", dict(exe="bb")), ("workload", dict(ident="id2"))
     sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r2", [1.1, 1.1], **other)], [grp(A, "r1", "r2")])
     if [len(m["samples"]) for m in sets] != [3, 2] or not pr or "not pooled" not in pr[0]:
         bad.append(f"16d linked but different {label}: {[m['run_ids'] for m in sets]} {pr}")
+# a malformed member list is rejected as a whole, never repaired: no sample counted twice
+def g2(base, ext):
+    return {"id": "bad", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": ext, "_root": os.path.realpath(A)}
+three, two = rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])
+for label, g, reason in (("16f extension listed twice", g2("r1", ["r2", "r2"]), "more than once"),
+                         ("16g base listed as an extension", g2("r1", ["r1", "r2"]), "base run id is also listed"),
+                         ("16h missing base", g2("", ["r2"]), "base_run_id"),
+                         ("16h empty extension list", g2("r1", []), "extension_run_ids"),
+                         ("16h extension list not a list", g2("r1", "r2"), "extension_run_ids")):
+    sets, pr = RV.measurements([three, two], [g])
+    if sorted(len(m["samples"]) for m in sets) != [2, 3] or not pr or reason not in pr[0] or any(m["adaptive"] for m in sets):
+        bad.append(f"{label}: {[len(m['samples']) for m in sets]} {pr}")
 # the same record under two roots (a copied results directory): loaded once
 for root in (A, B):
     d = os.path.join(root, "level2", "app", "in"); os.makedirs(d, exist_ok=True)
@@ -1424,7 +1436,7 @@ if V.files_added(old, dict(old, files_sha256=files)) != files or V.files_added(o
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 if [ -f "$REPO/build/level2/miniem/cuda/decks/maxwell-large.xml" ]; then
-pycheck "17f: MiniEM record measured before its files were registered: INSUFFICIENT without a supplement, PASS only with a matching one" <<'PY'
+pycheck "17f: MiniEM record measured before its files were registered: INSUFFICIENT without a complete, bound supplement" <<'PY'
 import json, os, sys
 sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
 import verify_registry_runs as V, hpcperf_inputs as hi
@@ -1451,17 +1463,25 @@ bad = []
 v = V.verify_record(p, R, rules)
 if v["verdict"] != "INSUFFICIENT" or v["file_identity"] != "insufficient":
     bad.append(f"no supplement: {v['verdict']} {v['file_identity']}")
-sup = {"schema": "hpcperf-file-identity-supplement-1", "records": [{"level": 2, "app": "miniem", "case": "maxwell-large-weak48",
-       "run_id": "rX", "files_sha256": dict(cur["workload"]["files_sha256"], **{"src/decks/solverMueLu.xml": "0" * 64}), "basis": "test"}]}
-json.dump(sup, open(f"{root}/{V.SUPPLEMENT}", "w"))
-v = V.verify_record(p, R, rules)
-if v["verdict"] == "PASS":
-    bad.append("a supplement whose hashes do not match the registry was accepted")
-sup["records"][0]["files_sha256"] = cur["workload"]["files_sha256"]
-json.dump(sup, open(f"{root}/{V.SUPPLEMENT}", "w"))
-v = V.verify_record(p, R, rules)
+full = {"level": 2, "app": "miniem", "case": "maxwell-large-weak48", "run_id": "rX", "files_sha256": cur["workload"]["files_sha256"],
+        "basis": "test basis", "evidence": ["test source"], "record_sha256": V.sha(p), "raw_dir": os.path.relpath(raw, R)}
+def with_sup(entry, schema="hpcperf-file-identity-supplement-1"):
+    json.dump({"schema": schema, "records": [entry]}, open(f"{root}/{V.SUPPLEMENT}", "w"))
+    return V.verify_record(p, R, rules)
+for label, entry, schema in (
+        ("hashes differ from the registry", dict(full, files_sha256=dict(full["files_sha256"], **{"src/decks/solverMueLu.xml": "0" * 64})), None),
+        ("identity + current hashes only, no basis / evidence", {k: full[k] for k in ("level", "app", "case", "run_id", "files_sha256")}, None),
+        ("empty basis", dict(full, basis=" "), None),
+        ("no evidence sources", dict(full, evidence=[]), None),
+        ("not bound to the record (record_sha256)", dict(full, record_sha256="0" * 64), None),
+        ("not bound to the raw runs (raw_dir)", dict(full, raw_dir="elsewhere"), None),
+        ("wrong schema", full, "other-schema")):
+    v = with_sup(entry, schema or "hpcperf-file-identity-supplement-1")
+    if v["verdict"] == "PASS" or v["file_identity"] != "insufficient":
+        bad.append(f"a supplement with {label} was accepted: {v['verdict']} {v['file_identity']}")
+v = with_sup(full)
 if v["verdict"] != "PASS" or v["file_identity"] != "supplement":
-    bad.append(f"matching supplement: {v['verdict']} {v['problems'] + v['gaps']}")
+    bad.append(f"complete matching supplement: {v['verdict']} {v['problems'] + v['gaps']}")
 if json.load(open(f"{raw}/workload_identity.json"))["workload"]["files_sha256"] != {}:
     bad.append("the stored identity was changed")
 print("ALLOK" if not bad else "\n".join(bad))

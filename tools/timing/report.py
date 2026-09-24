@@ -482,9 +482,11 @@ def render_md_registry(c):
         for app, iid, p in rejected:
             out.append(f"- NOT pooled, {md_cell(app)} / {md_cell(iid)}: {md_cell(p)}")
         if sup:
-            out.append("- input-file identity established after the measurement by a supplementary verification (the "
-                       "run's own argv / log and run-directory copies unchanged since before the run; the stored identity "
-                       "did not name these files): " + ", ".join(f"{md_cell(a)} / {md_cell(i)}" for a, i in sup))
+            out.append("- input-file identity from a supplementary verification established after the measurement, not "
+                       "captured at measurement time (the stored identity did not name these files): the run's own argv / log "
+                       "name the files, the run read the declared run-directory copies, their content hashes to the registry "
+                       "value and their status-change time precedes the run -- conditional evidence taken together, on the "
+                       "premise that ctime was not reset: " + ", ".join(f"{md_cell(a)} / {md_cell(i)}" for a, i in sup))
         if ins:
             out.append("- run verification INSUFFICIENT (timing kept, evidence incomplete): " +
                        ", ".join(f"{md_cell(a)} / {md_cell(i)}" for a, i in ins))

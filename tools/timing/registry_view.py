@@ -134,6 +134,23 @@ def _make_set(rs, group=None):
     return m
 
 
+def group_structure_problem(g):
+    """Why a measurement group's member list is malformed (None when it is well formed). A malformed group
+    is rejected as a whole -- never silently repaired -- so no sample can be counted twice."""
+    base, ext = g.get("base_run_id"), g.get("extension_run_ids")
+    if not isinstance(base, str) or not base.strip():
+        return "missing or empty base_run_id"
+    if not isinstance(ext, list) or not ext:
+        return "extension_run_ids missing, empty or not a list"
+    if any(not isinstance(i, str) or not i.strip() for i in ext):
+        return "an extension run id is empty or not a string"
+    if len(set(ext)) != len(ext):
+        return "an extension run id is listed more than once"
+    if base in ext:
+        return "the base run id is also listed as an extension"
+    return None
+
+
 def measurements(recs, groups=()):
     """(measurement sets, problems) of ONE input: explicit groups pooled (see the module docstring), every
     other accepted ok record its own measurement."""
@@ -142,7 +159,11 @@ def measurements(recs, groups=()):
     by_run = {(r["_root"], r["run_id"]): r for r in elig}
     sets, problems, used = [], [], set()
     for g in groups:
-        ids = [g.get("base_run_id")] + list(g.get("extension_run_ids") or [])
+        bad = group_structure_problem(g)
+        if bad:
+            problems.append(f"group {g.get('id')}: {bad} -- not pooled")
+            continue
+        ids = [g["base_run_id"]] + list(g["extension_run_ids"])
         members = [by_run.get((g["_root"], i)) for i in ids]
         missing = [i for i, m in zip(ids, members) if m is None]
         if missing:
