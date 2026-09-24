@@ -11,7 +11,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 re
 - one NVIDIA B200 (GPU 0), CUDA 13.2; one measurement at a time
 - no profiler in this campaign: device busy, host gap, kernel / operation counts, runtime-API calls and profiler inflation are not collected (null)
 - 43 registered Level 3 inputs: no ROI markers yet -- they keep their earlier native timing only
-- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); CV = sample stddev / median. An adaptive extension (+2 runs of the same configuration) is pooled with its 3 runs.
+- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); CV = sample stddev / median. An adaptive extension (+2 runs) is pooled with its 3 runs only through an explicit measurement group; runs of the same configuration without one stay separate measurements.
 - Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification (did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness (evidence from outside the timing runs; its basis is given per input in index.html).
 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
@@ -259,6 +259,13 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 re
 | tealeaf | bm5e4-4000sq-2steps | SUCCESS | nvidia-b200.cuda13.2 | 4.17 s | 3 | 0.1% | 0.0% | yes | PASS | PASS | fd2fc6c6c8 |
 | xsbench | large | SUCCESS | nvidia-b200.cuda13.2 | 40.1 ms | 3 | 1.8% | 1.0% | yes | PASS | PASS | fd2fc6c6c8 |
 | xsbench | small | SUCCESS | nvidia-b200.cuda13.2 | 10.4 ms | 3 | 0.3% | 0.2% | yes | PASS | PASS | fd2fc6c6c8 |
+
+### Pooled measurements and input-file identity
+
+- pooled by measurement group `amg2023/p1-256cubed/20260923T190616Z-2030182+20260923T214310Z-2258177` (amg2023 / p1-256cubed): logs/campaign.log: 2026-09-23T21:43:07Z level 2 adaptive extension: 2 inputs: amg2023/p1-256cubed quicksilver/p1-profile-8c-100k-20s; logs/level2.log: measure_level2: run_id=20260923T190616Z-2030182 platform=nvidia-b200.cuda13.2 collector=none cases=92 protocol=warmup:0,clean:3,profiled:0; logs/level2-adaptive.log: measure_level2: run_id=20260923T214310Z-2258177 platform=nvidia-b200.cuda13.2 collector=none cases=2 protocol=warmup:0,clean:2,profiled:0
+- pooled by measurement group `quicksilver/p1-profile-8c-100k-20s/20260923T190616Z-2030182+20260923T214310Z-2258177` (quicksilver / p1-profile-8c-100k-20s): logs/campaign.log: 2026-09-23T21:43:07Z level 2 adaptive extension: 2 inputs: amg2023/p1-256cubed quicksilver/p1-profile-8c-100k-20s; logs/level2.log: measure_level2: run_id=20260923T190616Z-2030182 platform=nvidia-b200.cuda13.2 collector=none cases=92 protocol=warmup:0,clean:3,profiled:0; logs/level2-adaptive.log: measure_level2: run_id=20260923T214310Z-2258177 platform=nvidia-b200.cuda13.2 collector=none cases=2 protocol=warmup:0,clean:2,profiled:0
+- pooled by measurement group `remhos/periodic-hexagon-p0/20260924T033754Z-2592820+20260924T033902Z-2596596` (remhos / periodic-hexagon-p0): phase4-remhos-order3/phase4.log: 2026-09-24T03:38:50Z adaptive extension: 1: remhos/periodic-hexagon-p0; phase4-remhos-order3/measure.log: measure_level2: run_id=20260924T033754Z-2592820 platform=nvidia-b200.cuda13.2 collector=none cases=2 protocol=warmup:0,clean:3,profiled:0; phase4-remhos-order3/measure-adaptive.log: measure_level2: run_id=20260924T033902Z-2596596 platform=nvidia-b200.cuda13.2 collector=none cases=1 protocol=warmup:0,clean:2,profiled:0
+- input-file identity established after the measurement by a supplementary verification (the run's own argv / log and run-directory copies unchanged since before the run; the stored identity did not name these files): miniem / maxwell-large-weak48, miniem / maxwell-large-strong64, miniem / maxwell-smoke-15, miniem / darcy-hex
 
 ### Not measured successfully
 
