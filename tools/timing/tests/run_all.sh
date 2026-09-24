@@ -1188,6 +1188,24 @@ for label, wl, argv, o, want in [
         bad.append(f"{label}: {v['verdict']} ({v['problems'] + v['gaps']}), want {want}")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+# a registered input whose run fails before the ROI (MiniEM bdot/blob today) stays a failure: NOT_RUN,
+# never PASS, and summarize counts it as not ok
+pycheck "13t: a run that aborts before the ROI is NOT_RUN, never PASS" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vt"); raw = os.path.join(T, "raw"); os.makedirs(os.path.join(raw, "clean.0"), exist_ok=True)
+open(os.path.join(raw, "clean.0", "run.log"), "w").write("terminate called after throwing an instance of 'Teuchos::Exceptions::InvalidParameterName'\n")
+open(os.path.join(raw, "clean.0", "run.txt"), "w").write("rc=134\n")
+ident = {"benchmark": "miniem", "input_id": "maxwell-bdot-small", "complete": True, "selector": "HPCPERF_MINIEM_INPUT",
+         "workload": {"args": [], "env": {}, "params": {}, "files_sha256": {}}}
+rec = {"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-bdot-small", "status": "clean_failed",
+       "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-bdot-small"}},
+       "roi": {"runs_s": [], "wall_s": None}, "provenance": {"raw_dir": raw}}
+p = os.path.join(T, "r.json"); json.dump(rec, open(p, "w"))
+v = V.verify_record(p, os.path.join(T, "norepo"), {1: {}, 2: {}})
+print("ALLOK" if v["verdict"] == "NOT_RUN" else f"verdict {v['verdict']}: {v['problems']}")
+PY
 out="$(python3 "$TOOLS/verify_registry_runs.py" --repo "$TMP/vr/repo" "$TMP/vr/rec" 2>&1 | noise | tail -1)"
 case "$out" in *"records)"*) ok "13p: the command line verifies a directory of records ($out)" ;;
                *) bad "13p: verify_registry_runs.py cli: $out" ;; esac
