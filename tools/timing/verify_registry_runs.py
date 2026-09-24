@@ -28,8 +28,10 @@ executable, working directory and argv -- ran that input:
 
 Verdicts: PASS; FAIL (a contradiction: wrong file, wrong argument, duplicate option, changed file, ...);
 INSUFFICIENT (no contradiction, but some part of the input is not evidenced -- listed as gaps); NOT_RUN
-(the record has no measured run, e.g. build_not_materialized). Exit 0 only when every record is PASS or
-NOT_RUN.
+(the record has no measured run, e.g. build_not_materialized); SUPERSEDED (the run did get the workload
+its identity records, but the registry has since changed the input's definition -- a valid historical
+result of the OLD workload, never a result of the current input; unlike an invalidated record it did
+not run the wrong workload). Exit 0 only when every record is PASS, NOT_RUN or SUPERSEDED.
 """
 
 import argparse
@@ -342,6 +344,24 @@ def verify_level2(c, repo, ident, rec, runs, rule):
             c.gap(f"knob {k}={v} is not evidenced by argv, files or output")
 
 
+_current = {}
+
+
+def current_workload(repo, level, app, iid):
+    """The input's workload as the registry defines it NOW (None: no registry here, or no such input)."""
+    key = (repo, level, app, iid)
+    if key not in _current:
+        _current[key] = None
+        bdir = os.path.join(repo, f"level{level}", app)
+        if os.path.isfile(os.path.join(bdir, "inputs.yaml")):
+            sys.path.insert(0, os.path.join(repo, "tools", "inputs"))
+            import hpcperf_inputs as hi
+            doc = hi.load(bdir)
+            inp = next((i for i in doc["inputs"] if i["id"] == iid), None)
+            _current[key] = hi.registry_identity(doc, inp)["workload"] if inp else "unregistered"
+    return _current[key]
+
+
 def verify_record(path, repo, rules):
     rec = json.load(open(path))
     out = {"record": path, "app": rec.get("app"), "case": rec.get("case"), "level": rec.get("level"),
@@ -380,8 +400,16 @@ def verify_record(path, repo, rules):
             (verify_level1 if rec["level"] == 1 else verify_level2)(c, repo, ident, rec, runs, rule)
         except (KeyError, OSError, re.error) as exc:
             c.fail(f"verifier error: {exc!r}")
-    out.update(verdict="FAIL" if c.problems else "INSUFFICIENT" if c.gaps else "PASS",
-               problems=c.problems, gaps=c.gaps, evidence=c.evidence, clean_runs=len(runs))
+    verdict = "FAIL" if c.problems else "INSUFFICIENT" if c.gaps else "PASS"
+    cur = current_workload(repo, rec["level"], rec["app"], rec["case"])
+    if verdict == "PASS" and cur is not None and cur != ident.get("workload"):
+        verdict = "SUPERSEDED"
+        c.gaps.append("the registry's current definition of this input differs from the recorded workload "
+                      + ("(input no longer registered)" if cur == "unregistered" else
+                         "(" + ", ".join(k for k in sorted(set(cur) | set(ident["workload"]))
+                                         if cur.get(k) != ident["workload"].get(k)) + " changed)")
+                      + " -- a result of the old workload only")
+    out.update(verdict=verdict, problems=c.problems, gaps=c.gaps, evidence=c.evidence, clean_runs=len(runs))
     return out
 
 
@@ -425,7 +453,7 @@ def main(argv):
     if a.json:
         with open(a.json, "w") as f:
             json.dump({"schema": "hpcperf-registry-run-verification-1", "counts": counts, "records": res}, f, indent=1)
-    return 0 if res and all(r["verdict"] in ("PASS", "NOT_RUN") for r in res) else 1
+    return 0 if res and all(r["verdict"] in ("PASS", "NOT_RUN", "SUPERSEDED") for r in res) else 1
 
 
 if __name__ == "__main__":
