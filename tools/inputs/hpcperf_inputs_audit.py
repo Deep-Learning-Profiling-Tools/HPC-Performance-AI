@@ -53,6 +53,14 @@ def load_measurement(mdir, level, bench, iid, bench_dir=None):
     f = os.path.join(mdir, f"level{level}-{bench}", iid, "measurement.json")
     if not os.path.exists(f):
         return None
+    inv = hi.invalidation(f)
+    if inv:     # kept on disk as evidence, never counted: no timing, no correctness verdict
+        return {"run_completed": False, "invalidated": True, "invalidation_reason": inv.get("reason"),
+                "invalidation_marker": inv["marker"], "replacement": inv.get("replacement"),
+                "timing_status": "INVALIDATED", "timing_ok": False, "comparison_rules": None,
+                "baseline_verdict": None, "native_check": None, "needs_validation": [], "measured_runs": None,
+                "main_compute_median_s": None, "e2e_median_s": None, "compute_ge_1s": None, "stable": None,
+                "dir": os.path.dirname(f)}
     d = json.load(open(f))
     s = _summary(d, bench_dir) if bench_dir else d.get("summary", {})
     return {"run_completed": bool(s.get("run_completed")), "timing_status": s.get("timing_status") or ("NATIVE" if s.get("timing_ok") else "FAILED"),
@@ -107,7 +115,8 @@ def audit(root, mdir=None, blockers=None):
             "input_forms": forms, "selector": d.get("selector"), "timing_status": timing_status,
             "timing_reason": d["timing"].get("reason") if timing_status != "NATIVE" else None,
             "n_measured": len(completed), "n_native_measured": len(native_measured),
-            "n_failed_measurements": len([k for k, m in meas.items() if not m["run_completed"]]),
+            "n_failed_measurements": len([k for k, m in meas.items() if not m["run_completed"] and not m.get("invalidated")]),
+            "invalidated_inputs": sorted(k for k, m in meas.items() if m.get("invalidated")),
             "unmeasured_inputs": [i["id"] for i in runnable if i["id"] not in completed] if mdir else [i["id"] for i in runnable],
             "unmaterialized_inputs": [i["id"] for i in ins if i.get("materialized", True) is False],
             "checker": checker, "record_only": rec, "correctness": corr,
@@ -140,7 +149,7 @@ def totals(rows):
                   "mean_inputs": round(statistics.mean(n), 2), "median_inputs": statistics.median(n),
                   "status": {s: sum(1 for r in rows if r["status"] == s) for s in ("MULTI_INPUT", "SINGLE_INPUT", "BLOCKED", "UNSET")},
                   "source_share": {"upstream": up, "derived": de, "custom": cu, "upstream_pct": round(100 * up / sum(n), 1), "derived_pct": round(100 * de / sum(n), 1), "custom_pct": round(100 * cu / sum(n), 1)},
-                  "measured_inputs": sum(r["n_measured"] for r in rows), "not_measured_runnable_inputs": sum(len(r["unmeasured_inputs"]) for r in rows),
+                  "measured_inputs": sum(r["n_measured"] for r in rows), "invalidated_measurements": sum(len(r.get("invalidated_inputs") or []) for r in rows), "not_measured_runnable_inputs": sum(len(r["unmeasured_inputs"]) for r in rows),
                   "unmaterialized_inputs": sum(len(r["unmaterialized_inputs"]) for r in rows),
                   "native_timed_inputs": sum(r["n_native_measured"] for r in rows),
                   "needs_timing_support_benchmarks": sum(1 for r in rows if r["timing_status"] != "NATIVE"),
@@ -167,7 +176,7 @@ def markdown(rows, tot, mdir):
         L.append(f"| {k} | {t['benchmarks']} | {t['inputs']} ({t['runnable_inputs']}) | {t['mean_inputs']} / {t['median_inputs']} | {st['MULTI_INPUT']} / {st['SINGLE_INPUT']} / {st['BLOCKED']} | {t['measured_inputs']} ({t['native_timed_inputs']}) | {t['needs_timing_support_benchmarks']} |")
     a = tot["all"]
     L += ["", f"Source share of all {a['inputs']} inputs: upstream {a['source_share']['upstream']} ({a['source_share']['upstream_pct']} %), derived {a['source_share']['derived']} ({a['source_share']['derived_pct']} %), custom {a['source_share']['custom']} ({a['source_share']['custom_pct']} %). "
-          f"Runnable inputs not measured: {a['not_measured_runnable_inputs']}; registered but unmaterialized: {a['unmaterialized_inputs']}. Comparison rules of the measured inputs: {a['comparison_rules_of_measured_inputs']}. "
+          f"Runnable inputs not measured: {a['not_measured_runnable_inputs']} (incl. {a['invalidated_measurements']} whose measurement is invalidated -- kept on disk, not counted); registered but unmaterialized: {a['unmaterialized_inputs']}. Comparison rules of the measured inputs: {a['comparison_rules_of_measured_inputs']}. "
           f"Benchmarks without any measured input: {', '.join(a['benchmarks_not_measured']) or 'none'}."]
     L += ["", "## SINGLE_INPUT benchmarks (why)", ""]
     for r in rows:
@@ -192,7 +201,8 @@ def markdown(rows, tot, mdir):
     L += ["", "## Runnable inputs without a completed measurement", ""]
     for r in rows:
         if r["unmeasured_inputs"]:
-            L.append(f"- {r['benchmark']} (L{r['level']}): {', '.join(r['unmeasured_inputs'])}" + (f" -- {r['measurement_blocker']}" if r["measurement_blocker"] else ""))
+            inv = set(r.get("invalidated_inputs") or [])
+            L.append(f"- {r['benchmark']} (L{r['level']}): {', '.join(i + (' (INVALIDATED)' if i in inv else '') for i in r['unmeasured_inputs'])}" + (f" -- {r['measurement_blocker']}" if r["measurement_blocker"] else ""))
     L += ["", "## Correctness blockers (record-only required quantities = NEEDS_VALIDATION, no checker)", ""]
     for r in rows:
         if r["checker"] in ("none", "record-only", "diagnostic-only"):

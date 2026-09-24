@@ -271,11 +271,17 @@ engine_setup() {
         case "$ENV_SCRIPT" in /*) ENV_SCRIPT_ABS="$ENV_SCRIPT" ;; *) ENV_SCRIPT_ABS="$REPO/$ENV_SCRIPT" ;; esac
         [ -f "$ENV_SCRIPT_ABS" ] || engine_die "environment script not found: $ENV_SCRIPT (pass --env-script)"
     fi
-    local probe_log; probe_log="$(mktemp)"
-    run_clean "$probe_log" "$REPO" -- python3 "$TOOLS/probes/device.py"
-    DEVICE_JSON="$(tail -1 "$probe_log")"; rm -f "$probe_log"
-    PLATFORM_ID="$(printf '%s' "$DEVICE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["device"]["platform_id"])' 2>/dev/null)"
-    [ -n "$PLATFORM_ID" ] || engine_die "device probe failed: $DEVICE_JSON"
+    # A dry run starts nothing in the clean environment, not even the device probe: it is a
+    # static plan (tests/run_all.sh 14 checks this with shims for env/timeout/mpirun).
+    if [ "$DRY_RUN" = 1 ]; then
+        DEVICE_JSON="{}"; PLATFORM_ID="not-probed-in-dry-run"
+    else
+        local probe_log; probe_log="$(mktemp)"
+        run_clean "$probe_log" "$REPO" -- python3 "$TOOLS/probes/device.py"
+        DEVICE_JSON="$(tail -1 "$probe_log")"; rm -f "$probe_log"
+        PLATFORM_ID="$(printf '%s' "$DEVICE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["device"]["platform_id"])' 2>/dev/null)"
+        [ -n "$PLATFORM_ID" ] || engine_die "device probe failed: $DEVICE_JSON"
+    fi
     if [ "$COLLECTOR" = auto ]; then
         case "$PLATFORM_ID" in
             nvidia-*) if collector_available nvidia_nsys; then COLLECTOR=nvidia_nsys; else COLLECTOR=none; fi ;;

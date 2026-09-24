@@ -1,0 +1,99 @@
+# tools/timing/cases/registry_evidence.yaml -- how each Level 2 run.sh hands a registered input to the program,
+# i.e. what EVIDENCE a measured run must show before it counts as a run of that input.
+# Read by tools/timing/verify_registry_runs.py. Hand-maintained next to the run.sh it describes; every entry
+# names the run.sh / source behaviour it relies on. Nothing here relaxes the generic checks (registry args
+# present as a contiguous run of the argv, registered files reached by real path AND content hash, no
+# unhandled duplicate options, selector passed); rules only ADD evidence for what the argv cannot show.
+#
+# Keys (all optional):
+#   covers        env knobs of the app's inputs that the templates below evidence (every knob an input sets
+#                 must be covered here or be the path of a registered file of that input)
+#   argv          regex templates matched against the argv (joined with single spaces, trailing space added)
+#   exe           regex templates matched against the executable path
+#   output        regex templates matched (re.M) against the program's output of EVERY clean run
+#   cwd_file      {file relative to the process cwd: [regex templates]} -- build-configuration evidence
+#   search_dirs   benchmark-relative directories run.sh resolves a bare file argument in (besides the
+#                 benchmark directory itself), in run.sh's order
+#   cwd_files     registered files the program reads from its working directory (by name); accepted only
+#                 when the process cwd IS the file's directory and the content hash matches
+#   generated     {registered file: argv path prefix of the file run.sh generates from it}; the generated
+#                 file's content differs by design -- the output templates must evidence the parameters
+#   copies        {registered file: argv path prefix of a byte-identical copy run.sh makes}; accepted only
+#                 when the copy's sha256 equals the registered file's
+#   last_wins     source reference proving the program's parser keeps the LAST occurrence of an option;
+#                 required before a registered option may appear more than once in the argv (and the last
+#                 occurrence must then carry the registered value)
+# Templates are Python format strings over the input's registry `params` ({n}, {round(final_time/dt)} is
+# not allowed -- use derived values listed under `derive`); a template naming a param the input does not
+# have is not applicable to that input and is reported as skipped.
+#   derive        {name: python expression over params} -- derived values for templates
+
+level1:                         # exact argv/exe/cwd is checked for every Level 1 input; NPB classes are compiled in
+  cg: &npb
+    output: ['^\s*[Cc]lass(_npb)?\s+=\s+{class}$']   # NPB prints 'class_npb = A' (or 'Class = A')
+  ep: *npb
+  ft: *npb
+  is: *npb
+  mg: *npb
+level2:
+  amg2023:
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_AMG_N, HPCPERF_AMG_PROBLEM]
+    argv: ['-n {n} {n} {n} ', '-problem {problem} ']
+    output: ['Problem ID\s+= {problem}$', '\(Nx, Ny, Nz\) = \({n}, {n}, {n}\)']
+  branson: {}                     # the deck (HPCPERF_BRANSON_DECK) is a registered file passed in the argv
+  cabanapic:                      # the Weibel deck is compiled in; the binary prints the values it read
+    covers: [HPCPERF_NY, HPCPERF_NPPC, HPCPERF_NUM_STEPS]
+    output: ['^hpcperf_weibel deck: ny={ny} nppc={nppc} num_steps={num_steps} ']
+  cloverleaf: {}
+  comb:
+    covers: [HPCPERF_COMB_LOCAL_SIZE, HPCPERF_COMB_CYCLES]
+    argv: ['(^| ){local_size}_{local_size}_{local_size} ', '-cycles {cycles} ']
+  exacmech:                       # run.sh writes an option file from EXACMECH_*; the miniapp prints what it read
+    covers: [EXACMECH_MODEL, EXACMECH_NQPTS, EXACMECH_NSTEPS]
+    output: ['^Material Model: {model}$', '^Number of steps: {nsteps}$', '^Number of qpts: {nqpts}$']
+  examinimd:                      # run.sh generates in.lj.<L>^3.s<steps> from input/in.lj (sed of lattice/run)
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_EXAMINIMD_LATTICE, HPCPERF_EXAMINIMD_STEPS]
+    generated: {input/in.lj: build/level2/examinimd/cuda/run/in.lj.}
+    cwd_files: [input/snap/Ta06A.snapcoeff, input/snap/Ta06A.snapparam]   # run.sh cd's into the SNAP deck dir
+    output: ['^run {steps} $', '^Atoms: {atoms} ']
+  exampm:
+    covers: [HPCPERF_EXAMPM_EXAMPLE]
+    exe: ['/examples/{example}$']
+  gamess_ri_mp2:                  # run.sh cd's into inputs/; *.rand inputs are generated in memory by the program
+    covers: [HPCPERF_GAMESS_INPUT, HPCPERF_GAMESS_NQVV]
+    argv: ['(^| ){input} ']
+    output: ['NQVV =\s+{nqvv}$']
+  haccabanapm: {}                 # the indat (HPCPERF_HACCABANAPM_INDAT) is a registered file in the argv
+  hipbone: {}
+  kripke:
+    covers: [KRIPKE_ZONES, KRIPKE_GROUPS, KRIPKE_QUAD, KRIPKE_LAYOUT]
+    argv: ['--layout {layout} ', '--groups {groups} ', '--quad {quad} ', '--zones {zones} ']
+  laghos: {}
+  minibude:                       # --deck names the deck directory that holds the registered poses.in etc.
+    covers: [MINIBUDE_DECK, MINIBUDE_PPWI, MINIBUDE_ITERS]
+    argv: ['--deck \S*/data/{deck} ', '-i {iterations} ', '-w {wgsize} ', '-p {ppwi} ']
+  miniem:                         # run.sh: --inputFile=<deck> (build's decks/), --numTimeSteps, --x/y/z-elements (weak/strong)
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_MINIEM_DECK]
+    derive: {n: "int(str(elements).split('^')[0]) if deck == 'maxwell-large.xml' else None"}
+    argv: ['(^| )--inputFile=\S*{deck} ', '--numTimeSteps={steps} ', '--x-elements={n} --y-elements={n} --z-elements={n} ']
+  miniweather:                    # grid / initial condition / simulated time are compiled in (tagged build dir)
+    covers: [HPCPERF_MINIWEATHER_BUILD_TAG]
+    output: ['^nx_glob, nz_glob: {nx} {nz}$']
+    cwd_file: {CMakeCache.txt: ['^DATA_SPEC:\w+={data_spec}$', '^SIM_TIME:\w+={sim_time}$', '^NX:\w+={nx}$', '^NZ:\w+={nz}$']}
+  p3_heat3d:
+    last_wins: 'level2/p3_heat3d/miniapps/heat3d/Parser.hpp:24-41 (one sequential pass, each --nx/--ny/--nz/--nbiter overwrites)'
+    output: ['^\(nx, ny, nz\) = {nx}, {ny}, {nz}$']
+  p3_vlp4d:
+    search_dirs: [wk]             # run.sh: a deck argument is taken from the caller's cwd, else from wk/
+  quicksilver: {}
+  remhos:                         # MFEM echoes the options it parsed
+    output: ['^\s+--problem {problem}$', '^\s+--refine-serial {rs}$', '^\s+--time-step {dt}$', '^\s+--mesh \S*/{mesh}$']
+  shaw:                           # run.sh writes input.yaml from HPCPERF_SHAW_*; the program prints what it read
+    covers: [HPCPERF_SHAW_NR, HPCPERF_SHAW_NTH, HPCPERF_SHAW_DT]
+    derive: {num_steps: 'round(final_time / dt)'}
+    output: ['^nr = {nr}$', '^nth = {nth}$', '^numSteps = {num_steps} ?$']
+  sw4lite: {}                     # the deck (HPCPERF_SW4LITE_INPUT) is a registered file in the argv
+  tealeaf: {}
+  xsbench:
+    last_wins: 'level2/xsbench/cuda/io.cu:346-349 (-s assigns input.HM on every occurrence)'
+    output: ['^H-M Benchmark Size:\s+{size}$']

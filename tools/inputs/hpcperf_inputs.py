@@ -37,7 +37,8 @@ Sub-commands (all read-only except `measure`, which writes into --out):
                                            1 a rule failed / the candidate run failed (verdict FAIL);
                                            2 refused: baseline belongs to another input or benchmark,
                                            was recorded for a different workload (params/args/files),
-                                           is bound to another input, or is the same output file;
+                                           is bound to another input, is the same output file, or
+                                           either side is invalidated (INVALIDATED.json);
                                            3 nothing failed but the comparison is not complete: a
                                            required quantity is still `record`, or the workload
                                            identity of baseline/candidate is not established (old
@@ -48,13 +49,15 @@ Sub-commands (all read-only except `measure`, which writes into --out):
                                            reference to this input with recorded evidence.
   status   <bench_dir> <measurement.json>  the status vocabulary of a finished measurement (the
                                            self-comparison is re-derived over the runs OTHER than
-                                           the baseline run)
+                                           the baseline run; an invalidated measurement reports
+                                           INVALIDATED and no verdict)
   migrate-baseline <bench_dir> <baseline.json> --input ID --evidence <measurement.json> [--note ..] [--out F]
                                            attach a workload identity to an old baseline from the
                                            evidence of the measurement it came from (same benchmark,
                                            input id, inputs.yaml sha256, command/selector); writes a
                                            NEW file and records source/evidence/basis; never copies
-                                           the candidate's identity
+                                           the candidate's identity; refused for an invalidated
+                                           baseline or evidence (INVALIDATED.json)
   measure  <bench_dir> <input_id> --out DIR [--warmup 1] [--reps 3] [--timeout S] [--gpus 1]
                                            warm-up run + N measured runs, one directory per run,
                                            timing + baseline + summary (median, min, max, MAD, spread)
@@ -735,6 +738,34 @@ def native_check(doc, current: dict, inp=None) -> dict:
     return {"status": "PASS" if res["ok"] else "FAIL", "checks": res["checks"]}
 
 
+# ----------------------------------------------------------------------------- invalidation
+INVALIDATION_FILE = "INVALIDATED.json"
+
+
+def invalidation(path) -> dict:
+    """The invalidation marker governing a measurement / baseline / run log, or None.
+
+    A measurement shown to have run another workload than the input it is filed under (e.g. the
+    registry arguments never reached the program) is not deleted: its directory gets an
+    INVALIDATED.json (schema hpcperf-invalidation-1: reason, actual vs expected workload, fix commit,
+    replacement records). The marker applies to every file below that directory -- the
+    measurement.json, the baseline.json written from it and the run logs -- so neither side of a
+    comparison, a baseline migration nor an audit can use them again."""
+    p = Path(path).resolve()
+    for d in [p] + list(p.parents) if p.is_dir() else list(p.parents):
+        f = d / INVALIDATION_FILE
+        if f.is_file():
+            try:
+                m = json.loads(f.read_text())
+            except ValueError:
+                m = {"reason": f"unreadable {INVALIDATION_FILE}"}
+            m.setdefault("marker", str(f))
+            return m
+        if (d / ".git").exists():
+            break
+    return None
+
+
 # ----------------------------------------------------------------------------- measure
 def sha256_file(p: Path):
     try:
@@ -1047,6 +1078,10 @@ def main(argv=None):
             inp = get_input(doc, a.input) if a.input else None
             print(json.dumps(extract(doc, Path(a.log), inp), indent=2)); return 0
         if a.cmd == "compare":
+            for side, f in (("baseline", a.baseline), ("candidate log", a.log)):
+                inv = invalidation(f)
+                if inv:
+                    sys.stderr.write(f"hpcperf_inputs: the {side} is invalidated ({inv.get('reason')}; {inv['marker']}) -- refusing to compare\n"); return 2
             bdoc = json.loads(Path(a.baseline).read_text())
             bid = bdoc.get("input_id")
             if a.input and bid and bid != a.input:
@@ -1084,6 +1119,10 @@ def main(argv=None):
                 return 1
             return 0 if res["verified"] else 3
         if a.cmd == "migrate-baseline":
+            for side, f in (("baseline", a.baseline), ("evidence", a.evidence)):
+                inv = invalidation(f)
+                if inv:
+                    raise InputError(f"the {side} is invalidated ({inv.get('reason')}; {inv['marker']}); an invalidated record never becomes a baseline")
             bdoc = json.loads(Path(a.baseline).read_text())
             inp = get_input(doc, a.input)
             out = migrate_baseline(doc, bdoc, inp, Path(a.evidence), a.note, a.registry_commit, a.manual_basis)
@@ -1093,6 +1132,9 @@ def main(argv=None):
             dest.write_text(json.dumps(out, indent=2))
             print(json.dumps({"migrated_to": str(dest), "workload": out["workload"], "workload_migration": out["workload_migration"]}, indent=2)); return 0
         if a.cmd == "status":
+            inv = invalidation(a.measurement)
+            if inv:
+                print(f"INVALIDATED: {inv.get('reason')} ({inv['marker']})"); return 3
             m = json.loads(Path(a.measurement).read_text())
             inp = get_input(doc, m["input_id"])
             s, _ = summarize(doc, inp, m["runs"], m.get("measured_runs", len([r for r in m["runs"] if r["measured"]])))

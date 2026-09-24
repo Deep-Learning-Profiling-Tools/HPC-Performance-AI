@@ -692,5 +692,28 @@ sed -e '/^PASS:: Fluence/d' "$FX/quicksilver_two_tables.log" > "$TMP/qs_nofluenc
 python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$TMP/qs_nofluence.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 1 ] && grep -q '"failed": \[' "$TMP/c.json" && grep -q '"pass_fluence"' "$TMP/c.json" && ok "quicksilver coverage: a missing upstream PASS:: line -> exit 1 FAIL (the native checks are what is verified)" || bad "quicksilver coverage marker rc=$rc"
 
+# ---- 13. invalidated measurements (INVALIDATED.json) are never compared, migrated, counted ----
+rm -rf "$TMP/m_inv"; cp -r "$TMP/m_ok" "$TMP/m_inv"
+sed -i "s#$TMP/m_ok/#$TMP/m_inv/#g" "$TMP/m_inv/baseline.json" "$TMP/m_inv/measurement.json"
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/m_inv/baseline.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>&1; rc0=$?
+echo '{"schema": "hpcperf-invalidation-1", "reason": "test: the registry args never reached the program"}' > "$TMP/m_inv/INVALIDATED.json"
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/m_inv/baseline.json" "$TMP/m_ok/rep2/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc0 -eq 0 ] && [ $rc -eq 2 ] && grep -q "baseline is invalidated" "$TMP/e" \
+    && ok "invalidation: a baseline that verified (exit 0) is refused once its measurement is invalidated (exit 2)" || bad "invalidation compare baseline rc0=$rc0 rc=$rc $(cat "$TMP/e")"
+python3 "$TOOL" compare "$FR/level1/fake" "$TMP/m_ok/baseline.json" "$TMP/m_inv/rep2/stdout.log" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "candidate log is invalidated" "$TMP/e" && ok "invalidation: an invalidated run log is refused as a candidate (exit 2)" || bad "invalidation compare candidate rc=$rc"
+python3 "$TOOL" migrate-baseline "$FR/level1/fake" "$TMP/wl_none.json" --input a --evidence "$TMP/m_inv/measurement.json" --out "$TMP/wl_mig_inv.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 0 ] && [ ! -e "$TMP/wl_mig_inv.json" ] && grep -q "invalidated" "$TMP/e" && ok "invalidation: migrate-baseline refuses invalidated evidence, writes nothing" || bad "invalidation migrate rc=$rc"
+out="$(python3 "$TOOL" status "$FR/level1/fake" "$TMP/m_inv/measurement.json" 2>&1)"; rc=$?
+[ $rc -eq 3 ] && case "$out" in INVALIDATED*) true ;; *) false ;; esac && ok "invalidation: status reports INVALIDATED (exit 3), no verdict" || bad "invalidation status rc=$rc $out"
+mkdir -p "$TMP/mdir/level1-fake"; rm -rf "$TMP/mdir/level1-fake/a"; cp -r "$TMP/m_inv" "$TMP/mdir/level1-fake/a"
+python3 - "$TMP/mdir" "$FR/level1/fake" <<'PY' && ok "invalidation: the audit loads an invalidated measurement as INVALIDATED, not completed, no verdict" || bad "invalidation audit"
+import sys, os
+sys.path.insert(0, os.path.join(os.environ.get("R", "."), "tools", "inputs"))
+import hpcperf_inputs_audit as au
+m = au.load_measurement(sys.argv[1], 1, "fake", "a", sys.argv[2])
+assert m["invalidated"] and not m["run_completed"] and m["timing_status"] == "INVALIDATED" and m["baseline_verdict"] is None and m["native_check"] is None, m
+PY
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

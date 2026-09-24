@@ -515,6 +515,17 @@ def op_rows(rec):
 
 # ----------------------------------------------------------------- driver
 
+# A raw run shown to have measured another workload than its case/input (see
+# tools/inputs/hpcperf_inputs.py `invalidation`) keeps its evidence on disk but carries an
+# INVALIDATED.json: no record is built from it and an existing record of it is not loaded, so it
+# reaches no CSV, summary, report or baseline selection.
+INVALIDATION_FILE = "INVALIDATED.json"
+
+
+def invalidated(raw):
+    return os.path.isfile(os.path.join(raw, INVALIDATION_FILE))
+
+
 def raw_dirs(raw_root):
     for level_dir in sorted(glob.glob(os.path.join(raw_root, "level[0-9]"))):
         for run in sorted(glob.glob(os.path.join(level_dir, "*", "*", "*"))):
@@ -526,12 +537,17 @@ def json_path(out_root, rec):
     return os.path.join(out_root, f"level{rec['level']}", rec["app"], rec["case"], f"{rec['run_id']}.json")
 
 
-def load_records(out_root):
+def load_records(out_root, invalid=None):
     records, skipped = [], 0
     for path in sorted(glob.glob(os.path.join(out_root, "level[0-9]", "*", "*", "*.json"))):
         rec = json.load(open(path))
         if rec.get("schema") != SCHEMA:
             skipped += 1
+            continue
+        raw = (rec.get("provenance") or {}).get("raw_dir")
+        if raw and invalidated(os.path.join(REPO, raw)):
+            if invalid is not None:
+                invalid.append(path)
             continue
         records.append(rec)
     records.sort(key=lambda r: (r["level"], r["app"], r["case"], r["run_id"]))
@@ -570,13 +586,16 @@ def main(argv=None):
     ap.add_argument("--no-report", action="store_true", help="do not regenerate <out-root>/report/")
     a = ap.parse_args(argv)
 
-    written = failed = 0
+    written = failed = n_invalid_raw = 0
     if not a.csv_only:
         if not os.path.isdir(a.raw_root):
             print(f"summarize: no raw directory {a.raw_root}", file=sys.stderr)
             return 1
         for raw in raw_dirs(a.raw_root):
             if a.run_id and os.path.basename(raw) not in a.run_id:
+                continue
+            if invalidated(raw):
+                n_invalid_raw += 1
                 continue
             try:
                 rec = build_record(raw)
@@ -594,12 +613,14 @@ def main(argv=None):
             written += 1
 
     os.makedirs(a.out_root, exist_ok=True)
-    records, skipped = load_records(a.out_root)
+    invalid = []
+    records, skipped = load_records(a.out_root, invalid)
     outs = write_csvs(a.out_root, records)
     by = {}
     for r in records:
         by.setdefault(r["level"], []).append(r)
-    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}")
+    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}"
+          f" invalidated_raw={n_invalid_raw} invalidated_records={len(invalid)}")
     for level, recs in sorted(by.items()):
         ok = sum(1 for r in recs if r["status"] == "ok")
         fom = sum(1 for r in recs if r["fom"]["status"] == "ok")

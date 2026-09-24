@@ -741,18 +741,25 @@ if /usr/bin/grep -rn 'HPCPERF_ROI_LOG\|HPCPERF_SKIP_VERIFY' "$REPO"/level1/*/CMa
 else
     ok "6c: no ctest command or validate.sh sets HPCPERF_ROI_LOG / HPCPERF_SKIP_VERIFY"
 fi
-BR=""
-for cand in "$REPO/build/gcc13" "$REPO/build/all"; do [ -d "$cand/level1" ] && { BR="$cand"; break; }; done
+# the executables the registry cases run (build/<benchmark>/cuda*/...), else a legacy build root
+exes="$(/usr/bin/awk -F'\t' '!/^#/ {print $5}' "$TOOLS/cases/level1_registry.tsv" | sed "s#{REPO}#$REPO#" | sort -u)"
+BR="registry"
+if [ -z "$(for e in $exes; do [ -x "$e" ] && echo y && break; done)" ]; then
+    BR=""; exes=""
+    for cand in "$REPO/build/gcc13" "$REPO/build/all"; do
+        [ -d "$cand/level1" ] && { BR="$cand"; exes="$(ls "$cand"/level1/*/*_cuda 2>/dev/null)"; break; }
+    done
+fi
 if [ -z "$BR" ]; then
     skip "6d: no Level 1 build tree"
 else
-    nb=0; missing=""
-    for exe in "$BR"/level1/*/*_cuda; do
-        [ -x "$exe" ] || continue
+    nb=0; absent=0; missing=""
+    for exe in $exes; do
+        [ -x "$exe" ] || { absent=$((absent+1)); continue; }
         nb=$((nb+1))
-        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing $(basename "$exe")"
+        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing ${exe#$REPO/}"
     done
-    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR)" \
+    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR; $absent not built)" \
                                          || bad "6d: $nb binaries, without markers:$missing"
 fi
 
@@ -1045,6 +1052,135 @@ case "$out" in *"json_written=0 "*) ok "12d: summarize --run-id processes only t
 out="$(bash "$TOOLS/measure_level1.sh" --build-root "$TMP/fb" --dry-run --collector none daxpy 2>&1 | noise)"
 case "$out" in *summarizing*) bad "12f: a dry run summarized" ;;
                *) ok "12f: a dry run neither measures nor summarizes" ;; esac
+# an invalidated raw run (INVALIDATED.json) builds no record, and an existing record of it is not loaded
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --no-report >/dev/null 2>&1
+nrec="$(find "$TMP/res_inv" -name '*.json' -path '*/level*' | wc -l)"
+for r in $(find "$TMP/raw" -name run_meta.txt -exec dirname {} \;); do echo '{"reason": "test"}' > "$r/INVALIDATED.json"; done
+o1="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv2" --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+o2="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --csv-only --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+find "$TMP/raw" -name INVALIDATED.json -delete
+case "$o1|$o2" in
+    *"json_written=0 "*"invalidated_raw=$nrec "*"|"*" records=0 "*"invalidated_records=$nrec"*)
+        ok "12g: $nrec invalidated raw runs build no record and their existing records are not loaded" ;;
+    *) bad "12g: invalidated runs still summarized ($nrec runs): $o1 / $o2" ;;
+esac
+
+echo "=== 13: registry run verifier (verify_registry_runs.py) -- negative cases"
+# A fake repository and records in the engine's layout: a Level 2 app whose registry names
+# wk/SLD10.dat, and an MFEM-like app with option arguments. Each record is verified read-only.
+pycheck "13a-13o: same-name file, relative/absolute path, controlled copy, dropped args, duplicate options" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vr"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/vl/wk/SLD10.dat", "registered deck\n")
+w(f"{R}/level2/vl/other/SLD10.dat", "a different deck with the same name\n")
+w(f"{R}/build/level2/vl/run/SLD10.dat", "registered deck\n")          # byte-identical copy
+w(f"{R}/build/level2/vl/bad/SLD10.dat", "tampered copy\n")
+w(f"{R}/build/level2/vl/vlp4d", ""); w(f"{R}/build/level2/rh/remhos", "")
+os.makedirs(f"{R}/build/level2/vl/cwd", exist_ok=True)
+deck_sha = V.sha(f"{R}/level2/vl/wk/SLD10.dat")
+rules_plain = {1: {}, 2: {"vl": {"search_dirs": ["wk"]}, "rh": {}, "lw": {"last_wins": "test parser"}}}
+rules_copy = {1: {}, 2: {"vl": {"search_dirs": ["wk"], "copies": {"wk/SLD10.dat": "build/level2/vl/"}}}}
+n = [0]
+def record(app, args, argv, cwd, files=None, sel="SEL", selval=None):
+    n[0] += 1
+    raw = f"{T}/raw/{n[0]}"; wl = {"input_id": "x", "args": args, "env": {}, "files_sha256": files or {}, "params": {}}
+    ident = {"schema": "hpcperf-workload-identity-1", "benchmark": app, "input_id": "x", "level": 2, "complete": True,
+             "selector": sel, "arg_files_sha256": {}, "workload": wl}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{100 + i}", f"# hpcperf-roi-log 2\npid {100 + i}\nrank 0\nexe {argv[0]}\ncwd {cwd}\nargv {json.dumps(argv)}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "done\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    rec = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": "x", "status": "ok",
+           "registry": {"input_id": "x", "identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {sel: selval or "x"}, "processes": []},
+           "roi": {"runs_s": [1.0, 1.0]}, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": "t"}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(rec)); return p
+bad = []
+def expect(label, path, rules, verdict, needle=""):
+    r = V.verify_record(path, os.path.realpath(R), rules)
+    txt = " | ".join(r["problems"] + r["gaps"])
+    if r["verdict"] != verdict or needle not in txt:
+        bad.append(f"{label}: got {r['verdict']} ({txt}), want {verdict} /{needle}/")
+exe, cwd = f"{R}/build/level2/vl/vlp4d", f"{R}/build/level2/vl/cwd"
+files = {"wk/SLD10.dat": deck_sha}
+# (1) same name, different content / location
+expect("13a same-name other deck", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/other/SLD10.dat"], cwd, files),
+       rules_plain, "FAIL", "not passed")
+expect("13b bare same name in the process cwd (a different file)", record("vl", ["SLD10.dat"], [exe, "SLD10.dat"], f"{R}/level2/vl/other", files),
+       rules_plain, "FAIL", "not passed")
+# (2) the registered file by absolute and by cwd-relative path
+expect("13c absolute path", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+expect("13d relative path", record("vl", ["SLD10.dat"], [exe, "../../../../level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+# (3) a byte-identical copy counts only under a declared copy rule; a differing copy never
+cp = record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/run/SLD10.dat"], cwd, files)
+expect("13e undeclared copy", cp, rules_plain, "FAIL", "not passed")
+expect("13f declared identical copy", cp, rules_copy, "PASS")
+expect("13g declared copy with other content", record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/bad/SLD10.dat"], cwd, files),
+       rules_copy, "FAIL", "")
+# (4) registry arguments that never reach the program
+rx = f"{R}/build/level2/rh/remhos"
+expect("13h registry args dropped", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-rs", "4", "-dt", "0.0025", "-pa"], cwd),
+       rules_plain, "FAIL", "not passed")
+# (5) run.sh defaults plus registered overrides: the duplicated option is refused ...
+expect("13i duplicate option, parser not last-wins", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-rs", "4", "-dt", "0.0025", "-rs", "1", "-dt", "0.02", "-pa"], cwd),
+       rules_plain, "FAIL", "given 2 times")
+# ... accepted after the fix that drops the overridden defaults ...
+expect("13j overrides replace the defaults", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-pa", "-rs", "1", "-dt", "0.02"], cwd),
+       rules_plain, "PASS")
+# ... and for a declared last-wins parser only when the LAST occurrence is the registry's
+w(f"{R}/build/level2/lw/app", "")
+lw = f"{R}/build/level2/lw/app"
+expect("13k last-wins, registry last", record("lw", ["-s", "small"], [lw, "-s", "large", "-s", "small"], cwd), rules_plain, "PASS")
+expect("13l last-wins, registry not last", record("lw", ["-s", "small"], [lw, "-s", "small", "-s", "large"], cwd), rules_plain, "FAIL", "last one")
+# the selector must name the input; the binary must be the app's own
+expect("13m wrong selector", record("rh", [], [rx], cwd, selval="y"), rules_plain, "FAIL", "selector")
+expect("13n foreign binary", record("rh", [], [exe], cwd), rules_plain, "FAIL", "own binary")
+# an env knob with no evidence rule is a gap, not a pass
+p = record("rh", [], [rx], cwd)
+d = json.load(open(p)); d["registry"]["identity"]["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}
+json.dump(d, open(p, "w")); ri = json.load(open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json"))
+ri["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}; json.dump(ri, open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json", "w"))
+expect("13o unevidenced knob", p, rules_plain, "INSUFFICIENT", "HPCPERF_RH_KNOB")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+out="$(python3 "$TOOLS/verify_registry_runs.py" --repo "$TMP/vr/repo" "$TMP/vr/rec" 2>&1 | noise | tail -1)"
+case "$out" in *"records)"*) ok "13p: the command line verifies a directory of records ($out)" ;;
+               *) bad "13p: verify_registry_runs.py cli: $out" ;; esac
+
+echo "=== 14: a registry dry run executes nothing"
+# Not every run.sh honours HPCPERF_DRY_RUN (the direct-launch ones ignore it), so the dry run must
+# never start run.sh or a benchmark at all. Shims for every way the engine starts a program
+# (env -i, timeout, mpirun/mpiexec/srun) record a sentinel and exit without running anything.
+SHIM="$TMP/shim"; SENT="$TMP/executed"; mkdir -p "$SHIM"
+for t in env timeout mpirun mpiexec srun; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 97\n' "$t" "$SENT" > "$SHIM/$t"; chmod +x "$SHIM/$t"
+done
+rm -f "$SENT"
+o1="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+o2="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level2.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+n1="$(printf '%s\n' "$o1" | /usr/bin/grep -c '^    command ')"; n2="$(printf '%s\n' "$o2" | /usr/bin/grep -c '^    command ')"
+r1="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level1_registry.tsv")"; r2="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level2_registry.tsv")"
+if [ -e "$SENT" ]; then
+    bad "14a: the registry dry run started a program: $(head -3 "$SENT" | tr '\n' ' ')"
+elif [ "$n1" != "$r1" ] || [ "$n2" != "$r2" ]; then
+    bad "14a: dry run planned $n1/$r1 Level 1 and $n2/$r2 Level 2 registry cases"
+elif [ -e "$TMP/dr/raw" ] || [ -e "$TMP/dr/res" ]; then
+    bad "14a: the dry run wrote raw or result directories"
+else
+    ok "14a: registry dry run planned all $n1 Level 1 + $n2 Level 2 inputs, started nothing, wrote nothing"
+fi
+# positive control: the same shims DO see a real (non-dry) run -- which they stop before any program runs
+rm -f "$SENT"
+PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --collector none --no-profile --no-summary \
+    --clean-runs 1 --raw-root "$TMP/dr2/raw" --results-root "$TMP/dr2/res" daxpy/"$(/usr/bin/awk -F'\t' '!/^#/ && $1=="daxpy" {print $2; exit}' "$TOOLS/cases/level1_registry.tsv")" >/dev/null 2>&1
+[ -s "$SENT" ] && ok "14b: positive control -- a non-dry run is caught by the shims ($(head -1 "$SENT" | cut -c1-40)...)" \
+               || bad "14b: the shims did not see a non-dry run; 14a proves nothing"
 
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"

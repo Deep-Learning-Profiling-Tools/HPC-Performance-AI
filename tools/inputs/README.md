@@ -147,6 +147,19 @@ links such a measurement to its registry entry (exit 3 when it cannot be establi
 missing or a compile-time input is not materialized). The `measure` command below is the earlier
 native-timer protocol (benchmark's own timer) and stays available for correctness baselines.
 
+## Invalidated measurements (`INVALIDATED.json`)
+
+A measurement found to have run another workload than the input it is filed under (for example the
+registry arguments never reached the program) is not deleted or relabelled: its directory gets an
+`INVALIDATED.json` (schema `hpcperf-invalidation-1`: reason, actual vs expected workload, fix commit,
+replacement record, manifest). The marker covers everything below the directory -- measurement.json,
+the baseline.json written from it, the run logs. `compare` refuses an invalidated baseline or candidate
+log (exit 2), `migrate-baseline` refuses invalidated baseline or evidence (an invalidated record never
+becomes a baseline, and no identity migration can relabel it), `status` prints `INVALIDATED` (exit 3),
+and `hpcperf_inputs_audit.py` loads it as `INVALIDATED` -- not completed, no timing, no verdict -- and
+lists it under `invalidated_inputs`. A corrected input needs a new measurement and its own correctness
+evidence.
+
 ## Commands
 
 ```bash

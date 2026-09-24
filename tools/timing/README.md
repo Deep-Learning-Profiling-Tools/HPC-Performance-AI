@@ -192,6 +192,22 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   in `input_id`. A case whose identity cannot be established (`identity_*`) or whose executable does
   not exist (`build_not_materialized`) is not run and is never a result.
 * Correctness stays with the registry (`tools/inputs`); a timing run records rc and ROI only.
+* **Did the run get the input?** `verify_registry_runs.py <results dir>` (read-only) checks every clean
+  run's ROI log -- executable, working directory, argv -- against the record's workload identity:
+  Level 1 exact exe/cwd/argv (path arguments by real path and sha256); Level 2 the app's own binary,
+  the selector, the registry arguments as one contiguous run of the argv with file arguments resolved
+  the way run.sh resolves them and compared by real path AND content hash (a same-named file elsewhere
+  never matches; a copy counts only under a declared copy rule with the same sha256), every registered
+  file reached, a registered option given twice only when the program's parser is declared last-wins
+  and the last occurrence is the registry's, and every env knob of the input evidenced by argv / exe /
+  program output / build configuration. What each run.sh does with an input -- search dirs, copies,
+  generated decks, last-wins parsers, the output lines that echo the parameters -- is declared per
+  application in `cases/registry_evidence.yaml`. Verdicts PASS / FAIL / INSUFFICIENT / NOT_RUN.
+* **Dry run** (`--dry-run`) is a static plan: the engine starts nothing -- not run.sh, not a benchmark,
+  not even the device probe -- because not every run.sh honours `HPCPERF_DRY_RUN` (tests 14a/14b).
+* **Invalidated runs.** A raw run shown to have measured another workload keeps its evidence and gets an
+  `INVALIDATED.json` (see `tools/inputs/README.md`); `summarize.py` builds no record from it and does
+  not load an existing record of it, so it reaches no CSV, report or baseline selection.
 
 ## Hardware neutrality
 
