@@ -1,16 +1,26 @@
 // tools/timing/report_assets/report.js -- inlined by tools/timing/report.py.
-// Level tab -> application -> (input x platform) -> the measurement. Every value from the
-// data is inserted as text (textContent), never as markup. The selection is kept in the
-// URL hash (#L2/quicksilver/p200000/nvidia-b200.cuda13.2) so a view can be linked.
+// Campaign -> level tab -> application -> (input x platform) -> the measurement. Every value from
+// the data is inserted as text (textContent), never as markup. The selection is kept in the URL hash
+// (#L2/remhos/periodic-hexagon-p0/nvidia-b200.cuda13.2; an earlier campaign is prefixed, #c1/L2/...)
+// so a view can be linked. Campaign kinds: "registry" (registered inputs, current result + history
+// chosen by tools/timing/registry_view.py) and "cases" (case tables; also every earlier snapshot).
 (function () {
   "use strict";
-  var D = JSON.parse(document.getElementById("timing-data").textContent);
+  var BUNDLE = JSON.parse(document.getElementById("timing-data").textContent);
+  var CAMPS = BUNDLE.campaigns || [BUNDLE];
+  var D = CAMPS[0];
   var PLATS = D.platforms || [];
   var CATS = ["compute", "copy_h2d", "copy_d2h", "copy_d2d", "copy_other", "fill", "collective", "other"];
   var CAT_NAME = {compute: "compute (kernels)", copy_h2d: "copy host to device", copy_d2h: "copy device to host",
                   copy_d2d: "copy device to device", copy_other: "copy, other", fill: "fill (memset)",
                   collective: "collective", other: "other"};
-  var st = {level: "1", app: null, kase: null, plat: null};
+  var st = {camp: 0, level: "1", app: null, kase: null, plat: null};
+  function setCamp(i) { st.camp = i; D = CAMPS[i]; PLATS = D.platforms || []; }
+  function isReg() { return D.kind === "registry"; }
+  function rangeSpread(runs, med) {
+    if (!runs || runs.length < 2 || !isNum(med) || !med) return null;
+    return (Math.max.apply(null, runs) - Math.min.apply(null, runs)) / med;
+  }
 
   // ---------------------------------------------------------------- helpers
   function el(tag, props, kids) {
@@ -54,14 +64,18 @@
   function apps() { return D.levels[st.level] || []; }
   function findApp(name) { return apps().filter(function (a) { return a.app === name; })[0] || null; }
   function platById(id) { return PLATS.filter(function (p) { return p.id === id; })[0] || null; }
+  function rowsOf(app) { return isReg() ? app.inputs : app.cases; }
+  function keyOf(row) { return isReg() ? row.input_id : row.case; }
+  function rowOf(app, kase) { return app ? rowsOf(app).filter(function (c) { return keyOf(c) === kase; })[0] || null : null; }
   function cellOf(app, kase, plat) {
-    if (!app) return null;
-    var c = app.cases.filter(function (c) { return c.case === kase; })[0];
-    return c && c.cells ? (c.cells[plat] || null) : null;
+    var c = rowOf(app, kase);
+    if (!c || !c.cells) return null;
+    if (isReg()) return plat ? {reg: true, row: c, run: c.cells[plat] || null} : null;
+    return c.cells[plat] || null;
   }
   function measured(app) {
     var n = 0;
-    app.cases.forEach(function (c) { PLATS.forEach(function (p) { if (c.cells[p.id]) n++; }); });
+    rowsOf(app).forEach(function (c) { PLATS.forEach(function (p) { if (c.cells[p.id]) n++; }); });
     return n;
   }
   function inputText(inp) {
@@ -80,13 +94,15 @@
 
   // ---------------------------------------------------------------- state <-> hash
   function writeHash() {
-    var parts = ["L" + st.level];
+    var parts = (st.camp ? ["c" + st.camp] : []).concat(["L" + st.level]);
     if (st.app) parts.push(st.app);
     if (st.app && st.kase && st.plat) { parts.push(st.kase); parts.push(st.plat); }
-    try { history.replaceState(null, "", "#" + parts.join("/")); } catch (e) { /* file:// in some browsers */ }
+    // window.history: the local function history() below would shadow the global
+    try { window.history.replaceState(null, "", "#" + parts.join("/")); } catch (e) { /* file:// in some browsers */ }
   }
   function readHash() {
     var h = (location.hash || "").replace(/^#/, "").split("/");
+    if (/^c[0-9]+$/.test(h[0]) && CAMPS[+h[0].slice(1)]) { setCamp(+h[0].slice(1)); h.shift(); }
     if (h[0] === "L1" || h[0] === "L2") st.level = h[0].slice(1);
     if (h[1] && findApp(h[1])) {
       st.app = h[1];
@@ -96,8 +112,14 @@
 
   // ---------------------------------------------------------------- level tabs + list
   function renderTabs() {
-    document.querySelectorAll(".tabs button").forEach(function (b) {
-      b.setAttribute("aria-selected", b.getAttribute("data-level") === st.level ? "true" : "false");
+    document.querySelectorAll(".tabs.levels button").forEach(function (b) {
+      var lv = b.getAttribute("data-level");
+      b.setAttribute("aria-selected", lv === st.level ? "true" : "false");
+      var span = b.querySelector("span");
+      if (span) span.textContent = (D.levels[lv] || []).length + (lv === "1" ? " benchmarks" : " applications");
+    });
+    document.querySelectorAll(".tabs.campaigns button").forEach(function (b) {
+      b.setAttribute("aria-selected", +b.getAttribute("data-campaign") === st.camp ? "true" : "false");
     });
   }
   function renderList() {
@@ -108,9 +130,17 @@
     apps().forEach(function (a) {
       if (q && a.app.toLowerCase().indexOf(q) === -1 && (a.suite || "").toLowerCase().indexOf(q) === -1) return;
       shown++;
-      var total = a.cases.length * PLATS.length;
-      var meta = (a.suite ? a.suite + " · " : "") + a.cases.length + (a.cases.length === 1 ? " input" : " inputs") +
-                 " · " + measured(a) + "/" + total + " measured";
+      var rows = rowsOf(a);
+      var meta;
+      if (isReg()) {
+        var bad = rows.filter(function (r) { return r.status !== "SUCCESS"; }).length;
+        var uns = rows.filter(function (r) { return PLATS.some(function (p) { var m = r.cells[p.id]; return m && !m.set.stable; }); }).length;
+        meta = (a.suite ? a.suite + " · " : "") + rows.length + (rows.length === 1 ? " input" : " inputs") +
+               (bad ? " · " + bad + " not measured" : " · all measured") + (uns ? " · " + uns + " UNSTABLE" : "");
+      } else {
+        meta = (a.suite ? a.suite + " · " : "") + rows.length + (rows.length === 1 ? " input" : " inputs") +
+               " · " + measured(a) + "/" + rows.length * PLATS.length + " measured";
+      }
       ul.appendChild(el("li", {}, [el("button", {type: "button", "aria-current": a.app === st.app ? "true" : null,
         onclick: function () { st.app = a.app; st.kase = null; st.plat = null; update(true); }},
         [a.app, el("small", {text: meta})])]));
@@ -123,6 +153,12 @@
     var main = document.getElementById("main");
     main.textContent = "";
     var app = findApp(st.app);
+    if (isReg()) { renderMainReg(main, app); return; }
+    if (D.historical) {
+      main.appendChild(el("div", {cls: "banner", text: "Earlier published snapshot (" + (D.records || 0) + " records as of " +
+        (D.generated_from || "-") + "), kept verbatim. It is a different campaign: its numbers are not part of the " +
+        "current results and are never compared with them."}));
+    }
     if (!app) {
       var list = apps(), inputs = 0, meas = 0;
       list.forEach(function (a) { inputs += a.cases.length; meas += measured(a); });
@@ -196,7 +232,8 @@
     var cv = (isNum(R.wall_s_stddev) && (R.runs_s || []).length > 1 && wall) ? R.wall_s_stddev / wall : null;
     var busy = dv ? dv.busy_frac_of_roi : null;
     var figs = [fig(fmtT(wall), "ROI (median of " + (R.runs_s || []).length + " clean)"),
-                fig(pct(cv, 1), "clean-run spread"),
+                fig(pct(rangeSpread(R.runs_s, wall), 1), "spread (max−min)/median"),
+                fig(pct(cv, 1), "CV (stddev/median)"),
                 fig(pct(busy, 0, true), "device busy in the ROI"),
                 fig(fmtT(dv && isNum(dv.host_gap_s) ? Math.max(dv.host_gap_s, 0) : null), "host gap in the ROI"),
                 fig(pct(wall && proc ? wall / proc : null, 1), "ROI share of the process"),
@@ -344,15 +381,197 @@
         el("tbody", {}, rows)])])]);
   }
 
+
+  // ---------------------------------------------------------------- registered inputs
+  var STATUS_TEXT = {SUCCESS: "ROI timing SUCCESS", RUN_FAILED: "run failed", NOT_MEASURED: "not measured"};
+  function pill(text, kind) { return el("span", {cls: "pill " + kind, text: text}); }
+  function statusPill(s) { return pill(STATUS_TEXT[s] || s, s === "SUCCESS" ? "ok" : "bad"); }
+  function verdictPill(v) {
+    return !v ? nul("none") : pill(v, v === "PASS" ? "ok" : (v === "SUPERSEDED" || v === "INCOMPLETE") ? "warn" : v === "NOT_RUN" ? "na" : "bad");
+  }
+  function paramsText(i) {
+    var p = i.params || {}, parts = Object.keys(p).sort().filter(function (k) { return k.charAt(0) !== "_"; })
+      .map(function (k) { return k + "=" + (typeof p[k] === "object" ? JSON.stringify(p[k]) : p[k]); });
+    return parts.join("  ") || "application defaults";
+  }
+  function renderMainReg(main, app) {
+    var C = D.counts || {}, camp = D.campaign || {};
+    if (!app) {
+      var list = apps(), rows = [];
+      list.forEach(function (a) { rows = rows.concat(a.inputs); });
+      var ok = rows.filter(function (r) { return r.status === "SUCCESS"; }).length;
+      var ver = rows.filter(function (r) { return r.run_verification === "PASS"; }).length;
+      var uns = rows.filter(function (r) { return PLATS.some(function (p) { var m = r.cells[p.id]; return m && !m.set.stable; }); }).length;
+      var corr = {PASS: 0, INCOMPLETE: 0, FAIL: 0, none: 0};
+      rows.forEach(function (r) { corr[r.correctness || "none"] = (corr[r.correctness || "none"] || 0) + 1; });
+      main.appendChild(el("div", {cls: "placeholder"}, [
+        el("p", {}, [el("b", {text: camp.title || "Registered inputs"}), " — every input registered in level" + st.level +
+          "/*/inputs.yaml, measured with measure_level" + st.level + ".sh --registry. Choose ",
+          el("b", {text: st.level === "1" ? "a benchmark" : "an application"}), " on the left."]),
+        el("div", {cls: "counts"}, [
+          el("span", {}, [el("b", {text: String(rows.length)}), " registered inputs"]),
+          el("span", {}, [el("b", {text: String(ok)}), " ROI timing SUCCESS"]),
+          el("span", {}, [el("b", {text: String(rows.length - ok)}), " not measured successfully"]),
+          el("span", {}, [el("b", {text: String(ver)}), " run verification PASS"]),
+          el("span", {}, [el("b", {text: String(uns)}), " UNSTABLE"]),
+          el("span", {}, ["measured ", el("b", {text: (D.measured_from || "-") + " .. " + (D.generated_from || "-")})])]),
+        kv([["protocol", (camp.protocol || {})["level" + st.level] || "null"],
+            ["platform", camp.platform_note || "null"],
+            ["not collected", camp.not_collected || "–"],
+            ["scientific correctness", "PASS " + corr.PASS + " · INCOMPLETE " + corr.INCOMPLETE + " · FAIL " + corr.FAIL +
+              " · none " + corr.none + " — evidence from outside the timing runs (basis per input); not re-verified by these ROI runs"],
+            ["Level 3", camp.level3 || (D.level3_inputs + " registered inputs without ROI support")],
+            ["spread", "(max − min) / median of all clean-run samples; stable when ≤ 10 %. CV = stddev / median, shown separately."]]),
+        (D.notes && D.notes.length) ? el("ul", {cls: "caveats"}, D.notes.map(function (n) { return el("li", {text: n}); })) : null]));
+      return;
+    }
+    main.appendChild(el("div", {cls: "apphead"}, [el("h2", {text: app.app}),
+      el("span", {cls: "meta", text: (app.suite ? app.suite + " · " : "") + "Level " + st.level + " · registered inputs"})]));
+    main.appendChild(el("div", {cls: "step", text: "Registered inputs × platforms — choose one"}));
+    main.appendChild(matrixReg(app));
+    var row = rowOf(app, st.kase);
+    if (row && st.plat) main.appendChild(detailReg(app, row, st.plat));
+    else main.appendChild(el("p", {cls: "lede", text: "The measurement appears here once an input and a platform are chosen."}));
+  }
+  function matrixReg(app) {
+    var head = el("tr", {}, [el("th", {text: "input"})].concat(PLATS.map(function (p) {
+      return el("th", {cls: "plat"}, [p.label + (p.runtime ? " · " + p.runtime : ""), el("small", {text: p.id})]);
+    })).concat([el("th", {text: "run verification"}), el("th", {text: "correctness"})]));
+    var body = app.inputs.map(function (r) {
+      var tds = PLATS.map(function (p) {
+        var m = r.cells[p.id], sel = r.input_id === st.kase && p.id === st.plat;
+        var label = m ? [fmtT(m.roi.wall_s), el("small", {text: m.set.n + " samples · spread " + pct(m.set.spread, 1) +
+                                                               (m.set.stable ? "" : " · UNSTABLE") + (m.set.adaptive ? " · 3+2" : "")})]
+                      : [STATUS_TEXT[r.status] || r.status, el("small", {text: r.attempts.length + (r.attempts.length === 1 ? " attempt" : " attempts")})];
+        return el("td", {}, [el("button", {type: "button", cls: "cellbtn" + (m ? (m.set.stable ? "" : " warn") : " bad"),
+          "aria-pressed": sel ? "true" : "false", "aria-label": app.app + " " + r.input_id + " on " + p.id,
+          onclick: function () { st.kase = r.input_id; st.plat = p.id; update(false);
+                                 var d = document.getElementById("detail"); if (d) d.scrollIntoView({block: "start"}); }}, label)]);
+      });
+      return el("tr", {}, [el("td", {cls: "inp"}, [el("b", {text: r.input_id}), " ", el("small", {text: [r.case, r.variant].filter(Boolean).join(" · ")}),
+        el("br"), el("code", {text: paramsText(r)})])].concat(tds).concat([
+        el("td", {}, [verdictPill(r.run_verification)]), el("td", {}, [verdictPill(r.correctness)])]));
+    });
+    return el("div", {cls: "tscroll"}, [el("table", {cls: "matrix"}, [el("thead", {}, [head]), el("tbody", {}, body)])]);
+  }
+  function detailReg(app, row, platId) {
+    var run = row.cells[platId], plat = platById(platId) || {id: platId};
+    var box = el("section", {cls: "detail", id: "detail", "aria-label": "measurement"});
+    box.appendChild(el("h2", {text: app.app + " · " + row.input_id + " · " + (plat.label || platId)}));
+    var checks = kv([["ROI timing", statusPill(row.status)],
+      ["run verification", el("span", {}, [verdictPill(row.run_verification), " did the run get this registered input (argv, cwd, executable, files)"])],
+      ["scientific correctness", el("span", {}, [verdictPill(row.correctness), " " + (row.correctness_basis || "")])]]);
+    if (!run) {
+      box.appendChild(el("div", {cls: "banner", text: row.blocker ? row.blocker :
+        "No verified successful measurement of this input on this platform (" + (STATUS_TEXT[row.status] || row.status) + ")."}));
+      box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Status"}), checks]));
+      box.appendChild(inputPanel(row, null));
+      box.appendChild(historyReg(row));
+      return box;
+    }
+    var R = run.roi, S = run.set, ctx = run.context;
+    box.appendChild(el("div", {cls: "runline", text: "runs " + S.run_ids.join(" + ") + " · " + S.utc_first + " .. " + S.utc_last +
+      " · source " + (S.git_commit || "-") + " · executable sha256 " + (S.exe_sha256 || "-") + "… · collector " +
+      ((run.measurement.collector || {}).name || "-") + " · platform " + platId}));
+    var figs = [fig(fmtT(R.wall_s), "ROI (median of " + S.n + " clean)"),
+                fig(pct(S.spread, 1), "spread (max−min)/median"),
+                fig(pct(S.cv, 1), "CV (stddev/median)"),
+                fig(S.stable ? "stable" : "UNSTABLE", "stability (spread ≤ 10 %)"),
+                fig(pct(R.wall_s && ctx.process_wall_s ? R.wall_s / ctx.process_wall_s : null, 1), "ROI share of the process"),
+                fig(run.device ? pct(run.device.busy_frac_of_roi, 0, true) : "null", run.device ? "device busy in the ROI" : "device busy: not collected")];
+    if (st.level === "2") {
+      var f = run.fom || {};
+      figs.push(fig(isNum(f.value) ? (Math.abs(f.value) >= 1e5 || Math.abs(f.value) < 1e-2 ? f.value.toPrecision(4)
+                     : f.value.toLocaleString("en-US", {maximumFractionDigits: 1})) : "null",
+                    (f.name ? "FOM: " + f.name + (f.unit ? " (" + f.unit + ")" : "") : "FOM: none printed") + " · run " + S.run_ids[S.run_ids.length - 1]));
+    }
+    box.appendChild(el("div", {cls: "figs"}, figs));
+    var sampleRows = S.per_record.map(function (p) {
+      var pr = p.protocol || {};
+      return ["run " + p.run_id, (p.runs_s || []).map(fmtT).join(", ") + "   (" + (pr.warmup_runs || 0) + " warm-up, " +
+              (pr.clean_runs || 0) + " clean, " + (pr.profiled_runs || 0) + " profiled)"];
+    });
+    box.appendChild(el("div", {cls: "panel two"}, [
+      el("div", {}, [el("h3", {text: "Clean-run samples" + (S.adaptive ? " (3 + 2 adaptive extension, pooled)" : "")}),
+        kv(sampleRows.concat([["median / min / max", fmtT(R.wall_s) + " / " + fmtT(R.wall_s_min) + " / " + fmtT(R.wall_s_max)],
+          ["spread", "(max − min) / median = " + pct(S.spread, 2)], ["CV", "sample stddev / median = " + pct(S.cv, 2)]]))]),
+      el("div", {}, [el("h3", {text: "Status"}), checks])]));
+    var t = run.app_timer;
+    box.appendChild(el("div", {cls: "panel two"}, [
+      el("div", {}, [el("h3", {text: "Device activity inside the ROI"}), run.device ? el("p", {text: "see the case-table view"}) :
+        el("p", {cls: "lede"}, [nul("not collected"), " — " + ((D.campaign || {}).not_collected || "no collector observed this run")])]),
+      el("div", {}, [el("h3", {text: "Checks"}), kv([
+        ["application's own timer", !t ? nul("no own timer for this region") : !isNum(t.value_s) ? nul(t.status)
+          : el("span", {}, [fmtT(t.value_s) + "  ", el("span", {cls: Math.abs(t.roi_diff_frac) <= 0.02 ? "chk" : "off",
+              text: "ROI " + (t.roi_diff_frac >= 0 ? "+" : "") + (100 * t.roi_diff_frac).toFixed(3) + "% (run " + S.run_ids[S.run_ids.length - 1] + ")"})])],
+        ["launcher GPU audit", run.audit_ok === true ? pill("clean", "ok") : run.audit_ok === false ? pill("not clean", "bad") : pill("no launcher", "na")],
+        ["excluded inside the ROI", run.measurement.roi_excludes || "nothing"],
+        ["profiler inflation", isNum(run.roi.profiler_inflation) ? run.roi.profiler_inflation.toFixed(2) + "×" : nul("not collected")]])])]));
+    box.appendChild(inputPanel(row, run));
+    if (run.caveats && run.caveats.length) {
+      box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Caveats (run " + S.run_ids[S.run_ids.length - 1] + ")"}),
+        el("ul", {cls: "caveats"}, run.caveats.map(function (c) { return el("li", {text: c}); }))]));
+    }
+    box.appendChild(historyReg(row));
+    return box;
+  }
+  function inputPanel(row, run) {
+    var env = row.env || {}, di = run ? run.device_info || {} : {};
+    var left = kv([["registered as", [row.case, row.variant, row.source_kind, row.input_form].filter(Boolean).join(" · ")],
+      ["parameters", el("code", {text: paramsText(row)})],
+      ["registry arguments", (row.args || []).length ? el("code", {text: row.args.join(" ")}) : "none"],
+      ["registry variables", Object.keys(env).sort().map(function (k) { return k + "=" + env[k]; }).join(" ") || "none"],
+      ["command as run", run ? el("code", {text: Array.isArray(run.inputs.argv) ? run.inputs.argv.join(" ") : (run.inputs.argv || "null")}) : "–"]]);
+    var right = run ? kv([["collector", ((run.measurement.collector || {}).name || "null")],
+      ["device", [di.count_visible, "×", di.product, di.arch].filter(function (x) { return x !== null && x !== undefined; }).join(" ") || "null"],
+      ["driver", di.driver_version || "null"], ["host CPU", run.host_cpu || "null"],
+      ["GPUs / processes", (run.measurement.gpus || "1") + " / " + num(run.inputs.processes)]]) : el("p", {cls: "lede", text: "no measurement"});
+    return el("div", {cls: "panel two"}, [el("div", {}, [el("h3", {text: "Input"}), left]),
+                                          el("div", {}, [el("h3", {text: "Measurement and device"}), right])]);
+  }
+  function historyReg(row) {
+    var sets = row.sets.map(function (s) {
+      return el("tr", {}, [el("td", {text: s.run_ids.join(" + ")}), el("td", {text: (s.utc_last || "").replace("T", " ").replace("Z", "")}),
+        el("td", {}, [verdictPill(s.verdict)]), el("td", {text: s.current_definition ? "current definition" : "earlier definition"}),
+        el("td", {cls: "n", text: String(s.n)}), el("td", {cls: "n em", text: fmtT(s.median)}), el("td", {cls: "n", text: pct(s.spread, 1)}),
+        el("td", {text: s.git_commit}),
+        el("td", {cls: "n", text: isNum(s.vs_previous) ? (s.vs_previous >= 0 ? "+" : "") + (100 * s.vs_previous).toFixed(1) + "%" : "–"})]);
+    }).reverse();
+    var att = row.attempts.map(function (a) {
+      return el("tr", {}, [el("td", {text: a.run_id}), el("td", {text: (a.utc || "").replace("T", " ").replace("Z", "")}),
+        el("td", {}, [pill(a.status, a.status === "ok" ? "ok" : "bad")]), el("td", {}, [verdictPill(a.verdict)]),
+        el("td", {cls: "n", text: String(a.clean_runs)}), el("td", {cls: "n", text: a.status === "ok" ? fmtT(a.roi_s) : "–"}),
+        el("td", {text: a.git_commit}), el("td", {text: (a.problems || []).join("; ")})]);
+    }).reverse();
+    function tbl(h, rows) {
+      return el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, h.map(function (x) { return el("th", {text: x}); }))]),
+        el("tbody", {}, rows)])]);
+    }
+    return el("div", {cls: "panel"}, [el("h3", {text: "Measurements of this input (pooled per configuration)"}),
+      sets.length ? tbl(["runs", "UTC", "verdict", "workload", "samples", "median", "spread", "source", "vs previous (same workload)"], sets)
+                  : el("p", {cls: "lede", text: "none"}),
+      el("h3", {text: "Every attempt (record)"}),
+      tbl(["run", "UTC", "status", "verification", "clean runs", "ROI median", "source", "notes"], att)]);
+  }
+
   // ---------------------------------------------------------------- wiring
   function update(scrollTop) {
     writeHash(); renderTabs(); renderList(); renderMain();
     if (scrollTop) { var m = document.getElementById("main"); if (m && m.getBoundingClientRect().top < 0) m.scrollIntoView(); }
   }
-  document.querySelectorAll(".tabs button").forEach(function (b) {
+  document.querySelectorAll(".tabs.levels button").forEach(function (b) {
     b.addEventListener("click", function () {
       if (st.level === b.getAttribute("data-level")) return;
       st.level = b.getAttribute("data-level"); st.app = null; st.kase = null; st.plat = null;
+      document.getElementById("app-filter").value = "";
+      update(false);
+    });
+  });
+  document.querySelectorAll(".tabs.campaigns button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var i = +b.getAttribute("data-campaign");
+      if (i === st.camp) return;
+      setCamp(i); st.app = null; st.kase = null; st.plat = null;
       document.getElementById("app-filter").value = "";
       update(false);
     });

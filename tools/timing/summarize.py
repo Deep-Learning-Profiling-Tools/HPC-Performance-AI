@@ -577,6 +577,32 @@ def write_csvs(out_root, records):
     return written
 
 
+REGISTRY_CURRENT_COLS = ["level", "benchmark", "input_id", "status", "run_verification", "platform", "samples", "roi_median_s",
+                         "spread", "cv", "stable", "adaptive", "run_ids", "git_commit", "correctness", "correctness_basis"]
+
+
+def write_registry_current(out_root):
+    """registry_current.csv: the current result of every registered input -- the same rules as the report
+    (tools/timing/registry_view.py). The per-record CSVs above stay a log of every record."""
+    import csv
+    import registry_view
+    rows, _recs, _meta, _orph = registry_view.current_view([out_root], REPO)
+    path = os.path.join(out_root, "registry_current.csv")
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(REGISTRY_CURRENT_COLS)
+        for r in rows:
+            if r["level"] == 3:
+                continue
+            m = r["current"] or {}
+            w.writerow([r["level"], r["benchmark"], r["input_id"], r["status"], r["run_verification"] or "",
+                        m.get("platform", ""), len(m.get("samples") or []), m.get("median", ""),
+                        "" if m.get("spread") is None else m["spread"], "" if m.get("cv") is None else m["cv"],
+                        m.get("stable", ""), m.get("adaptive", ""), " ".join(m.get("run_ids") or []),
+                        (m.get("git_commit") or "")[:10], r.get("correctness") or "", r.get("correctness_basis") or ""])
+    return path
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--raw-root", default=os.path.join(REPO, "build", "timing"))
@@ -625,6 +651,8 @@ def main(argv=None):
         ok = sum(1 for r in recs if r["status"] == "ok")
         fom = sum(1 for r in recs if r["fom"]["status"] == "ok")
         print(f"           level{level}: {len(recs)} runs, {ok} ok, {len(recs) - ok} not ok, fom_ok={fom}")
+    if any((r.get("registry") or {}).get("input_id") for r in records):
+        outs.append(write_registry_current(a.out_root))
     if not a.no_report:
         outs += report.write(a.out_root, os.path.join(a.out_root, "report"))
     for p in outs:

@@ -982,6 +982,9 @@ m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>'
 if not m:
     print("no embedded data"); raise SystemExit
 D = json.loads(m.group(1))
+if [c.get("kind") for c in D.get("campaigns", [{}])] != ["cases"]:
+    bad.append(f"case-table records should give one campaign of kind 'cases': {[c.get('kind') for c in D.get('campaigns', [])]}")
+D = D["campaigns"][0]
 plats = [p["id"] for p in D["platforms"]]
 if "test-platform" not in plats or "nvidia-b200.cuda13.2" not in plats:
     bad.append(f"platforms {plats} (measured ones and those with a conformance record)")
@@ -1240,6 +1243,91 @@ PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --collector none -
     --clean-runs 1 --raw-root "$TMP/dr2/raw" --results-root "$TMP/dr2/res" daxpy/"$(/usr/bin/awk -F'\t' '!/^#/ && $1=="daxpy" {print $2; exit}' "$TOOLS/cases/level1_registry.tsv")" >/dev/null 2>&1
 [ -s "$SENT" ] && ok "14b: positive control -- a non-dry run is caught by the shims ($(head -1 "$SENT" | cut -c1-40)...)" \
                || bad "14b: the shims did not see a non-dry run; 14a proves nothing"
+
+echo "=== 15: registered-input report (registry_view.py + report.py)"
+# Synthetic records of the REAL registry's remhos periodic-hexagon-p0 (current definition: -o 3) and
+# miniem maxwell-bdot-small: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
+# record plus a 2-run adaptive extension of the same configuration, a newer 3-run record built from
+# another binary (a separate measurement), and a failed MiniEM attempt.
+pycheck "15a-15h: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import hpcperf_inputs as hi, report, registry_view as RV
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "rv"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "remhos")); cur = hi.registry_identity(doc, hi.get_input(doc, "periodic-hexagon-p0"))
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+PLAT = "test-platform"
+def rec(run_id, wl, argv, runs, exe_sha="aa", commit="c0ffee", app="remhos", case="periodic-hexagon-p0", status="ok",
+        invalid=False, sel="HPCPERF_REMHOS_INPUT", order=3):
+    raw = os.path.join(T, "raw", app, case, run_id); os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl, benchmark=app, input_id=case, selector=sel)
+    for i, v in enumerate(runs if status == "ok" else [None]):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        if status == "ok":
+            open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(f"   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {order}\n   --time-step 0.005\n")
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    if invalid:
+        json.dump({"reason": "test: another workload"}, open(f"{raw}/INVALIDATED.json", "w"))
+    import statistics
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": case, "status": status, "run_id": run_id,
+         "utc": "2026-01-01T00:00:%02dZ" % int(run_id[-2:]), "platform": PLAT,
+         "registry": {"input_id": case, "identity": ident, "identity_complete": True, "identity_sha256": "id-" + json.dumps(wl, sort_keys=True)[:40]},
+         "inputs": {"declared_env": {sel: case}, "processes": [], "exe_sha256": exe_sha},
+         "roi": {"runs_s": runs if status == "ok" else [], "wall_s": statistics.median(runs) if status == "ok" else None},
+         "measurement": {"protocol": {"warmup_runs": 0, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+         "device": None, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": commit}, "caveats": []}
+    os.makedirs(f"{root}/level2/{app}/{case}", exist_ok=True)
+    json.dump(r, open(f"{root}/level2/{app}/{case}/{run_id}.json", "w"))
+rec("run01", old_wl, ["-o", "2"] + base, [1.50, 1.52, 1.51], commit="old0001", order=2)          # SUPERSEDED
+rec("run02", cur["workload"], ["-o", "2"] + base, [1.40, 1.41, 1.42], invalid=True, commit="bad0002", order=2)  # INVALIDATED
+rec("run03", cur["workload"], base + ["-o", "3"], [2.72, 2.40, 2.38])                               # current, 3 runs
+rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                                     # adaptive +2, same config
+rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
+ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "maxwell-bdot-small"))
+rec("run06", mcur["workload"], [], [], app="miniem", case="maxwell-bdot-small", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
+bad = []
+b1 = report.build_bundle([root]); b2 = report.build_bundle([root])
+if json.dumps(b1, sort_keys=True) != json.dumps(b2, sort_keys=True): bad.append("15a: two builds differ")
+c = b1["campaigns"][0]
+if c["kind"] != "registry": bad.append("15b: registry records not rendered as the registry view")
+rows = {i["input_id"]: i for a in c["levels"]["2"] for i in a["inputs"]}
+nreg = sum(1 for x in RV.registered_inputs(R) if x["level"] == 2)
+if len(rows) != nreg: bad.append(f"15c: {len(rows)} Level 2 inputs listed, registry has {nreg}")
+h = rows["periodic-hexagon-p0"]; m = h["cells"].get(PLAT)
+if not m or m["set"]["run_ids"] != ["run05"]:
+    bad.append(f"15d: current should be the newest configuration run05 (another binary is a separate measurement): {m and m['set']['run_ids']}")
+sets = {tuple(s["run_ids"]): s for s in h["sets"]}
+p = sets.get(("run03", "run04"))
+if not p or p["n"] != 5 or abs(p["median"] - 2.39) > 1e-9: bad.append(f"15e: adaptive 3+2 not pooled into 5 samples: {p}")
+if sets.get(("run01",), {}).get("verdict") != "SUPERSEDED" or sets[("run01",)]["current_definition"]: bad.append("15f: old definition not SUPERSEDED")
+if sets[("run01",)].get("vs_previous") is not None or p.get("vs_previous") is not None:
+    bad.append("15f: vs previous computed across workload definitions")
+if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.append("15f: vs previous missing between same-workload measurements")
+if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
+    bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
+f = rows["maxwell-bdot-small"]
+if f["status"] != "RUN_FAILED" or any(f["cells"].values()): bad.append(f"15h: failed input: status {f['status']}")
+if m and (m.get("device") is not None or m["roi"].get("profiler_inflation") is not None): bad.append("15h: no-profile fields not null")
+if c["counts"]["roi_success"]["level2"] != 1: bad.append(f"15h: counts {c['counts']['roi_success']}")
+report.write([root], os.path.join(T, "page"))
+md = open(os.path.join(T, "page", "README.md")).read()
+if "maxwell-bdot-small**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if command -v node >/dev/null 2>&1; then
+    printf '%s\n' '[{"name":"15i overview","level":"2","expect":["1 ROI timing SUCCESS"]},
+ {"name":"15i hexagon","level":"2","app":"remhos","input":"periodic-hexagon-p0","platform":"test-platform","expect":["run05","SUPERSEDED","INVALIDATED","earlier definition","device busy: not collected"]},
+ {"name":"15i failed","level":"2","app":"miniem","input":"maxwell-bdot-small","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
+    out="$(node "$HERE/page_smoke.js" "$TMP/rv/page/index.html" "$TMP/rv/checks.json" 2>&1)"
+    [ $? -eq 0 ] && ok "15i: the page's own script renders the synthetic campaign (DOM shim, $(echo "$out" | grep -c '^ok') checks)" \
+                 || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"
+else
+    skip "15i: node not available for the page smoke test"
+fi
 
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"

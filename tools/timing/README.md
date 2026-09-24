@@ -5,21 +5,41 @@ did during it, in a form that stays comparable when applications, inputs and
 hardware platforms are added. What was changed, why, and the interfaces for adding
 an application, an input or a platform: [DESIGN.md](DESIGN.md).
 
+There are two ways to run it. Both use the same engine, markers and records; they differ in where
+the inputs come from and in the protocol defaults.
+
+**A. Case tables (the original entry, no `--registry`).** The cases of `cases/` (51 Level 1, 28 Level 2)
+with the front-ends' defaults:
+
 ```bash
-tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 50 benchmarks
-tools/timing/measure_level2.sh all                               # Level 2: 24 applications
-python3 tools/timing/report.py --publish                         # copy the web page into docs/timing/
+tools/timing/measure_level1.sh --build-root build/gcc13 all      # 1 warm-up + 5 clean + 1 profiled run per case
+tools/timing/measure_level2.sh all                               # 0 warm-up + 1 clean + 1 profiled run per case
+python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
 bash tools/timing/tests/run_all.sh                               # self-tests, CPU only
 ```
 
-Each measurement ends by summarizing its own run (JSON per case, CSV per level) and
-regenerating the web page `results/timing/report/index.html`; `summarize.py` does the
-same by hand for all raw data.
+**B. Registered inputs (`--registry`).** Every input in `level<N>/*/inputs.yaml`, as in the 2026-09-23/24
+campaign (section [Registered inputs](#registered-inputs---registry) below):
+
+```bash
+python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
+tools/timing/measure_level1.sh --registry --no-profile --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean, no profiler
+tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 all              # 0 warm-up + 3 clean, no profiler
+tools/timing/measure_level2.sh --registry --no-profile --clean-runs 2 <app>/<input> ... # adaptive +2 (see below)
+python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
+python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
+python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
+```
+
+Each measurement ends by summarizing its own run (JSON per record, CSV per level; with registry
+records also `registry_current.csv`, the current result per registered input) and regenerating the web
+page `<results>/report/index.html`; `summarize.py` does the same by hand for all raw data.
 
 Requires `bash`, `python3` (standard library only) and a built tree; a profiler
 is optional (NVIDIA: `nsys`, shipped with the CUDA toolkit). Results land in
-`results/timing/` and raw evidence in `build/timing/`, both git-ignored:
-**measurement output is never committed.** Formats: [SCHEMA.md](SCHEMA.md).
+`results/timing/` and raw evidence in `build/timing/` by default (`--results-root`, `--raw-root`), both
+git-ignored: **raw evidence, JSON records and CSVs are never committed**; the one measurement output that
+may be committed is the rendered snapshot in `docs/timing/` (below). Formats: [SCHEMA.md](SCHEMA.md).
 
 ## What is measured: the region of interest
 
@@ -88,42 +108,64 @@ and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 
 ## The web page
 
-`report.py` renders `results/timing/` as one self-contained interactive page
-(`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google
-Fonts with system fallbacks, light and dark theme) plus a Markdown twin (`README.md`)
-that the repository browser displays. The page holds only the Level 1 and Level 2
-timing results:
+`report.py` renders one or more results directories as one self-contained interactive page
+(`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google Fonts with system
+fallbacks, light and dark theme) plus a Markdown twin (`README.md`) generated from the same data model.
+The page holds only the Level 1 and Level 2 timing results. Several `--results-root` directories are
+read as ONE campaign (e.g. the phases of a campaign kept in separate directories); `--history-page`
+embeds an earlier published `index.html` verbatim as a separate, labelled campaign (a campaign tab at
+the top) whose numbers are never mixed with, or compared against, the current ones.
 
-1. **Level tab**, then **an application** from the list (each shows its number of
-   inputs and how many input x platform combinations were measured).
-2. The application's **inputs x platforms** grid: inputs are its cases from
-   `cases/` (with the variables and arguments that define them) plus anything
-   measured; platforms are every platform with a measurement or a conformance record.
-   A combination never measured shows `null`.
-3. Choosing a measured combination shows **that measurement** -- and only then: ROI
-   (median, min/max, every clean run, entries, excluded time), clean-run spread, device
-   busy and host gap inside the ROI, ROI share of the process with the process
-   breakdown bar, profiler inflation, device time / ops / bytes per category (`null`
-   where the collector cannot observe it), the top operations, runtime API calls, the
-   FOM, the application's own timer against the ROI, the launcher audit, the platform's
-   conformance, the input and command as run, the caveats, and every run of the
-   combination with its change against the previous one (the view shows the latest
-   successful run; a later failed run is flagged).
+**Registered inputs** (records made with `--registry`) -- the current view:
 
-The selection is kept in the URL hash (`index.html#L2/quicksilver/p200000/nvidia-b200.cuda13.2`),
-so a view can be linked. The Markdown twin lists the latest successful run of every
-measured combination as a Level 1 and a Level 2 table. Absolute paths of the checkout
-are written as `{REPO}`; host names, the environment and GPU UUIDs are not in the page.
-The output depends only on the records and the case tables, so the same data gives
-the same bytes.
+1. **Level tab**, then **an application** (each shows its registered inputs, how many are not measured
+   successfully and how many are UNSTABLE). With nothing chosen: the counts of the level (registered,
+   ROI SUCCESS, not measured, run verification PASS, UNSTABLE), the protocol, what was not collected,
+   the correctness totals with their scope, Level 3, and the campaign notes.
+2. The application's **registered inputs x platforms**: the inputs come from the registry, not from
+   the records, so a failed or unmeasured input is listed (its cell shows the failure). Every row
+   shows its parameters, run-verification verdict and scientific-correctness verdict.
+3. Choosing an input and a platform shows its **current measurement**: ROI median of all clean-run
+   samples, spread (max - min) / median, CV (stddev / median), stable / UNSTABLE, ROI share of the
+   process, FOM, every sample per record with its protocol (an adaptive 3 + 2 is pooled and shown as
+   such), timing status, run verification, scientific correctness with its basis, the blocker of a
+   failed input, the input (registry parameters / arguments / variables and the command as run), the
+   code and binary identity, the caveats, and the history: every measurement of the input (pooled per
+   configuration, marked current or earlier definition, "vs previous" only between measurements of the
+   same workload) and every attempt with its verdict (PASS, SUPERSEDED, INVALIDATED, NOT_RUN, ...).
 
-* **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every
-  `summarize.py` rewrite `results/timing/report/` (git-ignored).
-* **In the repository**: `python3 tools/timing/report.py --publish` writes the same page
-  to `docs/timing/`; committing it is the deliberate step that shows it. That snapshot is
-  the only measurement output that enters git -- raw evidence, JSON and CSV never do.
-  GitHub shows `docs/timing/README.md`; `index.html` needs a browser (or GitHub Pages
-  serving `docs/`).
+What is current and how records pool is decided by `registry_view.py` (the same module gives the counts
+and `registry_current.csv`): only a record the run verifier accepts for the input's CURRENT definition
+can be a result; records of one input pool into one measurement only when platform, workload identity,
+executable sha256, source commit and protocol (warm-up, profiled runs, collector) are equal -- this is how
+an adaptive extension becomes one 5-sample result, while other campaigns, code, binaries or protocols
+stay separate measurements; the newest pooled measurement is current. Scientific correctness and
+blocker notes come from `annotations.json` next to the records (schema `hpcperf-timing-annotations-1`,
+written by the campaign from evidence outside the timing runs); without it the page says "none".
+
+**Case tables** (records without `--registry`, and every earlier snapshot): the original view -- the
+cases of `cases/` x platforms, `null` for a combination never measured, the latest successful run with
+its device activity per category, top operations, runtime API calls, application timer, launcher audit,
+conformance, input as run, caveats and the run history.
+
+**No profiler, no device numbers.** A run without a collector (`--no-profile`, as in campaign B) has
+device busy, host gap, time / ops / bytes per category, kernel and operation counts, runtime-API calls
+and profiler inflation `null` ("not collected"), never 0 and never copied from another run.
+
+The selection is kept in the URL hash (`index.html#L2/remhos/periodic-hexagon-p0/nvidia-b200.cuda13.2`,
+an earlier campaign `#c1/L2/...`), so a view can be linked. Absolute paths of the checkout are written
+as `{REPO}`, the results directories as `{RESULTS}`, host names as `{HOST}`; the environment and GPU
+UUIDs are not in the page. The output depends only on the records, the registry, the annotations and
+the embedded history (no wall-clock time; the date shown is the latest measurement), so the same data
+gives the same bytes.
+
+* **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every `summarize.py`
+  rewrite `<results>/report/` (git-ignored) -- for that one results directory.
+* **In the repository**: `report.py ... --publish` writes `docs/timing/index.html` and
+  `docs/timing/README.md`; committing them is the deliberate step that shows the results. Publish from
+  the directories that hold the verified results of the campaign (all of its phases), not from a
+  default `results/timing/` that may hold older data. GitHub shows `docs/timing/README.md`;
+  `index.html` needs a browser (or GitHub Pages serving `docs/`).
 
 The own-timer check comes from `app_timer_regex` / `app_timer_unit` in
 `cases/level2_apps.tsv`: the timer an application prints for exactly the region its
@@ -202,7 +244,30 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   and the last occurrence is the registry's, and every env knob of the input evidenced by argv / exe /
   program output / build configuration. What each run.sh does with an input -- search dirs, copies,
   generated decks, last-wins parsers, the output lines that echo the parameters -- is declared per
-  application in `cases/registry_evidence.yaml`. Verdicts PASS / FAIL / INSUFFICIENT / NOT_RUN.
+  application in `cases/registry_evidence.yaml`. Verdicts:
+
+  | verdict | meaning | can it be a current result? |
+  |---|---|---|
+  | PASS | the run got the input as the registry defines it now | yes |
+  | FAIL | a contradiction: wrong file, wrong or dropped argument, duplicate option, changed file, foreign binary | no |
+  | INSUFFICIENT | no contradiction, but part of the input is not evidenced (listed as gaps) | no |
+  | NOT_RUN | the program never reached the ROI (build missing, abort before the ROI) -- a failed attempt | no |
+  | SUPERSEDED | the run got the workload its identity records, but the registry has since redefined the input | no: history of the old definition |
+
+  **INVALIDATED vs SUPERSEDED.** An *invalidated* record ran another workload than the input it is filed
+  under (e.g. the registry arguments never reached the program): its raw run carries `INVALIDATED.json`,
+  it is evidence of a bug and never a result of anything. A *superseded* record is a correct measurement
+  of an earlier definition of the input (e.g. remhos `periodic-hexagon-p0` before order 3 was made
+  explicit): valid history of that workload, but not of the current one, and never compared with it.
+* **Protocol of campaign B.** Level 1: 1 warm-up + 5 clean runs, no profiler (`HPCPERF_SKIP_VERIFY=1`, as
+  in A). Level 2: no whole-process warm-up, 3 clean runs, no profiler. **Adaptive extension**: a Level 2
+  input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more clean runs of the
+  same configuration, run as a separate invocation (`measure_level2.sh --registry --no-profile
+  --clean-runs 2 <app>/<input>`); the front-ends do not do this by themselves -- the campaign script
+  selects the inputs after the first pass. The report pools the two records (same configuration) into
+  one 5-sample result; all samples are kept, and an input still above 10 % is UNSTABLE.
+* **Level 3** has no ROI markers: its registered inputs (43) keep their earlier native timing only and
+  are not measured by these front-ends.
 * **Dry run** (`--dry-run`) is a static plan: the engine starts nothing -- not run.sh, not a benchmark,
   not even the device probe -- because not every run.sh honours `HPCPERF_DRY_RUN` (tests 14a/14b).
 * **Invalidated runs.** A raw run shown to have measured another workload keeps its evidence and gets an
@@ -316,7 +381,12 @@ interfaces refuse instead of guessing, `gen_cases.py`, FOM extraction, and the w
 page (byte-identical for the same records, inputs x platforms with `null` for
 unmeasured combinations, latest-run selection and history, inert embedding of kernel
 names, no absolute paths, the Markdown twin, the application timer, `--run-id`, no
-summary on a dry run) -- 44 checks.
+summary on a dry run), the registry cases and their drift check, the run verifier with its negative
+cases (same-named file, relative / absolute path, copies, dropped and duplicated options, superseded
+definition, abort before the ROI), invalidated runs, the static dry run, and the registered-input
+report (pooling of an adaptive extension, INVALIDATED / SUPERSEDED never current, failed inputs listed,
+no-profile fields null, determinism; `tests/page_smoke.js` drives the page's own script with a minimal
+DOM when `node` is available) -- 58 checks.
 
 ## Scope and what is UNVERIFIED
 
@@ -329,6 +399,10 @@ summary on a dry run) -- 44 checks.
   environment.
 
 ## First ROI sweep (2026-09-22)
+
+(PR #14: case tables, with the profiler. Its published page is kept verbatim as the "Earlier snapshot"
+campaign of `docs/timing/index.html` and in git history, `6f6dff2:docs/timing/`; the registered-input
+campaign of 2026-09-23/24 is a separate measurement and is not compared with it.)
 
 dgx003, 1x NVIDIA B200 (sm_100, driver 595.58.03), CUDA 13.2.78, Nsight Systems
 2025.6.3, GCC 13.3 (uv toolchain), Level 1 `build/gcc13`, Level 2 at

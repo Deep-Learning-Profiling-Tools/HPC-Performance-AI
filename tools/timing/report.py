@@ -1,29 +1,38 @@
 #!/usr/bin/env python3
 """Render the Level 1 / Level 2 timing results as an interactive web page (+ Markdown twin).
 
-    tools/timing/report.py                   # results/timing  ->  results/timing/report/
-    tools/timing/report.py --publish         # results/timing  ->  docs/timing/ (tracked: commit it to show it)
-    tools/timing/report.py --results-root DIR --out DIR
+    tools/timing/report.py                               # results/timing  ->  results/timing/report/
+    tools/timing/report.py --publish                     # results/timing  ->  docs/timing/ (tracked)
+    tools/timing/report.py --results-root DIR [--results-root DIR2 ...] [--history-page OLD.html] [--out DIR | --publish]
 
-The page (index.html) lists the applications of each level. Choosing one shows its
-inputs (the cases of tools/timing/cases/ plus anything measured) against the platforms
-(every platform with a measurement or a conformance record); a combination that was
-never measured is shown as null. Only after an application, an input and a platform
-are chosen does it show that measurement: ROI time and runs, the process breakdown,
-device activity inside the ROI per category, the top operations, runtime API calls,
-the FOM, the application's own timer, the launcher audit, the caveats, the input as
-run, and the run history of that combination.
+Two kinds of results are rendered, both from the same records:
 
-README.md next to it is the plain-text twin the repository browser displays: the
-latest successful run of every measured (case, platform) as a Level 1 and a Level 2
-table.
+* Registered inputs (records made with measure_level<N>.sh --registry): the inputs come from the
+  registry (level<N>/*/inputs.yaml), so an input that failed or was never measured is still listed.
+  The current result of each input and its history are chosen by tools/timing/registry_view.py -- the
+  same rules as every other summary: only records the run verifier accepts for the input's CURRENT
+  definition count; INVALIDATED records (the run got another workload) and SUPERSEDED records (an
+  older definition of the input) are history; an adaptive extension (+2 clean runs of the same
+  configuration) is pooled with its 3 runs into one 5-sample result; "vs previous" is only computed
+  between measurements of the same workload. Scientific correctness and blocker notes come from
+  annotations.json next to the records (evidence from outside the timing runs), never from a ROI run.
+* Case-table results (measure_level<N>.sh without --registry): the cases of tools/timing/cases/ against
+  the platforms, the latest run of each (case, platform) -- the original view.
 
-summarize.py calls write() every time it runs, and the measurement front-ends run
-summarize after every measurement, so results/timing/report/ always shows the newest
-data. Publishing to docs/timing/ is the deliberate step: raw evidence and the JSON/CSV
-records stay out of git; the rendered page is the one snapshot that may be committed.
-Standard library only. The output depends only on the records and the case tables (no
-wall-clock time in it), and absolute paths of this checkout are written as {REPO}.
+Several --results-root directories are read as ONE campaign (e.g. the phases of one campaign kept in
+separate directories). --history-page embeds an earlier published index.html as a separate, clearly
+labelled historical campaign, verbatim: its numbers are never mixed into the current view.
+
+Fields that need a profiler (device busy, host gap, kernel and operation counts, runtime-API calls,
+profiler inflation) are null when the run had no collector; they are never filled from another run.
+Spread is (max - min) / median of the clean-run samples (the stability criterion, stable <= 10 %); the
+coefficient of variation (sample stddev / median) is shown separately and labelled CV.
+
+summarize.py calls write() for its own results root after every measurement. Publishing to docs/timing/
+is the deliberate step: raw evidence and the JSON/CSV records stay out of git; the rendered page and its
+Markdown twin are the snapshot that may be committed. Standard library only. The output depends only on
+the records, the registry and the annotations (no wall-clock time in it); absolute paths of this checkout
+are written as {REPO}, the results directories as {RESULTS}.
 """
 
 import argparse
@@ -38,6 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import cases as case_tables  # noqa: E402
+import registry_view as RV  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 HOME = os.path.expanduser("~")
@@ -52,10 +62,19 @@ LEVEL_NAMES = {1: "Level 1", 2: "Level 2"}
 
 # ----------------------------------------------------------------- inputs
 
+SCRUB_ROOTS = []     # results directories being rendered (set by write()): written as {RESULTS}
+SCRUB_HOSTS = []     # host names found in the records (set by build_bundle()): written as {HOST}
+
+
 def scrub(obj):
-    """Absolute paths of this checkout (and the home directory) never leave the machine."""
+    """Absolute paths of this checkout, of the results and of the home directory never leave the machine."""
     if isinstance(obj, str):
-        s = obj.replace(REPO, "{REPO}")
+        s = obj
+        for root in SCRUB_ROOTS:
+            s = s.replace(root, "{RESULTS}")
+        s = s.replace(REPO, "{REPO}")
+        for h in SCRUB_HOSTS:
+            s = s.replace(h, "{HOST}")
         return s.replace(HOME, "~") if HOME and HOME != "/" else s
     if isinstance(obj, list):
         return [scrub(x) for x in obj]
@@ -66,7 +85,8 @@ def scrub(obj):
 
 def load(results_root):
     recs = []
-    for p in sorted(glob.glob(os.path.join(results_root, "level[0-9]", "*", "*", "*.json"))):
+    roots = results_root if isinstance(results_root, (list, tuple)) else [results_root]
+    for p in sorted(q for root in roots for q in glob.glob(os.path.join(root, "level[0-9]", "*", "*", "*.json"))):
         try:
             with open(p) as f:
                 r = json.load(f)
@@ -206,18 +226,107 @@ def build_data(recs):
             apps.append({"app": app, "suite": suites.get(app, "") if lvl == 1 else "", "cases": cases})
         levels[str(lvl)] = apps
     latest = max((r.get("utc") or "" for r in recs), default="")
-    return {"generated_from": latest, "records": len(recs), "platforms": plats, "levels": levels}
+    return {"kind": "cases", "generated_from": latest, "records": len(recs), "platforms": plats, "levels": levels}
+
+
+# ----------------------------------------------------------------- registered inputs (registry_view)
+
+def _set_summary(m, input_key):
+    return {"run_ids": m["run_ids"], "verdict": m["verdict"], "n": len(m["samples"]), "median": m["median"],
+            "spread": m["spread"], "stable": m["stable"], "git_commit": (m["git_commit"] or "")[:10],
+            "utc_last": m["utc_last"], "platform": m["platform"], "current_definition": m["workload_key"] == input_key}
+
+
+def _measurement(m):
+    """One pooled measurement as the detail view shows it: the newest record for context, the pooled samples
+    for the ROI statistics."""
+    run = compact(m["records"][-1])
+    s = m["samples"]
+    run["roi"].update({"wall_s": m["median"], "runs_s": s, "wall_s_min": m["min"], "wall_s_max": m["max"],
+                       "wall_s_stddev": m["cv"] * m["median"] if m["cv"] is not None else None})
+    run["set"] = scrub({"run_ids": m["run_ids"], "n": len(s), "spread": m["spread"], "cv": m["cv"], "stable": m["stable"],
+                        "adaptive": m["adaptive"], "utc_first": m["utc_first"], "utc_last": m["utc_last"],
+                        "git_commit": (m["git_commit"] or "")[:10], "exe_sha256": (m["exe_sha256"] or "")[:16],
+                        "per_record": [{"run_id": r["run_id"], "runs_s": (r.get("roi") or {}).get("runs_s") or [],
+                                        "protocol": (r.get("measurement") or {}).get("protocol")} for r in m["records"]]})
+    return run
+
+
+def build_registry(roots):
+    """The registered-input campaign: every registry input of Level 1/2, its current measurement per platform,
+    its status, verification, correctness evidence and history (tools/timing/registry_view.py)."""
+    rows, recs, meta, orphans = RV.current_view(roots, REPO)
+    plats = platform_info(recs)
+    _, suites = defined_inputs()
+    levels = {}
+    for lvl in (1, 2):
+        apps = {}
+        for row in (r for r in rows if r["level"] == lvl):
+            sets = row["history_sets"]
+            hist, last = [], {}
+            for m in sets:
+                h = _set_summary(m, row["workload_key"])
+                prev = last.get((m["platform"], m["workload_key"]))
+                h["vs_previous"] = None if prev is None else (m["median"] - prev) / prev
+                last[(m["platform"], m["workload_key"])] = m["median"]
+                hist.append(h)
+            cells = {}
+            for p in plats:
+                m = row["current_by_platform"].get(p["id"])
+                cells[p["id"]] = _measurement(m) if m else None
+            apps.setdefault(row["benchmark"], []).append(scrub({
+                "input_id": row["input_id"], "case": row["case"], "variant": row["variant"], "source_kind": row["source_kind"],
+                "input_form": row["input_form"], "params": row["params"], "args": row["args"], "env": row["env"],
+                "status": row["status"], "run_verification": row["run_verification"],
+                "correctness": row.get("correctness"), "correctness_basis": row.get("correctness_basis"),
+                "blocker": row.get("blocker"), "cells": cells, "sets": hist,
+                "attempts": [{k: a[k] for k in ("run_id", "utc", "status", "verdict", "roi_s", "clean_runs", "git_commit")}
+                             | {"current_definition": a["workload_key"] == row["workload_key"], "problems": a["problems"][:3]}
+                             for a in row["attempts"]]}))
+        levels[str(lvl)] = [{"app": a, "suite": suites.get(a, "") if lvl == 1 else "", "inputs": apps[a]} for a in sorted(apps)]
+    utcs = sorted(r.get("utc") or "" for r in recs if r.get("utc"))
+    c = RV.counts(rows, recs, orphans)
+    return scrub({"kind": "registry", "campaign": meta["campaign"], "notes": meta["notes"],
+                  "measured_from": utcs[0] if utcs else "", "generated_from": utcs[-1] if utcs else "",
+                  "records": len(recs), "platforms": plats, "levels": levels, "counts": c,
+                  "level3_inputs": sum(1 for r in rows if r["level"] == 3)})
+
+
+def load_history_page(path):
+    """An earlier published index.html, embedded verbatim as a historical campaign."""
+    import re
+    text = open(path).read()
+    m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', text, re.S)
+    data = json.loads(m.group(1).replace("<\\/", "</"))
+    if "campaigns" in data:              # a page of this version: take its current campaign
+        data = data["campaigns"][0]
+    data.setdefault("kind", "cases")
+    data["historical"] = True
+    return data
 
 
 # ----------------------------------------------------------------- HTML
 
-def render_html(data):
+def campaign_label(c):
+    if c.get("kind") == "registry":
+        return (c.get("campaign") or {}).get("title") or "Registered inputs"
+    return ("Earlier snapshot" if c.get("historical") else "Case tables") + \
+        f" · {c.get('records', 0)} records as of {c.get('generated_from') or '-'}"
+
+
+def render_html(bundle):
     css = open(os.path.join(ASSETS, "report.css")).read()
     js = open(os.path.join(ASSETS, "report.js")).read()
     # JSON inside <script>: "</" would end the element, so it is written as "<\/" (still valid JSON)
-    payload = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
+    payload = json.dumps(bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
+    data = bundle["campaigns"][0]
     n_apps = {k: len(v) for k, v in data["levels"].items()}
     as_of = html.escape(data["generated_from"] or "no measurements yet")
+    ctabs = "".join(
+        f'<button type="button" role="tab" data-campaign="{i}" aria-selected="{str(i == 0).lower()}">'
+        f'{html.escape(campaign_label(c))}</button>' for i, c in enumerate(bundle["campaigns"]))
+    campaign_nav = (f'<nav class="tabs campaigns" role="tablist" aria-label="Campaign">{ctabs}</nav>\n'
+                    if len(bundle["campaigns"]) > 1 else "")
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -234,14 +343,14 @@ def render_html(data):
 <body>
 <div class="wrap">
 <header class="top">
-  <div class="eyebrow">tools/timing &middot; results as of {as_of}</div>
+  <div class="eyebrow">tools/timing &middot; latest measurement {as_of}</div>
   <h1>Timing results</h1>
   <p class="sub">Region-of-interest (ROI) timing of the Level&nbsp;1 benchmarks and the Level&nbsp;2 mini-applications:
   the computation between the markers in each source, without start-up, set-up, warm-up and verification. Choose an
   application, then an input and a platform.</p>
 </header>
 <noscript><p class="lede">This page needs JavaScript. README.md next to it has the same results as plain tables.</p></noscript>
-<nav class="tabs" role="tablist" aria-label="Level">
+{campaign_nav}<nav class="tabs levels" role="tablist" aria-label="Level">
   <button type="button" role="tab" id="tab-1" data-level="1" aria-selected="true">Level 1 <span>{n_apps.get("1", 0)} benchmarks</span></button>
   <button type="button" role="tab" id="tab-2" data-level="2" aria-selected="false">Level 2 <span>{n_apps.get("2", 0)} applications</span></button>
 </nav>
@@ -298,16 +407,112 @@ def fom_plain(fom):
     return f"{s} {fom.get('unit') or ''}".strip()
 
 
-def render_md(data, out_dir):
+def md_status_line(c):
+    k = c["counts"]
+    ok = k["roi_success"]
+    reg = k["registered_inputs"]
+    return (f"{reg['level1']} + {reg['level2']} registered Level 1 / Level 2 inputs: ROI timing SUCCESS for "
+            f"{ok['level1']} + {ok['level2']}, run failed for {len(k['run_failed'])}, not measured {len(k['not_measured'])}; "
+            f"run verification PASS for {k['run_verification_pass']}; UNSTABLE {len(k['unstable'])}. "
+            f"Level 3: {reg['level3']} registered inputs without ROI support (earlier native timing only).")
+
+
+def render_md_registry(c):
+    camp = c.get("campaign") or {}
+    k = c["counts"]
+    out = [f"## {camp.get('title') or 'Registered inputs'}", "",
+           f"Measured {c['measured_from'] or '-'} .. {c['generated_from'] or '-'} ({c['records']} records). " + md_status_line(c), ""]
+    for lvl in ("1", "2"):
+        if camp.get("protocol", {}).get(f"level{lvl}"):
+            out.append(f"- Level {lvl} protocol: {camp['protocol'][f'level{lvl}']}")
+    for key in ("platform_note", "not_collected", "level3"):
+        if camp.get(key):
+            out.append(f"- {camp[key]}")
+    out += ["- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); "
+            "CV = sample stddev / median. An adaptive extension (+2 runs of the same configuration) is pooled "
+            "with its 3 runs.",
+            "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification "
+            "(did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness "
+            "(evidence from outside the timing runs; its basis is given per input in index.html).", ""]
+    corr = k["correctness"]
+    out += ["| level | correctness PASS | INCOMPLETE | FAIL | none |", "|---|--:|--:|--:|--:|"]
+    for lvl in ("1", "2", "3"):
+        cc = corr[f"level{lvl}"]
+        out.append(f"| {lvl} | {cc['PASS']} | {cc['INCOMPLETE']} | {cc['FAIL']} | {cc['None']} |")
+    out.append("")
+    for note in c.get("notes") or []:
+        out.append(f"- {md_cell(note)}")
+    out.append("")
+    for lvl in ("1", "2"):
+        out += [f"### {LEVEL_NAMES[int(lvl)]}", ""]
+        head = ["application", "input", "status", "platform", "ROI median", "samples", "spread", "CV", "stable",
+                "run verification", "correctness", "source"]
+        out.append("| " + " | ".join(head) + " |")
+        out.append("|" + "|".join("---" if i < 4 else "--:" if i < 8 else "---" for i in range(len(head))) + "|")
+        for a in c["levels"].get(lvl, []):
+            for i in a["inputs"]:
+                cells = [(pid, run) for pid, run in sorted(i["cells"].items()) if run]
+                if not cells:
+                    cells = [("-", None)]
+                for pid, run in cells:
+                    st = run["set"] if run else None
+                    out.append("| " + " | ".join([
+                        md_cell(a["app"]), md_cell(i["input_id"]), i["status"], md_cell(pid),
+                        fmt_plain(run["roi"]["wall_s"]) if run else "-",
+                        str(st["n"]) + (" (3+2 adaptive)" if st["adaptive"] else "") if st else "-",
+                        md_pct(st["spread"], 1) if st else "-", md_pct(st["cv"], 1) if st else "-",
+                        ("yes" if st["stable"] else "UNSTABLE") if st else "-",
+                        str(i["run_verification"] or "-"), str(i["correctness"] or "none"),
+                        st["git_commit"] if st else "-"]) + " |")
+        out.append("")
+    fails = [(a["app"], i) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"] if i["status"] != "SUCCESS"]
+    if fails:
+        out += ["### Not measured successfully", ""]
+        for app, i in fails:
+            last = i["attempts"][-1] if i["attempts"] else None
+            out.append(f"- **{md_cell(app)} / {md_cell(i['input_id'])}**: {i['status']}" +
+                       (f", last attempt {last['run_id']} status {last['status']} ({last['verdict']})" if last else "") +
+                       (f". {md_cell(i['blocker'])}" if i.get("blocker") else ""))
+        out.append("")
+    hist = [(a["app"], i, s) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+            for s in i["sets"] if s["verdict"] == "SUPERSEDED"]
+    inval = [(a["app"], i, t) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+             for t in i["attempts"] if t["verdict"] == "INVALIDATED"]
+    if hist or inval:
+        out += ["### History kept, never current", ""]
+        for app, i, s in hist:
+            out.append(f"- SUPERSEDED {md_cell(app)} / {md_cell(i['input_id'])}: {s['n']} samples, median "
+                       f"{fmt_plain(s['median'])} ({s['git_commit']}) -- an earlier definition of the input, not compared with the current one")
+        for app, i, t in inval:
+            out.append(f"- INVALIDATED {md_cell(app)} / {md_cell(i['input_id'])}: run {t['run_id']} ({t['git_commit']}) "
+                       f"ran another workload than the input")
+        out.append("")
+    return out
+
+
+def render_md(bundle, out_dir):
     out = ["# Timing results", "",
-           f"Region-of-interest timing of the Level 1 benchmarks and Level 2 mini-applications (latest record "
-           f"{data['generated_from'] or '-'}, {data['records']} records). Open [index.html](index.html) to choose an "
-           f"application, an input and a platform; this file lists the latest successful run of every measured "
-           f"combination. `null`: not observable on that platform.", ""]
+           "Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-applications, generated by "
+           "tools/timing/report.py from the timing records (the same data as [index.html](index.html), which adds the "
+           "per-input detail and history). `null`: not observable or not collected.", ""]
+    for i, c in enumerate(bundle["campaigns"]):
+        if c.get("kind") == "registry":
+            out += render_md_registry(c)
+        else:
+            out += [f"## {campaign_label(c)}", ""] + (
+                ["Kept verbatim from the earlier published page; its measurements are not part of the current "
+                 "results and are not compared with them. Spread column here: CV = stddev / median.", ""]
+                if c.get("historical") else []) + render_md_cases(c)
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+def render_md_cases(data):
+    out = [f"Latest record {data['generated_from'] or '-'}, {data['records']} records: the latest successful run of every "
+           f"measured (case, platform).", ""]
     for lvl in ("1", "2"):
         apps = data["levels"].get(lvl, [])
-        out += [f"## {LEVEL_NAMES[int(lvl)]}", ""]
-        head = ["application", "input", "platform", "ROI", "spread", "device busy", "host gap", "kernels in ROI",
+        out += [f"### {LEVEL_NAMES[int(lvl)]}", ""]
+        head = ["application", "input", "platform", "ROI", "CV (stddev/median)", "device busy", "host gap", "kernels in ROI",
                 "ROI share of process", "profiler x"] + (["FOM", "vs own timer"] if lvl == "2" else []) + \
                ["runs", "vs previous"]
         out.append("| " + " | ".join(head) + " |")
@@ -340,37 +545,61 @@ def render_md(data, out_dir):
                     row += [str(len(cell["history"])), dl]
                     out.append("| " + " | ".join(row) + " |")
         out.append("")
-    return "\n".join(out)
+    return out
 
 
 # ----------------------------------------------------------------- entry points
 
-def write(results_root, out_dir):
-    """Render results_root into out_dir/index.html and out_dir/README.md; returns the two paths."""
-    data = build_data(load(results_root))
+def build_bundle(results_roots, history_pages=()):
+    roots = [os.path.realpath(r) for r in (results_roots if isinstance(results_roots, (list, tuple)) else [results_roots])]
+    SCRUB_ROOTS[:] = sorted({os.path.dirname(r) for r in roots} | set(roots), key=len, reverse=True)
+    recs = load(roots)
+    hosts = set()
+    for r in recs:
+        for proc in (r.get("inputs") or {}).get("processes") or []:
+            if proc.get("host"):
+                hosts |= {proc["host"], proc["host"].split(".")[0]}
+        h = ((r.get("platform_info") or {}).get("host") or {}).get("hostname")
+        if h:
+            hosts |= {h, h.split(".")[0]}
+    SCRUB_HOSTS[:] = sorted((h for h in hosts if len(h) >= 4), key=len, reverse=True)
+    registry = any(((r.get("registry") or {}).get("input_id")) for r in recs)
+    campaigns = [build_registry(roots) if registry else build_data(recs)]
+    campaigns += [load_history_page(p) for p in history_pages]
+    return {"campaigns": campaigns}
+
+
+def write(results_root, out_dir, history_pages=()):
+    """Render the results root(s) into out_dir/index.html and out_dir/README.md; returns the two paths."""
+    bundle = build_bundle(results_root, history_pages)
     os.makedirs(out_dir, exist_ok=True)
     page = os.path.join(out_dir, "index.html")
     md = os.path.join(out_dir, "README.md")
     with open(page, "w") as f:
-        f.write(render_html(data))
+        f.write(render_html(bundle))
     with open(md, "w") as f:
-        f.write(render_md(data, out_dir))
+        f.write(render_md(bundle, out_dir))
     return [page, md]
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--results-root", default=DEFAULT_RESULTS)
-    ap.add_argument("--out", default=None, help="output directory (default <results-root>/report)")
+    ap.add_argument("--results-root", action="append", default=None,
+                    help="results directory (repeatable: several directories of one campaign); default results/timing")
+    ap.add_argument("--history-page", action="append", default=[],
+                    help="an earlier published index.html to embed as a separate historical campaign (repeatable)")
+    ap.add_argument("--out", default=None, help="output directory (default <first results-root>/report)")
     ap.add_argument("--publish", action="store_true", help=f"write to {os.path.relpath(PUBLISH_DIR, REPO)}/")
     a = ap.parse_args(argv)
     if a.publish and a.out:
         ap.error("--publish and --out are exclusive")
-    out = PUBLISH_DIR if a.publish else (a.out or os.path.join(a.results_root, "report"))
-    if not os.path.isdir(a.results_root):
-        print(f"report: no results directory {a.results_root} (run summarize.py first)", file=sys.stderr)
-        return 1
-    for p in write(a.results_root, out):
+    roots = a.results_root or [DEFAULT_RESULTS]
+    out = PUBLISH_DIR if a.publish else (a.out or os.path.join(roots[0], "report"))
+    for r in roots:
+        if not os.path.isdir(r):
+            print(f"report: no results directory {r} (run summarize.py first)", file=sys.stderr)
+            return 1
+    for p in write(roots, out, a.history_page):
         print(f"report: {os.path.relpath(p, REPO)}")
     return 0
 
