@@ -137,14 +137,18 @@ implicit steps (the driver's `--numTimeSteps` is superseded by the deck's final 
 - Static Trilinos libraries (as every Level 2 dependency); the driver links ~60 of them.
 - Exodus output is off by default (`--exodus-output` writes mesh files through Ioss/netCDF); the validation
   does not exercise it.
-- **Registered inputs `maxwell-bdot-small`, `maxwell-bdot-medium`, `maxwell-blob-r1` do not run** (exit 134,
-  before the ROI). There are two independent blockers, found in a bounded check on 2026-09-24:
+- **The upstream decks `maxwell-bdot-small.xml`, `maxwell-bdot-medium.xml` and `maxwell-blob-R1.xml` are not
+  registered inputs** (they were until 2026-09-26). They do not run with this driver (exit 134, before the ROI),
+  for two independent reasons found in a bounded check:
   1. The driver reads the equation set as `sublist("Maxwell Physics").sublist("Maxwell Physics")`
      (`src/main.cpp:246`, unchanged from upstream), but these decks leave that inner `<ParameterList>`
      unnamed. The result is `Teuchos InvalidParameterName: "Type" does not exist`.
   2. The decks read Exodus meshes (`BDot.small.gen`, `BDot.medium.gen`, `blob-R1.g`) that are not in the
      pinned Trilinos source or in this repository. With the list named in a scratch copy, the run stops at
      `Could not open database 'BDot.small.gen'`.
+
+  The decks are byte-identical to the pinned upstream. Upstream copies them but runs no test with them. They are
+  kept unmodified in `src/decks/` and listed under `upstream_inputs_not_added` in `inputs.yaml`.
 
   The decks are byte-identical to the pinned upstream. Upstream copies them but runs no test with them. They are
   kept unmodified, and the inputs stay registered and reported as failed, not measured.

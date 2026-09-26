@@ -1246,7 +1246,7 @@ PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --collector none -
 
 echo "=== 15: registered-input report (registry_view.py + report.py)"
 # Synthetic records of the REAL registry's remhos periodic-hexagon-p0 (current definition: -o 3) and
-# miniem maxwell-bdot-small: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
+# miniem darcy-hex: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
 # record plus a 2-run adaptive extension of the same configuration, a newer 3-run record built from
 # another binary (a separate measurement), and a failed MiniEM attempt.
 pycheck "15a-15h: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism" <<'PY'
@@ -1290,8 +1290,8 @@ rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")
 json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
            "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
           open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
-ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "maxwell-bdot-small"))
-rec("run06", mcur["workload"], [], [], app="miniem", case="maxwell-bdot-small", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
+ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "darcy-hex"))
+rec("run06", mcur["workload"], [], [], app="miniem", case="darcy-hex", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
 bad = []
 b1 = report.build_bundle([root]); b2 = report.build_bundle([root])
 if json.dumps(b1, sort_keys=True) != json.dumps(b2, sort_keys=True): bad.append("15a: two builds differ")
@@ -1312,19 +1312,19 @@ if sets[("run01",)].get("vs_previous") is not None or p.get("vs_previous") is no
 if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.append("15f: vs previous missing between same-workload measurements")
 if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
     bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
-f = rows["maxwell-bdot-small"]
+f = rows["darcy-hex"]
 if f["status"] != "RUN_FAILED" or any(f["cells"].values()): bad.append(f"15h: failed input: status {f['status']}")
 if m and (m.get("device") is not None or m["roi"].get("profiler_inflation") is not None): bad.append("15h: no-profile fields not null")
 if c["counts"]["roi_success"]["level2"] != 1: bad.append(f"15h: counts {c['counts']['roi_success']}")
 report.write([root], os.path.join(T, "page"))
 md = open(os.path.join(T, "page", "README.md")).read()
-if "maxwell-bdot-small**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
+if "darcy-hex**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 if command -v node >/dev/null 2>&1; then
     printf '%s\n' '[{"name":"15i overview","level":"2","expect":["1 ROI timing SUCCESS"]},
  {"name":"15i hexagon","level":"2","app":"remhos","input":"periodic-hexagon-p0","platform":"test-platform","expect":["run05","SUPERSEDED","INVALIDATED","earlier definition","device busy: not collected"]},
- {"name":"15i failed","level":"2","app":"miniem","input":"maxwell-bdot-small","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
+ {"name":"15i failed","level":"2","app":"miniem","input":"darcy-hex","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
     out="$(node "$HERE/page_smoke.js" "$TMP/rv/page/index.html" "$TMP/rv/checks.json" 2>&1)"
     [ $? -eq 0 ] && ok "15i: the page's own script renders the synthetic campaign (DOM shim, $(echo "$out" | grep -c '^ok') checks)" \
                  || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"

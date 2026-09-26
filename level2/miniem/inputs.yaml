@@ -35,12 +35,12 @@ baseline:
       rule: record
 coverage:
   status: MULTI_INPUT
-  reason: 'seven upstream decks/sizes are registered (two maxwell-large sizes, the smoke deck, two bdot sizes, blob,
-  darcy). Each input names the files the driver reads: its deck (--inputFile, read from the build''s decks/
-  copy of src/decks/) and the solver configurations it loads with --solver=MueLu on CUDA (solverMueLu.xml,
-  solverMueLuCuda.xml; the driver logs "Loading solver config from <file>"). The bdot and blob decks also
-  read Exodus meshes (BDot.small.gen, BDot.medium.gen, blob-R1.g) that upstream does not distribute; they
-  are not registered files, and those three inputs do not run (level2/miniem/README.md, Warnings).'
+  reason: 'four upstream decks/sizes are registered (two maxwell-large sizes, the smoke deck, darcy). Each input
+    names the files the driver reads: its deck (--inputFile, read from the build''s decks/ copy of src/decks/) and
+    the solver configurations it loads with --solver=MueLu on CUDA (solverMueLu.xml, solverMueLuCuda.xml; the
+    driver logs "Loading solver config from <file>").'
+  upstream_inputs_not_added:
+  - 'decks/maxwell-bdot-small.xml, maxwell-bdot-medium.xml, maxwell-blob-R1.xml (registered until 2026-09-26, removed -- they do not run with this driver: the equation-set ParameterList is unnamed while main.cpp:246 reads it by name, and the Exodus meshes they read (BDot.small.gen, BDot.medium.gen, blob-R1.g) are not distributed with the pinned Trilinos; upstream runs no test with them; level2/miniem/README.md, Warnings)'
 inputs:
 - id: maxwell-large-weak48
   case: maxwell-refmaxwell
@@ -111,81 +111,6 @@ inputs:
     HPCPERF_SCALE_MODE: smoke
   files:
   - src/decks/maxwell.xml
-  - src/decks/solverMueLu.xml
-  - src/decks/solverMueLuCuda.xml
-  runtime_config:
-    gpus: 1
-    ranks: 1
-  build_config: null
-  backends_validated:
-  - cuda
-  input_form: file
-- id: maxwell-bdot-small
-  case: maxwell-bdot
-  variant: case
-  source:
-    kind: upstream-file
-    upstream:
-      repo: trilinos/Trilinos
-      version: see level2/<app>/README.md (Upstream commit)
-      path: decks/maxwell-bdot-small.xml (B-dot loop problem)
-  params:
-    deck: maxwell-bdot-small.xml
-  env:
-    HPCPERF_SCALE_MODE: smoke
-    HPCPERF_MINIEM_DECK: maxwell-bdot-small.xml
-  files:
-  - src/decks/maxwell-bdot-small.xml
-  - src/decks/solverMueLu.xml
-  - src/decks/solverMueLuCuda.xml
-  runtime_config:
-    gpus: 1
-    ranks: 1
-  build_config: null
-  backends_validated:
-  - cuda
-  input_form: file
-- id: maxwell-bdot-medium
-  case: maxwell-bdot
-  variant: size
-  source:
-    kind: upstream-file
-    upstream:
-      repo: trilinos/Trilinos
-      version: see level2/<app>/README.md (Upstream commit)
-      path: decks/maxwell-bdot-medium.xml
-  params:
-    deck: maxwell-bdot-medium.xml
-  env:
-    HPCPERF_SCALE_MODE: smoke
-    HPCPERF_MINIEM_DECK: maxwell-bdot-medium.xml
-  files:
-  - src/decks/maxwell-bdot-medium.xml
-  - src/decks/solverMueLu.xml
-  - src/decks/solverMueLuCuda.xml
-  runtime_config:
-    gpus: 1
-    ranks: 1
-  build_config: null
-  backends_validated:
-  - cuda
-  input_form: file
-- id: maxwell-blob-r1
-  case: maxwell-blob
-  variant: case
-  source:
-    kind: upstream-file
-    upstream:
-      repo: trilinos/Trilinos
-      version: see level2/<app>/README.md (Upstream commit)
-      path: decks/maxwell-blob-R1.xml (refinement level 1)
-  params:
-    deck: maxwell-blob-R1.xml
-  env:
-    HPCPERF_SCALE_MODE: smoke
-    HPCPERF_MINIEM_DECK: maxwell-blob-R1.xml
-  files:
-  - src/decks/maxwell-blob-R1.xml
   - src/decks/solverMueLu.xml
   - src/decks/solverMueLuCuda.xml
   runtime_config:
