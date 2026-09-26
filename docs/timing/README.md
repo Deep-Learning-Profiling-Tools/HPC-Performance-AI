@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs, ROI campaign 2026-09-23/24
 
-Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 registered Level 1 / Level 2 inputs: ROI timing SUCCESS for 134 + 89, run failed for 3, not measured 0; run verification PASS for 223; UNSTABLE 10. Level 3: 43 registered inputs without ROI support (earlier native timing only).
+Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 89 registered Level 1 / Level 2 inputs: ROI timing SUCCESS for 134 + 89, run failed for 0, not measured 0; run verification PASS for 223; UNSTABLE 10. Level 3: 43 registered inputs without ROI support (earlier native timing only).
 
 - Level 1 protocol: 1 warm-up + 5 clean runs, no profiler
 - Level 2 protocol: 0 warm-up + 3 clean runs, no profiler; +2 clean runs of the same configuration when (max-min)/median > 10 % after 3 (campaign script)
@@ -17,12 +17,13 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 re
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 121 | 12 | 0 | 1 |
-| 2 | 36 | 53 | 0 | 3 |
+| 2 | 36 | 53 | 0 | 0 |
 | 3 | 18 | 18 | 0 | 7 |
 
 - Six Level 2 inputs (exampm dambreak-0.005 / dambreak-0.05-upstream; remhos cube-remap-rs1, periodic-hexagon-p0, periodic-square-p5, periodic-cube-p0) ran the run.sh default workload before 3c9aec2: their earlier records are INVALIDATED (kept as history), the corrected inputs were measured again.
 - remhos periodic-hexagon-p0 / periodic-square-p5 were redefined at order 3 (695c6a9): their order-2 records are SUPERSEDED (valid history of the old definition, never compared with the order-3 result).
 - MiniEM: seven records of 2026-09-23 are BUILD_NOT_MATERIALIZED attempts (Trilinos not yet built); the inputs were measured after the build (2026-09-24).
+- MiniEM decks maxwell-bdot-small / maxwell-bdot-medium / maxwell-blob-R1 were removed from the registry on 2026-09-26 (they do not run with this driver: unnamed equation-set list, Exodus meshes not distributed); their failed attempt records stay in the results as raw evidence and are no longer listed as inputs.
 
 ### Level 1
 
@@ -225,9 +226,6 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 re
 | miniem | maxwell-large-weak48 | SUCCESS | nvidia-b200.cuda13.2 | 1.3 s | 3 | 0.1% | 0.1% | yes | PASS | INCOMPLETE | e3e86ba802 |
 | miniem | maxwell-large-strong64 | SUCCESS | nvidia-b200.cuda13.2 | 3 s | 3 | 0.5% | 0.3% | yes | PASS | INCOMPLETE | e3e86ba802 |
 | miniem | maxwell-smoke-15 | SUCCESS | nvidia-b200.cuda13.2 | 14.6 ms | 3 | 0.6% | 0.3% | yes | PASS | INCOMPLETE | e3e86ba802 |
-| miniem | maxwell-bdot-small | RUN_FAILED | - | - | - | - | - | - | NOT_RUN | none | - |
-| miniem | maxwell-bdot-medium | RUN_FAILED | - | - | - | - | - | - | NOT_RUN | none | - |
-| miniem | maxwell-blob-r1 | RUN_FAILED | - | - | - | - | - | - | NOT_RUN | none | - |
 | miniem | darcy-hex | SUCCESS | nvidia-b200.cuda13.2 | 41.8 ms | 3 | 0.8% | 0.4% | yes | PASS | INCOMPLETE | e3e86ba802 |
 | miniweather | thermal-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 32.2 s | 3 | 0.0% | 0.0% | yes | PASS | INCOMPLETE | fd2fc6c6c8 |
 | miniweather | collision-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 32.2 s | 3 | 0.0% | 0.0% | yes | PASS | INCOMPLETE | fd2fc6c6c8 |
@@ -266,12 +264,6 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-24T03:39:03Z (244 records). 134 + 92 re
 - pooled by measurement group `quicksilver/p1-profile-8c-100k-20s/20260923T190616Z-2030182+20260923T214310Z-2258177` (quicksilver / p1-profile-8c-100k-20s): logs/campaign.log: 2026-09-23T21:43:07Z level 2 adaptive extension: 2 inputs: amg2023/p1-256cubed quicksilver/p1-profile-8c-100k-20s; logs/level2.log: measure_level2: run_id=20260923T190616Z-2030182 platform=nvidia-b200.cuda13.2 collector=none cases=92 protocol=warmup:0,clean:3,profiled:0; logs/level2-adaptive.log: measure_level2: run_id=20260923T214310Z-2258177 platform=nvidia-b200.cuda13.2 collector=none cases=2 protocol=warmup:0,clean:2,profiled:0
 - pooled by measurement group `remhos/periodic-hexagon-p0/20260924T033754Z-2592820+20260924T033902Z-2596596` (remhos / periodic-hexagon-p0): phase4-remhos-order3/phase4.log: 2026-09-24T03:38:50Z adaptive extension: 1: remhos/periodic-hexagon-p0; phase4-remhos-order3/measure.log: measure_level2: run_id=20260924T033754Z-2592820 platform=nvidia-b200.cuda13.2 collector=none cases=2 protocol=warmup:0,clean:3,profiled:0; phase4-remhos-order3/measure-adaptive.log: measure_level2: run_id=20260924T033902Z-2596596 platform=nvidia-b200.cuda13.2 collector=none cases=1 protocol=warmup:0,clean:2,profiled:0
 - input-file identity from a supplementary verification established after the measurement, not captured at measurement time (the stored identity did not name these files): the run's own argv / log name the files, the run read the declared run-directory copies, their content hashes to the registry value and their status-change time precedes the run -- conditional evidence taken together, on the premise that ctime was not reset: miniem / maxwell-large-weak48, miniem / maxwell-large-strong64, miniem / maxwell-smoke-15, miniem / darcy-hex
-
-### Not measured successfully
-
-- **miniem / maxwell-bdot-small**: RUN_FAILED, last attempt 20260924T015148Z-2515628 status clean_failed (NOT_RUN). Aborts before the ROI (exit 134). Two blockers found in a bounded check: the deck leaves the equation-set ParameterList unnamed while the driver reads sublist("Maxwell Physics").sublist("Maxwell Physics") (level2/miniem/src/main.cpp:246), and the Exodus mesh the deck reads is not in the pinned Trilinos or this repository. Deck byte-identical to upstream, not modified (level2/miniem/README.md).
-- **miniem / maxwell-bdot-medium**: RUN_FAILED, last attempt 20260924T015148Z-2515628 status clean_failed (NOT_RUN). Aborts before the ROI (exit 134). Two blockers found in a bounded check: the deck leaves the equation-set ParameterList unnamed while the driver reads sublist("Maxwell Physics").sublist("Maxwell Physics") (level2/miniem/src/main.cpp:246), and the Exodus mesh the deck reads is not in the pinned Trilinos or this repository. Deck byte-identical to upstream, not modified (level2/miniem/README.md).
-- **miniem / maxwell-blob-r1**: RUN_FAILED, last attempt 20260924T015148Z-2515628 status clean_failed (NOT_RUN). Aborts before the ROI (exit 134). Two blockers found in a bounded check: the deck leaves the equation-set ParameterList unnamed while the driver reads sublist("Maxwell Physics").sublist("Maxwell Physics") (level2/miniem/src/main.cpp:246), and the Exodus mesh the deck reads is not in the pinned Trilinos or this repository. Deck byte-identical to upstream, not modified (level2/miniem/README.md).
 
 ### History kept, never current
 
