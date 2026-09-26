@@ -125,7 +125,9 @@ the top) whose numbers are never mixed with, or compared against, the current on
 2. The application's **registered inputs x platforms**: the inputs come from the registry, not from
    the records, so a failed or unmeasured input is listed (its cell shows the failure). Every row
    shows its parameters, run-verification verdict and scientific-correctness verdict.
-3. Choosing an input and a platform shows its **current measurement**: ROI median of all clean-run
+3. Choosing an input and a platform shows its **current measurement**, in the same layout as the
+   case-table view (figures, process breakdown bar, ROI and device-activity panels, runtime API and
+   checks, input and measurement, caveats, runs) plus a registered-input panel: ROI median of all clean-run
    samples, spread (max - min) / median, CV (stddev / median), stable / UNSTABLE, ROI share of the
    process, FOM, every sample per record with its protocol (an adaptive 3 + 2 is pooled and shown as
    such), timing status, run verification, scientific correctness with its basis, the blocker of a
