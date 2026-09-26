@@ -86,6 +86,7 @@ COLUMNS = [
     "host_cpu_model", "host_cpus_allowed", "host_loadavg_1m",
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
     "app_timer_s", "roi_vs_app_timer",
+    "input_id",
 ]
 OPS_COLUMNS = ["level", "app", "case", "platform", "run_id", "op", "category", "count",
                "total_s", "avg_s", "min_s", "max_s", "share"]
@@ -286,6 +287,26 @@ def build_record(raw):
     inputs = {"declared_env": declared_env, "declared_argv": dash(meta.get("argv")),
               "processes": procs, "exe_sha256": exe_sha}
 
+    # ---- registry input (a --registry case): the workload identity stored by the engine
+    registry = None
+    if dash(meta.get("input_id")):
+        ident, ident_path = None, os.path.join(raw, "workload_identity.json")
+        try:
+            with open(ident_path) as f:
+                ident = json.load(f)
+        except (OSError, ValueError):
+            pass
+        registry = {"input_id": meta["input_id"], "identity": ident,
+                    "identity_sha256": dash(meta.get("workload_identity_sha256")) or None,
+                    "identity_complete": bool(ident and ident.get("complete")
+                                              and ident.get("input_id") == meta["input_id"]
+                                              and ident.get("benchmark") == meta["app"])}
+        if not registry["identity_complete"]:
+            caveats.append("The registry input's workload identity could not be established: this record "
+                           "is not a result for that input.")
+            if status == "ok":
+                status = "identity_failed"
+
     # ---- FOM and launcher audit, from the first clean run
     clean0_log = os.path.join(runs[0]["dir"], "run.log") if runs else None
     fom = extract_fom(clean0_log, meta)
@@ -392,6 +413,7 @@ def build_record(raw):
             "notes": dash(meta.get("notes")) or None,
         },
         "inputs": inputs,
+        "registry": registry,
         "roi": roi,
         "device": device,
         "runtime_api": runtime,
@@ -474,6 +496,7 @@ def flatten(rec):
         "git_dirty": int(rec["provenance"]["git_dirty"]), "raw_dir": rec["provenance"]["raw_dir"],
         "app_timer_s": v((rec.get("app_timer") or {}).get("value_s")),
         "roi_vs_app_timer": v((rec.get("app_timer") or {}).get("roi_diff_frac")),
+        "input_id": v((rec.get("registry") or {}).get("input_id")),
     })
     for c in CATEGORIES:
         row[f"device_{c}_s"] = v(dev.get(f"{c}_s")) if dev else ""
@@ -492,6 +515,17 @@ def op_rows(rec):
 
 # ----------------------------------------------------------------- driver
 
+# A raw run shown to have measured another workload than its case/input (see
+# tools/inputs/hpcperf_inputs.py `invalidation`) keeps its evidence on disk but carries an
+# INVALIDATED.json: no record is built from it and an existing record of it is not loaded, so it
+# reaches no CSV, summary, report or baseline selection.
+INVALIDATION_FILE = "INVALIDATED.json"
+
+
+def invalidated(raw):
+    return os.path.isfile(os.path.join(raw, INVALIDATION_FILE))
+
+
 def raw_dirs(raw_root):
     for level_dir in sorted(glob.glob(os.path.join(raw_root, "level[0-9]"))):
         for run in sorted(glob.glob(os.path.join(level_dir, "*", "*", "*"))):
@@ -503,12 +537,17 @@ def json_path(out_root, rec):
     return os.path.join(out_root, f"level{rec['level']}", rec["app"], rec["case"], f"{rec['run_id']}.json")
 
 
-def load_records(out_root):
+def load_records(out_root, invalid=None):
     records, skipped = [], 0
     for path in sorted(glob.glob(os.path.join(out_root, "level[0-9]", "*", "*", "*.json"))):
         rec = json.load(open(path))
         if rec.get("schema") != SCHEMA:
             skipped += 1
+            continue
+        raw = (rec.get("provenance") or {}).get("raw_dir")
+        if raw and invalidated(os.path.join(REPO, raw)):
+            if invalid is not None:
+                invalid.append(path)
             continue
         records.append(rec)
     records.sort(key=lambda r: (r["level"], r["app"], r["case"], r["run_id"]))
@@ -538,6 +577,32 @@ def write_csvs(out_root, records):
     return written
 
 
+REGISTRY_CURRENT_COLS = ["level", "benchmark", "input_id", "status", "run_verification", "platform", "samples", "roi_median_s",
+                         "spread", "cv", "stable", "adaptive", "run_ids", "git_commit", "correctness", "correctness_basis"]
+
+
+def write_registry_current(out_root):
+    """registry_current.csv: the current result of every registered input -- the same rules as the report
+    (tools/timing/registry_view.py). The per-record CSVs above stay a log of every record."""
+    import csv
+    import registry_view
+    rows, _recs, _meta, _orph = registry_view.current_view([out_root], REPO)
+    path = os.path.join(out_root, "registry_current.csv")
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(REGISTRY_CURRENT_COLS)
+        for r in rows:
+            if r["level"] == 3:
+                continue
+            m = r["current"] or {}
+            w.writerow([r["level"], r["benchmark"], r["input_id"], r["status"], r["run_verification"] or "",
+                        m.get("platform", ""), len(m.get("samples") or []), m.get("median", ""),
+                        "" if m.get("spread") is None else m["spread"], "" if m.get("cv") is None else m["cv"],
+                        m.get("stable", ""), m.get("adaptive", ""), " ".join(m.get("run_ids") or []),
+                        (m.get("git_commit") or "")[:10], r.get("correctness") or "", r.get("correctness_basis") or ""])
+    return path
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--raw-root", default=os.path.join(REPO, "build", "timing"))
@@ -547,13 +612,16 @@ def main(argv=None):
     ap.add_argument("--no-report", action="store_true", help="do not regenerate <out-root>/report/")
     a = ap.parse_args(argv)
 
-    written = failed = 0
+    written = failed = n_invalid_raw = 0
     if not a.csv_only:
         if not os.path.isdir(a.raw_root):
             print(f"summarize: no raw directory {a.raw_root}", file=sys.stderr)
             return 1
         for raw in raw_dirs(a.raw_root):
             if a.run_id and os.path.basename(raw) not in a.run_id:
+                continue
+            if invalidated(raw):
+                n_invalid_raw += 1
                 continue
             try:
                 rec = build_record(raw)
@@ -571,16 +639,20 @@ def main(argv=None):
             written += 1
 
     os.makedirs(a.out_root, exist_ok=True)
-    records, skipped = load_records(a.out_root)
+    invalid = []
+    records, skipped = load_records(a.out_root, invalid)
     outs = write_csvs(a.out_root, records)
     by = {}
     for r in records:
         by.setdefault(r["level"], []).append(r)
-    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}")
+    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}"
+          f" invalidated_raw={n_invalid_raw} invalidated_records={len(invalid)}")
     for level, recs in sorted(by.items()):
         ok = sum(1 for r in recs if r["status"] == "ok")
         fom = sum(1 for r in recs if r["fom"]["status"] == "ok")
         print(f"           level{level}: {len(recs)} runs, {ok} ok, {len(recs) - ok} not ok, fom_ok={fom}")
+    if any((r.get("registry") or {}).get("input_id") for r in records):
+        outs.append(write_registry_current(a.out_root))
     if not a.no_report:
         outs += report.write(a.out_root, os.path.join(a.out_root, "report"))
     for p in outs:

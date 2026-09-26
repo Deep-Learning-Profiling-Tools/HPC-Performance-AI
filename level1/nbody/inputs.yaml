@@ -1,0 +1,92 @@
+# Registered inputs of nbody (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: nbody
+level: 1
+selector: null
+default_input: n16000-s10
+entry:
+  kind: binary
+  path: build/nbody/cuda/nbody_cuda
+timing:
+  scope: the benchmark's own total over all time steps of the N-body kernel
+  kind: total
+  unit: s
+  regex: ^# Total Time \(s\)\s*:\s*(?P<value>[0-9.eE+-]+)
+  select: only
+baseline:
+  method: 'built-in comparison with the CPU reference (GSimulationReference.hpp): PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger particle counts
+inputs:
+- id: n16000-s10
+  case: nbody-allpairs
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/nbody-cuda Makefile run: ./main 16000 10 (= ctest)'
+  params:
+    particles: 16000
+    steps: 10
+  args:
+  - '16000'
+  - '10'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n64000-s10
+  case: nbody-allpairs
+  variant: size
+  source:
+    kind: derived
+    derivation: particles x4
+  params:
+    particles: 64000
+    steps: 10
+  args:
+  - '64000'
+  - '10'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n32000-s10
+  case: nbody-allpairs
+  variant: size
+  source:
+    kind: derived
+    derivation: >-
+      particles x2. The port verifies the result with an O(n^2) host reference of EVERY step
+      (common/GSimulationReference.hpp), so the wall time is ~n^2 x steps while the timed GPU loop stays
+      below 0.1 s: n64000-s10 needs ~140 s per run and the x16 size (256,000 particles) exceeded the
+      900 s per-run timeout in its warm-up (attempt kept as the unregistered record n256000-s10).
+  params:
+    particles: 32000
+    steps: 10
+  args:
+  - '32000'
+  - '10'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

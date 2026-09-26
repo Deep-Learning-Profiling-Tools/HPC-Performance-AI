@@ -1,0 +1,134 @@
+# Registered inputs of haccabanapm (schema hpcperf-inputs-1), selected through HPCPERF_HACCABANAPM_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: haccabanapm
+level: 2
+selector: HPCPERF_HACCABANAPM_INPUT
+default_input: bench-256
+entry:
+  kind: run.sh
+  path: level2/haccabanapm/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'pm_run''s own per-step timing summary: total of the timed DKD steps (warm-up steps excluded; upstream''s
+    benchmark metric); pm_ic and I/O are outside'
+  kind: total
+  unit: s
+  regex: '^pm_run_timing: summary steps_timed=\d+ window=\S+ median_s=[0-9.eE+-]+ mad_s=[0-9.eE+-]+ total_s=(?P<value>[0-9.eE+-]+)'
+  select: only
+baseline:
+  method: no science value is printed to stdout (the evolved snapshot is checked by validate.sh against the initial
+    one); only the timed step count is verifiable from the log
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: steps_timed
+    role: diagnostic
+    regex: '^pm_run_timing: summary steps_timed=(?P<value>\d+)'
+    select: last
+    compare:
+      rule: exact
+  - name: median_step_s
+    role: diagnostic
+    regex: median_s=(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream's demo indat (5 steps, no timed window), the project's benchmark indat at 256^3 (run.sh
+    default, derived from the demo indat) and the same window at 128^3 (derived size step)
+inputs:
+- id: bench-256
+  case: m000-cosmology
+  variant: default
+  source:
+    kind: derived
+    derivation: >-
+      apps/demo/indat_bench_256.params is the project's benchmark indat derived from upstream's demo indat
+      (same HACC M000 cosmology, seed and transfer function; NG/NP/RL 128 -> 256, Z_FIN 50 -> 0, N_STEPS
+      5 -> 500 = upstream's validated z=200->0 window), the run.sh default since the Level 2 bring-up
+  params:
+    indat: apps/demo/indat_bench_256.params
+    ng: 256
+    np: 256
+    steps: 500
+  env:
+    HPCPERF_HACCABANAPM_INDAT: apps/demo/indat_bench_256.params
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - apps/demo/indat_bench_256.params
+  input_form: file
+- id: bench-128
+  case: m000-cosmology
+  variant: size
+  source:
+    kind: derived
+    derivation: >-
+      inputs/indat_bench_128.params: the bench-256 window (z=200->0, 500 DKD steps) at NG=NP=128, RL=128
+      (the demo size, same 1 Mpc/h spacing); only NG/NP/RL differ from indat_bench_256.params, and the
+      transfer function is referenced as ../apps/demo/cmbM000.tf (pm_ic resolves it from the indat's directory)
+  params:
+    indat: inputs/indat_bench_128.params
+    ng: 128
+    np: 128
+    steps: 500
+  env:
+    HPCPERF_HACCABANAPM_INDAT: inputs/indat_bench_128.params
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/indat_bench_128.params
+  input_form: file
+- id: demo-128
+  case: m000-cosmology
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: ECP-copa/HACCabanaPM
+      version: see level2/<app>/README.md (Upstream commit)
+      path: apps/demo/indat.params (NG=NP=128, z 200->50, 5 steps; upstream's demo, validate.sh)
+  params:
+    indat: apps/demo/indat.params
+    ng: 128
+    np: 128
+    steps: 5
+  env:
+    HPCPERF_HACCABANAPM_INDAT: apps/demo/indat.params
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - apps/demo/indat.params
+  input_form: file
+  notes: >-
+    upstream's demo indat runs 5 DKD steps, exactly pm_run's warm-up window (warmup=5), so no timed step
+    exists and the pm_run_timing summary line is not printed: the run completes but the native timer is
+    unavailable for this input (E2E and the pm_ic/pm_run wall times of run.sh only); NEEDS_TIMING_SUPPORT for
+    this input alone
+  timing:
+    kind: none
+    status: NEEDS_TIMING_SUPPORT
+    reason: >-
+      upstream's demo indat runs 5 DKD steps = pm_run's warm-up window (warmup=5), so steps_timed is 0 and
+      the pm_run_timing summary line is not printed; only the E2E wall and run.sh's pm_ic/pm_run wall times exist
+  baseline:   # the benchmark-level quantities come from the pm_run_timing summary, which this 5-step run never prints
+    quantities:
+    - name: provenance_5_steps
+      role: diagnostic
+      regex: '^pm_run_timing: provenance ranks=1 .* nsteps=5 warmup=5'
+      compare:
+        rule: present

@@ -1,0 +1,91 @@
+# Registered inputs of gaussian_elimination (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: gaussian_elimination
+level: 1
+selector: null
+default_input: matrix208
+entry:
+  kind: binary
+  path: build/gaussian_elimination/cuda/gaussian_elimination_cuda
+timing:
+  scope: the benchmark's own timer over the Fan1/Fan2 kernels of the elimination (memory transfers excluded; 'Time
+    total' printed separately)
+  kind: total
+  unit: s
+  regex: ^Time for CUDA kernels:\s*(?P<value>[0-9.eE+-]+) sec
+  select: only
+baseline:
+  method: no PASS line; the ctest wrapper checks the solution (verify.py); the registry records the two timer lines
+    only
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_time_line
+    role: diagnostic
+    regex: ^Time total
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream matrix file plus two sizes from upstream's built-in generator
+inputs:
+- id: matrix208
+  case: gaussian-elimination
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: data/gaussian/matrix208.txt (upstream file, = ctest)
+  params:
+    n: 208
+  args:
+  - -f
+  - level1/gaussian_elimination/data/matrix208.txt
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/matrix208.txt
+  input_form: file
+- id: s1024
+  case: gaussian-elimination
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: upstream's own -s <size> generator (create_matrix)
+  params:
+    n: 1024
+  args:
+  - -s
+  - '1024'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: s4096
+  case: gaussian-elimination
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: -s 4096
+  params:
+    n: 4096
+  args:
+  - -s
+  - '4096'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

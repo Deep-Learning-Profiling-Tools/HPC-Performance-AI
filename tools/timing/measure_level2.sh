@@ -28,10 +28,12 @@
 #   --results-root DIR  records, CSVs and the web page (default results/timing)
 #   --no-summary        skip the summarize + report step after the runs
 #   --dry-run           print what would run
+#   --registry          measure the registered inputs (level*/<app>/inputs.yaml via the generated
+#                       cases/level2_registry.tsv; SELECT = all | <app> | <app>/<input_id>)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-LEVEL=2 CLEAN_RUNS=1 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0
+LEVEL=2 CLEAN_RUNS=1 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0 REGISTRY=0
 COLLECTOR=auto BACKEND=CUDA BUILD_ROOT="" RAW_ROOT="$REPO/build/timing"
 ENV_SCRIPT="${HPCPERF_TIMING_ENV_SCRIPT:-hpcperf_env.sh}"
 SELECT=()
@@ -47,6 +49,7 @@ while [ $# -gt 0 ]; do
         --results-root) RESULTS_ROOT="${2:?}"; shift 2 ;;
         --no-summary)  SUMMARIZE=0; shift ;;
         --dry-run)     DRY_RUN=1; shift ;;
+        --registry)    REGISTRY=1; shift ;;
         -h|--help)     awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*)            die "unknown option '$1' (try --help)" ;;
         *)             SELECT+=("$1"); shift ;;

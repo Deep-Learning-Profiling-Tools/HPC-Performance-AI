@@ -1,7 +1,7 @@
 name: sparta
 level: 3
 application: SPARTA
-description: SPARTA DSMC (KOKKOS/CUDA package), collisional-flow bench deck (in.collide) at 1/2/4 GPUs, one MPI rank per GPU
+description: SPARTA DSMC (KOKKOS/CUDA package), collisional-flow bench deck (in.collide) at 1/2/4 GPUs, one MPI rank per GPU; registered inputs (inputs.yaml) add in.free / in.sphere and the upstream reference sizes on 1 GPU
 supported_backends:
 - cuda
 - hip
@@ -24,10 +24,19 @@ profile_scheme: '<backend> (cuda validated; hip: build path present, untested --
 dependency_installs: []
 inputs:
 - src/bench/in.collide
+- src/bench/in.free
+- src/bench/in.sphere
 - src/bench/ar.species
 - src/bench/ar.vss
+- src/bench/data.sphere
+registered_inputs: inputs.yaml
 references:
 - src/bench/log.7Jul14.collide.icc.10K.1
+- src/bench/log.7Jul14.collide.icc.100K.1
+- src/bench/log.7Jul14.collide.icc.1M.1
+- src/bench/log.7Jul14.collide.icc.10M.1
+- src/bench/log.7Jul14.free.icc.1M.1
+- src/bench/log.7Jul14.sphere.icc.1M.1
 source_version: hpcperf-l3-v1
 source_tree_sha256: 63519f0e3e9ac974e1f5aff64446b5fcb9ffc1f9c113901249efe7fa2666d36c
 source_artifact:

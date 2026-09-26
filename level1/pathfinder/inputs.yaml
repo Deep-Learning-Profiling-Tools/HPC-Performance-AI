@@ -1,0 +1,87 @@
+# Registered inputs of pathfinder (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: pathfinder
+level: 1
+selector: null
+default_input: c100000-r100-p20
+entry:
+  kind: binary
+  path: build/pathfinder/cuda/pathfinder_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the CUDA port prints no timer
+baseline:
+  method: no built-in check line
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: no_error
+    role: required
+    regex: (FAIL|[Ee]rror)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger grids
+inputs:
+- id: c100000-r100-p20
+  case: pathfinder
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/pathfinder run: ./pathfinder 100000 100 20 (= ctest)'
+  params:
+    cols: 100000
+    rows: 100
+    pyramid_height: 20
+  args:
+  - '100000'
+  - '100'
+  - '20'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: c1000000-r100-p20
+  case: pathfinder
+  variant: size
+  source:
+    kind: derived
+    derivation: cols x10
+  params:
+    cols: 1000000
+    rows: 100
+    pyramid_height: 20
+  args:
+  - '1000000'
+  - '100'
+  - '20'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: c100000-r1000-p20
+  case: pathfinder
+  variant: size
+  source:
+    kind: derived
+    derivation: rows x10
+  params:
+    cols: 100000
+    rows: 1000
+    pyramid_height: 20
+  args:
+  - '100000'
+  - '1000'
+  - '20'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

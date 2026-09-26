@@ -1,0 +1,133 @@
+# Registered inputs of minibude (schema hpcperf-inputs-1), selected through HPCPERF_MINIBUDE_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: minibude
+level: 2
+selector: HPCPERF_MINIBUDE_INPUT
+default_input: bm1-ppwi-all
+entry:
+  kind: run.sh
+  path: level2/minibude/run.sh
+  backend_arg: CUDA
+timing:
+  scope: miniBUDE's own sum_ms of the timed iterations of ONE configuration (ppwi/wgsize); with the default auto-tuning
+    over 8 ppwi values there are 8 blocks and the value is ambiguous (timing FAILED for such inputs by design)
+  kind: total
+  unit: ms
+  regex: ^\s+sum_ms:\s+(?P<value>[0-9.]+)
+  select: only
+baseline:
+  method: miniBUDE validates every pose energy against data/<deck>/ref_energies.out (outcome valid true/false, max_diff_%)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: valid_true
+    role: required
+    regex: 'outcome:\s+\{ valid: true'
+    compare:
+      rule: present
+  - name: valid_false
+    role: required
+    regex: 'valid: false'
+    compare:
+      rule: absent
+  - name: max_diff_pct
+    role: diagnostic
+    regex: 'max_diff_%: (?P<value>[0-9.]+)'
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: both vendored decks are registered
+  blocker: upstream's bm2_long deck (a longer bm2 run) is not vendored; size/storage policy to check before adding
+  upstream_inputs_not_added:
+  - data/bm2_long
+inputs:
+- id: bm1-ppwi-all
+  case: bm1
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: UoB-HPC/miniBUDE
+      version: see level2/<app>/README.md (Upstream commit)
+      path: data/bm1 (65536 poses, 26/938 atoms), 16 iterations, wgsize 64, ppwi auto-tune over all compiled values
+        (run.sh default)
+  params:
+    deck: bm1
+    iterations: 16
+    wgsize: 64
+    ppwi: all
+  env:
+    MINIBUDE_DECK: bm1
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/bm1/poses.in
+  input_form: file
+  timing:
+    scope: >-
+      miniBUDE's own 'best:' summary line of the auto-tuning run: sum_ms of the timed iterations of the best
+      (ppwi, wgsize) configuration among the 8 PPWI values tried (each configuration prints its own block;
+      the best one is what upstream reports as the result of an auto-tuned run)
+    kind: total
+    unit: ms
+    regex: '^best: \{.*sum_ms: (?P<value>[0-9.]+)'
+    select: only
+- id: bm1-ppwi2
+  case: bm1
+  variant: parameter
+  source:
+    kind: upstream-file
+    upstream:
+      repo: UoB-HPC/miniBUDE
+      version: see level2/<app>/README.md (Upstream commit)
+      path: data/bm1 with a single configuration ppwi=2
+  params:
+    deck: bm1
+    iterations: 16
+    wgsize: 64
+    ppwi: 2
+  env:
+    MINIBUDE_DECK: bm1
+    MINIBUDE_PPWI: '2'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/bm1/poses.in
+  input_form: file
+- id: bm2-ppwi2-iters8
+  case: bm2
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: UoB-HPC/miniBUDE
+      version: see level2/<app>/README.md (Upstream commit)
+      path: data/bm2 (2672/2672 atoms, ~300x the interactions) with ppwi=2 and 8 iterations (run.sh header recommendation)
+  params:
+    deck: bm2
+    iterations: 8
+    wgsize: 64
+    ppwi: 2
+  env:
+    MINIBUDE_DECK: bm2
+    MINIBUDE_PPWI: '2'
+    MINIBUDE_ITERS: '8'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/bm2/poses.in
+  input_form: file

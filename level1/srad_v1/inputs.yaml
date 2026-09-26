@@ -1,0 +1,109 @@
+# Registered inputs of srad_v1 (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: srad_v1
+level: 1
+selector: null
+default_input: iter100
+entry:
+  kind: binary
+  path: build/srad_v1/cuda/srad_v1_cuda
+timing:
+  scope: 'upstream''s own stage timer for the COMPUTE stage (all SRAD iterations: prepare/reduce/srad/srad2 kernels);
+    setup, image I/O and transfers are separate stages'
+  kind: total
+  unit: s
+  regex: '^\s*(?P<value>[0-9.]+) s,\s+[0-9.]+ % : COMPUTE$'
+  select: only
+baseline:
+  method: no PASS line; ctest's verify.py re-implements SRAD in numpy against image_out.pgm (not wired into the
+    registry)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_time_line
+    role: diagnostic
+    regex: '^Total time:'
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream image at three iteration counts (the image size is fixed by the only upstream input file)
+inputs:
+- id: iter100
+  case: srad-v1-image
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/srad_v1 run: ./srad 100 0.5 502 458 image.pgm (= ctest; upstream image)'
+  params:
+    iterations: 100
+    lambda: 0.5
+    rows: 502
+    cols: 458
+  args:
+  - '100'
+  - '0.5'
+  - '502'
+  - '458'
+  - level1/srad_v1/data/image.pgm
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/image.pgm
+  input_form: file
+- id: iter500
+  case: srad-v1-image
+  variant: steps
+  source:
+    kind: derived
+    derivation: 500 SRAD iterations on the upstream image
+  params:
+    iterations: 500
+    lambda: 0.5
+    rows: 502
+    cols: 458
+  args:
+  - '500'
+  - '0.5'
+  - '502'
+  - '458'
+  - level1/srad_v1/data/image.pgm
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/image.pgm
+  input_form: file
+- id: iter2000
+  case: srad-v1-image
+  variant: steps
+  source:
+    kind: derived
+    derivation: 2000 iterations
+  params:
+    iterations: 2000
+    lambda: 0.5
+    rows: 502
+    cols: 458
+  args:
+  - '2000'
+  - '0.5'
+  - '502'
+  - '458'
+  - level1/srad_v1/data/image.pgm
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/image.pgm
+  input_form: file

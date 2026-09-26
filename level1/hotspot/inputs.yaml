@@ -1,0 +1,115 @@
+# Registered inputs of hotspot (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: hotspot
+level: 1
+selector: null
+default_input: g512-p2-t2
+entry:
+  kind: binary
+  path: build/hotspot/cuda/hotspot_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: 'the port''s pin_stats timer macro (printf "timer: ...") is compiled out in this build: the binary prints
+    only the configuration lines (survey log); the temperature field goes to output.out'
+baseline:
+  method: no PASS line; ctest's verify.py re-simulates in numpy (rel 1e-3) against output.out (not wired into the
+    registry)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: grid_line
+    role: diagnostic
+    regex: '^gridSize: \[\d+, \d+\]'
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the vendored 512 grid at three iteration counts is registered; upstream's 64 and 1024 grids are not vendored
+  blocker: temp/power_64 and temp/power_1024 (upstream data package, ~11 MB each at 1024) are not in the repository;
+    needs the external-artifact mechanism
+  upstream_inputs_not_added:
+  - data/hotspot/temp_64+power_64
+  - data/hotspot/temp_1024+power_1024
+inputs:
+- id: g512-p2-t2
+  case: hotspot-2d
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/hotspot run.sh: ./hotspot 512 2 2 temp_512 power_512 output.out (= ctest)'
+  params:
+    grid: 512
+    pyramid_height: 2
+    sim_time: 2
+  args:
+  - '512'
+  - '2'
+  - '2'
+  - level1/hotspot/data/temp_512
+  - level1/hotspot/data/power_512
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/temp_512
+  - data/power_512
+  input_form: file
+- id: g512-p2-t20
+  case: hotspot-2d
+  variant: steps
+  source:
+    kind: derived
+    derivation: sim_time (iterations) 20 on the upstream 512 grid
+  params:
+    grid: 512
+    pyramid_height: 2
+    sim_time: 20
+  args:
+  - '512'
+  - '2'
+  - '20'
+  - level1/hotspot/data/temp_512
+  - level1/hotspot/data/power_512
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/temp_512
+  - data/power_512
+  input_form: file
+- id: g512-p2-t200
+  case: hotspot-2d
+  variant: steps
+  source:
+    kind: derived
+    derivation: sim_time 200
+  params:
+    grid: 512
+    pyramid_height: 2
+    sim_time: 200
+  args:
+  - '512'
+  - '2'
+  - '200'
+  - level1/hotspot/data/temp_512
+  - level1/hotspot/data/power_512
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/temp_512
+  - data/power_512
+  input_form: file

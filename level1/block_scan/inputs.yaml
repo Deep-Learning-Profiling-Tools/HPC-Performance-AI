@@ -1,0 +1,74 @@
+# Registered inputs of block_scan (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: block_scan
+level: 1
+selector: null
+default_input: g2227104
+entry:
+  kind: binary
+  path: build/block_scan/cuda/block_scan_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: two scan variants each print 'Average kernel time'; no total
+baseline:
+  method: 'built-in: ''Output items: PASS'' and ''Aggregate: PASS'' per variant'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: output_pass
+    role: required
+    regex: '^\s*Output items: PASS'
+    compare:
+      rule: present
+  - name: aggregate_pass
+    role: required
+    regex: '^\s*Aggregate: PASS'
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: FAIL
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: ctest run line plus a 4x grid
+inputs:
+- id: g2227104
+  case: block-scan
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/block-scan-cuda (= ctest): ./main 2227104 100'
+  params:
+    grid_size: 2227104
+    repeat: 100
+  args:
+  - '2227104'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: g8908416
+  case: block-scan
+  variant: size
+  source:
+    kind: derived
+    derivation: grid size x4
+  params:
+    grid_size: 8908416
+    repeat: 100
+  args:
+  - '8908416'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

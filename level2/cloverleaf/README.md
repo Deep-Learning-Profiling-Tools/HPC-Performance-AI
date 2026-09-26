@@ -170,6 +170,51 @@ Runs two decks with upstream's built-in reference check
 `This test is considered PASSED` for each, then prints
 `CloverLeaf CUDA validation: PASS|FAIL` (exit 0/1).
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_CLOVERLEAF_INPUT`, 2026-09-21)
+
+`HPCPERF_CLOVERLEAF_INPUT=<id> level2/cloverleaf/run.sh CUDA` runs one of the upstream
+`InputDecks/` decks verbatim (sha256 in `inputs.yaml`); the id is refused together with
+`HPCPERF_CLOVERLEAF_DECK` or extra arguments, the application log is
+`build/level2/cloverleaf/cuda/clover.input.<id>.out` and -- because CloverLeaf writes the
+field-summary rows only there -- run.sh appends that file to stdout after the run. Without
+the variable run.sh behaves exactly as above (`exec`, default `clover.out`).
+
+| id | deck | cells | steps | built-in reference (report.cpp) |
+|---|---|---|---|---|
+| `bm-short-960sq-87steps` | `InputDecks/clover_bm_short.in` | 960 x 960 | 87 | test_problem 2, KE 1.19316898756307 |
+| `bm4-short-1920sq-87steps` | `InputDecks/clover_bm4_short.in` | 1920 x 1920 | 87 | test_problem 487, KE 6.088288e-01 (7 digits) |
+| `bm16-short-3840sq-87steps` | `InputDecks/clover_bm16_short.in` | 3840 x 3840 | 87 | test_problem 4, KE 0.307475452287895 |
+| `bm16-3840sq-2955steps` (default) | `InputDecks/clover_bm16.in` | 3840 x 3840 | 2955 | test_problem 5, KE 4.85350315783719 |
+| `bm128-short-15360x7680-87steps` | `InputDecks/clover_bm128_short.in` | 15360 x 7680 (118 M) | 87 | none upstream (self baseline only) |
+
+Timer: CloverLeaf's own `Wall clock` (driver/hydro.cpp: `timer()` at the start of `hydro()`,
+after initialisation, to completion of the last step including its field summary and the
+reference check; printed per step cumulatively and once at the end -- the final value is
+the time-step loop total). Baseline: test id (exact), final step (exact), final kinetic
+energy from the last `step:` field-summary row (compared with this build's baseline at the
+1e-5 relative tolerance CloverLeaf itself applies), `This test is considered PASSED` and
+`Outcome: PASSED` present, `NOT PASSED` / `Outcome: FAILED` absent. All quantities are
+required; the registry is READY for every input (the bm128 deck against a self baseline, not
+an upstream value).
+
+Calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; spread = (max - min) / median):
+
+| id | case (deck) | size | native timer field / scope | main compute median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable | rules / verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bm-short-960sq-87steps` | clover_bm_short (test_problem 2) | 960 x 960 cells, 87 steps | final `Wall clock` (time-step loop) | 0.0563 s | 0.05631, 0.05626, 0.0563 | 0.09 % | 2.42 s | no | yes | READY / PASS |
+| `bm4-short-1920sq-87steps` | clover_bm4_short (test_problem 487) | 1920 x 1920, 87 steps | final `Wall clock` (time-step loop) | 0.1536 s | 0.1536, 0.1552, 0.1534 | 1.12 % | 2.42 s | no | yes | READY / PASS |
+| `bm16-short-3840sq-87steps` | clover_bm16_short (test_problem 4) | 3840 x 3840, 87 steps | final `Wall clock` (time-step loop) | 0.5294 s | 0.5294, 0.5294, 0.5294 | 0.02 % | 2.38 s | no | yes | READY / PASS |
+| `bm16-3840sq-2955steps` | clover_bm16 (default, test_problem 5) | 3840 x 3840, 2955 steps | final `Wall clock` (time-step loop) | 17.72 s | 17.72, 17.72, 17.72 | 0.01 % | 20.3 s | yes | yes | READY / PASS |
+| `bm128-short-15360x7680-87steps` | clover_bm128_short (no test id) | 15360 x 7680, 87 steps | final `Wall clock` (time-step loop) | 3.878 s | 3.875, 3.878, 3.879 | 0.10 % | 6.64 s | yes | yes | READY / PASS |
+
+Built-in check in every measured run (A-type, upstream hard-coded reference): `Test problem 2
+is within 1.17e-11 %`, `487 within 5.31e-06 %` (7-digit reference), `4 within 4.58e-11 %`,
+`5 within 2.98e-10 %` of the expected solution -- all `This test is considered PASSED`
+(threshold 0.001 %); identical `Wall clock`-independent results across the 3 runs of each
+input. `bm128-short` has no reference id: its final KE (7.711623e-02) is a self baseline.
+`validate.sh CUDA` re-run after the change: PASS. Raw runs and baselines:
+`HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-cloverleaf/`.
+
 ## Validation
 
 Upstream's own mechanism: each `test_problem N` deck has a hard-coded reference

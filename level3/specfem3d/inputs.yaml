@@ -1,0 +1,110 @@
+# Registered inputs of specfem3d (schema hpcperf-inputs-1), selected through HPCPERF_SPECFEM3D_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: specfem3d
+level: 3
+selector: HPCPERF_SPECFEM3D_INPUT
+default_input: homogeneous-halfspace-mesh-default-5000
+entry:
+  kind: run.sh
+  path: level3/specfem3d/run.sh
+  backend_arg: CUDA
+timing:
+  scope: xspecfem3D's own 'Total elapsed time in seconds' of the time loop (OUTPUT_FILES/output_solver.txt, echoed
+    by run.sh); mesh decomposition/generation (xdecompose_mesh, xmeshfem3D, xgenerate_databases) are separate preprocessing
+    stages, recorded by run.sh as '# solver wall time' context only
+  kind: total
+  unit: s
+  regex: Total elapsed time in seconds =\s*(?P<value>[0-9.eE+-]+)
+  select: last
+baseline:
+  method: validate.sh compares seismograms with REF_SEIS (upstream compare_seismogram_correlations.py); no seismogram
+    value is in stdout -- only the time-loop completion marker is recorded
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: time_loop_finished
+    role: diagnostic
+    regex: Time loop finished
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream homogeneous_halfspace case at two mesh resolutions and two step counts is registered
+  blocker: the other upstream EXAMPLES (layered_halfspace, homogeneous_acoustic, Mount_StHelens, waterlayered_halfspace,
+    tomographic_model, CPML_examples) are in the frozen tree with their own DATA/MESH, but run.sh hard-wires the
+    homogeneous_halfspace example directory (EX=...); a per-example selection needs a run.sh change (not done this
+    round)
+  upstream_inputs_not_added:
+  - EXAMPLES/applications/layered_halfspace
+  - homogeneous_acoustic
+  - Mount_StHelens
+  - waterlayered_halfspace
+  - tomographic_model
+inputs:
+- id: homogeneous-halfspace-mesh-default-5000
+  case: homogeneous-halfspace
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: SPECFEM/specfem3d
+      version: hpcperf-l3-v1 (SPECFEM3D Cartesian v4.1.1 frozen tree 9bdc4eed)
+      path: EXAMPLES/applications/homogeneous_halfspace as shipped (CUBIT MESH-default 36x36x16, NSTEP 5000) --
+        run.sh smoke
+  params:
+    example: homogeneous_halfspace
+    mesh: MESH-default
+    elements: 20736
+    nstep: 5000
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: homogeneous-halfspace-refine2-1000
+  case: homogeneous-halfspace
+  variant: size
+  source:
+    kind: derived
+    derivation: 'the same domain meshed by the in-house xmeshfem3D refined 2x (run.sh strong mode, HPCPERF_SPECFEM_STRONG=2),
+      NSTEP 1000 (HPCPERF_SPECFEM_STEPS) -- derived class A: Par_file/Mesh_Par_file sizes only'
+  params:
+    example: homogeneous_halfspace
+    mesh: xmeshfem3D refined 2x
+    elements: 165888
+    nstep: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_SPECFEM_STRONG: '2'
+    HPCPERF_SPECFEM_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: homogeneous-halfspace-refine2-5000
+  case: homogeneous-halfspace
+  variant: steps
+  source:
+    kind: derived
+    derivation: refined 2x mesh with the upstream NSTEP 5000
+  params:
+    example: homogeneous_halfspace
+    mesh: xmeshfem3D refined 2x
+    elements: 165888
+    nstep: 5000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_SPECFEM_STRONG: '2'
+    HPCPERF_SPECFEM_STEPS: '5000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

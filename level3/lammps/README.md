@@ -90,6 +90,106 @@ slower than 1 GPU (1.12 s) at 16.4M atoms/100 steps is the expected
 communication-dominated behaviour of a fixed small workload and is **not** a
 scaling result.
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_LAMMPS_INPUT`, 2026-09-21)
+
+`HPCPERF_LAMMPS_INPUT=<id> level3/lammps/run.sh CUDA` selects one of the frozen
+`src/bench/` decks with its recorded replication and step count; the id is
+refused together with `HPCPERF_SCALE_MODE=strong|weak` or the
+`HPCPERF_LAMMPS_STEPS/STRONG/LOCAL` knobs. The derived deck written into the run
+directory differs from upstream only in `run ${steps}` and absolute paths for
+`data.*`/`*.eam` (the frozen tree is never touched; `benchmark.yaml` declares the
+decks and reference logs as protected inputs/references).
+
+| id | deck | atoms | source | reference |
+|---|---|---|---|---|
+| `lj-32k` (default) | `in.lj` x=y=z=1 | 32,000 | upstream file | `log.15Jul25.lj.fixed.g++.1` |
+| `lj-2m` | `in.lj` x=y=z=4 | 2,048,000 | upstream scaled-size mechanism (bench/README) | none upstream (self baseline) |
+| `lj-16m` | `in.lj` x=y=z=8 | 16,384,000 | upstream scaled-size mechanism | none upstream (self baseline) |
+| `eam-32k` | `in.eam` + `Cu_u3.eam` | 32,000 | upstream file | `log.15Jul25.eam.fixed.g++.1` |
+| `rhodo-32k` | `in.rhodo` + `data.rhodo` (CHARMM, PPPM/cuFFT, SHAKE, NPT) | 32,000 | upstream file | `log.15Jul25.rhodo.fixed.g++.1` |
+
+All styles of these decks have Kokkos versions in this build (no host
+fallback): lj/cut, eam, lj/charmm/coul/long, pppm, bond harmonic, angle/dihedral
+charmm, improper harmonic, fix nve/shake/npt. `in.chain` and `in.chute` also
+build with this package set but are not registered yet. Timer: LAMMPS' `Loop
+time` (the 100-step run loop). Baseline: Temp/E_pair/TotEng/Press at steps 0 and
+100 with the validate.sh tolerances (1e-8 / 1e-5 relative).
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
+
+| id | Loop time (main compute) | spread | run.sh wall (E2E) | vs upstream reference log |
+|---|---|---|---|---|
+| `lj-32k` | 0.0199 s | 0.6 % | 3.23 s | 7/7 selected fields identical at log print precision |
+| `lj-2m` | 0.158 s | 0.5 % | 5.23 s | self baseline (no upstream log) |
+| `lj-16m` | 1.086 s | 0.3 % | 13.5 s | self baseline (no upstream log) |
+| `eam-32k` | 0.0765 s | 0.2 % | 3.12 s | 7/7 selected fields identical at log print precision |
+| `rhodo-32k` | 0.387 s | 0.7 % | 6.33 s | 6/6 selected fields identical at log print precision |
+
+"Identical at log print precision" means exactly this and no more: the selected
+thermo fields -- `lj`/`eam`: atoms, Temp and E_pair at step 0, Temp, E_pair,
+TotEng and Press at step 100 (`thermo_style one`, 8 significant digits as printed
+by LAMMPS `%g`-style thermo output, `units lj` for `in.lj`, `units metal` for
+`in.eam`); `rhodo`: TotEng at steps 0 and 100, Temp and Press at step 100
+(`thermo_style multi`, `units real`, 4-6 decimals) -- have the same printed
+string in this build's run and in the upstream reference logs
+`bench/log.15Jul25.{lj,eam,rhodo}.fixed.g++.1` (a 1-process CPU run, July 2025).
+The comparison rule applied is validate.sh's: 1e-8 relative at step 0, 1e-5
+relative at step 100 (measured relative error 0 for every field). Other thermo
+columns (E_mol, KinEng, E_bond, ...), other steps and the per-step timing
+breakdown are not compared. Spread = (max - min) / median over 3 runs.
+
+Only `lj-16m` reaches one second of loop time on a B200; the 32k-atom decks
+are 0.02-0.4 s (the bench convention is 100 steps). Raw runs, baselines and the
+upstream-reference comparisons: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level3-lammps/`.
+
+### ReaxFF: the separate `reaxff.cuda` build profile (implemented 2026-09-21, round 3)
+
+ReaxFF is the CORAL-2 LAMMPS tier-1 workload (HNS crystal). The frozen tree carries
+`examples/reaxff/HNS/` (`in.reaxff.hns` with `x/y/z/t` free variables, `data.hns-equil`
+(304 atoms), `ffield.reax.hns`, reference logs `log.30Nov23.reaxff.hns.g++.{1,4}`: CPU,
+LAMMPS 21 Nov 2023) and the `REAXFF` package with its KOKKOS styles. The default `cuda`
+profile does not enable `REAXFF`, and it is not changed; instead:
+
+| item | as implemented |
+|---|---|
+| profile | `reaxff.cuda` = `HPCPERF_LAMMPS_VARIANT=reaxff` for `build.sh`, `run.sh` and `validate.sh` (`l3_backend_profile LAMMPS cuda reaxff`); `HPCPERF_LAMMPS_PROFILE` override still honoured |
+| packages | `KOKKOS MOLECULE KSPACE MANYBODY RIGID GRANULAR` + `REAXFF` (`-DPKG_REAXFF=yes`); every other CMake option, the bundled Kokkos 4.6.2, `Kokkos_ARCH_BLACKWELL100`, the host compiler, CUDA 13.2.78 and Open MPI 5.0.10 identical to `cuda` |
+| fingerprint | `.deps/level3/lammps/reaxff.cuda/install/.hpcperf-l3-fingerprint` with `PKGS=...,REAXFF` in `cmake_options`; the `cuda` fingerprint (built 2026-09-21T10:06Z) is untouched |
+| paths | `.deps/level3/lammps/reaxff.cuda/{install,logs,cache}`, `build/level3/lammps/reaxff.cuda/` (+ `run.inputs.<id>.<label>/`); nothing under the `cuda` trees was written |
+| build | measured: **292 s** at `HPCPERF_BUILD_JOBS=32` (2026-09-21T21:49:00Z -> 21:53:52Z; the round-2 estimate was 6-10 min); binary `build/level3/lammps/reaxff.cuda/lmp_kokkos_cuda` |
+| frozen source | untouched (`prepare_benchmark.sh --status`: READY); the derived deck differs from upstream only in `run ${steps}` and absolute `read_data` / `pair_coeff * * ffield` paths |
+| run.sh | registered inputs may name `deck_dir: examples/reaxff/HNS` and `variant: reaxff`; a ReaxFF id is refused on the `cuda` profile ("needs build variant 'reaxff'"); `bench/` decks and the default smoke command are unchanged, `validate.sh CUDA` on the default profile re-run: PASS |
+| Kokkos options | the unchanged `-k on g 1 -sf kk -pk kokkos newton on neigh half gpu/aware on` (`neigh/qeq` stays at its default `full`) -- the CORAL-2 command line for this workload |
+
+Registered inputs (`inputs.yaml`, `HPCPERF_LAMMPS_VARIANT=reaxff HPCPERF_LAMMPS_INPUT=<id>`):
+
+| id | replication | atoms | steps | source | reference |
+|---|---|---|---|---|---|
+| `reaxff-hns-2k` | 2x2x2 (the README example syntax) | 2,432 | 100 | upstream deck + README `-v x 2 -v y 2 -v z 2 -v t 100` | upstream CPU log `log.30Nov23.reaxff.hns.g++.1` |
+| `reaxff-hns-16k` | 4x4x4 (README size mechanism) | 19,456 | 100 | upstream deck, size variables | none upstream (self baseline) |
+
+Executed GPU path (from the run logs' "Neighbor list info": `(1) pair reaxff/kk ...
+kokkos_device`, `(2) fix qeq/reax/kk ... kokkos_device`; `KOKKOS mode with Kokkos version
+4.6.2`): both the ReaxFF pair style and the QEq charge solver ran as Kokkos device styles.
+Numerical check (rule: CORAL-2 LAMMPS acceptance, thermo Temp / PotEng / Press / E_vdwl /
+E_coul within 0.1 % of the baseline, applied at steps 0 and 100; `thermo_modify norm yes`,
+`units real`): `reaxff-hns-2k` vs the upstream CPU log -- Temp, PotEng, E_vdwl, E_coul
+identical to all printed digits at both steps in 3/3 runs, Press within 4.8e-7 (step 0) and
+3.6e-6 (step 100) relative; verdict PASS, exit 0 (`measurements/level3-lammps/upstream-references/`).
+`reaxff-hns-16k` has no upstream log: self baseline, READY / PASS across the 3 runs.
+
+Calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; `Loop time` of the 100-step run):
+
+| id | Loop time median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
+|---|---|---|---|---|---|---|
+| `reaxff-hns-2k` | 0.8612 s | 0.8549, 0.8612, 0.8687 | 1.61 % | 4.58 s | no | yes |
+| `reaxff-hns-16k` | 0.9866 s | 0.9853, 0.9874, 0.9866 | 0.22 % | 4.63 s | no | yes |
+
+Both stay just under one second of loop time on a B200 (a reference value, not a gate);
+larger replications are the deck's own mechanism and can be registered later without any
+build change. `validate.sh` on the `reaxff.cuda` profile (in.lj smoke on the reaxff binary):
+PASS.
+
 ## Validation (`validate.sh`, upstream mechanism)
 
 Thermo output (Temp, E_pair, TotEng, Press at steps 0 and 100) of the

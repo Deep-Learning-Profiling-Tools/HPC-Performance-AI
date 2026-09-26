@@ -1,0 +1,68 @@
+# Registered inputs of burrows_wheeler_transform (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: burrows_wheeler_transform
+level: 1
+selector: null
+default_input: n10000000
+entry:
+  kind: binary
+  path: build/burrows_wheeler_transform/cuda/burrows_wheeler_transform_cuda
+timing:
+  scope: the benchmark's own device timer (suffix comparison sort on the GPU); the host reference time is printed
+    separately and excluded
+  kind: total
+  unit: ms
+  regex: '^Device time: (?P<value>[0-9.eE+-]+) ms'
+  select: only
+baseline:
+  method: 'built-in comparison with the host transform: PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus a 4x string
+inputs:
+- id: n10000000
+  case: bwt
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/bwt-cuda Makefile run: ./main 10000000 (= ctest)'
+  params:
+    string_length: 10000000
+  args:
+  - '10000000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n40000000
+  case: bwt
+  variant: size
+  source:
+    kind: derived
+    derivation: string length x4
+  params:
+    string_length: 40000000
+  args:
+  - '40000000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

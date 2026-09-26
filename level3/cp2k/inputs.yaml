@@ -1,0 +1,178 @@
+# Registered inputs of cp2k (schema hpcperf-inputs-1), selected through HPCPERF_CP2K_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: cp2k
+level: 3
+selector: HPCPERF_CP2K_INPUT
+default_input: h2o-64
+entry:
+  kind: run.sh
+  path: level3/cp2k/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: >-
+    CP2K writes its report to cp2k.out in the run directory (run.sh -o cp2k.out;
+    build/level3/cp2k/<profile>/<run subdir>/<case>/cp2k.out), not to stdout. The file carries the native
+    timer: the T I M I N G table's 'CP2K' row (TOTAL TIME, e.g. 16.39 s for h2o-32) and the 'qs_mol_dyn_low' row
+    (the MD driver, 16.21 s), plus the 'ENERGY| Total FORCE_EVAL' lines. Wiring needs either run.sh to echo that
+    block to stdout or the tool to read a run-directory file; not done this round -- E2E only.
+    not to stdout (run.sh -o cp2k.out); wiring the file is pending
+baseline:
+  method: regtests carry upstream reference values (TEST_FILES.toml, used by validate.sh); H2O benchmarks have no
+    reference. Nothing numeric is in stdout (cp2k.out holds ENERGY| lines).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: launcher_audit
+    role: diagnostic
+    regex: '^hpcperf-launch: audit summary'
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: four H2O sizes and two regtests are registered
+  blocker: H2O-512..8192 exceed the single-GPU budget of this round; the other upstream benchmark families (QS_DM_LS,
+    QS_LiH_HFX, QS_mp2_rpa, QMMM_*, Fayalite-FIST) are in the frozen tree but not wired as run.sh cases
+  upstream_inputs_not_added:
+  - benchmarks/QS/H2O-512..8192.inp
+  - benchmarks/QS_DM_LS
+  - benchmarks/QS_LiH_HFX
+  - benchmarks/QS_mp2_rpa
+  - benchmarks/QMMM_*
+inputs:
+- id: h2o-64
+  case: qs-gpw-water-md
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: benchmarks/QS/H2O-64.inp (64 water molecules, 10 MD steps) -- run.sh smoke default
+  params:
+    case: h2o
+    molecules: 64
+    md_steps: 10
+  env:
+    HPCPERF_CP2K_CASE: h2o
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_CP2K_SYSTEM: '64'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: h2o-32
+  case: qs-gpw-water-md
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: benchmarks/QS/H2O-32.inp
+  params:
+    case: h2o
+    molecules: 32
+    md_steps: 10
+  env:
+    HPCPERF_CP2K_CASE: h2o
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_CP2K_SYSTEM: '32'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: h2o-128
+  case: qs-gpw-water-md
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: benchmarks/QS/H2O-128.inp
+  params:
+    case: h2o
+    molecules: 128
+    md_steps: 10
+  env:
+    HPCPERF_CP2K_CASE: h2o
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_CP2K_SYSTEM: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: h2o-256
+  case: qs-gpw-water-md
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: benchmarks/QS/H2O-256.inp
+  params:
+    case: h2o
+    molecules: 256
+    md_steps: 10
+  env:
+    HPCPERF_CP2K_CASE: h2o
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_CP2K_SYSTEM: '256'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: regtest-gpw-h2o-geoopt
+  case: regtest-gpw-1
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: tests/QS/regtest-gpw-1/H2O-geoopt.inp (upstream regression test with TEST_FILES.toml reference)
+  params:
+    case: regtest
+    regtest: QS/regtest-gpw-1/H2O-geoopt.inp
+  env:
+    HPCPERF_CP2K_CASE: regtest
+    HPCPERF_CP2K_REGTEST: QS/regtest-gpw-1/H2O-geoopt.inp
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: regtest-dm-ls-scf-h2-big-5
+  case: regtest-dm-ls-scf-1
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: cp2k/cp2k
+      version: hpcperf-l3-v1 (CP2K v2026.2 frozen tree)
+      path: tests/QS/regtest-dm-ls-scf-1/H2-big-5.inp (linear-scaling SCF regression test)
+  params:
+    case: regtest
+    regtest: QS/regtest-dm-ls-scf-1/H2-big-5.inp
+  env:
+    HPCPERF_CP2K_CASE: regtest
+    HPCPERF_CP2K_REGTEST: QS/regtest-dm-ls-scf-1/H2-big-5.inp
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

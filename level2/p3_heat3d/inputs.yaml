@@ -1,0 +1,106 @@
+# Registered inputs of p3_heat3d (schema hpcperf-inputs-1), selected through HPCPERF_P3_HEAT3D_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: p3_heat3d
+level: 2
+selector: HPCPERF_P3_HEAT3D_INPUT
+default_input: n512-1000
+entry:
+  kind: run.sh
+  path: level2/p3_heat3d/run.sh
+  backend_arg: CUDA
+timing:
+  scope: heat3d's own MainLoop timer (all FTCS steps); initialisation and I/O are separate timers
+  kind: total
+  unit: s
+  regex: ^MainLoop (?P<value>[0-9.eE+-]+) \[s\], \d+ calls
+  select: only
+baseline:
+  method: validate.sh compares with the analytic solution of the periodic single-mode problem; the binary prints
+    only performance figures, nothing numeric to verify from the log
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: elapsed_line
+    role: diagnostic
+    regex: '^Elapsed time: [0-9.]+ \[s\]'
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: three grid sizes through the program's own --nx/--ny/--nz
+inputs:
+- id: n512-1000
+  case: heat3d-ftcs
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: yasahi-hpc/P3-miniapps
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'docs/heat3d.md example: --nx 512 --ny 512 --nz 512 --nbiter 1000 (run.sh default)'
+  params:
+    nx: 512
+    ny: 512
+    nz: 512
+    nbiter: 1000
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n256-1000
+  case: heat3d-ftcs
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: yasahi-hpc/P3-miniapps
+      version: see level2/<app>/README.md (Upstream commit)
+      path: --nx 256 --ny 256 --nz 256 --nbiter 1000 (run.sh header example size)
+  params:
+    nx: 256
+    ny: 256
+    nz: 256
+    nbiter: 1000
+  args:
+  - --nx
+  - '256'
+  - --ny
+  - '256'
+  - --nz
+  - '256'
+  - --nbiter
+  - '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n1024-200
+  case: heat3d-ftcs
+  variant: size
+  source:
+    kind: derived
+    derivation: --nx 1024 --ny 1024 --nz 1024 --nbiter 200 (8x cells, fewer steps)
+  params:
+    nx: 1024
+    ny: 1024
+    nz: 1024
+    nbiter: 200
+  args:
+  - --nx
+  - '1024'
+  - --ny
+  - '1024'
+  - --nz
+  - '1024'
+  - --nbiter
+  - '200'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

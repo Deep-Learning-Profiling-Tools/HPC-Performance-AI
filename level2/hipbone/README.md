@@ -172,6 +172,79 @@ hipBone: NekBone FOM = 3479.4 GFLOPs.
 (37.6 M DOFs, 100 timed CG iterations in 0.287 s, 2.7 TB/s effective
 bandwidth; results are bit-reproducible run to run on the GPU.)
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_HIPBONE_INPUT`, 2026-09-21)
+
+`HPCPERF_HIPBONE_INPUT=<id> level2/hipbone/run.sh CUDA` selects a registered
+problem (`tools/inputs/hpcperf_inputs.py list level2/hipbone`); the id defines
+the whole hipBone argument list and is refused together with extra arguments.
+Without the variable run.sh behaves exactly as above. Every registered input
+passes `-v` (per-iteration residual printing inside the CG loop) so the
+residual norms can be kept as baseline quantities.
+
+| id | args | elements / DOFs | source |
+|---|---|---|---|
+| `coral2-nx24-p14` (default) | `-nx 24 -ny 24 -nz 24 -p 14 -v` | 13,824 / 37.6 M | upstream README single-GPU CORAL-2 example |
+| `sweep-nx32-p4` | `-nx 32 -ny 32 -nz 32 -p 4 -v` | 32,768 / 2.05 M | upstream `run.sh` 15-point polynomial-degree sweep (constant ~2 M DOFs) |
+| `sweep-nx16-p8` | `-nx 16 -ny 16 -nz 16 -p 8 -v` | 4,096 / 2.05 M | upstream `run.sh` sweep |
+| `sweep-nx9-p14` | `-nx 9 -ny 9 -nz 9 -p 14 -v` | 729 / 1.95 M | upstream `run.sh` sweep |
+| `nx40-p14` | `-nx 40 -ny 40 -nz 40 -p 14 -v` | 64,000 / 174.7 M | derived: the README example at 4.6x the DOFs, so the timed section exceeds 1 s |
+
+Upstream `run.sh` sweep (15 points at ~2 M DOFs per rank) -- status on this build:
+
+| point (`-nx N -p P`) | status |
+|---|---|
+| 32/4, 16/8, 9/14 | registered and measured (`sweep-*` above) |
+| 126/1, 63/2, 42/3, 26/5, 21/6, 18/7, 14/9, 13/10, 12/11, 11/12, 10/13, 9/15 | untested (not excluded; not run in the pilot) |
+
+Not registered: `-nx 48 -p 14` (110,592 elements, 300.8 M DOFs) exits 134 in
+host mesh setup with `std::bad_array_new_length` before any device allocation
+(record: `measurements/level2-hipbone/nx48-p14/`; nx40 uses 22.8 GB of 183 GB,
+so GPU memory is not the limit). Candidate cause, unconfirmed (no debug symbols,
+no backtrace): `libs/mesh/meshGeometricFactors.cpp:35`
+`ggeo.malloc(Nelements*Nggeo*Np)` multiplies three `dlong` = `int` operands
+(`include/types.h:60`; Nggeo = 7, Np = 15^3 = 3375): 110,592 x 7 x 3375 =
+2,612,736,000 > 2^31 - 1, while nx40 gives 1,512,000,000. Confirming it needs a
+`-g` build or a backtrace; upstream's integer types are not changed here.
+
+Timer: hipBone's own `elapsed` (100 CG iterations after the 1000 warm-up
+iterations; setup, JIT and MPI start-up excluded). Baseline: `cg_iterations` and
+`dofs` exact, `r_norm_initial` within 1 % (the validate.sh rule), `r_norm_final`
+recorded -- the CORAL-2 "generally < 1e-8" guidance holds for the validate.sh
+problem and for `sweep-nx9-p14` (7.7e-9) but not at the larger sizes (see the
+note below), so no absolute threshold is applied there; a relative tolerance
+for an optimized build is still to be fixed (NEEDS_VALIDATION). The residual
+history was identical to all printed digits (`%12.12le`) over the 3 runs at every
+registered size. The 1 % rule on `r_norm_initial` comes from validate.sh check 4,
+which compares the CUDA backend with OCCA's Serial backend (two libm realisations
+of the pseudo-random right-hand side); between two CUDA runs on the same GPU it is
+only a loose guard, not a tolerance that a 1 % change would satisfy.
+Acceptance status (round 3): `cg_iterations` and `dofs` are required configuration
+checks, `r_norm_initial` is a diagnostic (with the 1 % guard), `r_norm_final` is the
+required science result and still `record` -- so `compare` returns exit 3 / verdict
+INCOMPLETE for every hipBone input until a tolerance with a basis is fixed; the passing
+configuration checks never turn that into a PASS.
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians; the
+warm-up absorbs the OCCA JIT compile of a new problem size, ~9 s here):
+
+| id | 100 timed CG iterations (main compute) | spread | run.sh wall (E2E) | r norm after 100 it. | main >= 1 s |
+|---|---|---|---|---|---|
+| `coral2-nx24-p14` | 0.2877 s | 0.1 % | 19.9 s | 3.58e-8 | no |
+| `sweep-nx32-p4` | 0.0266 s | 0.4 % | 3.58 s | 9.84e-6 | no |
+| `sweep-nx16-p8` | 0.0224 s | 0.9 % | 3.38 s | 1.67e-7 | no |
+| `sweep-nx9-p14` | 0.0271 s | < 0.1 % | 3.62 s | 7.66e-9 | no |
+| `nx40-p14` | 1.2529 s | < 0.1 % | 89.9 s | 7.77e-8 | yes |
+
+Spread = (max - min) / median over the 3 measured runs; "< 0.1 %" means the
+three values differ by at most the 1e-4 s print resolution of the `elapsed` field.
+The three registered upstream sweep points measure 0.022-0.029 s for the 100 timed
+iterations on a B200; the 12 other sweep points were not run, so nothing is claimed
+about them. hipBone's own 1000 warm-up iterations stay inside the application and
+are never counted as part of the measured section or as the harness warm-up run.
+Wall time is dominated by host-side setup at every size (the timed section is
+1.4 % of the wall for the CORAL-2 example). Raw runs and baselines:
+`HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-hipbone/`.
+
 ## Validation
 
 ```bash

@@ -1,0 +1,182 @@
+# Registered inputs of SPARTA (schema hpcperf-inputs-1), selected through
+# HPCPERF_SPARTA_INPUT=<id> in run.sh. Without the variable run.sh behaves as before
+# (smoke/strong/weak on bench/in.collide). Every input is one of the three upstream bench decks
+# at one of the sizes upstream publishes reference logs for (src/bench/README):
+# 10K particles = 10x10x10 cells, 100K = 20x20x25, 1M = 40x50x50, 10M = 100x100x100.
+schema: hpcperf-inputs-1
+benchmark: sparta
+level: 3
+selector: HPCPERF_SPARTA_INPUT
+default_input: collide-10k
+entry:
+  kind: run.sh
+  path: level3/sparta/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    SPARTA's own "Loop time" of the SECOND run command of the deck (bench/README: "The CPU time
+    for the run is in the second Loop time line"): MPI_Wtime around the benchmark timestep loop
+    (move, collide, sort, comm, stats output) -- 100 steps for in.collide/in.free after a 30-step
+    large-timestep equilibration, 1000 steps for in.sphere after 1000 equilibration steps. The
+    equilibration run (first Loop time line), box/grid/particle creation, balance_grid, surface
+    read-in and the final statistics are excluded. Printed with %g (6 significant digits).
+  kind: total
+  unit: s
+  regex: '^Loop time of (?P<value>[0-9.eE+-]+) on \d+ procs for \d+ steps with \d+ particles'
+  select: last
+baseline:
+  method: >-
+    DSMC is stochastic (seed 12345, but GPU/parallel move and collision order is not
+    reproducible), so upstream's regression practice and this repository's validate.sh compare
+    statistics with tolerances, never bits. The registry keeps the last stats row of the
+    benchmark run: the step count of the benchmark run (exact, from the Loop time line), the
+    final step (exact), the particle count (exact for in.collide/in.free: reflecting walls,
+    particles are conserved -- validate.sh checks Np at every row), the gas temperature
+    (validate.sh: within 2 % of the reference; the closed box conserves energy so the printed
+    temperature is constant to all printed digits in every upstream log) and the number of
+    collision attempts (validate.sh: within 15 %). These are validate.sh's in.collide rules,
+    applied to the box decks (in.collide, in.free). in.sphere (open boundaries, inflow, surface
+    collisions) prints other columns and has no rule basis of its own: its particle count and
+    collision-attempt count are recorded (required, not verified); the surface-collision count
+    and max particles per cell are diagnostics.
+  reference: upstream reference logs bench/log.7Jul14.<deck>.icc.<size>.1 (icc, 1 process, 2014) through the same regexes; this build's first measured run as the working baseline
+  quantities:
+    - name: bench_steps
+      role: required
+      regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for (?P<value>\d+) steps with \d+ particles'
+      select: last
+      compare: {rule: exact}
+    - name: final_step
+      role: required
+      regex: '^\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: np_final
+      role: required
+      regex: '^\s+\d+\s+[0-9.eE+-]+\s+(?P<value>\d+)\s+\d+\s+\d+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: natt_final
+      role: required
+      regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+(?P<value>\d+)\s+\d+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: rel, tol: 0.15}
+    - name: temp_final
+      role: required
+      regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>[0-9.eE+-]+)\s*$'
+      select: last
+      compare: {rule: rel, tol: 0.02}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream collide deck at four sizes, the free deck and the sphere deck (sphere-1m frozen INCOMPLETE)
+inputs:
+  - id: collide-10k
+    case: collide-box
+    variant: default
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.collide with its default x=y=z=10 (bench/README: 10K particles); reference log bench/log.7Jul14.collide.icc.10K.1"}
+    params: {deck: in.collide, x: 10, y: 10, z: 10, cells: 1000, particles: 10000, equilibration_steps: 30, bench_steps: 100, reference_log: log.7Jul14.collide.icc.10K.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the run.sh smoke problem and the validate.sh problem.
+  - id: collide-100k
+    case: collide-box
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.collide -var x 20 -var y 20 -var z 25 (bench/README: 100K particles); reference log bench/log.7Jul14.collide.icc.100K.1"}
+    params: {deck: in.collide, x: 20, y: 20, z: 25, cells: 10000, particles: 100000, equilibration_steps: 30, bench_steps: 100, reference_log: log.7Jul14.collide.icc.100K.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: collide-1m
+    case: collide-box
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.collide -var x 40 -var y 50 -var z 50 (bench/README: 1M particles); reference log bench/log.7Jul14.collide.icc.1M.1"}
+    params: {deck: in.collide, x: 40, y: 50, z: 50, cells: 100000, particles: 1000000, equilibration_steps: 30, bench_steps: 100, reference_log: log.7Jul14.collide.icc.1M.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+  - id: collide-10m
+    case: collide-box
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.collide -var x 100 -var y 100 -var z 100 (bench/README: 10M particles); reference log bench/log.7Jul14.collide.icc.10M.1"}
+    params: {deck: in.collide, x: 100, y: 100, z: 100, cells: 1000000, particles: 10000000, equilibration_steps: 30, bench_steps: 100, reference_log: log.7Jul14.collide.icc.10M.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: the same grid as run.sh's strong-scaling default (HPCPERF_SPARTA_STRONG=100), here as a fixed single-rank input.
+  - id: free-1m
+    case: free-molecular-box
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.free -var x 40 -var y 50 -var z 50 (bench/README: 1M particles); reference log bench/log.7Jul14.free.icc.1M.1"}
+    params: {deck: in.free, x: 40, y: 50, z: 50, cells: 100000, particles: 1000000, equilibration_steps: 30, bench_steps: 100, reference_log: log.7Jul14.free.icc.1M.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    notes: no collide command -- pure advection with wall reflection; the Natt/Ncoll columns are 0 by construction (natt_final compares 0 with 0).
+  - id: sphere-1m
+    case: flow-around-sphere
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: sparta/sparta, version: 27Aug2026 (95b9abaa8bd548991cc3c3f1c58b34722f7ade74), path: "bench/in.sphere -var x 40 -var y 50 -var z 50 with data.sphere (bench/README: 1M particles); reference log bench/log.7Jul14.sphere.icc.1M.1"}
+    params: {deck: in.sphere, x: 40, y: 50, z: 50, cells: 100000, particles: 1000000, equilibration_steps: 1000, bench_steps: 1000, reference_log: log.7Jul14.sphere.icc.1M.1}
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - name: bench_steps
+          role: required
+          regex: '^Loop time of [0-9.eE+-]+ on \d+ procs for (?P<value>\d+) steps with \d+ particles'
+          select: last
+          compare: {rule: exact}
+        - name: final_step
+          role: required
+          regex: '^\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s*$'
+          select: last
+          compare: {rule: exact}
+        - name: np_final
+          role: required
+          regex: '^\s+\d+\s+[0-9.eE+-]+\s+(?P<value>\d+)\s+\d+\s+\d+\s+\d+\s+\d+\s*$'
+          select: last
+          compare: {rule: record}
+        - name: natt_final
+          role: required
+          regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+(?P<value>\d+)\s+\d+\s+\d+\s+\d+\s*$'
+          select: last
+          compare: {rule: record}   # validate.sh's collide 15 % rule has no established basis for in.sphere -> recorded, not verified
+        - name: nscoll_final
+          role: diagnostic   # per-step surface-collision count, statistical diagnostic
+          regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+(?P<value>\d+)\s+\d+\s*$'
+          select: last
+          compare: {rule: record}
+        - name: max_particles_per_cell
+          role: diagnostic   # load-balance diagnostic (compute reduce max)
+          regex: '^\s+\d+\s+[0-9.eE+-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+(?P<value>\d+)\s*$'
+          select: last
+          compare: {rule: record}
+    notes: >-
+      open boundaries with inflow (fix emit/face), diffuse surface collisions on the sphere
+      (read_surf data.sphere), dynamic load balance; particle count fluctuates around the inflow
+      steady state (upstream log: 999,920 at the last step), so np and the surface-collision
+      count are recorded, not verified (NEEDS_VALIDATION for np_final). Vs the 2014 reference
+      log: same seed/grid/fnum/timestep/stats points/phases and the same initial population
+      (955,103), but the deck commands differ by version (inflow -> emit/face, read_surf and
+      surf_modify syntax) and the count after equilibration is 1.0 % lower here (990,824 vs
+      1,000,977; three runs here mutually within 0.1 %, the 2014 log is one run; no statistical
+      model validated, no significance claimed) -- cause not determined. The collide 15 % rule
+      has no established basis for this deck: natt is recorded. Stats every 100 steps
+      (7 columns: step cpu np nattempt ncoll nscoll c_max). All styles of the deck have KOKKOS
+      versions in this build (fix_emit_face_kokkos, surf_collide_diffuse_kokkos,
+      fix_balance_kokkos, compute_reduce_kokkos, compute_grid_kokkos, read_surf_kokkos).

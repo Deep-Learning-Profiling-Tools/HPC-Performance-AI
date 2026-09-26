@@ -1,0 +1,79 @@
+# Registered inputs of p3_vlp4d (schema hpcperf-inputs-1), selected through HPCPERF_P3_VLP4D_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: p3_vlp4d
+level: 2
+selector: HPCPERF_P3_VLP4D_INPUT
+default_input: sld10-large
+entry:
+  kind: run.sh
+  path: level2/p3_vlp4d/run.sh
+  backend_arg: CUDA
+timing:
+  scope: vlp4d's own MainLoop timer (all semi-Lagrangian steps)
+  kind: total
+  unit: s
+  regex: ^MainLoop (?P<value>[0-9.eE+-]+) \[s\], \d+ calls
+  select: only
+baseline:
+  method: the diagnostics (log ||E||_2, mass) go to nrj.out, not stdout; validate.sh checks the Landau-damping decay
+    from that file
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: iterations
+    role: diagnostic
+    regex: '^Number of total iterations : (?P<value>\d+)'
+    select: last
+    compare:
+      rule: exact
+coverage:
+  status: MULTI_INPUT
+  reason: both upstream decks
+inputs:
+- id: sld10-large
+  case: landau-damping-2d
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: yasahi-hpc/P3-miniapps
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'wk/SLD10_large.dat: 128^4 points, dt 0.125, 128 steps (run.sh default)'
+  params:
+    deck: wk/SLD10_large.dat
+    points: 128^4
+    dt: 0.125
+    steps: 128
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - wk/SLD10_large.dat
+  input_form: file
+- id: sld10
+  case: landau-damping-2d
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: yasahi-hpc/P3-miniapps
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'wk/SLD10.dat: dt 0.01, 40 steps'
+  params:
+    deck: wk/SLD10.dat
+    dt: 0.01
+    steps: 40
+  args:
+  - SLD10.dat   # run.sh resolves a bare deck name under level2/p3_vlp4d/wk/
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - wk/SLD10.dat
+  input_form: file

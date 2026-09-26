@@ -1,0 +1,81 @@
+# Registered inputs of bilateral_filter (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: bilateral_filter
+level: 1
+selector: null
+default_input: w2960-h1440
+entry:
+  kind: binary
+  path: build/bilateral_filter/cuda/bilateral_filter_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: three per-radius timers (3x3, 6x6, 9x9) are printed; no total
+baseline:
+  method: 'built-in comparison with the upstream CPU reference: PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus a 4x image
+inputs:
+- id: w2960-h1440
+  case: bilateral-filter
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/bilateral-cuda Makefile run: ./main 2960 1440 0.5 0.5 1000 (= ctest)'
+  params:
+    width: 2960
+    height: 1440
+    intensity: 0.5
+    spatial: 0.5
+    repeat: 1000
+  args:
+  - '2960'
+  - '1440'
+  - '0.5'
+  - '0.5'
+  - '1000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: w5920-h2880
+  case: bilateral-filter
+  variant: size
+  source:
+    kind: derived
+    derivation: image 2x in each direction (positional width/height)
+  params:
+    width: 5920
+    height: 2880
+    intensity: 0.5
+    spatial: 0.5
+    repeat: 1000
+  args:
+  - '5920'
+  - '2880'
+  - '0.5'
+  - '0.5'
+  - '1000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

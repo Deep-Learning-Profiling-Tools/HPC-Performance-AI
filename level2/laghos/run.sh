@@ -25,6 +25,8 @@
 #   HPCPERF_LAGHOS_RS      serial refinements of cube01_hex.mesh (default 4;
 #                          elements = 8^(rs+1) / 8 * 8 = 8 * 8^rs)
 #   HPCPERF_LAGHOS_ARGS    replaces the whole problem line (except -d)
+#   HPCPERF_LAGHOS_INPUT   a registered input id (inputs.yaml: upstream verification rows +
+#                          the FOM deck); mutually exclusive with the variables above and extra args
 #   HPCPERF_LAGHOS_DEVICE  MFEM device string (default cuda/hip by backend)
 #
 # Constraint checked here: the serial mesh must have at least as many
@@ -60,7 +62,19 @@ N_RANKS="$(hpcperf_ranks laghos yes)" || exit 2
 hpcperf_forbid_args laghos -m -rs -rp -epm -nx -ny -nz -dev -d -- "$@" || exit 2   # mesh/size/device only via the checked variables
 MODE="${HPCPERF_SCALE_MODE:-strong}"
 
-if [ -n "${HPCPERF_LAGHOS_ARGS:-}" ]; then
+INPUT_ID="${HPCPERF_LAGHOS_INPUT:-}"
+if [ -n "$INPUT_ID" ]; then
+    # A registered input (inputs.yaml, tools/inputs/hpcperf_inputs.py) supplies the whole
+    # problem line; it is refused together with HPCPERF_LAGHOS_ARGS, a scale mode, the
+    # size knobs or extra arguments (nothing is silently overridden).
+    for v in HPCPERF_LAGHOS_ARGS HPCPERF_SCALE_MODE HPCPERF_LAGHOS_RS HPCPERF_LAGHOS_EPM; do
+        [ -z "${!v:-}" ] || { echo "run.sh: HPCPERF_LAGHOS_INPUT=$INPUT_ID and $v are mutually exclusive" >&2; exit 2; }
+    done
+    [ $# -eq 0 ] || { echo "run.sh: HPCPERF_LAGHOS_INPUT=$INPUT_ID is mutually exclusive with extra arguments" >&2; exit 2; }
+    ARGS_TXT="$(python3 "$R/tools/inputs/hpcperf_inputs.py" args "$HERE" "$INPUT_ID")" || exit 2
+    mapfile -t PROBLEM <<< "$ARGS_TXT"
+    echo "# Laghos $BACKEND: input=$INPUT_ID ranks=$N_RANKS args: ${PROBLEM[*]}"
+elif [ -n "${HPCPERF_LAGHOS_ARGS:-}" ]; then
     # shellcheck disable=SC2206
     PROBLEM=(${HPCPERF_LAGHOS_ARGS})
 else

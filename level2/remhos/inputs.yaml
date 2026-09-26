@@ -1,0 +1,202 @@
+# Registered inputs of remhos (schema hpcperf-inputs-1), selected through HPCPERF_REMHOS_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: remhos
+level: 2
+selector: HPCPERF_REMHOS_INPUT
+default_input: cube-remap-rs4
+entry:
+  kind: run.sh
+  path: level2/remhos/run.sh
+  backend_arg: CUDA
+timing:
+  scope: Remhos' own 'Total kernel time' (RHS, inverse, low-order and FCT kernels over all RK stages) -- the FOM
+    timers; mesh setup and untimed per-step work are outside
+  kind: total
+  unit: s
+  regex: '^Total kernel time: (?P<value>[0-9.eE+-]+)'
+  select: only
+baseline:
+  method: 'upstream README ''Verification of Results'': final mass and max value per run; validate.sh reproduces
+    them to every printed digit. Registry rule: final mass and max value within 1e-8 relative of this build''s baseline
+    (looser than print identity; basis = the README verification criterion).'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: final_mass
+    role: required
+    regex: ^Final mass u:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: rel
+      tol: 1.0e-08
+  - name: max_value
+    role: required
+    regex: ^Max value u:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: rel
+      tol: 1.0e-08
+  - name: mass_loss
+    role: diagnostic
+    regex: ^Mass loss u:\s+(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the GPU remap default at two refinements plus three README advection cases on other meshes (run in the
+    GPU solver combination; the README's CPU-only -ho 1 -lo 2 settings are validate.sh's business)
+inputs:
+- id: cube-remap-rs4
+  case: remap-3d-cube
+  variant: default
+  source:
+    kind: derived
+    derivation: README verification run 11 (cube01_hex remap -p 10) refined to -rs 4 with dt scaled (-dt 0.0025,
+      400 RK3 steps) in the GPU solver combination -ho 3 -lo 5 -fct 2 -pa -d cuda (run.sh default)
+  params:
+    mesh: cube01_hex.mesh
+    problem: 10
+    rs: 4
+    dt: 0.0025
+    tf: 0.8
+    ho: 3
+    lo: 5
+    fct: 2
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: cube-remap-rs1
+  case: remap-3d-cube
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: CEED/Remhos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README run 11 as documented: cube01_hex -p 10 -rs 1 -o 2 -dt 0.02 -tf 0.8 (GPU solver combination kept)'
+  params:
+    mesh: cube01_hex.mesh
+    problem: 10
+    rs: 1
+    dt: 0.02
+    tf: 0.8
+  args:
+  - -rs
+  - '1'
+  - -dt
+  - '0.02'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: periodic-hexagon-p0
+  case: advection-2d
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: CEED/Remhos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README run 1: -m periodic-hexagon.mesh -p 0 -rs 2 -dt 0.005 -tf 10; validate.sh GPU case -ho 3 -lo 5 -fct 2 -pa at Remhos'' default order 3 (remhos.cpp:229) -- set explicitly because run.sh defaults to -o 2'
+  params:
+    mesh: periodic-hexagon.mesh
+    problem: 0
+    rs: 2
+    o: 3
+    dt: 0.005
+    tf: 10
+  args:
+  - -m
+  - data/periodic-hexagon.mesh
+  - -p
+  - '0'
+  - -rs
+  - '2'
+  - -dt
+  - '0.005'
+  - -tf
+  - '10'
+  - -o
+  - '3'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: periodic-square-p5
+  case: advection-2d
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: CEED/Remhos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README run 5: -m periodic-square.mesh -p 5 -rs 3 -dt 0.005 -tf 0.8; validate.sh GPU case -ho 3 -lo 5 -fct 2 -pa at Remhos'' default order 3 (remhos.cpp:229) -- set explicitly because run.sh defaults to -o 2'
+  params:
+    mesh: periodic-square.mesh
+    problem: 5
+    rs: 3
+    o: 3
+    dt: 0.005
+    tf: 0.8
+  args:
+  - -m
+  - data/periodic-square.mesh
+  - -p
+  - '5'
+  - -rs
+  - '3'
+  - -dt
+  - '0.005'
+  - -tf
+  - '0.8'
+  - -o
+  - '3'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: periodic-cube-p0
+  case: advection-3d
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: CEED/Remhos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README run 7: -m periodic-cube.mesh -p 0 -rs 1 -o 2 -dt 0.014 -tf 8'
+  params:
+    mesh: periodic-cube.mesh
+    problem: 0
+    rs: 1
+    o: 2
+    dt: 0.014
+    tf: 8
+  args:
+  - -m
+  - data/periodic-cube.mesh
+  - -p
+  - '0'
+  - -rs
+  - '1'
+  - -o
+  - '2'
+  - -dt
+  - '0.014'
+  - -tf
+  - '8'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

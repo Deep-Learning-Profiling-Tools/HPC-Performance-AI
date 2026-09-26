@@ -36,10 +36,17 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     source "$R/hpcperf_env.sh" 2>/dev/null
     set -eu
 fi
+# Registered inputs (inputs.yaml): HPCPERF_BRANSON_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_BRANSON_INPUT || exit 2
 
 BUILD="$R/build/level2/branson/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 EXE="$BUILD/BRANSON"
-DECK="$HERE/inputs/3D_hohlraum_single_node.xml"
+DECK="${HPCPERF_BRANSON_DECK:-inputs/3D_hohlraum_single_node.xml}"      # deck path (relative to level2/branson or absolute)
+case "$DECK" in /*) ;; *) DECK="$HERE/$DECK" ;; esac
+[ -f "$DECK" ] || { echo "run.sh: deck $DECK not found" >&2; exit 1; }
 
 if [ ! -x "$EXE" ]; then
     echo "error: $EXE not found -- run $HERE/build.sh $BACKEND first" >&2
@@ -60,4 +67,4 @@ N_RANKS="$(hpcperf_ranks branson no)" || exit 2   # HPCPERF_GPUS (or legacy HPCP
 MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper --)
 
 echo "== Branson $BACKEND: ${MPIRUN[*]} $EXE $DECK $*"
-exec "${MPIRUN[@]}" "$EXE" "$DECK" "$@"
+exec "${MPIRUN[@]}" "$EXE" "$DECK" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

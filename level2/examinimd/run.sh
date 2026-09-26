@@ -38,6 +38,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
+# Registered inputs (inputs.yaml): HPCPERF_EXAMINIMD_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_EXAMINIMD_INPUT || exit 2
 set -euo pipefail
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 [ $# -gt 0 ] && shift
@@ -63,6 +68,9 @@ if [ -n "${HPCPERF_EXAMINIMD_DECK:-}" ]; then
     DECK="$HPCPERF_EXAMINIMD_DECK"
     case "$DECK" in /*) ;; *) DECK="$HERE/$DECK" ;; esac
     [ -f "$DECK" ] || { echo "run.sh: deck $DECK not found" >&2; exit 1; }
+    # SNAP decks name their coefficient/parameter files relative to the working directory (README:
+    # unchecked fopen, segfault otherwise): run such a deck from its own directory.
+    if compgen -G "$(dirname "$DECK")/*.snapcoeff" >/dev/null; then cd "$(dirname "$DECK")" || exit 1; fi
 else
     case "$MODE" in
         smoke)  LX=40; LY=40; LZ=40; STEPS="${HPCPERF_EXAMINIMD_STEPS:-100}" ;;
@@ -107,4 +115,4 @@ elif [ "$N_RANKS" -gt 1 ]; then
     exit 2
 fi
 exec "$R/level2/tools/hpcperf_mpi_launch.sh" --gpus "$N_RANKS" --bind app -- \
-    "$EXE" -il "$DECK" "${COMM[@]}" "$@"
+    "$EXE" -il "$DECK" "${COMM[@]}" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

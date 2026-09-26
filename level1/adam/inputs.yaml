@@ -1,0 +1,98 @@
+# Registered inputs of adam (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: adam
+level: 1
+selector: null
+default_input: n10000-t200
+entry:
+  kind: binary
+  path: build/adam/cuda/adam_cuda
+timing:
+  scope: the benchmark's own timer around the Adam update kernel, averaged over `repeat` launches (main_compute
+    = average x repeat); allocation, H2D/D2H and the CPU reference are outside
+  kind: per_iteration
+  unit: ms
+  regex: ^Average kernel execution time (?P<value>[0-9.eE+-]+) \(ms\)
+  select: only
+  work:
+    key: repeat
+    offset: 0
+baseline:
+  method: 'built-in element-wise comparison with the upstream CPU reference (reference.h): PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger vector sizes through the benchmark's own size parameter
+inputs:
+- id: n10000-t200
+  case: adam-update
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/adam-cuda Makefile run: ./main 10000 200 100 (= ctest)'
+  params:
+    vector_size: 10000
+    time_steps: 200
+    repeat: 100
+  args:
+  - '10000'
+  - '200'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n100000-t200
+  case: adam-update
+  variant: size
+  source:
+    kind: derived
+    derivation: vector size (positional parameter 1) x10; time steps and repeat unchanged
+  params:
+    vector_size: 100000
+    time_steps: 200
+    repeat: 100
+  args:
+  - '100000'
+  - '200'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n1000000-t200
+  case: adam-update
+  variant: size
+  source:
+    kind: derived
+    derivation: vector size x100
+  params:
+    vector_size: 1000000
+    time_steps: 200
+    repeat: 100
+  args:
+  - '1000000'
+  - '200'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

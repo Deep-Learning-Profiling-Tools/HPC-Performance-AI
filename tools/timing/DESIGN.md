@@ -166,6 +166,10 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
 
 ### 5.3 Adding an input
 
+* A benchmark with an `inputs.yaml`: add the input there (the registry is the source of truth) and
+  run `python3 tools/timing/gen_registry_cases.py`; it is then measured with `--registry` (README,
+  "Registered inputs"). The hand-written tables below remain for cases outside the registry.
+
 * Level 2: a row in `cases/level2_cases.tsv` -- `app case gpus env args timeout_s
   fom_regex notes`; `env` may only set variables the application's `run.sh` reads
   (`python3 tools/timing/cases.py allowed-env <app>`) or its `extra_env`; one variable

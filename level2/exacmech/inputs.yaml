@@ -1,0 +1,112 @@
+# Registered inputs of exacmech (schema hpcperf-inputs-1), selected through HPCPERF_EXACMECH_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: exacmech
+level: 2
+selector: HPCPERF_EXACMECH_INPUT
+default_input: fcc-a-1m-1000
+entry:
+  kind: run.sh
+  path: level2/exacmech/run.sh
+  backend_arg: CUDA
+timing:
+  scope: the miniapp's own timer over all time steps of the set-up / material-model / retrieve kernels
+  kind: total
+  unit: s
+  regex: '^Run time of set-up, material, and retrieve kernels over \d+ time steps is: (?P<value>[0-9.eE+-]+)\(s\)'
+  select: only
+baseline:
+  method: upstream ships no reference; validate.sh compares GPU vs CPU on the upstream CPU deck. The registry keeps
+    the final volume-averaged stress components (required, recorded; no tolerance basis yet).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: stress_s11_final
+    role: required
+    regex: '^Step# \d+ Stress: (?P<value>[0-9.eE+-]+) '
+    select: last
+    compare:
+      rule: record
+  - name: stress_s33_final
+    role: required
+    regex: '^Step# \d+ Stress: [0-9.eE+-]+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+) '
+    select: last
+    compare:
+      rule: record
+  - name: steps
+    role: required
+    regex: '^Number of steps: (?P<value>\d+)'
+    select: last
+    compare:
+      rule: exact
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream GPU case as shipped, the scaled default and a second material model
+inputs:
+- id: fcc-a-1m-1000
+  case: evptn-fcc-a
+  variant: default
+  source:
+    kind: derived
+    derivation: upstream option_gpu.txt problem (evptn_FCC_A, props.txt, axisymmetric velocity gradient, dt 0.00025)
+      scaled from 350,000 x 60 to 1,000,000 orientations x 1000 steps (run.sh default)
+  params:
+    model: evptn_FCC_A
+    nqpts: 1000000
+    nsteps: 1000
+    dt: 0.00025
+  env:
+    EXACMECH_NQPTS: '1000000'
+    EXACMECH_NSTEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: fcc-a-350k-60
+  case: evptn-fcc-a
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/ExaCMech
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'miniapp/cases/option_gpu.txt as shipped: 350,000 orientations, 60 steps'
+  params:
+    model: evptn_FCC_A
+    nqpts: 350000
+    nsteps: 60
+    dt: 0.00025
+  env:
+    EXACMECH_NQPTS: '350000'
+    EXACMECH_NSTEPS: '60'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: bcc-a-1m-1000
+  case: evptn-bcc-a
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/ExaCMech
+      version: see level2/<app>/README.md (Upstream commit)
+      path: material model evptn_BCC_A (miniapp option file line 2) at the default size
+  params:
+    model: evptn_BCC_A
+    nqpts: 1000000
+    nsteps: 1000
+    dt: 0.00025
+  env:
+    EXACMECH_MODEL: evptn_BCC_A
+    EXACMECH_NQPTS: '1000000'
+    EXACMECH_NSTEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

@@ -1,0 +1,90 @@
+# Registered inputs of ltimes (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: ltimes
+level: 1
+selector: null
+default_input: size1000000
+entry:
+  kind: binary
+  path: build/ltimes/cuda/ltimes_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the standalone port prints only PASS/FAIL; upstream RAJAPerf's kernel timer is not ported
+baseline:
+  method: 'added driver: upstream Base_Seq CPU variant compared element-wise (rel tol 1e-10): PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream default size plus larger sizes through the port's size argument (upstream --size)
+inputs:
+- id: size1000000
+  case: ltimes
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/RAJAPerf
+      version: b0f1cd36afd7c2ac57fcb1dc676012be28fb1327
+      path: upstream default problem size 1000000 (target size), 50 reps (= ctest, no arguments)
+  params:
+    size: 1000000
+    reps: 50
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: size4000000
+  case: ltimes
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/RAJAPerf
+      version: b0f1cd36afd7c2ac57fcb1dc676012be28fb1327
+      path: 'upstream --size mechanism: problem size 4000000 (target size); reps unchanged'
+  params:
+    size: 4000000
+    reps: 50
+  args:
+  - '4000000'
+  - '50'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: size16000000
+  case: ltimes
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/RAJAPerf
+      version: b0f1cd36afd7c2ac57fcb1dc676012be28fb1327
+      path: 'upstream --size mechanism: problem size 16000000 (target size); reps unchanged'
+  params:
+    size: 16000000
+    reps: 50
+  args:
+  - '16000000'
+  - '50'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

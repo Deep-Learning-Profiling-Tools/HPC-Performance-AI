@@ -51,7 +51,11 @@ fi
 
 JOBS="${MAKE_JOBS:-4}"
 SRC="$HERE/cpp"
-BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
+# HPCPERF_MINIWEATHER_BUILD_TAG=<tag> builds into a separate directory
+# (build/level2/miniweather/<backend>-<tag>) so that several compile-time
+# configurations (registered inputs, inputs.yaml) can coexist; unset = the
+# default directory as before.
+BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')${HPCPERF_MINIWEATHER_BUILD_TAG:+-$HPCPERF_MINIWEATHER_BUILD_TAG}"
 
 NX="${MINIWEATHER_NX:-2048}"
 NZ="${MINIWEATHER_NZ:-1024}"

@@ -136,6 +136,54 @@ Deck options (`--file`): `tea.in` (512^2, 20 steps, validation),
 `tea_bm_5e_{1,2,4,8}_{2,4}.in` variants with 2 or 4 steps. `tea_bm_1..3`
 (10^2 .. 500^2) have no entry in `tea.problems` and report FAILED by design.
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_TEALEAF_INPUT`, 2026-09-21)
+
+`HPCPERF_TEALEAF_INPUT=<id> level2/tealeaf/run.sh CUDA` selects one of the
+upstream `Benchmarks/` decks (`tools/inputs/hpcperf_inputs.py list level2/tealeaf`);
+the id is refused together with `HPCPERF_TEALEAF_DECK` or extra tealeaf arguments,
+and the application log goes to `build/level2/tealeaf/cuda/run/tea.input.<id>.out`
+(the default `tea.out` is untouched). Without the variable run.sh behaves exactly
+as above. Every deck is used verbatim (sha256 in `inputs.yaml`) and has its own
+`tea.problems` entry, so the application's built-in check applies to each.
+
+| id | deck | cells | timesteps | `tea.problems` reference | source |
+|---|---|---|---|---|---|
+| `bm4-1000sq-10steps` | `Benchmarks/tea_bm_4.in` | 1000 x 1000 | 10 | 9.727733205075556e+01 | upstream file (benchmark 4) |
+| `bm5e2-2000sq-10steps` | `Benchmarks/tea_bm_5e_2.in` | 2000 x 2000 | 10 | 9.605026999605091e+01 | upstream file ("5e" size series) |
+| `bm5-4000sq-10steps` (default) | `Benchmarks/tea_bm_5.in` | 4000 x 4000 | 10 | 9.5462351582214282e+01 | upstream file (benchmark 5, the run.sh default) |
+| `bm6-8000sq-10steps` | `Benchmarks/tea_bm_6.in` | 8000 x 8000 | 10 | 9.517473876862078e+01 | upstream file (benchmark 6, largest upstream deck) |
+| `bm5e4-4000sq-2steps` | `Benchmarks/tea_bm_5e_4_2.in` | 4000 x 4000 | 2 | 8.944258537125111e+01 | upstream file (step-count axis of the default grid) |
+
+Timer: TeaLeaf's own `Wallclock` profile (`driver/diffuse.cpp`, `clock_gettime`
+around every timestep: min-timestep reduction, halo exchange, CG solve, solve
+finalisation, periodic field summary), accumulated over the timesteps and
+printed after each one with 3 decimals; the value after the last timestep is
+`main_compute_s`. Start-up, mesh/chunk initialisation, the initial field summary,
+the final check and finalisation are outside it. Baseline: `Expected` (the
+`tea.problems` value, exact), `Actual` (the final global temperature sum,
+compared with this build's baseline at the 1e-5 relative tolerance TeaLeaf itself
+applies in `field_summary_driver.cpp` -- upstream's own criterion, not a new one),
+timesteps completed (exact), `This run PASSED` / `Outcome: PASSED` present,
+`FAILED` absent. CG iteration counts per timestep are printed but not compared.
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs; spread =
+(max - min) / median; stable = spread <= 10 %):
+
+| id | case (deck) | size | native timer field / scope | main compute median | per run | spread | run.sh wall (E2E) | main >= 1 s | stable |
+|---|---|---|---|---|---|---|---|---|---|
+| `bm4-1000sq-10steps` | tea_bm_4 | 1000 x 1000 cells, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 1.497 s | 1.499, 1.495, 1.497 | 0.27 % | 3.58 s | yes | yes |
+| `bm5e2-2000sq-10steps` | tea_bm_5e_2 | 2000 x 2000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 4.228 s | 4.204, 4.228, 4.235 | 0.73 % | 6.94 s | yes | yes |
+| `bm5-4000sq-10steps` | tea_bm_5 (default) | 4000 x 4000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 18.42 s | 18.4, 18.43, 18.42 | 0.17 % | 21.9 s | yes | yes |
+| `bm6-8000sq-10steps` | tea_bm_6 | 8000 x 8000, 10 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 115.4 s | 115.4, 115.4, 115.3 | 0.07 % | 119 s | yes | yes |
+| `bm5e4-4000sq-2steps` | tea_bm_5e_4_2 | 4000 x 4000, 2 steps | `Wallclock:` after the last timestep (cumulative timestep loop) | 4.171 s | 4.171, 4.171, 4.173 | 0.05 % | 6.99 s | yes | yes |
+
+Application check, every one of the 15 measured runs `This run PASSED`:
+`Actual` vs `Expected` relative difference 1.8e-11 (`bm4`), 5.7e-11 (`bm5e2`),
+1.0e-12 (`bm5`), identical to all 16 printed digits (`bm6`, `bm5e4-4000sq-2steps`);
+`Actual` was identical across the 3 runs of every input. Raw runs and baselines:
+`HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-tealeaf/`;
+`validate.sh CUDA` (tea.in) re-run after the change: PASS.
+
 ## Validation
 
 TeaLeaf has a built-in reference check (`driver/field_summary_driver.cpp`,

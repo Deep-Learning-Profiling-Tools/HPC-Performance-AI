@@ -1,0 +1,108 @@
+# Registered inputs of gamess_ri_mp2 (schema hpcperf-inputs-1), selected through HPCPERF_GAMESS_RI_MP2_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: gamess_ri_mp2
+level: 2
+selector: HPCPERF_GAMESS_RI_MP2_INPUT
+default_input: w30-rand
+entry:
+  kind: run.sh
+  path: level2/gamess_ri_mp2/run.sh
+  backend_arg: CUDA
+timing:
+  scope: the mini-app's own mean wall time of the RI-MP2 energy kernel over its repetitions (upstream's reported
+    metric)
+  kind: total
+  unit: s
+  regex: ^\s*Wall time \(mean\)\s*=\s*(?P<value>[0-9.]+) sec
+  select: only
+baseline:
+  method: 'upstream''s own check: the computed MP2 correlation energy vs the reference within its relative tolerance
+    (''Passed :-)''); the relative error is recorded'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: passed
+    role: required
+    regex: Passed :-\)
+    compare:
+      rule: present
+  - name: rel_error_mp2
+    role: diagnostic
+    regex: Rel\. error of computed MP2 corr\. energy =\s*(?P<value>[0-9.E+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the physical benzene input and two generated sizes are registered
+  blocker: upstream's other physical kernel inputs (cor.kern, w30/w60 .kern files) are not vendored (large binary
+    kernel files)
+  upstream_inputs_not_added:
+  - inputs/cor.kern
+  - inputs/w30.kern
+  - inputs/w60.kern
+inputs:
+- id: w30-rand
+  case: synthetic-w30
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: jkwack/GAMESS_RI-MP2_MiniApp
+      version: see level2/<app>/README.md (Upstream commit)
+      path: generated 'w30.rand' dimensions (NQVV 30) -- run.sh default
+  params:
+    input: w30.rand
+    nqvv: 30
+  env:
+    HPCPERF_GAMESS_INPUT: w30.rand
+    HPCPERF_GAMESS_NQVV: '30'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: benz-kern
+  case: benzene-physical
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: jkwack/GAMESS_RI-MP2_MiniApp
+      version: see level2/<app>/README.md (Upstream commit)
+      path: inputs/benz.kern (the upstream physical benzene kernel input)
+  params:
+    input: benz.kern
+  env:
+    HPCPERF_GAMESS_INPUT: benz.kern
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - inputs/benz.kern
+  input_form: file
+- id: w60-rand
+  case: synthetic-w60
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: jkwack/GAMESS_RI-MP2_MiniApp
+      version: see level2/<app>/README.md (Upstream commit)
+      path: generated dimensions with NQVV 60 (the mini-app's own size parameter)
+  params:
+    input: w60.rand
+    nqvv: 60
+  env:
+    HPCPERF_GAMESS_INPUT: w60.rand
+    HPCPERF_GAMESS_NQVV: '60'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

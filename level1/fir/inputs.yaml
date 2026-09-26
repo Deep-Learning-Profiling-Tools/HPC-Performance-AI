@@ -1,0 +1,99 @@
+# Registered inputs of fir (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: fir
+level: 1
+selector: null
+default_input: y1024-x4096
+entry:
+  kind: binary
+  path: build/fir/cuda/fir_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the port exposes no timing option (upstream's benchmark_runner -t timing mode is not wired into the CLI);
+    only the verification line is printed
+baseline:
+  method: 'built-in (upstream Verify): ''Passed!'''
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: Passed
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: three points of the upstream -y size sweep
+inputs:
+- id: y1024-x4096
+  case: fir-filter
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: NUCAR-DEV/Hetero-Mark
+      version: aa685e02705f4be380cba215c6df10b42262a9cd
+      path: fir benchmark -y 1024 -x 4096 (= ctest)
+  params:
+    blocks: 1024
+    block_size: 4096
+  args:
+  - -y
+  - '1024'
+  - -x
+  - '4096'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: y4096-x4096
+  case: fir-filter
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: NUCAR-DEV/Hetero-Mark
+      version: aa685e02705f4be380cba215c6df10b42262a9cd
+      path: upstream sweep parameter -y (number of blocks) 4096
+  params:
+    blocks: 4096
+    block_size: 4096
+  args:
+  - -y
+  - '4096'
+  - -x
+  - '4096'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: y16384-x4096
+  case: fir-filter
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: NUCAR-DEV/Hetero-Mark
+      version: aa685e02705f4be380cba215c6df10b42262a9cd
+      path: -y 16384
+  params:
+    blocks: 16384
+    block_size: 4096
+  args:
+  - -y
+  - '16384'
+  - -x
+  - '4096'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

@@ -105,6 +105,59 @@ particles per rank for 20 transport steps. Controls:
 
 Observed on one NVIDIA B200: approximately 14 seconds end to end.
 
+## Registered inputs (`inputs.yaml`, `HPCPERF_QUICKSILVER_INPUT_ID`, 2026-09-21)
+
+`HPCPERF_QUICKSILVER_INPUT_ID=<id> level2/quicksilver/run.sh CUDA` selects a
+registered input (`tools/inputs/hpcperf_inputs.py list level2/quicksilver`);
+the id is refused together with `HPCPERF_QUICKSILVER_INPUT`/`_CELLS_PER_RANK`/
+`_PARTICLES_PER_RANK`/`_STEPS`. Without the variable run.sh behaves exactly as
+above.
+
+| id | deck | source | mesh / particles / steps | ranks |
+|---|---|---|---|---|
+| `p1-profile-8c-100k-20s` (default) | `inputs/coral2_p1_profile.inp` + run.sh sizes | derived (P1 physics, sizes supplied by run.sh) | 8^3 / 100,000 / 20 per rank | N |
+| `coral2-p1-1rank` | `inputs/upstream/Coral2_P1_1.inp` | upstream verbatim, `Examples/CORAL2_Benchmark/Problem1/` | 16^3 / 163,840 / 100 | 1 only |
+| `coral2-p2-1rank` | `inputs/upstream/Coral2_P2_1.inp` | upstream verbatim, `Examples/CORAL2_Benchmark/Problem2/` | 11^3 / 53,240 / 100 | 1 only |
+| `cts2-1rank` | `inputs/upstream/CTS2_1.inp` | upstream verbatim, `Examples/CTS2_Benchmark/` | 16^3 / 40,960 / 100 | 1 only |
+
+The three upstream decks carry their own mesh/particle/step counts and
+`xDom=yDom=zDom=1`; run.sh passes them with `-i` only and refuses
+`HPCPERF_GPUS>1` for them (never re-decomposed silently). Timer: the
+`MC_Fast_Timer` `main` row of the Cumulative table (all cycles: cycleInit +
+cycleTracking + cycleFinalize; setup and the final report excluded). Baseline:
+the four upstream `PASS::` checks present, no `FAIL::`, last-cycle census /
+segments / scalar flux recorded (Monte Carlo, fixed seed 1029384756, GPU tracking
+order not bitwise reproducible). What `compare` actually covers (round 4):
+
+| side / quantity | read from | used how |
+|---|---|---|
+| candidate: `PASS:: Absorption/Fission/Scatter`, `PASS:: Collision to Facet`, `PASS:: No Particles Lost`, `PASS:: Fluence` | the candidate log | `present` -- upstream's own coralBenchmark checks (statistical, computed inside the run); no baseline value is consulted |
+| candidate: `FAIL::` | the candidate log | `absent` |
+| baseline + candidate: last-cycle `census`, `num_seg`, `scalar_flux` | both logs (cycle table, last row) | `record`: both values are stored and shown side by side; **no numeric comparison is made** (no tolerance basis) |
+
+So the only verified quantities are candidate-side PASS/FAIL markers; there is
+no baseline-vs-candidate numeric comparison yet. `scalar_flux` (the physical
+result) is a required quantity and stays `record`, so `compare` returns
+INCOMPLETE (exit 3) for every Quicksilver input; `census` and `num_seg` are
+diagnostics. This applies to all four registered decks (they all print the
+coralBenchmark block). A changed scalar flux with all `PASS::` lines kept is
+NOT detected as a failure -- it is shown as a recorded difference
+(`tests/run_all.sh` section 12 demonstrates it: 591852.1 -> 887778.2, exit 3);
+a missing `PASS::` line is a failure (exit 1). The "optimized vs baseline"
+requirement is therefore not met for Quicksilver until a tally rule with a
+basis exists; this round does not invent a statistical tolerance.
+
+Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
+
+| id | `main` (main compute) | spread | run.sh wall (E2E) | checks |
+|---|---|---|---|---|
+| `p1-profile-8c-100k-20s` | 6.93 s | 4.8 % | 10.1 s | 4/4 PASS |
+| `coral2-p1-1rank` | 54.98 s | 2.4 % | 57.2 s | 4/4 PASS |
+| `coral2-p2-1rank` | 145.9 s | 6.3 % | 148.8 s | 4/4 PASS |
+| `cts2-1rank` | 225.1 s | 2.8 % | 227.5 s | 4/4 PASS |
+
+Raw runs and baselines: `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level2-quicksilver/`.
+
 ## Validate
 
 ```bash

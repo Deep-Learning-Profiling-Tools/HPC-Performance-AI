@@ -31,6 +31,9 @@ set +u; # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
+# Registered inputs (inputs.yaml): HPCPERF_EXACA_INPUT=<id> supplies this script's case/size knobs (tools/inputs/README.md);
+# refused together with a conflicting pre-set knob or an unknown id. The frozen source tree is never touched.
+hpcperf_apply_input "$HERE" HPCPERF_EXACA_INPUT || exit 2
 
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"

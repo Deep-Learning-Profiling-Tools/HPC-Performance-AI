@@ -1,0 +1,133 @@
+# Registered inputs of nyx (schema hpcperf-inputs-1), selected through HPCPERF_NYX_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: nyx
+level: 3
+selector: HPCPERF_NYX_INPUT
+default_input: minisb-32cubed-10
+entry:
+  kind: run.sh
+  path: level3/nyx/run.sh
+  backend_arg: CUDA
+timing:
+  scope: Nyx's own 'Run time' (AMReX timer of the whole Evolve over all steps; initialization excluded)
+  kind: total
+  unit: s
+  regex: ^Run time = (?P<value>[0-9.eE+-]+)
+  select: only
+baseline:
+  method: validate.sh checks the final state/particles from the plotfiles (STATE_AND_PARTICLES_PASS; heat/cool has
+    the I_R check pending). Nothing numeric is printed to stdout; the registry records completion only.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: run_time_line
+    role: diagnostic
+    regex: '^Run time = '
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: four upstream decks (three physics cases, two LyA sizes) are registered
+  blocker: the other Exec directories (AMR-density, DrivenTurbulence, GravityTests, HydroTests, ...) are in the
+    frozen tree but not wired as run.sh cases
+  upstream_inputs_not_added:
+  - Exec/AMR-density/inputs
+  - Exec/DrivenTurbulence
+  - Exec/GravityTests/zeldovich_dm
+  - Exec/HydroTests
+inputs:
+- id: minisb-32cubed-10
+  case: santa-barbara-minisb
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: AMReX-Astro/Nyx
+      version: hpcperf-l3-v1 (Nyx frozen tree 71b64ddf)
+      path: Exec/MiniSB/inputs.32 (32^3 cells, 32,686 DM particles from ic_sb_32.ascii, 10 steps) -- run.sh default
+  params:
+    case: minisb
+    cells: 32^3
+    steps: 10
+  env:
+    HPCPERF_NYX_CASE: minisb
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: lya-adiabatic-32cubed-10
+  case: lyman-alpha-adiabatic
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: AMReX-Astro/Nyx
+      version: hpcperf-l3-v1 (Nyx frozen tree 71b64ddf)
+      path: 'Exec/LyA/inputs.rt.garuda (upstream GPU regression deck LyA-adiabatic: 32^3, 32.nyx IC, z=100)'
+  params:
+    case: lya_adiabatic
+    cells: 32^3
+    steps: 10
+  env:
+    HPCPERF_NYX_CASE: lya_adiabatic
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: lya-adiabatic-64cubed
+  case: lyman-alpha-adiabatic
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: AMReX-Astro/Nyx
+      version: hpcperf-l3-v1 (Nyx frozen tree 71b64ddf)
+      path: Exec/LyA/inputs with 64sssss_20mpc.nyx (the flagship 64^3 science deck, adiabatic derivative -- run.sh
+        strong mode)
+  params:
+    case: lya_adiabatic
+    cells: 64^3
+  env:
+    HPCPERF_NYX_CASE: lya_adiabatic
+    HPCPERF_SCALE_MODE: strong
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: >-
+    run.sh's max_step default applies (HPCPERF_NYX_STEPS=10, upstream's MiniSB test length): 10 steps of the 64^3 deck, measured 1.5 s Run time
+- id: lya-heatcool-32cubed
+  case: lyman-alpha-heat-cool
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: AMReX-Astro/Nyx
+      version: hpcperf-l3-v1 (Nyx frozen tree 71b64ddf)
+      path: Exec/LyA/inputs.rt with TREECOOL_middle (heat_cool_type=11, CVODE) -- validate verdict I_R_CHECK_PENDING,
+        never a pass
+  params:
+    case: lya_heatcool
+    cells: 32^3
+  env:
+    HPCPERF_NYX_CASE: lya_heatcool
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_NYX_HEATCOOL: 'YES'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: >-
+    10 steps (run.sh default) on the heatcool profile; correctness of the heating/cooling network stays PENDING (validate.sh I_R check), never a pass; correctness of the heating/cooling network is PENDING (I_R check) -- registered as an upstream case, not
+    as a validated one

@@ -1,0 +1,112 @@
+# Registered inputs of cabanapic (schema hpcperf-inputs-1), selected through HPCPERF_CABANAPIC_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: cabanapic
+level: 2
+selector: HPCPERF_CABANAPIC_INPUT
+default_input: weibel-ny512-nppc2000
+entry:
+  kind: run.sh
+  path: level2/cabanapic/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: CabanaPIC prints no kernel timer; run.sh's 'wall time' line is the wrapper's process wall, not the application's
+    -- recorded as E2E only
+baseline:
+  method: no built-in check for the GPU-sized problem; upstream's tests compare energies for the built-in deck.
+    The registry keeps the final energies.txt line (step exact; E/B field energies recorded, required, no tolerance
+    basis yet).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: final_step
+    role: required
+    regex: '^# last line \(step time E_energy B_energy\): (?P<value>\d+) '
+    select: last
+    compare:
+      rule: exact
+  - name: e_energy_final
+    role: required
+    regex: '^# last line \(step time E_energy B_energy\): \d+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+) '
+    select: last
+    compare:
+      rule: record
+  - name: b_energy_final
+    role: required
+    regex: '^# last line \(step time E_energy B_energy\): \d+ [0-9.eE+-]+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+)'
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream deck size, the GPU size and an intermediate one through the deck's runtime size variables;
+    other compile-time decks (custom_init.cxx, tests/decks) are not registered
+inputs:
+- id: weibel-ny512-nppc2000
+  case: weibel-instability
+  variant: default
+  source:
+    kind: derived
+    derivation: upstream's built-in Weibel deck at ny=512, nppc=2000, 96000 steps (decks/hpcperf_weibel.cxx, compiled
+      in; sizes read from HPCPERF_NY/NPPC/NUM_STEPS at start-up)
+  params:
+    ny: 512
+    nppc: 2000
+    num_steps: 96000
+    particles: 1024000
+  env:
+    HPCPERF_NY: '512'
+    HPCPERF_NPPC: '2000'
+    HPCPERF_NUM_STEPS: '96000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: weibel-ny32-nppc100
+  case: weibel-instability
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ECP-copa/CabanaPIC
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'the upstream built-in deck size: ny=32, nppc=100, 6000 steps (3200 particles)'
+  params:
+    ny: 32
+    nppc: 100
+    num_steps: 6000
+    particles: 3200
+  env:
+    HPCPERF_NY: '32'
+    HPCPERF_NPPC: '100'
+    HPCPERF_NUM_STEPS: '6000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: weibel-ny128-nppc500
+  case: weibel-instability
+  variant: size
+  source:
+    kind: derived
+    derivation: intermediate size ny=128, nppc=500, 24000 steps (the same time-step rule)
+  params:
+    ny: 128
+    nppc: 500
+    num_steps: 24000
+    particles: 64000
+  env:
+    HPCPERF_NY: '128'
+    HPCPERF_NPPC: '500'
+    HPCPERF_NUM_STEPS: '24000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

@@ -42,9 +42,9 @@ fi
 mkdir -p "$TMP/fb/level1"
 rows="$(python3 "$TOOLS/cases.py" resolve --level 1 --build-root "$TMP/fb" --no-env-check all 2>&1 | noise)"
 n1="$(printf '%s\n' "$rows" | /usr/bin/grep -c .)"
-nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=17' | wc -l)"
+nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=18' | wc -l)"
 nbm="$(ls -d "$REPO"/level1/*/CMakeLists.txt 2>/dev/null | wc -l)"
-if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 17 fields ($nbm benchmarks)"
+if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 18 fields ($nbm benchmarks)"
 else bad "1c: level 1 resolve: $n1 rows, $nbad malformed"; fi
 if printf '%s\n' "$rows" | awk -F'\t' '$9 ~ /verify\.py|python/' | /usr/bin/grep -q .; then
     bad "1d: a Level 1 case runs a python wrapper instead of the binary"
@@ -110,6 +110,120 @@ if not refused(cases.level2_rows, "CUDA"):
     bad.append("an empty field was accepted")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+
+echo
+echo "=== 1r: registered inputs (inputs.yaml -> generated cases/level<N>_registry.tsv)"
+pycheck "1r1: registry tables: one case per registered input (counts from the registry), case == input_id, no drift" <<'PY'
+import os, subprocess, sys, glob
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+bad = []
+repo = os.environ["REPO"]
+for lvl, fn in ((1, cases.level1_registry_rows), (2, cases.level2_registry_rows)):
+    rows, _ = fn("CUDA")
+    n = 0
+    for f in glob.glob(os.path.join(repo, f"level{lvl}", "*", "inputs.yaml")):
+        out = subprocess.run([sys.executable, os.path.join(repo, "tools/inputs/hpcperf_inputs.py"), "list", os.path.dirname(f)],
+                             capture_output=True, text=True).stdout
+        n += len([l for l in out.splitlines() if l.strip()])
+    if len(rows) != n:
+        bad.append(f"level {lvl}: {len(rows)} registry cases for {n} registered inputs")
+    if any(r["case"] != r["input_id"] or not r["input_id"] for r in rows):
+        bad.append(f"level {lvl}: a registry case without its input id")
+if g.check():
+    bad.append("drift: " + "; ".join(g.check()))
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r2: registry Level 1: a compile-time input runs its OWN binary (NPB class A/C), generated data per input id" <<'PY'
+import os, sys, shlex
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+rows, _ = cases.level1_registry_rows("CUDA")
+by = {(r["app"], r["case"]): r for r in rows}
+bad = []
+for b in ("cg", "ep", "ft", "is", "mg"):
+    for cls, d in (("class-a", "cuda-classA"), ("class-c", "cuda-classC"), ("class-b", "cuda")):
+        exe = shlex.split(by[(b, cls)]["argv"])[0]
+        if not exe.endswith(f"/build/{b}/{d}/{b}_cuda"):
+            bad.append(f"{b}/{cls} runs {exe}")
+for app, iid, data in (("aes", "plaintext-4mib", "input_4MB.hex"), ("aes", "plaintext-16mib", "input_16MB.hex"),
+                       ("pagerank", "nodes4096", "4096.data"), ("pagerank", "nodes1024", "1024.data")):
+    argv = shlex.split(by[(app, iid)]["argv"])
+    if not any(a.endswith(data) and os.path.isabs(a) for a in argv):
+        bad.append(f"{app}/{iid}: {data} not passed as an absolute path: {argv}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r3: registry Level 2: selector allowed only as the registry declares it; stray / conflicting / hand-written selector and knobs refused" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+bad = []
+def refused(fn, *a):
+    try:
+        fn(*a); return False
+    except cases.CaseError:
+        return True
+rows, _ = cases.level2_registry_rows("CUDA")
+reg = cases.registry_l2()
+for r in rows:
+    sel = reg[r["app"]][0]
+    if r["env"] != f"{sel}={r['input_id']}":
+        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}")
+if "HPCPERF_XSBENCH_INPUT" not in cases.allowed_env("xsbench", ""):
+    bad.append("the registry selector of xsbench is not an allowed input variable")
+for internal in ("HPCPERF_INPUT_ARGS", "HPCPERF_INPUT_ID"):
+    if internal in cases.allowed_env("xsbench", ""):
+        bad.append(f"{internal} (set inside run.sh by the selector helper) is settable by a case")
+kz = [r for r in rows if r["app"] == "kripke" and r["case"] == "z64-g64-q128"]
+kd, _ = cases.level2_rows("CUDA")
+kd = [r for r in kd if r["app"] == "kripke"]
+if not refused(cases.refuse_undeclared, kd, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128"}):
+    bad.append("a selector in the shell was not refused for the hand-written kripke case")
+if not refused(cases.refuse_undeclared, kd, {"KRIPKE_ZONES": "8,8,8"}):
+    bad.append("a registry knob in the shell was not refused")
+if not refused(cases.refuse_undeclared, kz, {"HPCPERF_KRIPKE_INPUT": "z32-g32-q64"}):
+    bad.append("a conflicting selector value in the shell was not refused")
+try:
+    cases.refuse_undeclared(kz, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128", "UNRELATED": "1"})
+except cases.CaseError as e:
+    bad.append(f"an identical declared value was refused: {e}")
+if not refused(cases.parse_env, "HPCPERF_GITHUB_TOKEN=x", "t"):
+    bad.append("a credential-looking variable was accepted")
+tmp = os.path.join(os.environ["TMP"], "casedir_reg")
+os.makedirs(tmp, exist_ok=True)
+for f in ("level2_apps.tsv", "level2_registry.tsv"):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+with open(os.path.join(tmp, "level2_cases.tsv"), "w") as f:
+    f.write("kripke\tsneaky\t1\tHPCPERF_KRIPKE_INPUT=z64-g64-q128\t-\t-\t-\t-\n")
+orig = cases.CASES
+cases.CASES = tmp
+if not refused(cases.level2_rows, "CUDA"):
+    bad.append("a hand-written case that sets the registry selector was accepted")
+cases.CASES = orig
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r4: drift: a hand edit of a generated registry table is detected" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+tmp = os.path.join(os.environ["TMP"], "casedir_drift")
+os.makedirs(tmp, exist_ok=True)
+for f in os.listdir(cases.CASES):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+p = os.path.join(tmp, "level1_registry.tsv")
+text = open(p).read().replace("build/cg/cuda-classC/cg_cuda", "build/cg/cuda/cg_cuda", 1)
+open(p, "w").write(text)
+cases.CASES = tmp
+problems = g.check()
+print("ALLOK" if any("level1_registry.tsv" in m for m in problems) else f"not detected: {problems}")
+PY
+out="$(bash "$TOOLS/measure_level1.sh" --registry --dry-run --no-profile cg/class-a cg/class-c 2>&1 || true)"
+if printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classA/cg_cuda' && printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classC/cg_cuda' \
+   && printf '%s\n' "$out" | /usr/bin/grep -q 'input    class-a (registry level1/cg/inputs.yaml'; then
+    ok "1r5: registry dry run: class-a / class-c commands name their materialized binaries and the registry input"
+else
+    bad "1r5: registry dry run: $(printf '%s\n' "$out" | /usr/bin/grep -E 'command|input' | head -4 | tr '\n' ' ')"
+fi
 
 echo
 echo "=== 2: ROI log v2 and the vendor-neutral analysis"
@@ -627,18 +741,25 @@ if /usr/bin/grep -rn 'HPCPERF_ROI_LOG\|HPCPERF_SKIP_VERIFY' "$REPO"/level1/*/CMa
 else
     ok "6c: no ctest command or validate.sh sets HPCPERF_ROI_LOG / HPCPERF_SKIP_VERIFY"
 fi
-BR=""
-for cand in "$REPO/build/gcc13" "$REPO/build/all"; do [ -d "$cand/level1" ] && { BR="$cand"; break; }; done
+# the executables the registry cases run (build/<benchmark>/cuda*/...), else a legacy build root
+exes="$(/usr/bin/awk -F'\t' '!/^#/ {print $5}' "$TOOLS/cases/level1_registry.tsv" | sed "s#{REPO}#$REPO#" | sort -u)"
+BR="registry"
+if [ -z "$(for e in $exes; do [ -x "$e" ] && echo y && break; done)" ]; then
+    BR=""; exes=""
+    for cand in "$REPO/build/gcc13" "$REPO/build/all"; do
+        [ -d "$cand/level1" ] && { BR="$cand"; exes="$(ls "$cand"/level1/*/*_cuda 2>/dev/null)"; break; }
+    done
+fi
 if [ -z "$BR" ]; then
     skip "6d: no Level 1 build tree"
 else
-    nb=0; missing=""
-    for exe in "$BR"/level1/*/*_cuda; do
-        [ -x "$exe" ] || continue
+    nb=0; absent=0; missing=""
+    for exe in $exes; do
+        [ -x "$exe" ] || { absent=$((absent+1)); continue; }
         nb=$((nb+1))
-        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing $(basename "$exe")"
+        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing ${exe#$REPO/}"
     done
-    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR)" \
+    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR; $absent not built)" \
                                          || bad "6d: $nb binaries, without markers:$missing"
 fi
 
@@ -861,6 +982,9 @@ m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>'
 if not m:
     print("no embedded data"); raise SystemExit
 D = json.loads(m.group(1))
+if [c.get("kind") for c in D.get("campaigns", [{}])] != ["cases"]:
+    bad.append(f"case-table records should give one campaign of kind 'cases': {[c.get('kind') for c in D.get('campaigns', [])]}")
+D = D["campaigns"][0]
 plats = [p["id"] for p in D["platforms"]]
 if "test-platform" not in plats or "nvidia-b200.cuda13.2" not in plats:
     bad.append(f"platforms {plats} (measured ones and those with a conformance record)")
@@ -931,6 +1055,440 @@ case "$out" in *"json_written=0 "*) ok "12d: summarize --run-id processes only t
 out="$(bash "$TOOLS/measure_level1.sh" --build-root "$TMP/fb" --dry-run --collector none daxpy 2>&1 | noise)"
 case "$out" in *summarizing*) bad "12f: a dry run summarized" ;;
                *) ok "12f: a dry run neither measures nor summarizes" ;; esac
+# an invalidated raw run (INVALIDATED.json) builds no record, and an existing record of it is not loaded
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --no-report >/dev/null 2>&1
+nrec="$(find "$TMP/res_inv" -name '*.json' -path '*/level*' | wc -l)"
+for r in $(find "$TMP/raw" -name run_meta.txt -exec dirname {} \;); do echo '{"reason": "test"}' > "$r/INVALIDATED.json"; done
+o1="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv2" --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+o2="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --csv-only --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+find "$TMP/raw" -name INVALIDATED.json -delete
+case "$o1|$o2" in
+    *"json_written=0 "*"invalidated_raw=$nrec "*"|"*" records=0 "*"invalidated_records=$nrec"*)
+        ok "12g: $nrec invalidated raw runs build no record and their existing records are not loaded" ;;
+    *) bad "12g: invalidated runs still summarized ($nrec runs): $o1 / $o2" ;;
+esac
+
+echo "=== 13: registry run verifier (verify_registry_runs.py) -- negative cases"
+# A fake repository and records in the engine's layout: a Level 2 app whose registry names
+# wk/SLD10.dat, and an MFEM-like app with option arguments. Each record is verified read-only.
+pycheck "13a-13o: same-name file, relative/absolute path, controlled copy, dropped args, duplicate options" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vr"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/vl/wk/SLD10.dat", "registered deck\n")
+w(f"{R}/level2/vl/other/SLD10.dat", "a different deck with the same name\n")
+w(f"{R}/build/level2/vl/run/SLD10.dat", "registered deck\n")          # byte-identical copy
+w(f"{R}/build/level2/vl/bad/SLD10.dat", "tampered copy\n")
+w(f"{R}/build/level2/vl/vlp4d", ""); w(f"{R}/build/level2/rh/remhos", "")
+os.makedirs(f"{R}/build/level2/vl/cwd", exist_ok=True)
+deck_sha = V.sha(f"{R}/level2/vl/wk/SLD10.dat")
+rules_plain = {1: {}, 2: {"vl": {"search_dirs": ["wk"]}, "rh": {}, "lw": {"last_wins": "test parser"}}}
+rules_copy = {1: {}, 2: {"vl": {"search_dirs": ["wk"], "copies": {"wk/SLD10.dat": "build/level2/vl/"}}}}
+n = [0]
+def record(app, args, argv, cwd, files=None, sel="SEL", selval=None):
+    n[0] += 1
+    raw = f"{T}/raw/{n[0]}"; wl = {"input_id": "x", "args": args, "env": {}, "files_sha256": files or {}, "params": {}}
+    ident = {"schema": "hpcperf-workload-identity-1", "benchmark": app, "input_id": "x", "level": 2, "complete": True,
+             "selector": sel, "arg_files_sha256": {}, "workload": wl}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{100 + i}", f"# hpcperf-roi-log 2\npid {100 + i}\nrank 0\nexe {argv[0]}\ncwd {cwd}\nargv {json.dumps(argv)}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "done\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    rec = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": "x", "status": "ok",
+           "registry": {"input_id": "x", "identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {sel: selval or "x"}, "processes": []},
+           "roi": {"runs_s": [1.0, 1.0]}, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": "t"}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(rec)); return p
+bad = []
+def expect(label, path, rules, verdict, needle=""):
+    r = V.verify_record(path, os.path.realpath(R), rules)
+    txt = " | ".join(r["problems"] + r["gaps"])
+    if r["verdict"] != verdict or needle not in txt:
+        bad.append(f"{label}: got {r['verdict']} ({txt}), want {verdict} /{needle}/")
+exe, cwd = f"{R}/build/level2/vl/vlp4d", f"{R}/build/level2/vl/cwd"
+files = {"wk/SLD10.dat": deck_sha}
+# (1) same name, different content / location
+expect("13a same-name other deck", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/other/SLD10.dat"], cwd, files),
+       rules_plain, "FAIL", "not passed")
+expect("13b bare same name in the process cwd (a different file)", record("vl", ["SLD10.dat"], [exe, "SLD10.dat"], f"{R}/level2/vl/other", files),
+       rules_plain, "FAIL", "not passed")
+# (2) the registered file by absolute and by cwd-relative path
+expect("13c absolute path", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+expect("13d relative path", record("vl", ["SLD10.dat"], [exe, "../../../../level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+# (3) a byte-identical copy counts only under a declared copy rule; a differing copy never
+cp = record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/run/SLD10.dat"], cwd, files)
+expect("13e undeclared copy", cp, rules_plain, "FAIL", "not passed")
+expect("13f declared identical copy", cp, rules_copy, "PASS")
+expect("13g declared copy with other content", record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/bad/SLD10.dat"], cwd, files),
+       rules_copy, "FAIL", "")
+# (4) registry arguments that never reach the program
+rx = f"{R}/build/level2/rh/remhos"
+expect("13h registry args dropped", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-rs", "4", "-dt", "0.0025", "-pa"], cwd),
+       rules_plain, "FAIL", "not passed")
+# (5) run.sh defaults plus registered overrides: the duplicated option is refused ...
+expect("13i duplicate option, parser not last-wins", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-rs", "4", "-dt", "0.0025", "-rs", "1", "-dt", "0.02", "-pa"], cwd),
+       rules_plain, "FAIL", "given 2 times")
+# ... accepted after the fix that drops the overridden defaults ...
+expect("13j overrides replace the defaults", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-pa", "-rs", "1", "-dt", "0.02"], cwd),
+       rules_plain, "PASS")
+# ... and for a declared last-wins parser only when the LAST occurrence is the registry's
+w(f"{R}/build/level2/lw/app", "")
+lw = f"{R}/build/level2/lw/app"
+expect("13k last-wins, registry last", record("lw", ["-s", "small"], [lw, "-s", "large", "-s", "small"], cwd), rules_plain, "PASS")
+expect("13l last-wins, registry not last", record("lw", ["-s", "small"], [lw, "-s", "small", "-s", "large"], cwd), rules_plain, "FAIL", "last one")
+# the selector must name the input; the binary must be the app's own
+expect("13m wrong selector", record("rh", [], [rx], cwd, selval="y"), rules_plain, "FAIL", "selector")
+expect("13n foreign binary", record("rh", [], [exe], cwd), rules_plain, "FAIL", "own binary")
+# an env knob with no evidence rule is a gap, not a pass
+p = record("rh", [], [rx], cwd)
+d = json.load(open(p)); d["registry"]["identity"]["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}
+json.dump(d, open(p, "w")); ri = json.load(open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json"))
+ri["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}; json.dump(ri, open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json", "w"))
+expect("13o unevidenced knob", p, rules_plain, "INSUFFICIENT", "HPCPERF_RH_KNOB")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+# a changed input definition (remhos periodic-hexagon-p0: order 3 made explicit): a record of the old
+# workload is SUPERSEDED (kept, never a result of the current input); the current workload with ONE -o
+# passes; a second -o (run.sh default + registry) is refused -- MFEM is not last-wins
+pycheck "13q-13s: changed definition -> SUPERSEDED; single effective -o; duplicated -o refused (real remhos registry)" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "vq")
+doc = hi.load(os.path.join(R, "level2", "remhos")); inp = hi.get_input(doc, "periodic-hexagon-p0")
+cur = hi.registry_identity(doc, inp)
+bad = []
+if cur["workload"]["args"][-2:] != ["-o", "3"] or cur["workload"]["params"].get("o") != 3:
+    bad.append(f"registry does not state order 3: {cur['workload']['args']}")
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+echo = "   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {o}\n   --time-step 0.005\n"
+n = [0]
+def rec(wl, argv, o):
+    n[0] += 1; raw = f"{T}/raw/{n[0]}"; os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl)
+    for i in range(3):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}/build/level2/remhos/cuda/run\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(echo.format(o=o))
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "remhos", "case": "periodic-hexagon-p0", "status": "ok",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {cur["selector"]: "periodic-hexagon-p0"}},
+         "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/{n[0]}.json"; json.dump(r, open(p, "w")); return p
+rules = V.load_rules(os.path.join(os.environ["TOOLS"], "cases", "registry_evidence.yaml"))
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+for label, wl, argv, o, want in [
+        ("13q old order-2 record", old_wl, ["-o", "2"] + base, 2, "SUPERSEDED"),
+        ("13r current workload, one -o 3", cur["workload"], base + ["-o", "3"], 3, "PASS"),
+        ("13s run.sh -o 2 AND registry -o 3", cur["workload"], ["-o", "2"] + base + ["-o", "3"], 3, "FAIL")]:
+    v = V.verify_record(rec(wl, argv, o), R, rules)
+    if v["verdict"] != want:
+        bad.append(f"{label}: {v['verdict']} ({v['problems'] + v['gaps']}), want {want}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+# a registered input whose run fails before the ROI (MiniEM bdot/blob today) stays a failure: NOT_RUN,
+# never PASS, and summarize counts it as not ok
+pycheck "13t: a run that aborts before the ROI is NOT_RUN, never PASS" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vt"); raw = os.path.join(T, "raw"); os.makedirs(os.path.join(raw, "clean.0"), exist_ok=True)
+open(os.path.join(raw, "clean.0", "run.log"), "w").write("terminate called after throwing an instance of 'Teuchos::Exceptions::InvalidParameterName'\n")
+open(os.path.join(raw, "clean.0", "run.txt"), "w").write("rc=134\n")
+ident = {"benchmark": "miniem", "input_id": "maxwell-bdot-small", "complete": True, "selector": "HPCPERF_MINIEM_INPUT",
+         "workload": {"args": [], "env": {}, "params": {}, "files_sha256": {}}}
+rec = {"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-bdot-small", "status": "clean_failed",
+       "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-bdot-small"}},
+       "roi": {"runs_s": [], "wall_s": None}, "provenance": {"raw_dir": raw}}
+p = os.path.join(T, "r.json"); json.dump(rec, open(p, "w"))
+v = V.verify_record(p, os.path.join(T, "norepo"), {1: {}, 2: {}})
+print("ALLOK" if v["verdict"] == "NOT_RUN" else f"verdict {v['verdict']}: {v['problems']}")
+PY
+out="$(python3 "$TOOLS/verify_registry_runs.py" --repo "$TMP/vr/repo" "$TMP/vr/rec" 2>&1 | noise | tail -1)"
+case "$out" in *"records)"*) ok "13p: the command line verifies a directory of records ($out)" ;;
+               *) bad "13p: verify_registry_runs.py cli: $out" ;; esac
+
+echo "=== 14: a registry dry run executes nothing"
+# Not every run.sh honours HPCPERF_DRY_RUN (the direct-launch ones ignore it), so the dry run must
+# never start run.sh or a benchmark at all. Shims for every way the engine starts a program
+# (env -i, timeout, mpirun/mpiexec/srun) record a sentinel and exit without running anything.
+SHIM="$TMP/shim"; SENT="$TMP/executed"; mkdir -p "$SHIM"
+for t in env timeout mpirun mpiexec srun; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 97\n' "$t" "$SENT" > "$SHIM/$t"; chmod +x "$SHIM/$t"
+done
+rm -f "$SENT"
+o1="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+o2="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level2.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+n1="$(printf '%s\n' "$o1" | /usr/bin/grep -c '^    command ')"; n2="$(printf '%s\n' "$o2" | /usr/bin/grep -c '^    command ')"
+r1="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level1_registry.tsv")"; r2="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level2_registry.tsv")"
+if [ -e "$SENT" ]; then
+    bad "14a: the registry dry run started a program: $(head -3 "$SENT" | tr '\n' ' ')"
+elif [ "$n1" != "$r1" ] || [ "$n2" != "$r2" ]; then
+    bad "14a: dry run planned $n1/$r1 Level 1 and $n2/$r2 Level 2 registry cases"
+elif [ -e "$TMP/dr/raw" ] || [ -e "$TMP/dr/res" ]; then
+    bad "14a: the dry run wrote raw or result directories"
+else
+    ok "14a: registry dry run planned all $n1 Level 1 + $n2 Level 2 inputs, started nothing, wrote nothing"
+fi
+# positive control: the same shims DO see a real (non-dry) run -- which they stop before any program runs
+rm -f "$SENT"
+PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --collector none --no-profile --no-summary \
+    --clean-runs 1 --raw-root "$TMP/dr2/raw" --results-root "$TMP/dr2/res" daxpy/"$(/usr/bin/awk -F'\t' '!/^#/ && $1=="daxpy" {print $2; exit}' "$TOOLS/cases/level1_registry.tsv")" >/dev/null 2>&1
+[ -s "$SENT" ] && ok "14b: positive control -- a non-dry run is caught by the shims ($(head -1 "$SENT" | cut -c1-40)...)" \
+               || bad "14b: the shims did not see a non-dry run; 14a proves nothing"
+
+echo "=== 15: registered-input report (registry_view.py + report.py)"
+# Synthetic records of the REAL registry's remhos periodic-hexagon-p0 (current definition: -o 3) and
+# miniem darcy-hex: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
+# record plus a 2-run adaptive extension of the same configuration, a newer 3-run record built from
+# another binary (a separate measurement), and a failed MiniEM attempt.
+pycheck "15a-15h: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import hpcperf_inputs as hi, report, registry_view as RV
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "rv"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "remhos")); cur = hi.registry_identity(doc, hi.get_input(doc, "periodic-hexagon-p0"))
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+PLAT = "test-platform"
+def rec(run_id, wl, argv, runs, exe_sha="aa", commit="c0ffee", app="remhos", case="periodic-hexagon-p0", status="ok",
+        invalid=False, sel="HPCPERF_REMHOS_INPUT", order=3):
+    raw = os.path.join(T, "raw", app, case, run_id); os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl, benchmark=app, input_id=case, selector=sel)
+    for i, v in enumerate(runs if status == "ok" else [None]):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        if status == "ok":
+            open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(f"   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {order}\n   --time-step 0.005\n")
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    if invalid:
+        json.dump({"reason": "test: another workload"}, open(f"{raw}/INVALIDATED.json", "w"))
+    import statistics
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": case, "status": status, "run_id": run_id,
+         "utc": "2026-01-01T00:00:%02dZ" % int(run_id[-2:]), "platform": PLAT,
+         "registry": {"input_id": case, "identity": ident, "identity_complete": True, "identity_sha256": "id-" + json.dumps(wl, sort_keys=True)[:40]},
+         "inputs": {"declared_env": {sel: case}, "processes": [], "exe_sha256": exe_sha},
+         "roi": {"runs_s": runs if status == "ok" else [], "wall_s": statistics.median(runs) if status == "ok" else None},
+         "measurement": {"protocol": {"warmup_runs": 0, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+         "device": None, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": commit}, "caveats": []}
+    os.makedirs(f"{root}/level2/{app}/{case}", exist_ok=True)
+    json.dump(r, open(f"{root}/level2/{app}/{case}/{run_id}.json", "w"))
+rec("run01", old_wl, ["-o", "2"] + base, [1.50, 1.52, 1.51], commit="old0001", order=2)          # SUPERSEDED
+rec("run02", cur["workload"], ["-o", "2"] + base, [1.40, 1.41, 1.42], invalid=True, commit="bad0002", order=2)  # INVALIDATED
+rec("run03", cur["workload"], base + ["-o", "3"], [2.72, 2.40, 2.38])                               # current, 3 runs
+rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                                     # adaptive +2, same config
+rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
+json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
+           "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
+          open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
+ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "darcy-hex"))
+rec("run06", mcur["workload"], [], [], app="miniem", case="darcy-hex", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
+bad = []
+b1 = report.build_bundle([root]); b2 = report.build_bundle([root])
+if json.dumps(b1, sort_keys=True) != json.dumps(b2, sort_keys=True): bad.append("15a: two builds differ")
+c = b1["campaigns"][0]
+if c["kind"] != "registry": bad.append("15b: registry records not rendered as the registry view")
+rows = {i["input_id"]: i for a in c["levels"]["2"] for i in a["inputs"]}
+nreg = sum(1 for x in RV.registered_inputs(R) if x["level"] == 2)
+if len(rows) != nreg: bad.append(f"15c: {len(rows)} Level 2 inputs listed, registry has {nreg}")
+h = rows["periodic-hexagon-p0"]; m = h["cells"].get(PLAT)
+if not m or m["set"]["run_ids"] != ["run05"]:
+    bad.append(f"15d: current should be the newest configuration run05 (another binary is a separate measurement): {m and m['set']['run_ids']}")
+sets = {tuple(s["run_ids"]): s for s in h["sets"]}
+p = sets.get(("run03", "run04"))
+if not p or p["n"] != 5 or abs(p["median"] - 2.39) > 1e-9: bad.append(f"15e: adaptive 3+2 not pooled into 5 samples: {p}")
+if sets.get(("run01",), {}).get("verdict") != "SUPERSEDED" or sets[("run01",)]["current_definition"]: bad.append("15f: old definition not SUPERSEDED")
+if sets[("run01",)].get("vs_previous") is not None or p.get("vs_previous") is not None:
+    bad.append("15f: vs previous computed across workload definitions")
+if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.append("15f: vs previous missing between same-workload measurements")
+if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
+    bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
+f = rows["darcy-hex"]
+if f["status"] != "RUN_FAILED" or any(f["cells"].values()): bad.append(f"15h: failed input: status {f['status']}")
+if m and (m.get("device") is not None or m["roi"].get("profiler_inflation") is not None): bad.append("15h: no-profile fields not null")
+if c["counts"]["roi_success"]["level2"] != 1: bad.append(f"15h: counts {c['counts']['roi_success']}")
+report.write([root], os.path.join(T, "page"))
+md = open(os.path.join(T, "page", "README.md")).read()
+if "darcy-hex**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if command -v node >/dev/null 2>&1; then
+    printf '%s\n' '[{"name":"15i overview","level":"2","expect":["1 ROI timing SUCCESS"]},
+ {"name":"15i hexagon","level":"2","app":"remhos","input":"periodic-hexagon-p0","platform":"test-platform","expect":["run05","SUPERSEDED","INVALIDATED","earlier definition","Where the process spends its time","Device activity inside the ROI","no collector observed this run","Runs of this input"]},
+ {"name":"15i failed","level":"2","app":"miniem","input":"darcy-hex","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
+    out="$(node "$HERE/page_smoke.js" "$TMP/rv/page/index.html" "$TMP/rv/checks.json" 2>&1)"
+    [ $? -eq 0 ] && ok "15i: the page's own script renders the synthetic campaign (DOM shim, $(echo "$out" | grep -c '^ok') checks)" \
+                 || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"
+else
+    skip "15i: node not available for the page smoke test"
+fi
+
+echo "=== 16: pooling needs an explicit measurement group"
+pycheck "16a-16h: linked 3+2 -> 5; unlinked 3+3 -> 2; other campaign -> 2; inconsistent or malformed group refused; duplicate record -> once" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import registry_view as RV
+T = os.path.join(os.environ["TMP"], "rg")
+def rec(root, run_id, runs, exe="aa", ident="id1", warm=0, verdict="PASS"):
+    return {"schema": "hpcperf-timing-2", "level": 2, "app": "app", "case": "in", "run_id": run_id, "status": "ok", "utc": run_id,
+            "platform": "p", "registry": {"identity_sha256": ident, "identity": {"workload": {"k": ident}}},
+            "inputs": {"exe_sha256": exe}, "provenance": {"git_commit": "c"},
+            "measurement": {"protocol": {"warmup_runs": warm, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+            "roi": {"runs_s": runs}, "_root": os.path.realpath(root), "_verdict": verdict, "_path": os.path.join(root, run_id)}
+def grp(root, base, ext):
+    return {"id": f"{base}+{ext}", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": [ext],
+            "_root": os.path.realpath(root)}
+A, B = os.path.join(T, "campaignA"), os.path.join(T, "campaignB")
+bad = []
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])], [grp(A, "r1", "r2")])
+if [len(m["samples"]) for m in sets] != [5] or not sets[0]["adaptive"] or pr:
+    bad.append(f"16a linked 3+2: {[m['run_ids'] for m in sets]} {pr}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r3", [1.0, 1.1, 1.2])], [])
+if [len(m["samples"]) for m in sets] != [3, 3] or any(m["adaptive"] for m in sets):
+    bad.append(f"16b unlinked, same configuration, same campaign: {[m['run_ids'] for m in sets]}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(B, "r9", [1.0, 1.1, 1.2])], [grp(A, "r1", "r9")])
+if [len(m["samples"]) for m in sets] != [3, 3] or not pr:
+    bad.append(f"16c other campaign, same configuration (even with a cross-directory link): {[m['run_ids'] for m in sets]} {pr}")
+for label, other in (("binary", dict(exe="bb")), ("workload", dict(ident="id2")), ("protocol", dict(warm=1))):
+    sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r2", [1.1, 1.1], **other)], [grp(A, "r1", "r2")])
+    if [len(m["samples"]) for m in sets] != [3, 2] or not pr or "not pooled" not in pr[0]:
+        bad.append(f"16d linked but different {label}: {[m['run_ids'] for m in sets]} {pr}")
+# a malformed member list is rejected as a whole, never repaired: no sample counted twice
+def g2(base, ext):
+    return {"id": "bad", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": ext, "_root": os.path.realpath(A)}
+three, two = rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])
+for label, g, reason in (("16f extension listed twice", g2("r1", ["r2", "r2"]), "more than once"),
+                         ("16g base listed as an extension", g2("r1", ["r1", "r2"]), "base run id is also listed"),
+                         ("16h missing base", g2("", ["r2"]), "base_run_id"),
+                         ("16h empty extension list", g2("r1", []), "extension_run_ids"),
+                         ("16h extension list not a list", g2("r1", "r2"), "extension_run_ids")):
+    sets, pr = RV.measurements([three, two], [g])
+    if sorted(len(m["samples"]) for m in sets) != [2, 3] or not pr or reason not in pr[0] or any(m["adaptive"] for m in sets):
+        bad.append(f"{label}: {[len(m['samples']) for m in sets]} {pr}")
+# the same record under two roots (a copied results directory): loaded once
+for root in (A, B):
+    d = os.path.join(root, "level2", "app", "in"); os.makedirs(d, exist_ok=True)
+    r = rec(root, "r1", [1.0, 1.1, 1.2])
+    for k in ("_root", "_verdict", "_path"):
+        r.pop(k)
+    json.dump(r, open(os.path.join(d, "r1.json"), "w"))
+recs, dups = RV.load_records([A, B])
+if len(recs) != 1 or len(dups) != 1:
+    bad.append(f"16e duplicate record: {len(recs)} loaded, {len(dups)} duplicates")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 17: input-file identity through declared copies and logged reads (MiniEM-like)"
+pycheck "17a-17e: copies with the registered content pass; changed deck / changed solver config / unlogged config do not" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "fi"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/me/src/decks/deck.xml", "<deck/>\n"); w(f"{R}/level2/me/src/decks/solver.xml", "<solver/>\n")
+w(f"{R}/build/level2/me/exe", "")
+rules = {1: {}, 2: {"me": {"copy_dirs": {"src/decks": "build/level2/me/decks"}, "logged_reads": r"^Loading solver config from (\S+)$"}}}
+files = {"src/decks/deck.xml": V.sha(f"{R}/level2/me/src/decks/deck.xml"), "src/decks/solver.xml": V.sha(f"{R}/level2/me/src/decks/solver.xml")}
+n = [0]
+def case(deck, solver, logged=True):
+    n[0] += 1
+    w(f"{R}/build/level2/me/decks/deck.xml", deck); w(f"{R}/build/level2/me/decks/solver.xml", solver)
+    V._sha_cache.clear()
+    raw = f"{T}/raw/{n[0]}"; cwd = f"{R}/build/level2/me/decks"
+    ident = {"benchmark": "me", "input_id": "x", "complete": True, "selector": "SEL", "arg_files_sha256": {},
+             "workload": {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": files}}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{i}", f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {R}/build/level2/me/exe\ncwd {cwd}\n"
+          f"argv {json.dumps([R + '/build/level2/me/exe', '--inputFile=deck.xml'])}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "Loading solver config from solver.xml\n" if logged else "\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "me", "case": "x", "status": "ok", "run_id": f"r{n[0]}",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"SEL": "x"}},
+         "roi": {"runs_s": [1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(r))
+    return V.verify_record(p, R, rules)
+bad = []
+v = case("<deck/>\n", "<solver/>\n")
+if v["verdict"] != "PASS" or not any("declared copy" in e for e in v["evidence"]):
+    bad.append(f"17a identical copies: {v['verdict']} {v['problems'] + v['gaps']}")
+v = case("<deck changed='1'/>\n", "<solver/>\n")
+if v["verdict"] != "FAIL" or "deck.xml" not in " ".join(v["problems"]):
+    bad.append(f"17b changed deck, same name and argv: {v['verdict']}")
+v = case("<deck/>\n", "<solver changed='1'/>\n")
+if v["verdict"] != "FAIL" or "solver.xml" not in " ".join(v["problems"]):
+    bad.append(f"17c changed solver config: {v['verdict']}")
+v = case("<deck/>\n", "<solver/>\n", logged=False)
+if v["verdict"] != "INSUFFICIENT" or "solver.xml" not in " ".join(v["gaps"]):
+    bad.append(f"17d solver config not named by the run: {v['verdict']}")
+old = {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": {}}
+if V.files_added(old, dict(old, files_sha256=files)) != files or V.files_added(old, dict(old, params={"a": 1})) is not None:
+    bad.append("17e files_added does not isolate an added-files-only change")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if [ -f "$REPO/build/level2/miniem/cuda/decks/maxwell-large.xml" ]; then
+pycheck "17f: MiniEM record measured before its files were registered: INSUFFICIENT without a complete, bound supplement" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "fm"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "miniem")); cur = hi.registry_identity(doc, hi.get_input(doc, "maxwell-large-weak48"))
+ident = json.loads(json.dumps(cur)); ident["workload"]["files_sha256"] = {}          # as captured before the files were registered
+exe = f"{R}/build/level2/miniem/cuda/PanzerMiniEM_BlockPrec"; cwd = f"{R}/build/level2/miniem/cuda/decks"
+raw = os.path.join(T, "raw")
+for i in range(3):
+    d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+    open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {cwd}\nargv " + json.dumps([exe,
+        "--inputFile=maxwell-large.xml", "--solver=MueLu", "--linAlgebra=Tpetra", "--numTimeSteps=3", "--x-elements=48",
+        "--y-elements=48", "--z-elements=48", "--stacked-timer"]) + "\nB 1 1\nE 2 2\n")
+    open(f"{d}/run.log", "w").write("Loading solver config from solverMueLu.xml\nLoading solver config from solverMueLuCuda.xml\n")
+json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+os.makedirs(f"{root}/level2/miniem/maxwell-large-weak48", exist_ok=True)
+p = f"{root}/level2/miniem/maxwell-large-weak48/rX.json"
+json.dump({"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-large-weak48", "status": "ok", "run_id": "rX",
+           "registry": {"identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-large-weak48"}},
+           "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}, open(p, "w"))
+rules = V.load_rules(V.DEFAULT_RULES)
+bad = []
+v = V.verify_record(p, R, rules)
+if v["verdict"] != "INSUFFICIENT" or v["file_identity"] != "insufficient":
+    bad.append(f"no supplement: {v['verdict']} {v['file_identity']}")
+full = {"level": 2, "app": "miniem", "case": "maxwell-large-weak48", "run_id": "rX", "files_sha256": cur["workload"]["files_sha256"],
+        "basis": "test basis", "evidence": ["test source"], "record_sha256": V.sha(p), "raw_dir": os.path.relpath(raw, R)}
+def with_sup(entry, schema="hpcperf-file-identity-supplement-1"):
+    json.dump({"schema": schema, "records": [entry]}, open(f"{root}/{V.SUPPLEMENT}", "w"))
+    return V.verify_record(p, R, rules)
+for label, entry, schema in (
+        ("hashes differ from the registry", dict(full, files_sha256=dict(full["files_sha256"], **{"src/decks/solverMueLu.xml": "0" * 64})), None),
+        ("identity + current hashes only, no basis / evidence", {k: full[k] for k in ("level", "app", "case", "run_id", "files_sha256")}, None),
+        ("empty basis", dict(full, basis=" "), None),
+        ("no evidence sources", dict(full, evidence=[]), None),
+        ("not bound to the record (record_sha256)", dict(full, record_sha256="0" * 64), None),
+        ("not bound to the raw runs (raw_dir)", dict(full, raw_dir="elsewhere"), None),
+        ("wrong schema", full, "other-schema")):
+    v = with_sup(entry, schema or "hpcperf-file-identity-supplement-1")
+    if v["verdict"] == "PASS" or v["file_identity"] != "insufficient":
+        bad.append(f"a supplement with {label} was accepted: {v['verdict']} {v['file_identity']}")
+v = with_sup(full)
+if v["verdict"] != "PASS" or v["file_identity"] != "supplement":
+    bad.append(f"complete matching supplement: {v['verdict']} {v['problems'] + v['gaps']}")
+if json.load(open(f"{raw}/workload_identity.json"))["workload"]["files_sha256"] != {}:
+    bad.append("the stored identity was changed")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+else
+    skip "17f: MiniEM build decks not present"
+fi
 
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"

@@ -1,0 +1,110 @@
+# Registered inputs of mg (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: mg
+level: 1
+selector: null
+default_input: class-b
+entry:
+  kind: binary
+  path: build/mg/cuda/mg_cuda
+timing:
+  scope: NPB's own timer of the benchmark's timed section (class B; printed with 2 decimals)
+  kind: total
+  unit: s
+  regex: ^\s*Time in seconds\s*=\s*(?P<value>[0-9.]+)
+  select: only
+baseline:
+  method: 'built-in NPB verification against the class reference value: ''Verification = SUCCESSFUL'''
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: verification
+    role: required
+    regex: Verification\s+=\s+SUCCESSFUL
+    compare:
+      rule: present
+  - name: verification_fail
+    role: required
+    regex: Verification\s+=\s+UNSUCCESSFUL
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    classes A, B and C are materialized (B in the default build directory, A and C through
+    tools/inputs/npb_materialize_class.sh with the class headers under inputs/); the class is a
+    compile-time upstream problem size
+  upstream_inputs_not_added:
+  - CLASS=S and W (upstream's tiny sanity classes, below the timer resolution)
+  - CLASS=D and E (upstream's large classes, not attempted within the single-GPU budget)
+inputs:
+- id: class-b
+  case: npb-mg
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: NPB MultiGrid CLASS=B (npbparams.hpp pre-generated with upstream sys/setparams; = ctest)
+  params:
+    class: B
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: B
+    npbparams: level1/mg/cuda npbparams.hpp for B
+  backends_validated:
+  - cuda
+  input_form: compile-time
+- id: class-a
+  case: npb-mg
+  variant: build-config
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: "NPB class A (upstream problem class; npbparams.hpp regenerated from the sys/setparams class table -> inputs/npbparams.A.hpp)"
+  params:
+    class: A
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: A
+    npbparams: level1/mg/inputs/npbparams.A.hpp
+    build_dir: build/mg/cuda-classA
+    materialize: tools/inputs/npb_materialize_class.sh mg A
+  binary: build/mg/cuda-classA/mg_cuda
+  backends_validated:
+  - cuda
+  notes: materialized as a separate build directory (the vendored sources with the class-A header); the
+    class verification constants inside the port check the result
+  input_form: compile-time
+- id: class-c
+  case: npb-mg
+  variant: build-config
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: GMAP/NPB-GPU
+      version: 3f12d84920ee315ab00ef283717c1e74b68f4d00
+      path: "NPB class C (upstream problem class; npbparams.hpp regenerated from the sys/setparams class table -> inputs/npbparams.C.hpp)"
+  params:
+    class: C
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config:
+    CLASS: C
+    npbparams: level1/mg/inputs/npbparams.C.hpp
+    build_dir: build/mg/cuda-classC
+    materialize: tools/inputs/npb_materialize_class.sh mg C
+  binary: build/mg/cuda-classC/mg_cuda
+  backends_validated:
+  - cuda
+  notes: materialized as a separate build directory (the vendored sources with the class-C header); the
+    class verification constants inside the port check the result
+  input_form: compile-time

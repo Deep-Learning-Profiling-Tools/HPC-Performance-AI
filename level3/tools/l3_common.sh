@@ -447,3 +447,7 @@ l3_binary_backend_check() {
     esac
     return 0
 }
+
+# Registered-input selector shared by every run.sh (tools/inputs/README.md)
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../tools/inputs" && pwd)/hpcperf_input_selector.sh"
