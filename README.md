@@ -2,7 +2,12 @@
 
 An End-to-End AI Framework for Performance Prediction and Optimization in HPC Applications
 
-## Benchmark Levels
+> 📈 **Timing results:** [interactive page](docs/timing/index.html) · [table view](docs/timing/README.md)
+> -- region-of-interest time of every registered Level 1 / Level 2 input, with its samples, stability,
+> run verification and correctness status. GitHub shows `index.html` as source: open the table view here,
+> or download `docs/timing/index.html` and open it in a browser.
+
+## 🧱 Benchmark Levels
 
 | Level | Content | Status |
 |-------|---------|--------|
@@ -24,7 +29,7 @@ of framework libraries built inside the clone by `./setup_level2_deps.sh`.
 See [level2/README.md](level2/README.md) for the catalog and the Level 2
 environment additions.
 
-## Quick Start (fresh clone)
+## 🚀 Quick Start (fresh clone)
 
 ```bash
 git clone https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI.git
@@ -49,7 +54,7 @@ cmake -S . -B build/all -DBACKEND=CUDA -DCMAKE_BUILD_TYPE=Release
 cmake --build build/all -j
 ```
 
-## Contributing
+## 🤝 Contributing
 
 > **All collaborators must follow the contribution workflow: create a
 > `<scope>/<short-description>` branch from the latest `main` and open a pull
@@ -57,7 +62,7 @@ cmake --build build/all -j
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming and pull request guidelines.
 
-## Environment
+## 🖥️ Environment
 
 The suite was validated with the following configuration. Everything in the
 first table is **installed automatically by `./setup_env.sh`** -- versions are
@@ -101,7 +106,7 @@ install it once per machine before running `setup_env.sh`:
 `./check_env.sh` prints exactly how the current machine compares against this
 validated configuration.
 
-## Reproducibility Guarantee
+## 🔒 Reproducibility Guarantee
 
 A fresh `git clone` on any Linux x86_64 machine with the GPU prerequisites
 above gets the **same configuration this suite was validated with**, via a
@@ -135,7 +140,7 @@ toolchain. The GPU stack (driver / CUDA toolkit / GPU model) is taken from the
 host machine and is a prerequisite, not something this repository installs;
 `check_env.sh` shows how the host's GPU stack differs from the validated one.
 
-## What the scripts do
+## ⚙️ What the scripts do
 
 - `setup_env.sh` -- one-time, idempotent: finds or bootstraps conda, creates
   the project-local env `.conda_env/` from the pinned `environment.yml`,
@@ -172,7 +177,7 @@ host machine and is a prerequisite, not something this repository installs;
   need no GPU execution (topology, dependency markers, launcher dry-run
   parsing, run.sh interface guards).
 
-## Validation
+## ✅ Validation
 
 Every Level 1 benchmark ships a correctness check, run via `ctest`: either the
 upstream's built-in verification (e.g. NPB reference sums, HeCBench CPU
@@ -180,12 +185,13 @@ references) or an added independent reference (CPU re-computation, documented
 per benchmark). "Working" in the catalog means configure + build + run +
 validation all passed on the machine above.
 
-## Runtime measurement
+## ⏱️ Runtime measurement
 
 `tools/timing/` measures each Level 1 benchmark and Level 2 mini-application over its
 **region of interest** -- the computation marked in its source, without start-up,
 set-up, warm-up and verification -- and records the device activity inside it, per
 (application, input, platform). Results go to `results/timing/` (not in git); the
-interactive results page is published in [docs/timing/](docs/timing/). Start with
+published results are [docs/timing/index.html](docs/timing/index.html) (interactive page, open in a
+browser) and [docs/timing/README.md](docs/timing/README.md) (the same results as tables). Start with
 [tools/timing/DESIGN.md](tools/timing/DESIGN.md) (what changed, why, interfaces) and
 [tools/timing/README.md](tools/timing/README.md) (method).
