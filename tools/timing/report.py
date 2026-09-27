@@ -447,9 +447,10 @@ def render_md_registry(c):
     for lvl in ("1", "2"):
         out += [f"### {LEVEL_NAMES[int(lvl)]}", ""]
         head = ["application", "input", "status", "platform", "ROI median", "samples", "spread", "CV", "stable",
-                "run verification", "correctness", "source"]
+                "device busy", "kernels in ROI", "profiler x", "run verification", "correctness", "source"]
         out.append("| " + " | ".join(head) + " |")
-        out.append("|" + "|".join("---" if i < 4 else "--:" if i < 8 else "---" for i in range(len(head))) + "|")
+        out.append("|" + "|".join("---" if i < 4 else "--:" if i < 8 else "---" if i == 8 else "--:" if i < 12 else "---"
+                                  for i in range(len(head))) + "|")
         for a in c["levels"].get(lvl, []):
             for i in a["inputs"]:
                 cells = [(pid, run) for pid, run in sorted(i["cells"].items()) if run]
@@ -463,6 +464,9 @@ def render_md_registry(c):
                         str(st["n"]) + (" (3+2 adaptive)" if st["adaptive"] else "") if st else "-",
                         md_pct(st["spread"], 1) if st else "-", md_pct(st["cv"], 1) if st else "-",
                         ("yes" if st["stable"] else "UNSTABLE") if st else "-",
+                        md_pct((run.get("device") or {}).get("busy_frac_of_roi"), cap=True) if run else "-",
+                        ("null" if (run.get("device") or {}).get("compute_ops") is None else f"{run['device']['compute_ops']:,}") if run else "-",
+                        ("null" if run["roi"].get("profiler_inflation") is None else f"{run['roi']['profiler_inflation']:.2f}") if run else "-",
                         str(i["run_verification"] or "-"), str(i["correctness"] or "none"),
                         st["git_commit"] if st else "-"]) + " |")
         out.append("")

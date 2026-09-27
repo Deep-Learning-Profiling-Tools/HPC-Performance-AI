@@ -23,9 +23,9 @@ campaign (section [Registered inputs](#registered-inputs---registry) below):
 
 ```bash
 python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
-tools/timing/measure_level1.sh --registry --no-profile --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean, no profiler
-tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 all              # 0 warm-up + 3 clean, no profiler
-tools/timing/measure_level2.sh --registry --no-profile --clean-runs 2 <app>/<input> ... # adaptive +2 (see below)
+tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
+tools/timing/measure_level2.sh --registry --collector nvidia_nsys --clean-runs 3 all              # 0 warm-up + 3 clean + 1 nsys profiled
+tools/timing/measure_level2.sh --registry --collector nvidia_nsys --clean-runs 2 <app>/<input> ... # adaptive +2 (see below)
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
 python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
@@ -154,7 +154,8 @@ cases of `cases/` x platforms, `null` for a combination never measured, the late
 its device activity per category, top operations, runtime API calls, application timer, launcher audit,
 conformance, input as run, caveats and the run history.
 
-**No profiler, no device numbers.** A run without a collector (`--no-profile`, as in campaign B) has
+**No profiler, no device numbers.** A run without a collector (`--no-profile`, as in the first,
+no-profile pass of campaign B on 2026-09-23/24, kept as history) has
 device busy, host gap, time / ops / bytes per category, kernel and operation counts, runtime-API calls
 and profiler inflation `null` ("not collected"), never 0 and never copied from another run.
 
@@ -265,10 +266,14 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   it is evidence of a bug and never a result of anything. A *superseded* record is a correct measurement
   of an earlier definition of the input (e.g. remhos `periodic-hexagon-p0` before order 3 was made
   explicit): valid history of that workload, but not of the current one, and never compared with it.
-* **Protocol of campaign B.** Level 1: 1 warm-up + 5 clean runs, no profiler (`HPCPERF_SKIP_VERIFY=1`, as
-  in A). Level 2: no whole-process warm-up, 3 clean runs, no profiler. **Adaptive extension**: a Level 2
-  input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more clean runs of the
-  same configuration, run as a separate invocation (`measure_level2.sh --registry --no-profile
+* **Protocol of campaign B.** The current results (phase 5, 2026-09-26/27) follow the PR #14 structure:
+  Level 1: 1 warm-up + 5 clean runs + 1 nsys-profiled run (`HPCPERF_SKIP_VERIFY=1`, as in A); Level 2: no
+  whole-process warm-up, 3 clean runs + 1 nsys-profiled run. The ROI time comes from the clean runs, the
+  device activity from the profiled run of the same measurement. An earlier no-profile pass (2026-09-23/24)
+  is kept as history: a different protocol, so a separate measurement of each input. **Adaptive
+  extension**: a Level 2 input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more
+  clean runs of the same configuration -- including the profiled run, so both records are one measurement
+  configuration -- run as a separate invocation (`measure_level2.sh --registry --collector nvidia_nsys
   --clean-runs 2 <app>/<input>`); the front-ends do not do this by themselves -- the campaign script
   selects the inputs after the first pass and records each extension as a measurement group with its
   evidence (the campaign's decision line and both invocations' run ids and protocols). The report pools
