@@ -4,14 +4,14 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs, ROI campaign 2026-09-23..27
 
-Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 registered Level 1 / Level 2 inputs: ROI timing SUCCESS for 134 + 89, run failed for 0, not measured 0; run verification PASS for 223; UNSTABLE 18. Level 3: 43 registered inputs without ROI support (earlier native timing only).
+Measured 2026-09-23T18:04:11Z .. 2026-09-27T03:48:48Z (489 records). 134 + 89 registered Level 1 / Level 2 inputs: ROI timing SUCCESS for 134 + 89, run failed for 0, not measured 0; run verification PASS for 223; UNSTABLE 3. Level 3: 43 registered inputs without ROI support (earlier native timing only).
 
-- Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (current results, phase 5)
-- Level 2 protocol: 0 warm-up + 3 clean runs + 1 nsys profiled run; +2 clean runs of the same configuration when (max-min)/median > 10 % after 3 (campaign script, measurement group)
+- Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median)
+- Level 2 protocol: 0 warm-up + 3 clean runs + 1 nsys profiled run, +2 clean runs of the same configuration when (max-min)/median > 10 % after 3 (phase 5); the 4 inputs UNSTABLE there (first clean run off) were measured again with 1 whole-process warm-up + 3 clean + 1 profiled (phase 6)
 - one NVIDIA B200 (GPU 0), CUDA 13.2, Nsight Systems 2025.6.3; one measurement at a time
 - the ROI time comes from the clean runs; device activity (busy, host gap, operations, runtime-API calls) from the one nsys-profiled run of the same measurement. Earlier no-profile measurements (2026-09-23/24) are kept as history and have these fields null
 - 43 registered Level 3 inputs: no ROI markers yet -- they keep their earlier native timing only
-- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); CV = sample stddev / median. An adaptive extension (+2 runs) is pooled with its 3 runs only through an explicit measurement group; runs of the same configuration without one stay separate measurements.
+- Spread = (max - min) / median of all clean-run samples; CV = sample stddev / median. Stable: spread <= 10 % for fewer than 10 samples; IQR / median <= 5 % for 10 samples or more (the range grows with the sample count, the IQR does not). 'two levels': the samples fall into two groups (a gap > 5 % of the median, >= 20 % on each side). An adaptive extension (+2 runs) is pooled with its 3 runs only through an explicit measurement group; runs of the same configuration without one stay separate measurements.
 - Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification (did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness (evidence from outside the timing runs; its basis is given per input in index.html).
 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
@@ -25,6 +25,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 - MiniEM: seven records of 2026-09-23 are BUILD_NOT_MATERIALIZED attempts (Trilinos not yet built); the inputs were measured after the build (2026-09-24).
 - MiniEM decks maxwell-bdot-small / maxwell-bdot-medium / maxwell-blob-R1 were removed from the registry on 2026-09-26 (they do not run with this driver: unnamed equation-set list, Exodus meshes not distributed); their failed attempt records stay in the results as raw evidence and are no longer listed as inputs.
 - Phase 5 (2026-09-26/27, HEAD e8be61b): every registered Level 1 / Level 2 input measured again with the nsys collector, the PR #14 structure (clean runs for the ROI time, one profiled run for device activity). These are the current results; the no-profile measurements of 2026-09-23/24 are kept as history (a different protocol, a separate measurement per input).
+- Phase 6 (2026-09-27, HEAD bd28f8a): the 18 inputs UNSTABLE in phase 5 measured again -- Level 2 with one whole-process warm-up (all 4 stable), Level 1 with 20 clean runs judged by IQR/median &lt;= 5 % (11 of 14 stable). The phase-5 measurements of these inputs are kept as history.
 
 ### Level 1
 
@@ -41,11 +42,11 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | atomic_reduction | default | SUCCESS | nvidia-b200.cuda13.2 | 168 ms | 5 | 0.0% | 0.0% | yes | 97% | 2,000 | 1.02 | PASS | PASS | e8be61b03f |
 | background_subtraction | w4096-h2048-merged0-r102 | SUCCESS | nvidia-b200.cuda13.2 | 74.8 ms | 5 | 5.0% | 2.0% | yes | 87% | 300 | 1.02 | PASS | PASS | e8be61b03f |
 | background_subtraction | w4096-h2048-merged1-r102 | SUCCESS | nvidia-b200.cuda13.2 | 70.4 ms | 5 | 2.2% | 1.0% | yes | 86% | 100 | 1.03 | PASS | PASS | e8be61b03f |
-| background_subtraction | w8192-h4096-merged0-r102 | SUCCESS | nvidia-b200.cuda13.2 | 315 ms | 5 | 10.5% | 3.9% | UNSTABLE | 100% | 300 | 1.06 | PASS | PASS | e8be61b03f |
-| background_subtraction | w4096-h2048-merged0-r1002 | SUCCESS | nvidia-b200.cuda13.2 | 580 ms | 5 | 10.8% | 4.4% | UNSTABLE | 89% | 3,000 | 1.03 | PASS | PASS | e8be61b03f |
-| backprop | n65536 | SUCCESS | nvidia-b200.cuda13.2 | 1.43 ms | 5 | 29.7% | 14.2% | UNSTABLE | 48% | 2 | 1.14 | PASS | PASS | e8be61b03f |
-| backprop | n262144 | SUCCESS | nvidia-b200.cuda13.2 | 3.84 ms | 5 | 31.6% | 14.7% | UNSTABLE | 90% | 2 | 1.35 | PASS | PASS | e8be61b03f |
-| backprop | n524288 | SUCCESS | nvidia-b200.cuda13.2 | 9.41 ms | 5 | 25.3% | 12.1% | UNSTABLE | 94% | 2 | 1.29 | PASS | PASS | e8be61b03f |
+| background_subtraction | w8192-h4096-merged0-r102 | SUCCESS | nvidia-b200.cuda13.2 | 303 ms | 20 | 21.8% | 5.4% | UNSTABLE | 100% | 300 | 1.12 | PASS | PASS | bd28f8ad09 |
+| background_subtraction | w4096-h2048-merged0-r1002 | SUCCESS | nvidia-b200.cuda13.2 | 590 ms | 20 | 22.1% | 6.0% | UNSTABLE | 98% | 3,000 | 1.15 | PASS | PASS | bd28f8ad09 |
+| backprop | n65536 | SUCCESS | nvidia-b200.cuda13.2 | 1.44 ms | 20 | 391.5% | 82.6% | UNSTABLE | 80% | 2 | 1.81 | PASS | PASS | bd28f8ad09 |
+| backprop | n262144 | SUCCESS | nvidia-b200.cuda13.2 | 4.54 ms | 20 | 20.5% | 7.2% | yes (two levels) | 67% | 2 | 1.06 | PASS | PASS | bd28f8ad09 |
+| backprop | n524288 | SUCCESS | nvidia-b200.cuda13.2 | 9.29 ms | 20 | 24.1% | 4.8% | yes | 72% | 2 | 1.03 | PASS | PASS | bd28f8ad09 |
 | bezier_surface | n8192 | SUCCESS | nvidia-b200.cuda13.2 | 62.8 ms | 5 | 0.2% | 0.1% | yes | 100% | 1 | 1.00 | PASS | PASS | e8be61b03f |
 | bezier_surface | n300 | SUCCESS | nvidia-b200.cuda13.2 | 2.39 ms | 5 | 0.5% | 0.2% | yes | 95% | 1 | 1.03 | PASS | PASS | e8be61b03f |
 | bfs | graph65536 | SUCCESS | nvidia-b200.cuda13.2 | 455 us | 5 | 4.7% | 1.8% | yes | 28% | 20 | 1.25 | PASS | INCOMPLETE | e8be61b03f |
@@ -58,9 +59,9 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | bitonic_sort | exp25 | SUCCESS | nvidia-b200.cuda13.2 | 31.5 ms | 5 | 0.0% | 0.0% | yes | 99% | 325 | 1.00 | PASS | PASS | e8be61b03f |
 | bitonic_sort | exp22 | SUCCESS | nvidia-b200.cuda13.2 | 3.18 ms | 5 | 0.3% | 0.1% | yes | 95% | 253 | 1.01 | PASS | PASS | e8be61b03f |
 | bitonic_sort | exp27 | SUCCESS | nvidia-b200.cuda13.2 | 143 ms | 5 | 0.0% | 0.0% | yes | 100% | 378 | 1.00 | PASS | PASS | e8be61b03f |
-| black_scholes | x1048576 | SUCCESS | nvidia-b200.cuda13.2 | 5.91 ms | 5 | 13.3% | 5.6% | UNSTABLE | 24% | 512 | 1.15 | PASS | PASS | e8be61b03f |
-| black_scholes | x4194304 | SUCCESS | nvidia-b200.cuda13.2 | 23 ms | 5 | 14.6% | 7.0% | UNSTABLE | 25% | 2,048 | 1.14 | PASS | PASS | e8be61b03f |
-| black_scholes | x16777216 | SUCCESS | nvidia-b200.cuda13.2 | 95.2 ms | 5 | 14.0% | 5.9% | UNSTABLE | 28% | 8,192 | 1.17 | PASS | PASS | e8be61b03f |
+| black_scholes | x1048576 | SUCCESS | nvidia-b200.cuda13.2 | 5.98 ms | 20 | 2.7% | 0.7% | yes | 24% | 512 | 1.13 | PASS | PASS | bd28f8ad09 |
+| black_scholes | x4194304 | SUCCESS | nvidia-b200.cuda13.2 | 23.1 ms | 20 | 1.9% | 0.6% | yes | 39% | 2,048 | 1.47 | PASS | PASS | bd28f8ad09 |
+| black_scholes | x16777216 | SUCCESS | nvidia-b200.cuda13.2 | 95.2 ms | 20 | 26.6% | 10.2% | yes (two levels) | 28% | 8,192 | 1.17 | PASS | PASS | bd28f8ad09 |
 | block_scan | g2227104 | SUCCESS | nvidia-b200.cuda13.2 | 28.3 s | 5 | 0.0% | 0.0% | yes | 100% | 1,800 | 1.00 | PASS | PASS | e8be61b03f |
 | block_scan | g8908416 | SUCCESS | nvidia-b200.cuda13.2 | 113.3 s | 5 | 0.0% | 0.0% | yes | 100% | 1,800 | 1.00 | PASS | PASS | e8be61b03f |
 | burgers_equation | x8200-y8100-t100 | SUCCESS | nvidia-b200.cuda13.2 | 86.7 ms | 5 | 0.0% | 0.0% | yes | 100% | 400 | 1.00 | PASS | PASS | e8be61b03f |
@@ -69,14 +70,14 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | burrows_wheeler_transform | n10000000 | SUCCESS | nvidia-b200.cuda13.2 | 33.2 ms | 5 | 0.0% | 0.0% | yes | 100% | 301 | 1.00 | PASS | PASS | e8be61b03f |
 | burrows_wheeler_transform | n40000000 | SUCCESS | nvidia-b200.cuda13.2 | 177 ms | 5 | 0.0% | 0.0% | yes | 100% | 352 | 1.00 | PASS | PASS | e8be61b03f |
 | cg | class-b | SUCCESS | nvidia-b200.cuda13.2 | 230 ms | 5 | 0.2% | 0.1% | yes | 73% | 11,775 | 1.13 | PASS | PASS | e8be61b03f |
-| cg | class-a | SUCCESS | nvidia-b200.cuda13.2 | 23.3 ms | 5 | 12.3% | 5.1% | UNSTABLE | 44% | 2,355 | 1.34 | PASS | PASS | e8be61b03f |
+| cg | class-a | SUCCESS | nvidia-b200.cuda13.2 | 23.4 ms | 20 | 2.4% | 0.7% | yes | 44% | 2,355 | 1.34 | PASS | PASS | bd28f8ad09 |
 | cg | class-c | SUCCESS | nvidia-b200.cuda13.2 | 429 ms | 5 | 0.7% | 0.2% | yes | 84% | 11,775 | 1.06 | PASS | PASS | e8be61b03f |
 | channel_shuffle | g2-w224-h224 | SUCCESS | nvidia-b200.cuda13.2 | 2.21 s | 5 | 0.0% | 0.0% | yes | 100% | 2,400 | 1.00 | PASS | PASS | e8be61b03f |
 | channel_shuffle | g2-w512-h512 | SUCCESS | nvidia-b200.cuda13.2 | 1.53 s | 5 | 0.0% | 0.0% | yes | 100% | 1,600 | 1.00 | PASS | none | e8be61b03f |
 | channel_shuffle | g4-w224-h224 | SUCCESS | nvidia-b200.cuda13.2 | 2.21 s | 5 | 0.0% | 0.0% | yes | 100% | 2,400 | 1.00 | PASS | PASS | e8be61b03f |
-| color_histogram | x1048576 | SUCCESS | nvidia-b200.cuda13.2 | 522 us | 5 | 13.4% | 5.0% | UNSTABLE | 77% | 1 | 1.09 | PASS | PASS | e8be61b03f |
+| color_histogram | x1048576 | SUCCESS | nvidia-b200.cuda13.2 | 540 us | 20 | 6.5% | 1.8% | yes | 74% | 1 | 1.05 | PASS | PASS | bd28f8ad09 |
 | color_histogram | x4194304 | SUCCESS | nvidia-b200.cuda13.2 | 2 ms | 5 | 8.9% | 3.9% | yes | 92% | 1 | 1.01 | PASS | PASS | e8be61b03f |
-| color_histogram | x16777216 | SUCCESS | nvidia-b200.cuda13.2 | 7.71 ms | 5 | 15.0% | 6.9% | UNSTABLE | 99% | 1 | 1.01 | PASS | PASS | e8be61b03f |
+| color_histogram | x16777216 | SUCCESS | nvidia-b200.cuda13.2 | 7.76 ms | 20 | 2.5% | 0.6% | yes | 97% | 1 | 1.00 | PASS | PASS | bd28f8ad09 |
 | daxpy | size1000000 | SUCCESS | nvidia-b200.cuda13.2 | 2.06 ms | 5 | 1.3% | 0.5% | yes | 89% | 500 | 1.14 | PASS | PASS | e8be61b03f |
 | daxpy | size4000000 | SUCCESS | nvidia-b200.cuda13.2 | 5.32 ms | 5 | 0.4% | 0.2% | yes | 94% | 500 | 0.99 | PASS | PASS | e8be61b03f |
 | daxpy | size16000000 | SUCCESS | nvidia-b200.cuda13.2 | 32.6 ms | 5 | 0.0% | 0.0% | yes | 99% | 500 | 1.00 | PASS | PASS | e8be61b03f |
@@ -105,11 +106,11 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | gaussian_elimination | s4096 | SUCCESS | nvidia-b200.cuda13.2 | 2.3 s | 5 | 1.1% | 0.4% | yes | 97% | 8,190 | 1.01 | PASS | INCOMPLETE | e8be61b03f |
 | graph_coloring | nv200000 | SUCCESS | nvidia-b200.cuda13.2 | 6.37 ms | 5 | 1.1% | 0.5% | yes | 98% | 10 | 1.00 | PASS | PASS | e8be61b03f |
 | graph_coloring | nv1000000 | SUCCESS | nvidia-b200.cuda13.2 | 7.66 ms | 5 | 0.8% | 0.3% | yes | 98% | 10 | 1.00 | PASS | PASS | e8be61b03f |
-| histogram | w1920-h1080 | SUCCESS | nvidia-b200.cuda13.2 | 54.1 ms | 5 | 18.1% | 9.2% | UNSTABLE | 31% | 1,200 | 1.06 | PASS | PASS | e8be61b03f |
+| histogram | w1920-h1080 | SUCCESS | nvidia-b200.cuda13.2 | 63.1 ms | 20 | 1.7% | 0.6% | yes | 27% | 1,200 | 1.07 | PASS | PASS | bd28f8ad09 |
 | histogram | w3840-h2160 | SUCCESS | nvidia-b200.cuda13.2 | 68.1 ms | 5 | 2.7% | 1.4% | yes | 83% | 1,200 | 1.00 | PASS | PASS | e8be61b03f |
 | histogram | w7680-h4320 | SUCCESS | nvidia-b200.cuda13.2 | 203 ms | 5 | 1.1% | 0.4% | yes | 93% | 1,200 | 1.01 | PASS | PASS | e8be61b03f |
 | hotspot | g512-p2-t2 | SUCCESS | nvidia-b200.cuda13.2 | 136 us | 5 | 9.7% | 3.9% | yes | 4% | 1 | 1.35 | PASS | INCOMPLETE | e8be61b03f |
-| hotspot | g512-p2-t20 | SUCCESS | nvidia-b200.cuda13.2 | 188 us | 5 | 10.2% | 4.1% | UNSTABLE | 28% | 10 | 1.31 | PASS | INCOMPLETE | e8be61b03f |
+| hotspot | g512-p2-t20 | SUCCESS | nvidia-b200.cuda13.2 | 178 us | 20 | 8.5% | 2.5% | yes | 29% | 10 | 1.38 | PASS | INCOMPLETE | bd28f8ad09 |
 | hotspot | g512-p2-t200 | SUCCESS | nvidia-b200.cuda13.2 | 654 us | 5 | 1.7% | 0.6% | yes | 79% | 100 | 1.14 | PASS | INCOMPLETE | e8be61b03f |
 | hotspot_3d | g64-l8-i100 | SUCCESS | nvidia-b200.cuda13.2 | 397 us | 5 | 1.6% | 0.6% | yes | 87% | 100 | 1.35 | PASS | PASS | e8be61b03f |
 | hotspot_3d | g64-l8-i1000 | SUCCESS | nvidia-b200.cuda13.2 | 3.71 ms | 5 | 0.1% | 0.0% | yes | 92% | 1,000 | 1.23 | PASS | PASS | e8be61b03f |
@@ -133,7 +134,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | matvec_3d_stencil | size4000000 | SUCCESS | nvidia-b200.cuda13.2 | 9.61 ms | 5 | 0.3% | 0.1% | yes | 98% | 100 | 1.01 | PASS | PASS | e8be61b03f |
 | matvec_3d_stencil | size16000000 | SUCCESS | nvidia-b200.cuda13.2 | 36.6 ms | 5 | 0.0% | 0.0% | yes | 99% | 100 | 1.00 | PASS | PASS | e8be61b03f |
 | mg | class-b | SUCCESS | nvidia-b200.cuda13.2 | 18.4 ms | 5 | 3.0% | 1.2% | yes | 89% | 2,126 | 1.02 | PASS | PASS | e8be61b03f |
-| mg | class-a | SUCCESS | nvidia-b200.cuda13.2 | 5.21 ms | 5 | 10.1% | 4.4% | UNSTABLE | 68% | 430 | 1.06 | PASS | PASS | e8be61b03f |
+| mg | class-a | SUCCESS | nvidia-b200.cuda13.2 | 5.18 ms | 20 | 11.1% | 3.5% | yes | 68% | 430 | 0.97 | PASS | PASS | bd28f8ad09 |
 | mg | class-c | SUCCESS | nvidia-b200.cuda13.2 | 110 ms | 5 | 0.3% | 0.1% | yes | 97% | 2,406 | 1.00 | PASS | PASS | e8be61b03f |
 | murmurhash3 | k100000 | SUCCESS | nvidia-b200.cuda13.2 | 97.4 ms | 5 | 0.1% | 0.1% | yes | 100% | 100 | 1.01 | PASS | PASS | e8be61b03f |
 | murmurhash3 | k200000 | SUCCESS | nvidia-b200.cuda13.2 | 184 ms | 5 | 0.1% | 0.0% | yes | 100% | 100 | 1.01 | PASS | PASS | e8be61b03f |
@@ -169,7 +170,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 
 | application | input | status | platform | ROI median | samples | spread | CV | stable | device busy | kernels in ROI | profiler x | run verification | correctness | source |
 |---|---|---|---|--:|--:|--:|--:|---|--:|--:|--:|---|---|---|
-| amg2023 | p1-256cubed | SUCCESS | nvidia-b200.cuda13.2 | 650 ms | 5 (3+2 adaptive) | 55.5% | 24.4% | UNSTABLE | 77% | 5,069 | 1.03 | PASS | PASS | e8be61b03f |
+| amg2023 | p1-256cubed | SUCCESS | nvidia-b200.cuda13.2 | 641 ms | 3 | 0.1% | 0.1% | yes | 78% | 5,069 | 0.98 | PASS | PASS | bd28f8ad09 |
 | amg2023 | p1-128cubed | SUCCESS | nvidia-b200.cuda13.2 | 188 ms | 3 | 1.1% | 0.6% | yes | 40% | 4,508 | 1.14 | PASS | PASS | e8be61b03f |
 | amg2023 | p2-256cubed | SUCCESS | nvidia-b200.cuda13.2 | 418 ms | 3 | 10.0% | 5.8% | yes | 67% | 6,055 | 1.07 | PASS | PASS | e8be61b03f |
 | amg2023 | p2-128cubed | SUCCESS | nvidia-b200.cuda13.2 | 161 ms | 3 | 1.2% | 0.6% | yes | 31% | 5,190 | 1.23 | PASS | PASS | e8be61b03f |
@@ -179,7 +180,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | branson | hohlraum-multi-node | SUCCESS | nvidia-b200.cuda13.2 | 377.2 s | 3 | 0.4% | 0.2% | yes | 59% | 40 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
 | branson | lb-hohlraum | SUCCESS | nvidia-b200.cuda13.2 | 95.4 s | 3 | 1.0% | 0.5% | yes | 60% | 35,087 | 1.02 | PASS | INCOMPLETE | e8be61b03f |
 | cabanapic | weibel-ny512-nppc2000 | SUCCESS | nvidia-b200.cuda13.2 | 60.2 s | 3 | 0.2% | 0.1% | yes | 93% | 2,016,000 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
-| cabanapic | weibel-ny32-nppc100 | SUCCESS | nvidia-b200.cuda13.2 | 820 ms | 5 (3+2 adaptive) | 20.5% | 9.1% | UNSTABLE | 52% | 126,000 | 1.42 | PASS | INCOMPLETE | e8be61b03f |
+| cabanapic | weibel-ny32-nppc100 | SUCCESS | nvidia-b200.cuda13.2 | 821 ms | 3 | 1.0% | 0.5% | yes | 52% | 126,000 | 1.42 | PASS | INCOMPLETE | bd28f8ad09 |
 | cabanapic | weibel-ny128-nppc500 | SUCCESS | nvidia-b200.cuda13.2 | 4.49 s | 3 | 0.3% | 0.2% | yes | 71% | 504,000 | 1.11 | PASS | INCOMPLETE | e8be61b03f |
 | cloverleaf | bm-short-960sq-87steps | SUCCESS | nvidia-b200.cuda13.2 | 58.3 ms | 3 | 5.7% | 3.3% | yes | 83% | 10,891 | 1.25 | PASS | PASS | e8be61b03f |
 | cloverleaf | bm4-short-1920sq-87steps | SUCCESS | nvidia-b200.cuda13.2 | 155 ms | 3 | 0.1% | 0.0% | yes | 94% | 10,891 | 1.01 | PASS | PASS | e8be61b03f |
@@ -216,7 +217,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | kripke | z32-g32-q64 | SUCCESS | nvidia-b200.cuda13.2 | 256 ms | 3 | 0.3% | 0.2% | yes | 92% | 928 | 1.01 | PASS | INCOMPLETE | e8be61b03f |
 | kripke | z32-g64-q128-dgz | SUCCESS | nvidia-b200.cuda13.2 | 845 ms | 3 | 0.0% | 0.0% | yes | 98% | 928 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
 | laghos | tg3d-rs1 | SUCCESS | nvidia-b200.cuda13.2 | 21.9 s | 3 | 1.5% | 0.8% | yes | 46% | 4,216,265 | 1.39 | PASS | PASS | e8be61b03f |
-| laghos | sedov2d-rs3 | SUCCESS | nvidia-b200.cuda13.2 | 16.7 s | 5 (3+2 adaptive) | 16.3% | 7.0% | UNSTABLE | 47% | 3,440,838 | 1.62 | PASS | PASS | e8be61b03f |
+| laghos | sedov2d-rs3 | SUCCESS | nvidia-b200.cuda13.2 | 16.6 s | 3 | 0.4% | 0.2% | yes | 48% | 3,440,838 | 1.68 | PASS | PASS | bd28f8ad09 |
 | laghos | sedov3d-rs2 | SUCCESS | nvidia-b200.cuda13.2 | 17.6 s | 3 | 4.8% | 2.7% | yes | 56% | 3,239,943 | 1.52 | PASS | PASS | e8be61b03f |
 | laghos | sedov3d-rs4-fom | SUCCESS | nvidia-b200.cuda13.2 | 125.5 s | 3 | 0.1% | 0.0% | yes | 76% | 14,536,044 | 1.36 | PASS | PASS | e8be61b03f |
 | laghos | triplept3d-rs1 | SUCCESS | nvidia-b200.cuda13.2 | 42.1 s | 3 | 1.3% | 0.7% | yes | 50% | 8,471,382 | 1.62 | PASS | PASS | e8be61b03f |
@@ -256,15 +257,8 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-27T02:02:42Z (471 records). 134 + 89 re
 | tealeaf | bm5-4000sq-10steps | SUCCESS | nvidia-b200.cuda13.2 | 18.3 s | 3 | 0.1% | 0.1% | yes | 77% | 634,749 | 1.13 | PASS | PASS | e8be61b03f |
 | tealeaf | bm6-8000sq-10steps | SUCCESS | nvidia-b200.cuda13.2 | 115.8 s | 3 | 0.1% | 0.0% | yes | 93% | 1,480,018 | 1.05 | PASS | PASS | e8be61b03f |
 | tealeaf | bm5e4-4000sq-2steps | SUCCESS | nvidia-b200.cuda13.2 | 4.16 s | 3 | 0.0% | 0.0% | yes | 77% | 143,967 | 1.13 | PASS | PASS | e8be61b03f |
-| xsbench | large | SUCCESS | nvidia-b200.cuda13.2 | 40.7 ms | 5 (3+2 adaptive) | 65.0% | 28.3% | UNSTABLE | 96% | 3 | 1.02 | PASS | PASS | e8be61b03f |
+| xsbench | large | SUCCESS | nvidia-b200.cuda13.2 | 40.7 ms | 3 | 3.7% | 1.9% | yes | 96% | 3 | 0.99 | PASS | PASS | bd28f8ad09 |
 | xsbench | small | SUCCESS | nvidia-b200.cuda13.2 | 10.3 ms | 3 | 6.2% | 3.4% | yes | 83% | 3 | 1.07 | PASS | PASS | e8be61b03f |
-
-### Pooled measurements and input-file identity
-
-- pooled by measurement group `amg2023/p1-256cubed/20260926T204146Z-3816238+20260927T015718Z-10546` (amg2023 / p1-256cubed): phase5-profiled/phase5.log: 2026-09-27T01:57:12Z level 2 adaptive extension: 4 inputs: amg2023/p1-256cubed cabanapic/weibel-ny32-nppc100 laghos/sedov2d-rs3 xsbench/large; phase5-profiled/level2.log: measure_level2: run_id=20260926T204146Z-3816238 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=89 protocol=warmup:0,clean:3,profiled:1; phase5-profiled/level2-adaptive.log: measure_level2: run_id=20260927T015718Z-10546 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=4 protocol=warmup:0,clean:2,profiled:1
-- pooled by measurement group `cabanapic/weibel-ny32-nppc100/20260926T204146Z-3816238+20260927T015718Z-10546` (cabanapic / weibel-ny32-nppc100): phase5-profiled/phase5.log: 2026-09-27T01:57:12Z level 2 adaptive extension: 4 inputs: amg2023/p1-256cubed cabanapic/weibel-ny32-nppc100 laghos/sedov2d-rs3 xsbench/large; phase5-profiled/level2.log: measure_level2: run_id=20260926T204146Z-3816238 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=89 protocol=warmup:0,clean:3,profiled:1; phase5-profiled/level2-adaptive.log: measure_level2: run_id=20260927T015718Z-10546 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=4 protocol=warmup:0,clean:2,profiled:1
-- pooled by measurement group `laghos/sedov2d-rs3/20260926T204146Z-3816238+20260927T015718Z-10546` (laghos / sedov2d-rs3): phase5-profiled/phase5.log: 2026-09-27T01:57:12Z level 2 adaptive extension: 4 inputs: amg2023/p1-256cubed cabanapic/weibel-ny32-nppc100 laghos/sedov2d-rs3 xsbench/large; phase5-profiled/level2.log: measure_level2: run_id=20260926T204146Z-3816238 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=89 protocol=warmup:0,clean:3,profiled:1; phase5-profiled/level2-adaptive.log: measure_level2: run_id=20260927T015718Z-10546 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=4 protocol=warmup:0,clean:2,profiled:1
-- pooled by measurement group `xsbench/large/20260926T204146Z-3816238+20260927T015718Z-10546` (xsbench / large): phase5-profiled/phase5.log: 2026-09-27T01:57:12Z level 2 adaptive extension: 4 inputs: amg2023/p1-256cubed cabanapic/weibel-ny32-nppc100 laghos/sedov2d-rs3 xsbench/large; phase5-profiled/level2.log: measure_level2: run_id=20260926T204146Z-3816238 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=89 protocol=warmup:0,clean:3,profiled:1; phase5-profiled/level2-adaptive.log: measure_level2: run_id=20260927T015718Z-10546 platform=nvidia-b200.cuda13.2 collector=nvidia_nsys cases=4 protocol=warmup:0,clean:2,profiled:1
 
 ### History kept, never current
 
