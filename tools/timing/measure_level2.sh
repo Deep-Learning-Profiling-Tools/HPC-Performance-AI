@@ -21,6 +21,7 @@
 #   --env-script F      environment loader, relative to the repo (default hpcperf_env.sh,
 #                       or $HPCPERF_TIMING_ENV_SCRIPT)
 #   --clean-runs N      clean runs per case (default 1)
+#   --warmup N          discarded whole-process warm-up runs before the clean runs (default 0)
 #   --no-profile        no profiled run (ROI time and FOM only)
 #   --collector NAME    auto (default) | nvidia_nsys | none
 #   --backend B         CUDA (default) | HIP (UNTESTED)
@@ -42,6 +43,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --env-script)  ENV_SCRIPT="${2:?}"; shift 2 ;;
         --clean-runs)  CLEAN_RUNS="${2:?}"; shift 2 ;;
+        --warmup)      WARMUP_RUNS="${2:?}"; shift 2 ;;
         --no-profile)  PROFILED_RUNS=0; shift ;;
         --collector)   COLLECTOR="${2:?}"; shift 2 ;;
         --backend)     BACKEND="${2:?}"; shift 2 ;;
@@ -57,6 +59,7 @@ while [ $# -gt 0 ]; do
 done
 [ "${#SELECT[@]}" -gt 0 ] || die "give a selection: all, <app> or <app>/<case> (try --help)"
 case "$CLEAN_RUNS" in ''|*[!0-9]*|0) die "--clean-runs must be a positive number" ;; esac
+case "$WARMUP_RUNS" in ''|*[!0-9]*) die "--warmup must be a number" ;; esac
 # shellcheck source=lib/engine.sh
 . "$HERE/lib/engine.sh"
 engine_main "${SELECT[@]}"
