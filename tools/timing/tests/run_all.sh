@@ -1490,6 +1490,28 @@ else
     skip "17f: MiniEM build decks not present"
 fi
 
+echo "=== 18: stability depends on the sample size"
+pycheck "18a-18d: range rule below 10 samples, IQR rule from 10, one outlier in 20, two levels flagged" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import registry_view as RV
+bad = []
+st, rule, iqr, two = RV.stability([1.0, 1.05, 1.12, 1.0, 1.01])            # 5 samples, range 12 %
+if st or "max-min" not in rule: bad.append(f"18a 5 samples, range 12 %: {st} {rule}")
+st, rule, iqr, two = RV.stability([1.0, 1.01, 1.02, 1.0, 1.01])            # 5 samples, range 2 %
+if not st: bad.append("18a 5 samples, range 2 %: unstable")
+s = [1.0 + 0.001 * i for i in range(19)] + [1.6]                            # 20 samples, one outlier
+st, rule, iqr, two = RV.stability(s)
+if not st or "IQR" not in rule or two: bad.append(f"18b 20 samples with one outlier: {st} {rule} two={two}")
+s = [1.0, 1.01] * 5 + [1.3, 1.31] * 5                                       # 20 samples, two groups of 10
+st, rule, iqr, two = RV.stability(s)
+if st or not two: bad.append(f"18c two levels: stable={st} two={two}")
+s = [1.0 + 0.002 * i for i in range(20)]                                    # 20 samples, 4 % steady spread
+st, rule, iqr, two = RV.stability(s)
+if not st or two: bad.append(f"18d steady 20: {st} {two}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

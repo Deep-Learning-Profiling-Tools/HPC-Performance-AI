@@ -279,6 +279,12 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   evidence (the campaign's decision line and both invocations' run ids and protocols). The report pools
   a grouped base + extension into one 5-sample result; all samples are kept, and an input still above
   10 % is UNSTABLE. Without a group the extension record stays a separate 2-run measurement.
+* **Stability depends on the sample size.** With fewer than 10 clean-run samples an input is stable when
+  (max - min) / median <= 10 %; with 10 or more (e.g. a 20-run re-measurement of an UNSTABLE input) when
+  the interquartile range / median <= 5 % -- the range grows with every added sample, the IQR does not;
+  5 % is about as strict as the range rule at 5 samples. Samples that fall into two groups (a gap > 5 % of
+  the median with >= 20 % of the samples on each side) are flagged "two levels" as a description; more
+  runs do not remove such a pattern. The rule lives in `registry_view.stability()`.
 * **Input files read from copies or named only in the program's log.** `copy_dirs` in
   `cases/registry_evidence.yaml` declares that a registered file is read from a copy of the same name
   elsewhere (MiniEM reads `src/decks/*` from the build's `decks/`); the copy counts only with the

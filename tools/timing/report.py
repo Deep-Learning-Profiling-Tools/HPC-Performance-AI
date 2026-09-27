@@ -245,6 +245,7 @@ def _measurement(m):
     run["roi"].update({"wall_s": m["median"], "runs_s": s, "wall_s_min": m["min"], "wall_s_max": m["max"],
                        "wall_s_stddev": m["cv"] * m["median"] if m["cv"] is not None else None})
     run["set"] = scrub({"run_ids": m["run_ids"], "n": len(s), "spread": m["spread"], "cv": m["cv"], "stable": m["stable"],
+                        "iqr": m.get("iqr"), "stability_rule": m.get("stability_rule"), "two_levels": m.get("two_levels"),
                         "adaptive": m["adaptive"], "group": m.get("group"), "utc_first": m["utc_first"], "utc_last": m["utc_last"],
                         "git_commit": (m["git_commit"] or "")[:10], "exe_sha256": (m["exe_sha256"] or "")[:16],
                         "per_record": [{"run_id": r["run_id"], "runs_s": (r.get("roi") or {}).get("runs_s") or [],
@@ -429,8 +430,9 @@ def render_md_registry(c):
     for key in ("platform_note", "not_collected", "level3"):
         if camp.get(key):
             out.append(f"- {camp[key]}")
-    out += ["- Spread = (max - min) / median of all clean-run samples of the measurement (stable when <= 10 %); "
-            "CV = sample stddev / median. An adaptive extension (+2 runs) is pooled with its 3 runs only through "
+    out += ["- Spread = (max - min) / median of all clean-run samples; CV = sample stddev / median. Stable: spread <= 10 % "
+            "for fewer than 10 samples; IQR / median <= 5 % for 10 samples or more (the range grows with the sample count, "
+            "the IQR does not). 'two levels': the samples fall into two groups (a gap > 5 % of the median, >= 20 % on each side). An adaptive extension (+2 runs) is pooled with its 3 runs only through "
             "an explicit measurement group; runs of the same configuration without one stay separate measurements.",
             "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification "
             "(did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness "
@@ -463,7 +465,7 @@ def render_md_registry(c):
                         fmt_plain(run["roi"]["wall_s"]) if run else "-",
                         str(st["n"]) + (" (3+2 adaptive)" if st["adaptive"] else "") if st else "-",
                         md_pct(st["spread"], 1) if st else "-", md_pct(st["cv"], 1) if st else "-",
-                        ("yes" if st["stable"] else "UNSTABLE") if st else "-",
+                        (("yes" if st["stable"] else "UNSTABLE") + (" (two levels)" if st.get("two_levels") else "")) if st else "-",
                         md_pct((run.get("device") or {}).get("busy_frac_of_roi"), cap=True) if run else "-",
                         ("null" if (run.get("device") or {}).get("compute_ops") is None else f"{run['device']['compute_ops']:,}") if run else "-",
                         ("null" if run["roi"].get("profiler_inflation") is None else f"{run['roi']['profiler_inflation']:.2f}") if run else "-",

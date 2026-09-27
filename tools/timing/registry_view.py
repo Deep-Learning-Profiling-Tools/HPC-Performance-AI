@@ -28,9 +28,15 @@ record provided twice (same level, application, input and run id) is counted onc
 of an input is its newest measurement whose verdict is PASS or INSUFFICIENT (timing valid, verification
 incomplete -- reported as such).
 
-Statistics of a pooled measurement: median of all clean-run ROI samples; spread = (max - min) / median
-(the stability criterion: stable when <= 0.10); cv = sample standard deviation / median (reported, not
-used for the decision).
+Statistics of a pooled measurement: median of all clean-run ROI samples; spread = (max - min) / median;
+cv = sample standard deviation / median; iqr = interquartile range / median. Stability depends on the
+sample size, because the range grows with the number of samples while the IQR does not:
+  fewer than 10 samples (the 3 / 5-run protocols): stable when spread <= 10 %;
+  10 samples or more: stable when iqr <= 5 % -- about as strict as the range rule at 5 samples (the
+  expected range of 5 normal samples is ~2.3 sigma, so 10 % range ~ sigma 4.3 % ~ IQR 5.8 %).
+two_levels flags samples that fall into two groups: the largest gap between sorted samples exceeds
+5 % of the median and the smaller side holds at least 20 % of the samples (and at least 2). It is a
+description of the distribution, not part of the stability decision.
 """
 
 import argparse
@@ -49,7 +55,30 @@ sys.path.insert(0, os.path.join(REPO, "tools", "inputs"))
 import verify_registry_runs as V  # noqa: E402
 
 SCHEMA = "hpcperf-timing-2"
-STABLE_SPREAD = 0.10
+STABLE_SPREAD = 0.10          # (max - min) / median, fewer than LARGE_N samples
+LARGE_N = 10
+STABLE_IQR = 0.05             # interquartile range / median, LARGE_N samples or more
+TWO_LEVEL_GAP = 0.05
+
+
+def stability(samples):
+    """(stable, rule, iqr, two_levels) of one measurement's clean-run samples (see the module docstring)."""
+    s = sorted(samples)
+    n, med = len(s), statistics.median(s)
+    iqr = None
+    if n >= 4 and med:
+        q = statistics.quantiles(s, n=4, method="inclusive")
+        iqr = (q[2] - q[0]) / med
+    two = False
+    if n >= 4 and med:
+        gaps = [(s[i + 1] - s[i], i) for i in range(n - 1)]
+        g, i = max(gaps)
+        small = min(i + 1, n - i - 1)
+        two = g / med > TWO_LEVEL_GAP and small >= max(2, -(-n // 5))
+    if n >= LARGE_N and iqr is not None:
+        return iqr <= STABLE_IQR, f"IQR/median <= {STABLE_IQR:.0%} (n >= {LARGE_N})", iqr, two
+    spread = (s[-1] - s[0]) / med if med else None
+    return spread is not None and spread <= STABLE_SPREAD, f"(max-min)/median <= {STABLE_SPREAD:.0%} (n < {LARGE_N})", iqr, two
 ANNOTATIONS = "annotations.json"   # optional, per results root: correctness evidence and blockers (see load_annotations)
 GROUPS = "measurement_groups.json"  # optional, per results root: explicit measurement groups (see measurements)
 CONFIG_FIELDS = ("platform", "workload identity", "executable sha256", "source commit", "warm-up runs", "profiled runs", "collector")
@@ -129,7 +158,7 @@ def _make_set(rs, group=None):
          "protocol": [(r.get("measurement") or {}).get("protocol") for r in rs],
          "group": None if group is None else {k: group.get(k) for k in ("id", "reason", "evidence")},
          "root": rs[0]["_root"]}
-    m["stable"] = m["spread"] is not None and m["spread"] <= STABLE_SPREAD
+    m["stable"], m["stability_rule"], m["iqr"], m["two_levels"] = stability(s)
     m["adaptive"] = group is not None
     return m
 

@@ -238,7 +238,8 @@
     var busy = dv ? dv.busy_frac_of_roi : null;
     var spread = rangeSpread(R.runs_s, wall);
     var figs = [fig(fmtT(wall), "ROI (median of " + (R.runs_s || []).length + " clean)"),
-                fig(pct(spread, 1), "clean-run spread (max−min)/median" + (isNum(spread) && spread > 0.10 ? " · UNSTABLE" : "")),
+                fig(pct(spread, 1), "clean-run spread (max−min)/median" +
+                    ((S ? !S.stable : isNum(spread) && spread > 0.10) ? " · UNSTABLE" : "") + (S && S.two_levels ? " · two levels" : "")),
                 fig(pct(busy, 0, true), "device busy in the ROI"),
                 fig(fmtT(dv && isNum(dv.host_gap_s) ? Math.max(dv.host_gap_s, 0) : null), "host gap in the ROI"),
                 fig(pct(wall && proc ? wall / proc : null, 1), "ROI share of the process"),
@@ -274,6 +275,8 @@
     var roiRows = [["median", fmtT(wall)], ["min / max", fmtT(R.wall_s_min) + " / " + fmtT(R.wall_s_max)],
       ["clean runs", (R.runs_s || []).map(fmtT).join(", ") || "null"],
       ["spread / CV", pct(spread, 2) + " (max−min)/median · " + pct(cv, 2) + " stddev/median"]]
+      .concat(S ? [["stability", (S.stable ? "stable" : "UNSTABLE") + " by " + (S.stability_rule || "-") +
+        (isNum(S.iqr) ? " · IQR/median " + pct(S.iqr, 2) : "") + (S.two_levels ? " · samples fall into two levels" : "")]] : [])
       .concat(S && S.adaptive ? [["pooled", S.per_record.map(function (p) { return (p.runs_s || []).length; }).join(" + ") +
         " clean runs (adaptive extension, measurement group)"]] : [])
       .concat([["entries", num(R.entries)],
