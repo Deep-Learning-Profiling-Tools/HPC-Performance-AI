@@ -16,8 +16,8 @@ timing:
   regex: ^Time for CUDA kernels:\s*(?P<value>[0-9.eE+-]+) sec
   select: only
 baseline:
-  method: no PASS line; the ctest wrapper checks the solution (verify.py); the registry records the two timer lines
-    only
+  method: no PASS line; verify.py checks the printed solution's residual against the system the benchmark solved
+    (file, or the generated Toeplitz system for -s) -- the registry's correctness check (check:)
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: total_time_line
@@ -89,3 +89,13 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  # verify.py runs the binary with the input's own arguments (-f <file> or -s <n>), parses the printed solution and
+  # forms the residual with the system rebuilt in float64 (the matrix file, or create_matrix's Toeplitz formula and b = 1).
+  kind: standalone
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{args}']
+  pass_regex: '^PASS: residual'
+  fail_regex: '^FAIL'
+  basis: '||Ax - b||_inf / max(1, ||b||_inf) <= 1e-2, verify.py''s tolerance for the float32 elimination without pivoting
+    (ctest, n = 208); at n = 1024 / 4096 established by running the check, never by adjusting the tolerance'
+  covers: all

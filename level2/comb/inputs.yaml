@@ -101,3 +101,17 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  # Comb's own halo check is read from the files of the run: the run's Comb_<run>_proc* / Comb_<run>_summary files
+  # (written into the build directory, one run number per invocation) are copied out and check_run.py requires zero
+  # "test pre-comm / post-comm ... expected" lines and the test-comm phase in the summary. The assert behind the
+  # check is compiled out in the Release build, so the exit code alone says nothing.
+  kind: post_run
+  outputs:
+  - {glob: '{repo}/build/level2/comb/cuda/Comb_*', new: true}
+  command: [python3, '{bench_dir}/check_run.py', '{outputs}']
+  pass_regex: '^PASS: Comb halo check'
+  fail_regex: '^FAIL: Comb halo check'
+  basis: exact -- every received halo value is compared with its analytic expectation by Comb itself
+    (upstream/include/do_cycles.hpp); a mismatch line is a failure, the test-comm phase must have run
+  covers: all

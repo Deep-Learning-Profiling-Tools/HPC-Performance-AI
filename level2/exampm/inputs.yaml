@@ -28,6 +28,11 @@ coverage:
   reason: upstream's two examples; the dam break at three grid sizes
 inputs:
 - id: dambreak-0.01
+  check:
+    kind: none
+    reason: no reference; the proposed check (class D) is validate.sh's dam-break conservation checks on the last dump
+      plus a same-input baseline comparison of the final particle state (centre of mass, momentum, kinetic energy),
+      whose tolerance is not established
   case: dam-break
   variant: default
   source:
@@ -49,6 +54,11 @@ inputs:
   backends_validated:
   - cuda
 - id: dambreak-0.05-upstream
+  check:
+    kind: none
+    reason: no reference; the proposed check (class D) is validate.sh's dam-break conservation checks on the last dump
+      plus a same-input baseline comparison of the final particle state (centre of mass, momentum, kinetic energy),
+      whose tolerance is not established
   case: dam-break
   variant: size
   source:
@@ -79,6 +89,10 @@ inputs:
   backends_validated:
   - cuda
 - id: dambreak-0.005
+  check:
+    kind: none
+    reason: the registered write_freq 2000 exceeds the 250 steps, so no evolved dump exists; the program needs a
+      final-state summary outside the ROI first (class E)
   case: dam-break
   variant: size
   source:
@@ -106,6 +120,20 @@ inputs:
   backends_validated:
   - cuda
 - id: freefall-0.01
+  check:
+    # validate.sh's analytic free-fall check run with this input's arguments (the six FreeFall arguments), reading the
+    # HDF5 dumps of that run (h5dump + numpy).
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env: {HPCPERF_EXAMPM_FF_ARGS: '{param:cell_size} {param:ppc} {param:halo} {param:dt} {param:t_final} {param:write_freq}'}
+    pass_regex: '^ExaMPM CUDA validation \(FreeFall .*\): PASS'
+    fail_regex: '^ExaMPM CUDA validation \(FreeFall .*\): FAIL'
+    basis: 'analytic free fall on every dump: particle count exact, |mean v_z + g t| <= 1e-9 max(1, g t), |mean v_x|,
+      |mean v_y| <= 1e-9, |z_cm - (z0 - g t^2/2)| <= g t dt_0 + 1e-12 (symplectic-Euler bound), last dump at
+      t >= 0.9 t_final (validate.sh); note: validate.sh also applies its dam-break conservation checks to whatever
+      dumps are in build/level2/exampm/cuda/run'
+    covers: all
+    timeout: 7200
   case: free-fall
   variant: case
   source:

@@ -18,8 +18,10 @@ timing:
   select: only
 baseline:
   method: Kripke has no built-in reference; validate.sh compares the GPU with the Sequential architecture of the
-    same binary. The registry keeps the final particle count (required, recorded, no tolerance basis yet) and the
-    FOM (diagnostic).
+    same binary. The registry keeps the final particle count, compared with the same-input baseline at validate.sh's
+    KRIPKE_VALIDATE_RTOL 1e-6 (one unit in the last of the 7 printed digits), and the FOM (diagnostic). The registry
+    check (check_sequential.sh) compares all 10 per-iteration counts of the GPU run against a Sequential run of the same
+    problem.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: particle_count_final
@@ -27,7 +29,8 @@ baseline:
     regex: '^\s*iter \d+: particle count=(?P<value>[0-9.eE+-]+),'
     select: last
     compare:
-      rule: record
+      rule: rel
+      tol: 1.0e-6      # validate.sh KRIPKE_VALIDATE_RTOL: one unit in the last printed digit
   - name: throughput
     role: diagnostic
     regex: ^\s*Throughput:\s+(?P<value>[0-9.eE+-]+)
@@ -139,3 +142,14 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  # the GPU run of the registered problem (run.sh through the input), then check_sequential.sh runs the same problem
+  # with --arch Sequential (the host path of the same binary) and compares every iteration's particle count.
+  kind: post_run
+  command: [bash, '{bench_dir}/check_sequential.sh', '{log}', --zones, '{param:zones}', --groups, '{param:groups}', --quad, '{param:quad}', --layout, '{param:layout}', --niter, '{param:niter}', CUDA]
+  pass_regex: '^Kripke CUDA vs Sequential \(.*\): PASS'
+  fail_regex: '^Kripke CUDA vs Sequential \(.*\): FAIL'
+  basis: '|P_gpu - P_seq| / |P_seq| <= 1e-6 for all 10 iterations (validate.sh KRIPKE_VALIDATE_RTOL, one unit in the last
+    printed digit); Sequential = the independent host architecture of the same code'
+  covers: all
+  timeout: 14400

@@ -19,7 +19,7 @@ timing:
 baseline:
   method: upstream ships no reference; validate.sh checks the LJ melt against independent references. The registry
     keeps the final thermo row (step exact; temperature and potential energy recorded, required, no tolerance basis
-    yet).
+    yet -- the registry check pins the t=0 state and bounds the energy drift, it does not pin the final values).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: final_step
@@ -140,3 +140,20 @@ inputs:
   - input/snap/Ta06A.snapcoeff
   - input/snap/Ta06A.snapparam
   input_form: file
+  check:
+    kind: none
+    reason: SNAP deck -- the thermo row prints PE = 0.000000 (the SNAP energy is not computed) and validate_lj.py's
+      Lennard-Jones references do not apply; the only reference is LAMMPS' upstream examples/snap Ta06A log, not
+      vendored (class C, pending)
+check:
+  # the run through run.sh (the registered deck / lattice / steps), then validate_lj.py on its stdout: T(0), the
+  # analytic fcc lattice energy at t=0 and the NVE energy-conservation bound over the whole run.
+  kind: post_run
+  command: [python3, '{bench_dir}/validate_lj.py', --log, '{log}', --lattice, '{param:lattice}', --temp, '1.4']
+  pass_regex: '^ExaMiniMD LJ check: PASS'
+  fail_regex: '^ExaMiniMD LJ check: FAIL'
+  basis: 'validate_lj.py (= validate.sh deck A generalised to the registered lattice): T(0) = 1.4 (in.lj velocity create;
+    abs 1e-5), PE(0)/atom and ETot(0)/atom vs the analytic fcc lattice sum with ExaMiniMD''s cutoff shift (rel 1e-5),
+    max |ETot(t) - ETot(0)| / |ETot(0)| <= 1e-3 over all thermo rows; temperature_final / pote_final are bounded, not
+    pinned, by this check'
+  covers: []

@@ -61,6 +61,16 @@ Sub-commands (all read-only except `measure`, which writes into --out):
   measure  <bench_dir> <input_id> --out DIR [--warmup 1] [--reps 3] [--timeout S] [--gpus 1]
                                            warm-up run + N measured runs, one directory per run,
                                            timing + baseline + summary (median, min, max, MAD, spread)
+  check    <bench_dir> <input_id> --out DIR [--timeout S] [--gpus 1] [--dry-run]
+                                           the input's correctness check (inputs.yaml `check:`): a
+                                           standalone checker that runs the benchmark itself, or one
+                                           benchmark run (never with HPCPERF_SKIP_VERIFY) followed by
+                                           the checker / the program's own pass line; writes
+                                           check.json (verdict PASS / FAIL / ERROR); exit 0 only for PASS
+  verdict  <bench_dir> <input_id> [--measurement measurement.json] [--check check.json]
+                                           the input's correctness verdict from the baseline comparison
+                                           and the check (correctness_verdict): exit 0 PASS, 1 FAIL,
+                                           3 INCOMPLETE
 
 Status vocabulary (summary of `measure`, also printed by `status`), kept separate on purpose:
   run_completed        every measured run exited 0
@@ -84,7 +94,7 @@ upstream_inputs_not_added}` for the audit; per-input `input_form: runtime|file|c
 Exit codes: 0 ok, 1 validation/measurement/comparison failure, 2 usage / unknown input /
 inconsistent baseline, 3 comparison inconclusive (record-only rules).
 """
-import argparse, hashlib, json, math, os, re, shutil, socket, statistics, subprocess, sys, time
+import argparse, glob, hashlib, json, math, os, re, shutil, socket, statistics, subprocess, sys, time
 from pathlib import Path
 
 try:
@@ -98,10 +108,15 @@ SOURCE_KINDS = ("upstream-file", "upstream-parameterized", "derived", "custom")
 VARIANTS = ("size", "case", "parameter", "implementation-path", "steps", "build-config", "default")
 ENTRY_KINDS = ("run.sh", "binary")
 SELECT = ("first", "last", "only")
-RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "record", "ge", "le")
-VERIFYING_RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "ge", "le")
-NATIVE_RULES = ("present", "absent", "abs_lt", "ge", "le")     # need no baseline
+RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "record", "ge", "le", "near")
+VERIFYING_RULES = ("exact", "rel", "abs", "abs_lt", "present", "absent", "ge", "le", "near")
+NATIVE_RULES = ("present", "absent", "abs_lt", "ge", "le", "near")     # need no baseline
 STABLE_SPREAD = 0.10
+# correctness checks (inputs.yaml `check:`): a checker command run outside any timing
+CHECK_KINDS = ("standalone", "post_run", "none")
+CHECK_SCHEMA = "hpcperf-inputs-check-1"
+TEMPLATE_NAMES = ("exe", "args", "run_dir", "log", "outputs", "bench_dir", "repo", "param", "arg")
+TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|param:[A-Za-z0-9_.-]+|arg:\d+)\}")
 
 
 class InputError(Exception):
@@ -199,6 +214,12 @@ def validate(doc: dict) -> list:
                 errs.append(f"{where}: quantity {q['name']}: compare.rule must be one of {RULES}")
             if cmp.get("rule") in ("rel", "abs", "abs_lt", "ge", "le") and "tol" not in cmp and "value" not in cmp:
                 errs.append(f"{where}: quantity {q['name']}: rule {cmp.get('rule')} needs tol or value")
+            if cmp.get("rule") == "near" and ("tol" not in cmp or "value" not in cmp):
+                errs.append(f"{where}: quantity {q['name']}: rule near needs value (the reference) and tol (relative)")
+            src = q.get("source")
+            if src is not None and (not isinstance(src, dict) or not isinstance(src.get("file"), str) or not src["file"]
+                                    or src.get("select_file", "only") not in ("only", "newest")):
+                errs.append(f"{where}: quantity {q['name']}: source must be {{file: <path or glob, relative to the run directory>, select_file: only|newest}}")
             if q.get("select", "last") not in SELECT:
                 errs.append(f"{where}: quantity {q['name']}: select must be one of {SELECT}")
             if q.get("role", "required") not in ("required", "diagnostic"):
@@ -288,7 +309,159 @@ def validate(doc: dict) -> list:
             errs.append(f"input '{inp.get('id')}': materialized: false is only meaningful for input_form compile-time")
         if isinstance(inp, dict) and inp.get("input_form") == "compile-time" and not inp.get("build_config"):
             errs.append(f"input '{inp.get('id')}': a compile-time input needs build_config (what is fixed at build time)")
+    # correctness checks: the benchmark-level block and per-input overrides, then every input's
+    # applicable block rendered against that input (unknown parameters / arguments are refused here)
+    if "check" in doc:
+        _check_check(doc["check"], "check", [q["name"] for q in doc["baseline"]["quantities"]] if isinstance(doc.get("baseline"), dict) and isinstance(doc["baseline"].get("quantities"), list) else [], errs)
+    for inp in doc["inputs"]:
+        if not isinstance(inp, dict) or not inp.get("id"):
+            continue
+        if "check" in inp:
+            qn = [q["name"] for q in quantities(doc, inp) if isinstance(q, dict) and q.get("name")]
+            _check_check(inp["check"], f"input '{inp['id']}' check", qn, errs)
+        blk = check_of(doc, inp)
+        if isinstance(blk, dict) and blk.get("kind") in ("standalone", "post_run") and not any(e.startswith(("check", f"input '{inp['id']}' check")) for e in errs):
+            try:
+                ctx = check_context(doc, inp, Path("/repo"), Path(doc["_path"]).parent, Path("/run"),
+                                    log=Path("/run/stdout.log") if blk["kind"] == "post_run" else None,
+                                    outputs=Path("/run/outputs"), require_built=False)
+                render_check(blk, ctx)
+            except InputError as ex:
+                errs.append(f"input '{inp['id']}' check: {ex}")
     return errs
+
+
+def _check_check(blk, where, qnames, errs):
+    """Schema of a `check:` block (benchmark-level or per-input)."""
+    if blk is None:
+        errs.append(f"{where}: a check block must be a mapping (kind none with a reason to state that an input has no check)"); return
+    if not isinstance(blk, dict):
+        errs.append(f"{where}: check must be a mapping"); return
+    kind = blk.get("kind")
+    if kind not in CHECK_KINDS:
+        errs.append(f"{where}: check.kind must be one of {CHECK_KINDS}"); return
+    if kind == "none":
+        if not isinstance(blk.get("reason"), str) or not blk["reason"].strip():
+            errs.append(f"{where}: check kind none needs a reason (why this input has no correctness check yet)")
+        return
+    cmd = blk.get("command")
+    if kind == "standalone" and (not isinstance(cmd, list) or not cmd or not all(isinstance(t, (str, int, float)) for t in cmd)):
+        errs.append(f"{where}: check.command must be a non-empty list of tokens")
+    if kind == "post_run" and cmd is not None and (not isinstance(cmd, list) or not cmd or not all(isinstance(t, (str, int, float)) for t in cmd)):
+        errs.append(f"{where}: check.command must be a list of tokens (or absent: the program's own check on its stdout)")
+    if not isinstance(blk.get("pass_regex"), str) or not blk["pass_regex"]:
+        errs.append(f"{where}: check.pass_regex missing")
+    for k in ("pass_regex", "fail_regex"):
+        if blk.get(k) is not None:
+            try:
+                re.compile(str(blk[k]))
+            except re.error as ex:
+                errs.append(f"{where}: check.{k} does not compile: {ex}")
+    if not isinstance(blk.get("basis"), str) or not blk["basis"].strip():
+        errs.append(f"{where}: check.basis missing (what is compared, the tolerance and where it comes from)")
+    cov = blk.get("covers")
+    if cov != "all" and (not isinstance(cov, list) or not all(isinstance(c, str) for c in cov)):
+        errs.append(f"{where}: check.covers must be 'all' or a list of quantity names (may be empty)")
+    elif isinstance(cov, list):
+        for c in cov:
+            if c not in qnames:
+                errs.append(f"{where}: check.covers names an unknown quantity '{c}'")
+    for k in ("env", "run_env"):
+        if blk.get(k) is not None and (not isinstance(blk[k], dict) or not all(isinstance(kk, str) for kk in blk[k])):
+            errs.append(f"{where}: check.{k} must be a mapping of variable names to values (null = unset)")
+    if kind == "standalone" and blk.get("run_env"):
+        errs.append(f"{where}: check.run_env applies to post_run checks only (a standalone checker runs the benchmark itself)")
+    outs = blk.get("outputs")
+    if outs is not None:
+        if not isinstance(outs, list):
+            errs.append(f"{where}: check.outputs must be a list")
+        else:
+            for o in outs:
+                if isinstance(o, str):
+                    continue
+                if not isinstance(o, dict) or not isinstance(o.get("glob"), str) or not o["glob"]:
+                    errs.append(f"{where}: check.outputs entries are paths/globs or {{glob: <pattern>, new: true|false}}")
+    if blk.get("timeout") is not None and (not isinstance(blk["timeout"], int) or isinstance(blk["timeout"], bool) or blk["timeout"] <= 0):
+        errs.append(f"{where}: check.timeout must be a positive number of seconds")
+    tokens = [str(t) for t in (cmd or [])] + [str(blk.get("cwd") or "")] + \
+             [str(v) for k in ("env", "run_env") for v in (blk.get(k) or {}).values() if v is not None] + \
+             [o if isinstance(o, str) else str(o.get("glob", "")) for o in (outs or []) if isinstance(o, (str, dict))]
+    for tok in tokens:
+        for m in re.finditer(r"\{([a-z_]+)(:[^}]*)?\}", tok):
+            if m.group(1) not in TEMPLATE_NAMES:
+                errs.append(f"{where}: unknown template placeholder {m.group(0)} (known: {', '.join('{' + n + '}' for n in TEMPLATE_NAMES)})")
+            if m.group(1) in ("param", "arg") and not m.group(2):
+                errs.append(f"{where}: {m.group(0)} needs a name / index ({{param:NAME}}, {{arg:N}})")
+
+
+# ----------------------------------------------------------------------------- correctness checks
+def check_of(doc: dict, inp=None):
+    """The correctness check that applies to an input: its own `check` block (kind none = explicitly
+    none, with a reason) or the benchmark-level block. None when neither exists."""
+    if inp is not None and "check" in inp:
+        return inp["check"]
+    return doc.get("check")
+
+
+def check_context(doc, inp, root: Path, bench_dir: Path, run_dir: Path, log=None, outputs=None, require_built=True) -> dict:
+    """The values behind the template tokens of a check block for one input."""
+    e = doc["entry"]
+    if inp.get("materialized", True) is False:
+        raise InputError(f"input '{inp['id']}' is not materialized; nothing can be checked")
+    exe = root / (inp["binary"] if inp.get("binary") else e["path"])
+    if require_built and (e["kind"] == "binary" or inp.get("binary")) and not (exe.is_file() and os.access(exe, os.X_OK)):
+        raise InputError(f"binary {exe} not built")
+    return {"exe": str(exe), "args": resolve_repo_args(root, inp.get("args") or []), "params": inp.get("params") or {},
+            "run_dir": str(run_dir), "log": None if log is None else str(log), "outputs": None if outputs is None else str(outputs),
+            "bench_dir": str(Path(bench_dir).resolve()), "repo": str(root)}
+
+
+def render_token(tok: str, ctx: dict):
+    """One template token. `{args}` alone expands to the input's argument list; every other placeholder
+    ({exe} {run_dir} {log} {outputs} {bench_dir} {repo} {param:NAME} {arg:N}) is substituted in place."""
+    if tok == "{args}":
+        return list(ctx["args"])
+
+    def sub(m):
+        k = m.group(1)
+        if k.startswith("param:"):
+            name = k[6:]
+            if name not in ctx["params"]:
+                raise InputError(f"template {{{k}}}: the input has no parameter '{name}'")
+            return str(ctx["params"][name])
+        if k.startswith("arg:"):
+            i = int(k[4:])
+            if i >= len(ctx["args"]):
+                raise InputError(f"template {{{k}}}: the input has only {len(ctx['args'])} argument(s)")
+            return str(ctx["args"][i])
+        v = ctx.get(k)
+        if v is None:
+            raise InputError(f"template {{{k}}} is not available for this check kind")
+        return str(v)
+    out = TEMPLATE_RX.sub(sub, tok)
+    left = re.search(r"\{([a-z_]+)(:[^}]*)?\}", out)
+    if left and left.group(1) in TEMPLATE_NAMES:
+        raise InputError(f"template {left.group(0)} could not be expanded")
+    return out
+
+
+def render_check(blk: dict, ctx: dict) -> dict:
+    """The check block with every template expanded: command (list), env / run_env (None = unset),
+    cwd (default: the run directory) and outputs ([{glob, new}])."""
+    cmd = []
+    for t in blk.get("command") or []:
+        r = render_token(str(t), ctx)
+        cmd += r if isinstance(r, list) else [r]
+    env = {k: (None if v is None else render_token(str(v), ctx)) for k, v in (blk.get("env") or {}).items()}
+    run_env = {k: (None if v is None else render_token(str(v), ctx)) for k, v in (blk.get("run_env") or {}).items()}
+    cwd = render_token(str(blk["cwd"]), ctx) if blk.get("cwd") else ctx["run_dir"]
+    outs = []
+    for o in blk.get("outputs") or []:
+        if isinstance(o, str):
+            outs.append({"glob": render_token(o, ctx), "new": False})
+        else:
+            outs.append({"glob": render_token(str(o["glob"]), ctx), "new": bool(o.get("new"))})
+    return {"command": cmd, "env": env, "run_env": run_env, "cwd": cwd, "outputs": outs}
 
 
 def get_input(doc: dict, input_id: str) -> dict:
@@ -411,14 +584,46 @@ def parse_timing(doc: dict, log_path: Path, rc=0, params=None, inp=None) -> dict
     return res
 
 
-def extract(doc: dict, log_path: Path, inp=None) -> dict:
+def _source_lines(q: dict, run_dir, what: str):
+    """The lines a file-sourced quantity is read from: `source.file` (a path or glob) relative to the
+    run directory; a glob must match exactly one file (`select_file: only`, the default) or the newest
+    one is taken (`select_file: newest`). A missing file is an error, never an empty match."""
+    src = q["source"]
+    pat = src["file"]
+    p = Path(pat) if os.path.isabs(pat) else (Path(run_dir) / pat if run_dir else Path(pat))
+    if any(ch in pat for ch in "*?["):
+        matches = sorted(glob.glob(str(p)), key=lambda f: (os.path.getmtime(f), f))
+        if not matches:
+            raise InputError(f"{what}: no file matches {p}")
+        if src.get("select_file", "only") == "only" and len(matches) != 1:
+            raise InputError(f"{what}: {len(matches)} files match {p}, expected exactly one")
+        p = Path(matches[-1])
+    if not p.is_file():
+        raise InputError(f"{what}: source file {p} missing")
+    return p.read_text(errors="replace").splitlines()
+
+
+def extract(doc: dict, log_path: Path, inp=None, run_dir=None) -> dict:
+    """The baseline quantities of one run: from its stdout log, or -- for a quantity with `source.file` --
+    from that file next to the log (run_dir defaults to the log's directory)."""
     if not Path(log_path).is_file():
         raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
+    if run_dir is None:
+        run_dir = Path(log_path).parent
     out = {}
     for q in quantities(doc, inp):
         rule = q.get("compare", {}).get("rule")
-        ms = _matches(q["regex"], lines, q.get("section_start"))
+        qlines = lines
+        if q.get("source"):
+            try:
+                qlines = _source_lines(q, run_dir, f"baseline quantity {q['name']}")
+            except InputError as ex:
+                # a missing source file satisfies nothing: `absent` on it is an error, not a pass
+                out[q["name"]] = ({"present": False, "count": 0, "error": str(ex)} if rule in ("present", "absent")
+                                  else {"value": None, "error": str(ex)})
+                continue
+        ms = _matches(q["regex"], qlines, q.get("section_start"))
         if rule in ("present", "absent"):
             out[q["name"]] = {"present": bool(ms), "count": len(ms)}
             continue
@@ -464,9 +669,14 @@ def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
         else:
             diagnostic_recorded.append(n)
         if rule == "present":
-            good = bool(c.get("present")); rec.update({"present": bool(c.get("present"))})
+            good = bool(c.get("present")) and not c.get("error"); rec.update({"present": bool(c.get("present"))})
+            if c.get("error"):
+                rec["error"] = c["error"]
         elif rule == "absent":
-            good = not c.get("present"); rec.update({"present": bool(c.get("present"))})
+            # an unreadable source (missing file) never counts as "absent"
+            good = not c.get("present") and not c.get("error"); rec.update({"present": bool(c.get("present"))})
+            if c.get("error"):
+                rec["error"] = c["error"]
         elif rule == "record":
             present = c.get("value") is not None
             rec.update({"value": c.get("value"), "baseline": b.get("value"),
@@ -485,6 +695,11 @@ def compare(doc: dict, baseline: dict, current: dict, inp=None) -> dict:
                 thr = float(cmp["value"])
                 good = {"abs_lt": abs(cv) < thr, "ge": cv >= thr, "le": cv <= thr}[rule]
                 rec.update({"value": cv, "threshold": thr})
+            elif rule == "near":
+                # against a reference constant (an analytic / upstream-published value), not a baseline
+                ref = float(cmp["value"]); tol = float(cmp["tol"]); d = abs(cv - ref)
+                good = d <= tol * abs(ref)
+                rec.update({"value": cv, "reference": ref, "rel_err": d / max(abs(ref), 1e-300), "tol": tol})
             else:
                 bv = b.get("value")
                 if bv is None:
@@ -949,7 +1164,16 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
             rec["main_compute_s"] = rec["timing"]["main_compute_s"]
         except InputError as ex:
             rec["timing_error"] = str(ex); rec["main_compute_s"] = None
-        rec["baseline_quantities"] = extract(doc, log, inp) if rc == 0 and log.exists() else None
+        # output files a check block declares (shared application directories) are copied into the
+        # run directory first, so file-sourced quantities can read them under outputs/
+        blk = check_of(doc, inp)
+        if isinstance(blk, dict) and blk.get("kind") in ("standalone", "post_run") and blk.get("outputs"):
+            try:
+                ctx = check_context(doc, inp, root, bench_dir, rdir, log=log, outputs=rdir / "outputs", require_built=False)
+                rec["outputs"] = collect_outputs(render_check(blk, ctx)["outputs"], rdir / "outputs", since=t_start - 0.05)
+            except InputError as ex:
+                rec["outputs"] = [{"error": str(ex)}]
+        rec["baseline_quantities"] = extract(doc, log, inp, run_dir=rdir) if rc == 0 and log.exists() else None
         (rdir / "result.json").write_text(json.dumps(rec, indent=2))
         meta["runs"].append(rec)
         print(f"[{doc['benchmark']}/{inp['id']}] {label}: rc={rc} e2e={wall:.3f}s main_compute="
@@ -997,6 +1221,179 @@ def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps:
     return meta
 
 
+def collect_outputs(rendered_outputs, dest: Path, since=None):
+    """Copy the files a check declares (paths or globs; `new: true` = only files modified since
+    `since`, for shared directories that accumulate one file per run) into dest. Every file is
+    recorded with its size and sha256; a pattern that matches nothing is recorded as an error."""
+    recs = []
+    for o in rendered_outputs:
+        matches = sorted(glob.glob(o["glob"]))
+        if o.get("new") and since is not None:
+            matches = [m for m in matches if os.path.getmtime(m) >= since]
+        matches = [m for m in matches if os.path.isfile(m)]
+        if not matches:
+            recs.append({"pattern": o["glob"], "new_only": bool(o.get("new")), "error": "no file matched"}); continue
+        dest.mkdir(parents=True, exist_ok=True)
+        for m in matches:
+            target = dest / os.path.basename(m)
+            shutil.copy2(m, target)
+            recs.append({"source": m, "copied_to": str(target), "bytes": os.path.getsize(target),
+                         "sha256": sha256_file(target), "new_only": bool(o.get("new"))})
+    return recs
+
+
+def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gpus: int = 1, dry_run=False) -> dict:
+    """Execute the input's correctness check into `out` and write out/check.json (CHECK_SCHEMA).
+
+    standalone: the checker command runs the benchmark itself (e.g. a verify.py that runs the binary
+                and recomputes the result on the CPU); cwd = out/run.
+    post_run:   the tool runs the benchmark once (its stdout -> out/run/stdout.log, HPCPERF_SKIP_VERIFY
+                never set, `run_env` applied), copies the declared `outputs` into out/outputs, then runs
+                the checker command -- or, without a command, applies pass/fail regexes to the run's
+                own stdout (the program's built-in check).
+    Verdict: FAIL when a fail line is seen, when the benchmark or the checker exits non-zero, or when
+    no pass line is printed (exit 0 without the pass line is FAIL, not PASS); PASS only with a pass
+    line, no fail line and exit 0; ERROR when the check could not be started at all."""
+    blk = check_of(doc, inp)
+    if not isinstance(blk, dict) or blk.get("kind") == "none":
+        raise InputError(f"input '{inp['id']}' has no correctness check" + (f" ({blk.get('reason')})" if isinstance(blk, dict) else ""))
+    out = Path(out); run_dir = out / "run"; outputs = out / "outputs"
+    post = blk["kind"] == "post_run"
+    ctx = check_context(doc, inp, root, bench_dir, run_dir, log=run_dir / "stdout.log" if post else None,
+                        outputs=outputs, require_built=not dry_run)
+    r = render_check(blk, ctx)
+    if dry_run:
+        return {"dry_run": True, "kind": blk["kind"], "command": r["command"], "cwd": r["cwd"], "env": r["env"],
+                "run_env": r["run_env"], "outputs": r["outputs"], "pass_regex": blk["pass_regex"], "fail_regex": blk.get("fail_regex")}
+    for d in (run_dir, outputs):                 # never read a previous check's output
+        if d.exists():
+            shutil.rmtree(d)
+    out.mkdir(parents=True, exist_ok=True); run_dir.mkdir(parents=True)
+    tmo = int(timeout or blk.get("timeout") or 3600)
+    rec = {"schema": CHECK_SCHEMA, "benchmark": doc["benchmark"], "level": doc["level"], "input_id": inp["id"],
+           "kind": blk["kind"], "basis": blk["basis"], "covers": blk.get("covers"),
+           "pass_regex": blk["pass_regex"], "fail_regex": blk.get("fail_regex"),
+           "inputs_yaml_sha256": doc["_sha256"], "workload": workload_identity(doc, inp),
+           "host": socket.gethostname(), "gpu": gpu_info(), "git": git_head(root), "timeout_s": tmo,
+           "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+           "command": r["command"], "cwd": r["cwd"], "env": r["env"], "run": None, "outputs": [], "check": None,
+           "verdict": None, "matched_line": None, "notes": []}
+
+    def finish(verdict, note=None):
+        rec["verdict"] = verdict
+        if note:
+            rec["notes"].append(note)
+        rec["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        (out / "check.json").write_text(json.dumps(rec, indent=2))
+        return rec
+
+    t0 = time.time()
+    if post:
+        try:
+            cmd, env, _entry = build_command(doc, inp, root, bench_dir, gpus)
+        except InputError as ex:
+            return finish("ERROR", f"the benchmark cannot be run: {ex}")
+        env.pop("HPCPERF_SKIP_VERIFY", None)      # a correctness run is never a skip-verify (timing) run
+        for k, v in r["run_env"].items():
+            if v is None:
+                env.pop(k, None)
+            else:
+                env[k] = v
+        log = run_dir / "stdout.log"
+        try:
+            rc, wall = run_once(cmd, env, run_dir, log, tmo)
+        except OSError as ex:
+            return finish("ERROR", f"the benchmark could not be started: {ex}")
+        rec["run"] = {"command": cmd, "env_overrides": r["run_env"], "exit_code": rc, "e2e_s": round(wall, 4),
+                      "log": str(log), "log_sha256": sha256_file(log), "skip_verify": False}
+        rec["outputs"] = collect_outputs(r["outputs"], outputs, since=t0 - 0.05)
+        if rc != 0:
+            return finish("FAIL", f"the benchmark run exited {rc}; its output is not checked")
+    if r["command"]:
+        env = dict(os.environ)
+        env.pop("HPCPERF_SKIP_VERIFY", None)
+        env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
+        for k, v in r["env"].items():
+            if v is None:
+                env.pop(k, None)
+            else:
+                env[k] = v
+        clog = out / "check.log"
+        Path(r["cwd"]).mkdir(parents=True, exist_ok=True)
+        try:
+            rc, wall = run_once(r["command"], env, Path(r["cwd"]), clog, tmo)
+        except OSError as ex:
+            return finish("ERROR", f"the checker could not be started: {ex}")
+        rec["check"] = {"exit_code": rc, "e2e_s": round(wall, 4), "log": str(clog), "log_sha256": sha256_file(clog)}
+        text = clog.read_text(errors="replace")
+    else:
+        rec["check"] = {"exit_code": rec["run"]["exit_code"], "log": rec["run"]["log"], "log_sha256": rec["run"]["log_sha256"],
+                        "note": "the program's own check, read from its stdout"}
+        rc = rec["run"]["exit_code"]
+        text = Path(rec["run"]["log"]).read_text(errors="replace")
+    lines = text.splitlines()
+    fails = [ln for ln in lines if blk.get("fail_regex") and re.search(str(blk["fail_regex"]), ln)]
+    passes = [ln for ln in lines if re.search(str(blk["pass_regex"]), ln)]
+    rec["pass_lines"] = len(passes); rec["fail_lines"] = len(fails)
+    if fails:
+        rec["matched_line"] = fails[0].strip()
+        return finish("FAIL", "a fail line was printed")
+    if rc == 124:
+        return finish("FAIL", f"the checker exceeded the timeout of {tmo} s")
+    if rc != 0:
+        return finish("FAIL", f"the checker exited {rc}")
+    if not passes:
+        return finish("FAIL", "exit 0 but no pass line was printed")
+    rec["matched_line"] = passes[0].strip()
+    return finish("PASS")
+
+
+def correctness_verdict(doc, inp, compare_verdict, required_pending=None, check=None) -> dict:
+    """The correctness verdict of an input from its baseline comparison and its correctness check.
+
+    compare_verdict   PASS / INCOMPLETE / FAIL of `compare` (or the measurement's baseline_verdict);
+                      NONE when no comparison exists
+    required_pending  the required quantities the comparison left unverified (its `required_pending`
+                      or the measurement's `needs_validation`); None = every required `record` quantity
+                      of the registry entry
+    check             a check.json record (CHECK_SCHEMA) or None
+    Rules, in this order:
+      FAIL        the comparison or the check failed -- nothing outweighs a failure
+      PASS        the comparison verified every required quantity, or nothing failed and a check
+                  PASSED whose `covers` holds every still-pending required quantity ("all" covers
+                  everything) and whose workload identity is the input's current one
+      INCOMPLETE  otherwise; a check that ERRORed, is stale (another workload) or does not cover the
+                  pending quantities counts as no check"""
+    if required_pending is None:
+        required_pending = [q["name"] for q in quantities(doc, inp)
+                            if q.get("compare", {}).get("rule") == "record" and role_of(q) == "required"]
+    cv = (check or {}).get("verdict")
+    res = {"compare_verdict": compare_verdict, "required_pending": list(required_pending),
+           "check_verdict": cv, "check_covers": (check or {}).get("covers"), "check_applicable": None}
+    if check:
+        mism = workload_mismatch(check.get("workload") or {}, workload_identity(doc, inp)) if check.get("workload") else ["no workload identity in the check record"]
+        res["check_applicable"] = not mism
+        if mism:
+            res["check_stale"] = mism
+    if compare_verdict == "FAIL":
+        return dict(res, verdict="FAIL", reason="the baseline comparison failed")
+    if cv == "FAIL" and res["check_applicable"]:
+        return dict(res, verdict="FAIL", reason="the correctness check failed")
+    if compare_verdict == "PASS":
+        return dict(res, verdict="PASS", reason="every required quantity was verified by the baseline comparison")
+    if cv == "PASS" and res["check_applicable"]:
+        cov = check.get("covers")
+        if cov == "all" or set(required_pending) <= set(cov or []):
+            return dict(res, verdict="PASS", reason="nothing failed and the correctness check covers every pending required quantity")
+        return dict(res, verdict="INCOMPLETE", reason="the check passed but does not cover: " + ", ".join(sorted(set(required_pending) - set(cov or []))))
+    if check and not res["check_applicable"]:
+        return dict(res, verdict="INCOMPLETE", reason="the check record belongs to another workload: " + "; ".join(res.get("check_stale") or []))
+    if cv == "ERROR":
+        return dict(res, verdict="INCOMPLETE", reason="the check could not be evaluated (ERROR)")
+    return dict(res, verdict="INCOMPLETE", reason=("no correctness check" if not check else "check verdict " + str(cv))
+                + ("; pending: " + ", ".join(required_pending) if required_pending else ""))
+
+
 def status_line(s: dict) -> str:
     keys = ("run_completed", "timing_ok", "timing_status", "native_check", "baseline_saved", "comparison_rules",
             "baseline_verdict", "baseline_from_run", "independent_runs_compared", "compute_ge_1s", "stable", "baseline_self_consistent")
@@ -1026,6 +1423,12 @@ def main(argv=None):
     s.add_argument("--out", help="destination (default: <baseline>.workload-migrated.json; never overwrites)")
     s.add_argument("--registry-commit", help="when the run's tree was dirty: the commit whose registry entry is checked against the current one")
     s.add_argument("--manual-basis", help="required with --registry-commit for a dirty run: the operator's stated basis linking the run-time registry file to that commit (recorded verbatim)")
+    s = sub.add_parser("check"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("--out", required=True)
+    s.add_argument("--timeout", type=int, help="seconds (default: the block's timeout, else 3600)"); s.add_argument("--gpus", type=int, default=1)
+    s.add_argument("--dry-run", action="store_true", help="print the rendered command, run nothing")
+    s = sub.add_parser("verdict"); s.add_argument("bench_dir"); s.add_argument("input_id")
+    s.add_argument("--measurement", help="measurement.json of a `measure` run (its baseline verdict and pending quantities)")
+    s.add_argument("--check", help="check.json of a `check` run")
     s = sub.add_parser("measure"); s.add_argument("bench_dir"); s.add_argument("input_id"); s.add_argument("--out", required=True)
     s.add_argument("--warmup", type=int, default=1); s.add_argument("--reps", type=int, default=3)
     s.add_argument("--timeout", type=int, default=1800); s.add_argument("--gpus", type=int, default=1)
@@ -1162,9 +1565,38 @@ def main(argv=None):
             s = meta["summary"]
             print(status_line(s))
             return 0 if s["run_completed"] and (s["timing_ok"] or s["timing_status"] == "NEEDS_TIMING_SUPPORT") else 1
+        if a.cmd == "check":
+            inp = get_input(doc, a.input_id)
+            root = repo_root(bench_dir)
+            rec = run_check(doc, inp, root, bench_dir, Path(a.out), a.timeout, a.gpus, dry_run=a.dry_run)
+            if a.dry_run:
+                print(json.dumps(rec, indent=2)); return 0
+            print(f"[{doc['benchmark']}/{inp['id']}] check {rec['verdict']}: {rec.get('matched_line') or '; '.join(rec['notes'])}")
+            print(f"  {Path(a.out) / 'check.json'}")
+            return {"PASS": 0, "FAIL": 1}.get(rec["verdict"], 2)
+        if a.cmd == "verdict":
+            inp = get_input(doc, a.input_id)
+            cmp_v, pending = "NONE", None
+            if a.measurement:
+                inv = invalidation(a.measurement)
+                if inv:
+                    raise InputError(f"the measurement is invalidated ({inv.get('reason')}; {inv['marker']}); it gives no verdict")
+                m = json.loads(Path(a.measurement).read_text())
+                if m.get("input_id") != inp["id"] or m.get("benchmark") != doc["benchmark"]:
+                    raise InputError(f"{a.measurement} belongs to {m.get('benchmark')}/{m.get('input_id')}, not {doc['benchmark']}/{inp['id']}")
+                s = m.get("summary") or {}
+                cmp_v = s.get("baseline_verdict") or "NONE"; pending = s.get("needs_validation")
+            chk = None
+            if a.check:
+                chk = json.loads(Path(a.check).read_text())
+                if chk.get("schema") != CHECK_SCHEMA or chk.get("input_id") != inp["id"] or chk.get("benchmark") != doc["benchmark"]:
+                    raise InputError(f"{a.check} is not a check record of {doc['benchmark']}/{inp['id']}")
+            res = correctness_verdict(doc, inp, cmp_v, pending, chk)
+            print(json.dumps(res, indent=2))
+            return {"PASS": 0, "FAIL": 1}.get(res["verdict"], 3)
     except InputError as ex:
         sys.stderr.write(f"hpcperf_inputs: {ex}\n")
-        return 2 if a.cmd in ("args", "param", "show", "shell-env", "identity") else 1
+        return 2 if a.cmd in ("args", "param", "show", "shell-env", "identity", "check", "verdict") else 1
     return 0
 
 

@@ -16,8 +16,10 @@ timing:
   regex: ^MainLoop (?P<value>[0-9.eE+-]+) \[s\], \d+ calls
   select: only
 baseline:
-  method: validate.sh compares with the analytic solution of the periodic single-mode problem; the binary prints
-    only performance figures, nothing numeric to verify from the log
+  method: the binary prints 'L2_norm:' -- the L2 norm of (numerical - analytic) for the periodic single-mode problem --
+    which validate.sh predicts in closed form (u0 is an eigenmode of the discrete Laplacian, so u_n = A^n u0 with
+    A = 1 + 0.1 (6 cos(2 pi dx) - 6)); every registered input carries its closed-form value as a `near` rule at
+    validate.sh's relative tolerance 1e-3 (6 printed digits; GPU reduction order perturbs ~1e-12)
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: elapsed_line
@@ -30,6 +32,21 @@ coverage:
   reason: three grid sizes through the program's own --nx/--ny/--nz
 inputs:
 - id: n512-1000
+  baseline:
+    quantities:
+    - name: elapsed_line
+      role: diagnostic
+      regex: '^Elapsed time: [0-9.]+ \[s\]'
+      compare:
+        rule: present
+    - name: l2_norm
+      role: required
+      regex: '^L2_norm: (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: near
+        value: 3.5517793e-03      # closed form for N = 512, 1000 steps (validate.sh formula)
+        tol: 1.0e-3
   case: heat3d-ftcs
   variant: default
   source:
@@ -50,6 +67,21 @@ inputs:
   backends_validated:
   - cuda
 - id: n256-1000
+  baseline:
+    quantities:
+    - name: elapsed_line
+      role: diagnostic
+      regex: '^Elapsed time: [0-9.]+ \[s\]'
+      compare:
+        rule: present
+    - name: l2_norm
+      role: required
+      regex: '^L2_norm: (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: near
+        value: 1.7546025e-02      # closed form for N = 256, 1000 steps (validate.sh formula)
+        tol: 1.0e-3
   case: heat3d-ftcs
   variant: size
   source:
@@ -79,6 +111,21 @@ inputs:
   backends_validated:
   - cuda
 - id: n1024-200
+  baseline:
+    quantities:
+    - name: elapsed_line
+      role: diagnostic
+      regex: '^Elapsed time: [0-9.]+ \[s\]'
+      compare:
+        rule: present
+    - name: l2_norm
+      role: required
+      regex: '^L2_norm: (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: near
+        value: 1.3107948e-04      # closed form for N = 1024, 200 steps (validate.sh formula)
+        tol: 1.0e-3
   case: heat3d-ftcs
   variant: size
   source:

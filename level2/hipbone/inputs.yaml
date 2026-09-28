@@ -142,3 +142,8 @@ inputs:
       measured 2026-09-21 on dgx003: 100 timed CG iterations 1.2529 s (3 runs identical), 22.8 GB
       device memory, ~90 s wall of which ~70 s is host mesh setup; r_norm after 100 iterations
       7.77e-8 (recorded), 100 iterations, deterministic.
+check:
+  kind: none
+  reason: r_norm_final stays `record` -- upstream's 'generally < 1e-8' does not hold at the registered sizes and no
+    independent reference run exists for them; candidate basis (needs a decision) = validate.sh's CUDA-vs-Serial
+    criterion, |log10(candidate / baseline)| <= 1, or a Serial reference run per input (cost not established)

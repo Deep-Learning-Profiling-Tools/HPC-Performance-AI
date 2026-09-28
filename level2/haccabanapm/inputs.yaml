@@ -132,3 +132,15 @@ inputs:
       regex: '^pm_run_timing: provenance ranks=1 .* nsteps=5 warmup=5'
       compare:
         rule: present
+check:
+  # validate.sh runs run.sh on this input's indat and apps/snapshot_check on the ic / evolved snapshots it wrote.
+  kind: standalone
+  command: [bash, '{bench_dir}/validate.sh', CUDA]
+  env: {HPCPERF_HACCABANAPM_INDAT: '{param:indat}'}
+  pass_regex: '^HACCabanaPM CUDA validation \(.*\): PASS'
+  fail_regex: '^HACCabanaPM CUDA validation \(.*\): FAIL'
+  basis: snapshot_check (mirrors upstream's GoogleTest asserts 1-4, plus 5-7) -- particle count conserved, step == N_STEPS
+    and a_out == 1/(1+Z_FIN) (1e-6 rel), finite positions in [0, rL), finite velocities / equal masses, ids a
+    permutation, |sum v| / (N v_rms) <= 1e-6 per component, rms density-contrast growth within [0.5, 2] x linear theory
+  covers: all
+  timeout: 3600

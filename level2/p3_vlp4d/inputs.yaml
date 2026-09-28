@@ -31,6 +31,17 @@ coverage:
   reason: both upstream decks
 inputs:
 - id: sld10-large
+  check:
+    # validate.sh runs exactly this deck (wk/SLD10_large.dat) in its own directory and fits the Landau damping of
+    # ||E||_2 from the run's nrj.out.
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    pass_regex: '^PASS: p3_vlp4d \(CUDA\) Landau damping'
+    fail_regex: '^FAIL: p3_vlp4d'
+    basis: 129 finite nrj.out lines; least-squares slope through the local maxima of log||E||_2 within 5 % of the linear
+      Landau damping rate gamma = -0.40208 and the maxima spacing within 5 % of omega_r = 1.68289 (validate.sh; linear
+      theory for |k| = 0.5 sqrt 2, v_th = 1)
+    covers: all
   case: landau-damping-2d
   variant: default
   source:
@@ -54,6 +65,10 @@ inputs:
   - wk/SLD10_large.dat
   input_form: file
 - id: sld10
+  check:
+    kind: none
+    reason: 40 steps at dt 0.01 (t_end 0.4) is less than one plasma period, so the Landau-damping fit does not apply;
+      the proposed check (class D) is a same-input baseline comparison of the nrj.out rows, tolerance not established
   case: landau-damping-2d
   variant: size
   source:
