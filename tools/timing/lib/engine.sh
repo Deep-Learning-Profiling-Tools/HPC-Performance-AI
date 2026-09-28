@@ -14,7 +14,8 @@
 #
 # Raw evidence: <RAW_ROOT>/level<L>/<app>/<case>/<run_id>/
 #   run_meta.txt              case, protocol, platform, provenance (key=value)
-#   warmup.<i>/{run.log,bind.<pid>}   discarded
+#   warmup.<i>/{run.log,run.txt,roi.<pid>,bind.<pid>}   discarded from every statistic; the ROI
+#                             time is kept as `roi.warmup_runs_s` (what the first contact cost)
 #   clean.<i>/{run.log,run.txt,roi.<pid>,bind.<pid>}
 #   prof/{run.log,run.txt,roi.<pid>,bind.<pid>,trace.*}
 # bind.<pid> is the placement record of the measured process (probes/bindprobe.c, injected
@@ -239,10 +240,16 @@ measure_case() {
         echo "  $label FAIL ($pre_status: input $input_id not run; see ${out#$REPO/}/workload_identity.*)"
         return 1
     fi
+    # Warm-up runs are discarded from every statistic, but their ROI time is recorded: it shows
+    # what the first contact with the input cost (file and JIT caches, device state) next to the
+    # clean runs that follow it.
     i=0
     while [ "$i" -lt "$WARMUP_RUNS" ]; do
         d="$out/warmup.$i"; mkdir -p "$d"
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
+        t0=$(now_ns)
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
+        rc=$?; t1=$(now_ns)
+        echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         i=$((i + 1))
     done
 

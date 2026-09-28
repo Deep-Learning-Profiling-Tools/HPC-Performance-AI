@@ -49,7 +49,7 @@ run_meta.txt        key=value: schema, run_id, utc, level, app, case, backend, g
                     roi_where, warmup_runs, clean_runs, profiled_runs, skip_verify, collector,
                     collector_version, env_script, env_allow, env_deny_regex, platform_id,
                     device_json, git_commit, git_dirty, exe_sha256 (Level 1), status
-warmup.<i>/run.log  discarded
+warmup.<i>/{run.log,run.txt,roi.<pid>}  discarded (ROI time kept as roi.warmup_runs_s only)
 clean.<i>/run.log   stdout+stderr (the FOM and the launcher audit are read from clean.0)
 clean.<i>/run.txt   start_ns= end_ns= rc=
 clean.<i>/roi.<pid> ROI logs, one per process
@@ -126,7 +126,7 @@ the collector must reproduce it exactly (`expected.json`).
 | identity | `level`, `app`, `case`, `platform`, `run_id`, `utc`, `status` |
 | `measurement` | tool, protocol (warm-up / clean / profiled runs), collector (name, version, verified, capabilities), `skip_verify`, `verify_vs_roi`, `roi_where` (marker source lines), `roi_excludes`, backend, gpus, timeout, env script, env allow-list and deny rule, notes |
 | `inputs` | `declared_env`, `declared_argv`, and per process the argv / exe / cwd / host / rank the ROI log recorded, `exe_sha256` and `exe_sha256_when` (`measurement`: hashed by the engine right after the clean runs -- Level 1 up front, Level 2 from the ROI processes' own `exe` line; `summarize`: hashed later from the path, older runs only) |
-| `roi` | `wall_s` (median of the clean runs), `runs_s`, min / max / stddev, `entries`, `excluded_s`, `processes`, `imbalance_s`, `profiled_wall_s` (the same region in the trace), `profiled_marker_wall_s` (the profiled run's own ROI log), `profiler_inflation` |
+| `roi` | `wall_s` (median of the clean runs), `runs_s`, min / max / stddev, `entries`, `excluded_s`, `processes`, `imbalance_s`, `profiled_wall_s` (the same region in the trace), `profiled_marker_wall_s` (the profiled run's own ROI log), `profiler_inflation`; `warmup_runs_s`: the ROI time of each discarded warm-up run (null when it left no ROI log or failed) -- never part of any statistic, kept so the cost of the first contact with the input is visible |
 | `device` | inside the ROI: `busy_s` (union of all device activity), `busy_frac_of_roi`, `host_gap_s` = `roi.wall_s - busy_s`, `op_time_sum_s`, `overlap_s`, per category `<cat>_s` and `<cat>_ops`, copy/fill `<cat>_bytes` (pro rata when clipped). Null without a collector |
 | `runtime_api` | `name`, `roi` and `whole` call counts and time, synchronizing calls separately |
 | `ops` | per device operation inside the ROI: name, category, count, total / avg / min / max, share |

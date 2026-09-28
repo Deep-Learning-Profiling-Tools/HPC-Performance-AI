@@ -1563,6 +1563,24 @@ if rows["appd"]["placement_gpus"] != "0000:52:00.0" or rows["appd"]["placement_c
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
+echo "=== 20: warm-up runs are recorded, never counted"
+mkraw "$RAW/appf/default/r1" none 1 "Rate: 1"
+mkdir -p "$RAW/appf/default/r1/warmup.0"
+echo "start_ns=1000000000 end_ns=1000900000 rc=0" > "$RAW/appf/default/r1/warmup.0/run.txt"
+printf '# hpcperf-roi-log 2\npid 9\nrank 0\nargv ["x"]\nB 0 1000100000\nE 2500000 1002600000\n' > "$RAW/appf/default/r1/warmup.0/roi.9"   # 2.5 ms, ~5x the clean runs
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/out20" --no-report >/dev/null 2>&1
+pycheck "20a: roi.warmup_runs_s holds the warm-up ROI; wall_s / runs_s unchanged" <<'PY'
+import json, os, glob
+bad = []
+d = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out20/level2/appf/default/*.json"))[0]))
+r = d["roi"]
+if r["warmup_runs_s"] != [0.0025]: bad.append(f"warmup_runs_s {r['warmup_runs_s']}")
+if abs(r["wall_s"] - 0.00055) > 1e-9 or len(r["runs_s"]) != 2: bad.append(f"clean statistics changed: {r['wall_s']} {r['runs_s']}")
+e = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out20/level2/appe/default/*.json"))[0]))["roi"]
+if e["warmup_runs_s"] != []: bad.append(f"no warm-up dir -> {e['warmup_runs_s']}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

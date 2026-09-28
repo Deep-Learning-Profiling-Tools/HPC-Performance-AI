@@ -291,9 +291,17 @@ def build_record(raw):
         runs.append({"dir": d, "run": rt, "logs": logs, "roi": roi})
     good = [r for r in runs if r["run"] and r["run"].get("rc") == 0 and r["roi"] and r["roi"]["entries"] > 0]
     walls = [sec(r["roi"]["wall_ns"]) for r in good]
+    # warm-up runs: discarded from every statistic, recorded (when the engine logged their ROI)
+    # so the cost of the first contact with the input is visible next to the clean runs
+    warm = []
+    for d in sorted(glob.glob(os.path.join(raw, "warmup.*")), key=lambda p: int(p.rsplit(".", 1)[1])):
+        wl = [analysis.parse_roi_log(p) for p in sorted(glob.glob(os.path.join(d, "roi.*")))]
+        wr = analysis.clean_roi(wl) if wl else None
+        rt = read_run_txt(d)
+        warm.append(sec(wr["wall_ns"]) if wr and wr["entries"] > 0 and (rt is None or rt.get("rc") == 0) else None)
 
-    roi = {"wall_s": None, "runs_s": walls, "wall_s_min": None, "wall_s_max": None, "wall_s_stddev": None,
-           "entries": None, "excluded_s": None, "processes": None, "imbalance_s": None,
+    roi = {"wall_s": None, "runs_s": walls, "warmup_runs_s": warm, "wall_s_min": None, "wall_s_max": None,
+           "wall_s_stddev": None, "entries": None, "excluded_s": None, "processes": None, "imbalance_s": None,
            "profiled_wall_s": None, "profiled_marker_wall_s": None, "profiler_inflation": None}
     context = {"process_wall_s": None, "pre_roi_s": None, "post_roi_s": None}
     if walls:
