@@ -1516,9 +1516,9 @@ echo "=== 19: placement probe (probes/bindprobe.c) and the record's placement bl
 BP="$TMP/bp"; mkdir -p "$BP"
 if command -v cc >/dev/null 2>&1 && cc -O2 -shared -fPIC -o "$BP/bindprobe.so" "$TOOLS/probes/bindprobe.c" 2> "$BP/cc.log"; then
     # a process that wrote an ROI log records its placement; one that did not records nothing
-    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_BIND_LOG="$BP/bind" HPCPERF_ROI_LOG="$BP/roi" \
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_PLACEMENT_LOG="$BP/bind" HPCPERF_ROI_LOG="$BP/roi" \
         /bin/sh -c 'echo "# fake" > "$HPCPERF_ROI_LOG.$$"; exit 0'
-    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_BIND_LOG="$BP/bind_plain" HPCPERF_ROI_LOG="$BP/roi_plain" \
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_PLACEMENT_LOG="$BP/bind_plain" HPCPERF_ROI_LOG="$BP/roi_plain" \
         /bin/sh -c 'exit 0'
     mine="$(/usr/bin/grep Cpus_allowed_list /proc/self/status | cut -f2)"
     n=$(ls "$BP"/bind.* 2>/dev/null | wc -l); np=$(ls "$BP"/bind_plain.* 2>/dev/null | wc -l)

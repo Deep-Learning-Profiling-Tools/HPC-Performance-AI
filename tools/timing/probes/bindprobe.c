@@ -10,7 +10,7 @@
  * created, no signal is used. The application binary is not changed, so the record's
  * exe sha256 stays what it was.
  *
- * Output: <HPCPERF_BIND_LOG>.<pid>, one file per process that either held a GPU
+ * Output: <HPCPERF_PLACEMENT_LOG>.<pid>, one file per process that either held a GPU
  * device open or wrote an ROI log (<HPCPERF_ROI_LOG>.<pid>); shells, launchers and
  * helpers write nothing. Lines are "key value"; see tools/timing/SCHEMA.md
  * ("placement"). The file is diagnostic context, never a metric.
@@ -83,7 +83,7 @@ static int bp_last_cpu(const char* path) {
 
 static void bp_init(void) __attribute__((constructor));
 static void bp_init(void) {
-    const char* log = getenv("HPCPERF_BIND_LOG");
+    const char* log = getenv("HPCPERF_PLACEMENT_LOG");
     if (!log || !*log) return;
     bp_armed = 1;
     bp_t0 = bp_now();
@@ -94,7 +94,9 @@ static void bp_init(void) {
 
 static void bp_fini(void) __attribute__((destructor));
 static void bp_fini(void) {
-    const char* log = getenv("HPCPERF_BIND_LOG");
+    /* HPCPERF_PLACEMENT_LOG, not HPCPERF_BIND_LOG: that name belongs to the Level 2 launcher's
+     * GPU-binding audit (level2/tools/hpcperf_mpi_launch.sh) and must stay untouched */
+    const char* log = getenv("HPCPERF_PLACEMENT_LOG");
     const char* roi = getenv("HPCPERF_ROI_LOG");
     static const char* const envs[] = {
         "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER", "HPCPERF_GPUS", "OMP_NUM_THREADS",

@@ -84,7 +84,7 @@ now_ns() { date +%s%N; }
 # bind_env <run dir> -- the two variables that inject the placement probe into a run
 # (nothing when the probe is off or did not build). Word-split on purpose: the raw root
 # is refused when it contains whitespace (engine_setup).
-bind_env() { [ -n "${BINDPROBE_SO:-}" ] && echo "LD_PRELOAD=$BINDPROBE_SO HPCPERF_BIND_LOG=$1/bind"; return 0; }
+bind_env() { [ -n "${BINDPROBE_SO:-}" ] && echo "LD_PRELOAD=$BINDPROBE_SO HPCPERF_PLACEMENT_LOG=$1/bind"; return 0; }
 
 # bindprobe_setup: compile tools/timing/probes/bindprobe.c once per raw root (keyed by the
 # source hash) into <RAW_ROOT>/.bindprobe/. A build failure disables the probe for this
