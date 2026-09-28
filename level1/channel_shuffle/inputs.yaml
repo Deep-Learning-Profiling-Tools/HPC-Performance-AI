@@ -110,7 +110,10 @@ check:
   kind: post_run
   run_env: {HPCPERF_SKIP_VERIFY: null}
   pass_regex: '^Average time of channel shuffle \(NCHW\):'
-  fail_regex: 'Failed to pass channel shuffle'
+  # An aborted sweep is a failure too: upstream computes numel as int (cuda/main.cu:149, "assume no
+  # integer overflow"); at N=16, C=512, W=H=512 it overflows, cudaMalloc fails and the program prints
+  # "Device memory allocation failed. Exit" and exits 0 -- g2-w512-h512 has never completed its sweep.
+  fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
   basis: exact (memcmp) against the upstream CPU reference inside the program (cuda/main.cu); "Failed to pass ... check" on
     any mismatch, the "Average time" lines only after a passed comparison
   covers: all

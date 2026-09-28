@@ -992,6 +992,16 @@ doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, 
 assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[2]), inp), inp)["verdict"] == "PASS"
 assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[3]), inp), inp)["verdict"] == "FAIL"
 PY
+# an aborted sweep (upstream's int numel overflows at N=16, C=512, W=H=512; cudaMalloc fails; exit 0) is a
+# failure of the check, not a pass on the configurations that ran before it
+python3 - "$R" <<'PY' && ok "channel_shuffle: the check's fail line covers the aborted sweep ('Device memory allocation failed')" || bad "channel_shuffle aborted-sweep rule"
+import re, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w512-h512")
+fail = hi.check_of(doc, inp)["fail_regex"]
+assert re.search(fail, "Device memory allocation failed. Exit"), fail
+assert re.search(fail, "Failed to pass channel shuffle (NCHW) check"), fail
+assert not re.search(fail, "Average time of channel shuffle (NCHW): 0.2 (ms)"), fail
+PY
 if [ -x "$R/build/gaussian_elimination/cuda/gaussian_elimination_cuda" ]; then :; fi
 python3 - "$R" <<'PY' && ok "gaussian_elimination verify.py: the -s branch rebuilds create_matrix's Toeplitz system (a[i][j] = 10 exp(-0.01|i-j|), b = 1) and accepts the exact solution" || bad "gaussian verify -s branch"
 import os, subprocess, sys, tempfile, numpy as np
