@@ -52,3 +52,8 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  kind: none
+  reason: no reference exists for the rendered image (upstream ships none; verify.py checks structure and determinism
+    only); a same-input comparison of ao.ppm against the unoptimized baseline's image is the proposed check (class D),
+    its per-channel tolerance for reordered floating point not established

@@ -13,8 +13,8 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the CUDA port prints only 'Kernel Executed N times'; hop counts go to result.txt (checked by ctest verify.py)
 baseline:
-  method: no PASS line from the binary; ctest's verify.py recomputes all hop counts on the CPU (not wired into the
-    registry)
+  method: no PASS line from the binary; verify.py recomputes all hop counts on the CPU and compares result.txt
+    exactly -- the registry's correctness check (check:)
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: kernel_executed
@@ -73,3 +73,13 @@ inputs:
   files:
   - data/graph4096.txt
   input_form: file
+check:
+  # tools/inputs `check`: the checker runs the binary on the input's graph and recomputes every hop count
+  # with an independent CPU breadth-first search from the same graph file; result.txt must match exactly.
+  kind: standalone
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}']
+  pass_regex: '^PASS: all \d+ BFS costs match the CPU reference'
+  fail_regex: '^FAIL'
+  basis: exact integer comparison of every node's hop count with the CPU BFS of level1/bfs/verify.py (upstream ships no
+    reference; the graph file is the same one the benchmark reads)
+  covers: all

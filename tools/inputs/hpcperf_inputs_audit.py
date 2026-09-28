@@ -49,6 +49,18 @@ def _summary(d, bench_dir):
     return s
 
 
+def load_check(cdir, bench, iid):
+    """The check.json of an input under <cdir>/<bench>/<iid>/ (tools/inputs `check`), or None."""
+    f = os.path.join(cdir, bench, iid, "check.json")
+    if not os.path.exists(f):
+        return None
+    try:
+        d = json.load(open(f))
+    except ValueError:
+        return {"verdict": "ERROR", "error": "unreadable check.json", "file": f}
+    return dict(d, file=f) if d.get("schema") == hi.CHECK_SCHEMA else {"verdict": "ERROR", "error": "not a check record", "file": f}
+
+
 def load_measurement(mdir, level, bench, iid, bench_dir=None):
     f = os.path.join(mdir, f"level{level}-{bench}", iid, "measurement.json")
     if not os.path.exists(f):
@@ -70,7 +82,7 @@ def load_measurement(mdir, level, bench, iid, bench_dir=None):
             "compute_ge_1s": s.get("compute_ge_1s"), "stable": s.get("stable"), "dir": os.path.dirname(f)}
 
 
-def audit(root, mdir=None, blockers=None):
+def audit(root, mdir=None, blockers=None, cdir=None):
     rows = []
     for f in sorted(glob.glob(os.path.join(root, "level*", "*", "inputs.yaml"))):
         d = yaml.safe_load(open(f)); lvl = LEVELS[f.split(os.sep)[-3]]; b = d["benchmark"]
@@ -88,6 +100,32 @@ def audit(root, mdir=None, blockers=None):
                 m = load_measurement(mdir, lvl, b, i["id"], os.path.dirname(f))
                 if m:
                     meas[i["id"]] = m
+        # correctness checks (check.json per input) and the combined verdict per input
+        # (hi.correctness_verdict: baseline comparison + check; FAIL anywhere is FAIL)
+        checks, verdicts = {}, {}
+        try:
+            hdoc = hi.load(os.path.dirname(f))
+        except Exception as ex:
+            hdoc = None; load_err = str(ex)
+        for i in ins:
+            c = load_check(cdir, b, i["id"]) if cdir else None
+            if c:
+                checks[i["id"]] = {"verdict": c.get("verdict"), "covers": c.get("covers"), "file": c.get("file"),
+                                   "finished_utc": c.get("finished_utc")}
+            m = meas.get(i["id"])
+            cmp_v = (m or {}).get("baseline_verdict") or "NONE"
+            if m and m.get("invalidated"):
+                cmp_v = "NONE"
+            try:
+                if hdoc is None:
+                    raise RuntimeError(load_err)
+                verdicts[i["id"]] = hi.correctness_verdict(hdoc, hi.get_input(hdoc, i["id"]), cmp_v, (m or {}).get("needs_validation") if m and m.get("run_completed") else None,
+                                                           c if c and "schema" in c else None)["verdict"]
+            except Exception as ex:      # a registry the library refuses: no verdict, the reason kept
+                verdicts[i["id"]] = f"ERROR: {ex}"
+        blk = d.get("check")
+        has_check = {i["id"]: (isinstance(i.get("check"), dict) and i["check"].get("kind") in ("standalone", "post_run"))
+                     or ("check" not in i and isinstance(blk, dict) and blk.get("kind") in ("standalone", "post_run")) for i in ins}
         completed = [k for k, m in meas.items() if m["run_completed"]]
         native_measured = [k for k in completed if meas[k]["timing_ok"]]
         cr = {}
@@ -120,6 +158,8 @@ def audit(root, mdir=None, blockers=None):
             "unmeasured_inputs": [i["id"] for i in runnable if i["id"] not in completed] if mdir else [i["id"] for i in runnable],
             "unmaterialized_inputs": [i["id"] for i in ins if i.get("materialized", True) is False],
             "checker": checker, "record_only": rec, "correctness": corr,
+            "checks": checks, "has_check": has_check, "verdicts": verdicts,
+            "verdict_counts": {v: sum(1 for x in verdicts.values() if x == v) for v in ("PASS", "INCOMPLETE", "FAIL")},
             "coverage_blocker": blocker, "measurement_blocker": mb,
             "upstream_inputs_not_added": cov.get("upstream_inputs_not_added") or [],
             "derived_custom": [{"id": i["id"], "kind": i["source"]["kind"], "derivation": (i["source"].get("derivation") or "").strip()} for i in ins if i["source"]["kind"] in ("derived", "custom")],
@@ -214,9 +254,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
     ap.add_argument("--measurements"); ap.add_argument("--blockers"); ap.add_argument("--md"); ap.add_argument("--json")
+    ap.add_argument("--checks", help="directory of correctness check records: <dir>/<benchmark>/<input_id>/check.json (tools/inputs `check`)")
     a = ap.parse_args()
     blockers = yaml.safe_load(open(a.blockers)) if a.blockers else {}
-    rows = audit(a.root, a.measurements, blockers); tot = totals(rows)
+    rows = audit(a.root, a.measurements, blockers, a.checks); tot = totals(rows)
     md = markdown(rows, tot, a.measurements)
     if a.md:
         open(a.md, "w").write(md)

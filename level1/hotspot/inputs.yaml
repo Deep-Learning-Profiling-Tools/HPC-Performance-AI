@@ -14,8 +14,8 @@ timing:
   reason: 'the port''s pin_stats timer macro (printf "timer: ...") is compiled out in this build: the binary prints
     only the configuration lines (survey log); the temperature field goes to output.out'
 baseline:
-  method: no PASS line; ctest's verify.py re-simulates in numpy (rel 1e-3) against output.out (not wired into the
-    registry)
+  method: no PASS line; verify.py re-simulates the transient in numpy float32 and compares output.out (rel 1e-3)
+    -- the registry's correctness check (check:)
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: grid_line
@@ -113,3 +113,13 @@ inputs:
   - data/temp_512
   - data/power_512
   input_form: file
+check:
+  # verify.py runs the binary (grid, pyramid height, sim_time, temperature and power files -> output.out in the run
+  # directory) and re-simulates the same transient thermal problem in numpy float32 with the program's constants.
+  kind: standalone
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{param:grid}', '{param:pyramid_height}', '{param:sim_time}', '{arg:3}', '{arg:4}']
+  pass_regex: '^PASS: hotspot output matches CPU reference'
+  fail_regex: '^FAIL'
+  basis: max over the grid of |gpu - ref| / (1 + |ref|) <= 1e-3, verify.py's own float32-stencil tolerance (ctest, 2 steps);
+    whether it holds at 20 and 200 steps is established by running the check, not by adjusting it
+  covers: all

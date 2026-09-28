@@ -151,3 +151,14 @@ inputs:
   files:
   - inputs/3D_lb_hohlraum.xml
   input_form: file
+check:
+  # Branson's own per-step energy balances on the run's log (check_log.py gpu, the parser validate.sh uses):
+  # a consistency check of the transport, not a comparison with an independent result -- photons_transported stays
+  # `record` until the CPU-reference run of the same deck (check_log.py cmp, validate.sh check C) is established.
+  kind: post_run
+  command: [python3, '{bench_dir}/check_log.py', gpu, '{log}']
+  pass_regex: '^PASS: branson log check'
+  fail_regex: '^FAIL: branson log check'
+  basis: '|Radiation conservation| <= 1e-9 (Emission + Source + Pre census E) and |Material conservation| <= 1e-9 Pre mat E
+    in every step (Branson diagnostics, validate.sh check B; observed 1e-13..1e-15), GPU transport used, run finished'
+  covers: []

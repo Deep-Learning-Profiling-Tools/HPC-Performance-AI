@@ -158,3 +158,8 @@ inputs:
   backends_validated:
   - cuda
   input_form: compile-time
+check:
+  kind: none
+  reason: d_te stays `record` -- upstream's |d_te| < 4.5e-5 is defined for its 100x50 / 400 s validation problem only,
+    and the physical energy change of the registered 1000 s runs is 1e-4 .. 8e-4; a tolerance needs a basis
+    independent of any candidate (repeat / serial runs of the reference build), to be decided

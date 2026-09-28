@@ -16,8 +16,9 @@ timing:
     -- recorded as E2E only
 baseline:
   method: no built-in check for the GPU-sized problem; upstream's tests compare energies for the built-in deck.
-    The registry keeps the final energies.txt line (step exact; E/B field energies recorded, required, no tolerance
-    basis yet).
+    The registry keeps the final energies.txt line (step exact; E/B field energies compared with the same-input
+    baseline at 10 % relative -- the margin upstream itself uses for its energy regression,
+    tests/energy_comparison/compare_energies.h error_margin 0.10).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: final_step
@@ -31,13 +32,15 @@ baseline:
     regex: '^# last line \(step time E_energy B_energy\): \d+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+) '
     select: last
     compare:
-      rule: record
+      rule: rel
+      tol: 0.10        # upstream's energy-regression margin (tests/energy_comparison/compare_energies.h error_margin = 0.10)
   - name: b_energy_final
     role: required
     regex: '^# last line \(step time E_energy B_energy\): \d+ [0-9.eE+-]+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+)'
     select: last
     compare:
-      rule: record
+      rule: rel
+      tol: 0.10        # same margin
 coverage:
   status: MULTI_INPUT
   reason: the upstream deck size, the GPU size and an intermediate one through the deck's runtime size variables;

@@ -741,5 +741,313 @@ else
     skip=$((skip+1)); echo "skip remhos run.sh -o count (not built)"
 fi
 
+# ---- 15. correctness checks (inputs.yaml `check:`, `check`, file-sourced quantities, `near`, verdict) ----
+CK="$TMP/ck"; mkdir -p "$CK/build/fake" "$CK/level1/ck" "$CK/shared"; touch "$CK/hpcperf_env.sh"
+# the fake benchmark: prints a result line, records whether the timing switch was set, writes result.txt
+# into its cwd and one file per run into a shared directory; FAKE_RC forces its exit code
+cat > "$CK/build/fake/ck_bin" <<'EOF'
+#!/bin/sh
+echo "args: $*"
+echo "verify=${HPCPERF_SKIP_VERIFY:-unset}"
+echo "value 42" > result.txt
+echo "shared $$ $*" > "$FAKE_SHARED/out_$$.txt"
+[ "${FAKE_NOPASS:-}" = 1 ] || echo "RESULT OK"
+exit "${FAKE_RC:-0}"
+EOF
+chmod +x "$CK/build/fake/ck_bin"
+cat > "$CK/level1/ck/verify.py" <<'EOF'
+import os, subprocess, sys
+r = subprocess.run([sys.argv[1]] + sys.argv[2:], capture_output=True, text=True)
+mode = os.environ.get("FAKE_CHECK", "pass")
+if mode == "pass": print("PASS: verified " + " ".join(sys.argv[2:]))
+elif mode == "silent": pass
+elif mode == "fail": print("FAIL: mismatch")
+elif mode == "exit1": print("PASS: printed but"); sys.exit(1)
+EOF
+cat > "$CK/level1/ck/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: ck
+level: 1
+selector: null
+default_input: a
+entry: {kind: binary, path: build/fake/ck_bin}
+timing: {kind: none, status: NEEDS_TIMING_SUPPORT, reason: fake}
+baseline:
+  quantities:
+  - {name: ok_line, regex: '^RESULT OK$', compare: {rule: present}}
+  - {name: file_value, regex: '^value (?P<value>\d+)$', source: {file: result.txt}, compare: {rule: exact}}
+  - {name: shared_marker, regex: '^shared ', source: {file: 'outputs/out_*.txt', select_file: newest}, compare: {rule: present}}
+  - {name: bad_marker, regex: '^BAD', source: {file: 'outputs/out_*.txt', select_file: newest}, compare: {rule: absent}}
+coverage: {status: MULTI_INPUT}
+check:
+  kind: standalone
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{args}']
+  outputs: [{glob: '{repo}/shared/out_*.txt', new: true}]
+  pass_regex: '^PASS: verified'
+  fail_regex: '^FAIL'
+  basis: fake checker for the tests
+  covers: all
+inputs:
+  - {id: a, case: c, variant: default, source: {kind: upstream-file, upstream: x}, params: {n: 7, tag: seven}, args: [level1/ck/verify.py, '7'], backends_validated: [cuda]}
+  - id: b
+    case: c
+    variant: size
+    source: {kind: upstream-file, upstream: x}
+    params: {n: 8}
+    args: ['8']
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_SKIP_VERIFY: null}
+      outputs: [{glob: '{repo}/shared/out_*.txt', new: true}]
+      pass_regex: '^RESULT OK$'
+      fail_regex: '^RESULT BAD'
+      basis: the program's own line
+      covers: [file_value]
+  - id: c
+    case: c
+    variant: size
+    source: {kind: upstream-file, upstream: x}
+    params: {n: 9}
+    args: ['9']
+    backends_validated: [cuda]
+    check: {kind: none, reason: nothing to check yet}
+  - id: d
+    case: c
+    variant: size
+    source: {kind: upstream-file, upstream: x}
+    params: {n: 10}
+    args: ['10']
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      command: [python3, '{bench_dir}/verify.py', /bin/true, '{param:n}', '{arg:0}', '{log}', '{outputs}']
+      outputs: [{glob: '{repo}/shared/out_*.txt', new: true}]
+      pass_regex: '^PASS: verified'
+      fail_regex: '^FAIL'
+      basis: checker after the run, reads the run's outputs
+      covers: all
+EOF
+python3 "$TOOL" validate "$CK/level1/ck" >/dev/null 2>&1 && ok "check: a registry with benchmark-level and per-input check blocks (standalone, post_run, none) validates" || bad "check registry invalid: $(python3 "$TOOL" validate "$CK/level1/ck" 2>&1 | noise)"
+# schema negatives: each variant must be refused with a specific message
+ckneg() {  # ckneg <label> <sed expr> <expected message>
+    mkdir -p "$TMP/ckneg/level1/ck"; sed -e "$2" "$CK/level1/ck/inputs.yaml" > "$TMP/ckneg/level1/ck/inputs.yaml"
+    out="$(python3 "$TOOL" validate "$TMP/ckneg/level1/ck" 2>&1 | noise || true)"
+    grep -q -- "$3" <<<"$out" && ok "check schema: $1" || bad "check schema: $1 not refused: $out"
+}
+ckneg "unknown placeholder" "s/'{exe}', '{args}'/'{exe}', '{binary}'/" "unknown template placeholder {binary}"
+ckneg "unknown parameter" "s/'{param:n}', '{arg:0}'/'{param:nope}', '{arg:0}'/" "no parameter 'nope'"
+ckneg "argument index out of range" "s/'{param:n}', '{arg:0}'/'{param:n}', '{arg:5}'/" "only 1 argument"
+ckneg "covers names an unknown quantity" "s/covers: \[file_value\]/covers: [no_such_quantity]/" "unknown quantity 'no_such_quantity'"
+ckneg "kind none needs a reason" "s/check: {kind: none, reason: nothing to check yet}/check: {kind: none}/" "kind none needs a reason"
+ckneg "standalone cannot set run_env" "s/^  covers: all\$/  covers: all\n  run_env: {X: '1'}/" "run_env applies to post_run"
+ckneg "basis required" "s/  basis: fake checker for the tests/  basis: ''/" "check.basis missing"
+ckneg "{log} only for post_run" "s/'{exe}', '{args}'/'{exe}', '{log}'/" "not available for this check kind"
+ckneg "near needs value and tol" "s/compare: {rule: exact}}/compare: {rule: near, tol: 0.1}}/" "rule near needs value"
+# dry run renders the templates without running anything
+python3 "$TOOL" check "$CK/level1/ck" a --out "$TMP/ck_dry" --dry-run > "$TMP/ck_dry.json" 2>/dev/null; rc=$?
+python3 - "$TMP/ck_dry.json" "$CK" <<'PY' && [ ! -e "$TMP/ck_dry" ] && ok "check --dry-run: {exe} {args} rendered (repository path absolute), nothing executed" || bad "check dry-run rc=$rc $(cat "$TMP/ck_dry.json")"
+import json, sys; d = json.load(open(sys.argv[1])); ck = sys.argv[2]
+assert d["dry_run"] and d["command"] == ["python3", f"{ck}/level1/ck/verify.py", f"{ck}/build/fake/ck_bin", f"{ck}/level1/ck/verify.py", "7"], d["command"]
+assert d["outputs"] == [{"glob": f"{ck}/shared/out_*.txt", "new": True}], d["outputs"]
+PY
+python3 "$TOOL" check "$CK/level1/ck" d --out "$TMP/ck_dry2" --dry-run > "$TMP/ck_dry2.json" 2>/dev/null
+python3 - "$TMP/ck_dry2.json" "$TMP/ck_dry2" <<'PY' && ok "check --dry-run: {param:n} {arg:0} {log} {outputs} rendered for a post_run checker" || bad "check dry-run d: $(cat "$TMP/ck_dry2.json")"
+import json, sys; d = json.load(open(sys.argv[1])); o = sys.argv[2]
+assert d["command"][2:] == ["/bin/true", "10", "10", f"{o}/run/stdout.log", f"{o}/outputs"], d["command"]
+PY
+# standalone: PASS / silent exit 0 / FAIL line / exit 1 with a PASS line / missing checker
+export FAKE_SHARED="$CK/shared"
+FAKE_CHECK=pass python3 "$TOOL" check "$CK/level1/ck" a --out "$TMP/ck_a" >/dev/null 2>&1; rc=$?
+python3 - "$TMP/ck_a/check.json" <<'PY' && [ $rc -eq 0 ] && ok "check standalone: PASS line + exit 0 -> verdict PASS (exit 0), record carries workload, command, log sha256, outputs" || bad "check standalone PASS rc=$rc $(cat "$TMP/ck_a/check.json" 2>/dev/null | head -c 600)"
+import json, sys; d = json.load(open(sys.argv[1]))
+assert d["schema"] == "hpcperf-inputs-check-1" and d["verdict"] == "PASS" and d["matched_line"].startswith("PASS: verified") and d["kind"] == "standalone"
+assert d["workload"]["params"]["n"] == 7 and d["check"]["exit_code"] == 0 and len(d["check"]["log_sha256"]) == 64 and d["run"] is None
+assert d["covers"] == "all" and d["basis"] and d["git"] and d["started_utc"] and d["finished_utc"]
+PY
+FAKE_CHECK=silent python3 "$TOOL" check "$CK/level1/ck" a --out "$TMP/ck_a2" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q '"verdict": "FAIL"' "$TMP/ck_a2/check.json" && grep -q "no pass line" "$TMP/ck_a2/check.json" && ok "check standalone: exit 0 without the pass line -> FAIL, not PASS" || bad "check silent rc=$rc"
+FAKE_CHECK=fail python3 "$TOOL" check "$CK/level1/ck" a --out "$TMP/ck_a3" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q '"matched_line": "FAIL: mismatch"' "$TMP/ck_a3/check.json" && ok "check standalone: a FAIL line -> FAIL with the line recorded" || bad "check fail-line rc=$rc"
+FAKE_CHECK=exit1 python3 "$TOOL" check "$CK/level1/ck" a --out "$TMP/ck_a4" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q "checker exited 1" "$TMP/ck_a4/check.json" && ok "check standalone: exit 1 with a PASS line -> FAIL (the exit code wins)" || bad "check exit1 rc=$rc"
+mkdir -p "$TMP/ckmiss/level1/ck" "$TMP/ckmiss/build/fake" "$TMP/ckmiss/shared"; cp "$CK/build/fake/ck_bin" "$TMP/ckmiss/build/fake/"; touch "$TMP/ckmiss/hpcperf_env.sh"
+sed -e "s#\[python3, '{bench_dir}/verify.py', '{exe}', '{args}'\]#['{bench_dir}/no_such_checker', '{exe}']#" "$CK/level1/ck/inputs.yaml" > "$TMP/ckmiss/level1/ck/inputs.yaml"
+FAKE_SHARED="$TMP/ckmiss/shared" python3 "$TOOL" check "$TMP/ckmiss/level1/ck" a --out "$TMP/ck_a5" >/dev/null 2>&1; rc=$?
+[ $rc -eq 2 ] && grep -q '"verdict": "ERROR"' "$TMP/ck_a5/check.json" && ok "check standalone: a checker that cannot start -> ERROR (exit 2), never PASS" || bad "check missing checker rc=$rc"
+python3 "$TOOL" check "$CK/level1/ck" c --out "$TMP/ck_c" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "has no correctness check (nothing to check yet)" "$TMP/e" && ok "check: an input with kind none is refused with its reason (exit 2)" || bad "check none rc=$rc $(cat "$TMP/e")"
+# post_run: the program's own line; HPCPERF_SKIP_VERIFY never reaches the run; outputs collected (new files only)
+echo "stale" > "$CK/shared/out_stale.txt"; touch -d '2000-01-01' "$CK/shared/out_stale.txt"
+HPCPERF_SKIP_VERIFY=1 python3 "$TOOL" check "$CK/level1/ck" b --out "$TMP/ck_b" >/dev/null 2>&1; rc=$?
+python3 - "$TMP/ck_b" <<'PY' && [ $rc -eq 0 ] && ok "check post_run: program pass line -> PASS; HPCPERF_SKIP_VERIFY unset for the run; only the run's new shared file collected (sha256 recorded)" || bad "check post_run b rc=$rc $(cat "$TMP/ck_b/check.json" 2>/dev/null | head -c 800)"
+import json, os, sys; o = sys.argv[1]; d = json.load(open(os.path.join(o, "check.json")))
+assert d["verdict"] == "PASS" and d["run"]["exit_code"] == 0 and d["run"]["skip_verify"] is False and d["check"]["note"]
+assert "verify=unset" in open(d["run"]["log"]).read(), open(d["run"]["log"]).read()
+outs = [x for x in d["outputs"] if "sha256" in x]
+assert len(outs) == 1 and os.path.basename(outs[0]["source"]).startswith("out_") and not outs[0]["source"].endswith("out_stale.txt") and len(outs[0]["sha256"]) == 64, d["outputs"]
+assert os.path.isfile(outs[0]["copied_to"])
+PY
+FAKE_RC=3 python3 "$TOOL" check "$CK/level1/ck" b --out "$TMP/ck_b2" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q "benchmark run exited 3" "$TMP/ck_b2/check.json" && ok "check post_run: benchmark exit 3 -> FAIL without reading its output" || bad "check post_run rc rc=$rc"
+FAKE_NOPASS=1 python3 "$TOOL" check "$CK/level1/ck" b --out "$TMP/ck_b3" >/dev/null 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q "no pass line" "$TMP/ck_b3/check.json" && ok "check post_run: run exit 0 without the pass line -> FAIL" || bad "check post_run nopass rc=$rc"
+FAKE_CHECK=pass python3 "$TOOL" check "$CK/level1/ck" d --out "$TMP/ck_d" >/dev/null 2>&1; rc=$?
+python3 - "$TMP/ck_d" <<'PY' && [ $rc -eq 0 ] && ok "check post_run with a checker: the run's log and outputs directory are handed to the checker" || bad "check post_run d rc=$rc $(cat "$TMP/ck_d/check.json" 2>/dev/null | head -c 600)"
+import json, os, sys; o = sys.argv[1]; d = json.load(open(os.path.join(o, "check.json")))
+assert d["verdict"] == "PASS" and d["run"]["exit_code"] == 0 and d["matched_line"] == f"PASS: verified 10 10 {o}/run/stdout.log {o}/outputs"
+PY
+# file-sourced quantities through measure (result.txt in the run directory, the shared file under outputs/)
+python3 "$TOOL" measure "$CK/level1/ck" b --out "$TMP/ck_m" --warmup 0 --reps 2 --timeout 30 >/dev/null 2>&1; rc=$?
+python3 - "$TMP/ck_m/measurement.json" <<'PY' && ok "file-sourced quantities: value read from result.txt, markers from the newest outputs/ file; baseline verdict PASS over the independent run" || bad "file-sourced measure rc=$rc $(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d['runs'][0].get('baseline_quantities'), d['runs'][0].get('outputs'), d['summary']['baseline_verdict'])" "$TMP/ck_m/measurement.json" 2>&1)"
+import json, sys; d = json.load(open(sys.argv[1]))
+q = d["runs"][0]["baseline_quantities"]
+assert q["file_value"]["value"] == 42 and q["shared_marker"]["present"] and not q["bad_marker"]["present"] and "error" not in q["bad_marker"], q
+assert d["summary"]["baseline_verdict"] == "PASS", d["summary"]["baseline_verdict"]
+PY
+python3 - "$R" "$CK/level1/ck" "$TMP/ck_m" <<'PY' && ok "file-sourced quantities: a missing source file is an error -- 'absent' does not pass on it, compare fails" || bad "missing source file accepted"
+import json, os, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+doc = hi.load(sys.argv[2]); inp = hi.get_input(doc, "b")
+log = Path(sys.argv[3]) / "rep1" / "stdout.log"
+cur = hi.extract(doc, log, inp, run_dir=Path(sys.argv[3]) / "nowhere")
+assert cur["bad_marker"].get("error") and cur["file_value"]["value"] is None, cur
+b = json.load(open(Path(sys.argv[3]) / "baseline.json"))
+res = hi.compare(doc, b["quantities"], cur, inp)
+assert not res["ok"] and "bad_marker" in res["failed"] and "file_value" in res["failed"], res["failed"]
+PY
+# the near rule: a reference constant with a relative tolerance (no baseline needed)
+python3 - "$R" <<'PY' && ok "near rule: |v - value| <= tol |value| passes, beyond it fails, and it needs no baseline value" || bad "near rule"
+import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = {"baseline": {"quantities": [{"name": "l2", "regex": "x", "compare": {"rule": "near", "value": 0.00355178, "tol": 1e-3}}]}}
+ok_ = hi.compare(doc, {}, {"l2": {"value": 0.003554}}, None); bad_ = hi.compare(doc, {}, {"l2": {"value": 0.00360}}, None)
+assert ok_["verdict"] == "PASS" and ok_["checks"][0]["reference"] == 0.00355178, ok_
+assert bad_["verdict"] == "FAIL" and bad_["checks"][0]["rel_err"] > 1e-3, bad_
+assert hi.native_check(doc, {"l2": {"value": 0.003554}})["status"] == "PASS"
+PY
+# the combined verdict (correctness_verdict / verdict sub-command)
+python3 - "$R" "$CK/level1/ck" "$TMP/ck_a/check.json" <<'PY' && ok "correctness_verdict: FAIL wins; compare PASS is PASS; INCOMPLETE + covering check PASS is PASS; non-covering / ERROR / stale checks leave INCOMPLETE" || bad "correctness_verdict"
+import copy, json, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = hi.load(sys.argv[2]); inp = hi.get_input(doc, "a"); chk = json.load(open(sys.argv[3]))
+V = lambda cv, pend, c: hi.correctness_verdict(doc, inp, cv, pend, c)["verdict"]
+assert V("FAIL", [], chk) == "FAIL" and V("PASS", [], dict(chk, verdict="FAIL")) == "FAIL"
+assert V("PASS", [], None) == "PASS" and V("INCOMPLETE", ["q"], chk) == "PASS"           # covers all
+assert V("INCOMPLETE", ["q"], dict(chk, covers=["other"])) == "INCOMPLETE" and V("INCOMPLETE", ["q"], dict(chk, covers=["q"])) == "PASS"
+assert V("NONE", None, chk) == "PASS" and V("NONE", None, None) == "INCOMPLETE" and V("INCOMPLETE", ["q"], dict(chk, verdict="ERROR")) == "INCOMPLETE"
+stale = copy.deepcopy(chk); stale["workload"]["params"]["n"] = 99
+r = hi.correctness_verdict(doc, inp, "INCOMPLETE", ["q"], stale); assert r["verdict"] == "INCOMPLETE" and r["check_stale"], r
+PY
+python3 "$TOOL" verdict "$CK/level1/ck" b --measurement "$TMP/ck_m/measurement.json" --check "$TMP/ck_b/check.json" > "$TMP/v.json" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && grep -q '"verdict": "PASS"' "$TMP/v.json" && ok "verdict sub-command: measurement PASS + check PASS -> PASS (exit 0)" || bad "verdict rc=$rc $(cat "$TMP/v.json")"
+python3 "$TOOL" verdict "$CK/level1/ck" b --check "$TMP/ck_b2/check.json" > "$TMP/v.json" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && grep -q '"verdict": "FAIL"' "$TMP/v.json" && ok "verdict sub-command: a failed check -> FAIL (exit 1)" || bad "verdict fail rc=$rc"
+python3 "$TOOL" verdict "$CK/level1/ck" c > "$TMP/v.json" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && grep -q '"verdict": "INCOMPLETE"' "$TMP/v.json" && ok "verdict sub-command: nothing measured, no check -> INCOMPLETE (exit 3)" || bad "verdict incomplete rc=$rc"
+python3 "$TOOL" verdict "$CK/level1/ck" a --check "$TMP/ck_b/check.json" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "not a check record of ck/a" "$TMP/e" && ok "verdict sub-command: another input's check record is refused" || bad "verdict wrong input rc=$rc"
+# the audit reads check records: <checks>/<bench>/<input>/check.json
+mkdir -p "$TMP/ckaudit/ck/a" "$TMP/ckaudit/ck/b"; cp "$TMP/ck_a/check.json" "$TMP/ckaudit/ck/a/"; cp "$TMP/ck_b2/check.json" "$TMP/ckaudit/ck/b/"
+python3 - "$R" "$CK" "$TMP/ckaudit" <<'PY' && ok "audit --checks: per-input has_check / check verdict / combined verdict (a PASS, b FAIL, c INCOMPLETE without a check)" || bad "audit checks"
+import sys, os; sys.path.insert(0, os.path.join(sys.argv[1], "tools", "inputs")); import hpcperf_inputs_audit as au
+rows = au.audit(sys.argv[2], None, {}, sys.argv[3]); r = [x for x in rows if x["benchmark"] == "ck"][0]
+assert r["has_check"] == {"a": True, "b": True, "c": False, "d": True}, r["has_check"]
+assert r["checks"]["a"]["verdict"] == "PASS" and r["checks"]["b"]["verdict"] == "FAIL" and "c" not in r["checks"]
+assert r["verdicts"] == {"a": "PASS", "b": "FAIL", "c": "INCOMPLETE", "d": "INCOMPLETE"}, r["verdicts"]
+assert r["verdict_counts"] == {"PASS": 1, "INCOMPLETE": 2, "FAIL": 1}
+PY
+unset FAKE_SHARED
+# real registries: the wired checks render, the closed-form and channel_shuffle rules behave
+python3 "$TOOL" check "$R/level1/bfs" graph4096 --out "$TMP/ck_bfs" --dry-run > "$TMP/ck_bfs.json" 2>/dev/null; rc=$?
+python3 - "$TMP/ck_bfs.json" "$R" <<'PY' && ok "bfs: check renders verify.py <exe> <absolute graph path> (standalone, covers all)" || bad "bfs check render rc=$rc $(cat "$TMP/ck_bfs.json")"
+import json, sys; d = json.load(open(sys.argv[1])); R = sys.argv[2]
+assert d["kind"] == "standalone" and d["command"][:2] == ["python3", f"{R}/level1/bfs/verify.py"] and d["command"][3] == f"{R}/level1/bfs/data/graph4096.txt", d["command"]
+PY
+python3 "$TOOL" check "$R/level1/hotspot" g512-p2-t200 --out "$TMP/ck_hs" --dry-run > "$TMP/ck_hs.json" 2>/dev/null
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['command'][3:6]==['512','2','200'] and d['command'][6].endswith('/data/temp_512'), d['command']" "$TMP/ck_hs.json" && ok "hotspot: check renders grid / pyramid height / sim_time from the params and the data files from the args" || bad "hotspot check render: $(cat "$TMP/ck_hs.json")"
+python3 "$TOOL" check "$R/level2/examinimd" snap-ta06a --out "$TMP/x" --dry-run >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 2 ] && grep -q "SNAP deck" "$TMP/e" && ok "examinimd: the SNAP input's per-input 'kind: none' overrides the benchmark check with its reason" || bad "examinimd snap rc=$rc"
+for d in level1/bfs level1/hotspot level1/srad_v1 level1/gaussian_elimination level1/channel_shuffle level2/haccabanapm level2/examinimd level2/exacmech level2/kripke level2/comb level2/branson level2/exampm level2/p3_vlp4d level2/p3_heat3d level2/miniem level2/cabanapic level2/hipbone level2/miniweather level2/quicksilver level2/shaw level1/ao_bench; do
+    python3 "$TOOL" validate "$R/$d" >/dev/null 2>&1 || bad "validate $d after the correctness wiring: $(python3 "$TOOL" validate "$R/$d" 2>&1 | noise | head -3)"
+done; ok "every registry touched by the correctness wiring validates"
+printf 'Elapsed time: 1.5 [s]\nL2_norm: 0.00355178\n' > "$TMP/h3.log"
+python3 "$TOOL" extract "$R/level2/p3_heat3d" "$TMP/h3.log" --input n512-1000 > "$TMP/h3.json" 2>/dev/null
+python3 - "$R" "$TMP/h3.json" "$TMP/h3.log" <<'PY' && ok "p3_heat3d: L2_norm is a required 'near' quantity against the closed form (0.00355178 passes, 0.0036 fails, upstream-documented value)" || bad "p3_heat3d near rule"
+import json, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+doc = hi.load(sys.argv[1] + "/level2/p3_heat3d"); inp = hi.get_input(doc, "n512-1000")
+cur = json.load(open(sys.argv[2])); assert cur["l2_norm"]["value"] == 0.00355178
+assert hi.compare(doc, {}, cur, inp)["verdict"] == "PASS"
+assert hi.compare(doc, {}, {"l2_norm": {"value": 0.0036}, "elapsed_line": {"present": True}}, inp)["verdict"] == "FAIL"
+el = {"present": True}
+assert hi.native_check(doc, {"l2_norm": {"value": 0.00013108}, "elapsed_line": el}, hi.get_input(doc, "n1024-200"))["status"] == "PASS"
+assert hi.native_check(doc, {"l2_norm": {"value": 0.017546}, "elapsed_line": el}, hi.get_input(doc, "n256-1000"))["status"] == "PASS"
+assert hi.native_check(doc, {"l2_norm": {"value": 0.0180}, "elapsed_line": el}, hi.get_input(doc, "n256-1000"))["status"] == "FAIL"
+PY
+printf '(N=1 C=32 W=224 H=224)\nAverage time of channel shuffle (NHWC): 0.1 (ms)\nAverage time of channel shuffle (NCHW): 0.2 (ms)\n' > "$TMP/cs_ok.log"
+printf '(N=1 C=32 W=224 H=224)\n' > "$TMP/cs_skip.log"
+python3 - "$R" "$TMP/cs_ok.log" "$TMP/cs_skip.log" <<'PY' && ok "channel_shuffle: the 'Average time' lines are required evidence that the built-in memcmp ran -- a skip-verify style log no longer passes on the absent failure marker alone" || bad "channel_shuffle evidence rule"
+import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w512-h512")
+assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[2]), inp), inp)["verdict"] == "PASS"
+assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[3]), inp), inp)["verdict"] == "FAIL"
+PY
+# an aborted sweep (upstream's int numel overflows at N=16, C=512, W=H=512; cudaMalloc fails; exit 0) is a
+# failure of the check, not a pass on the configurations that ran before it
+python3 - "$R" <<'PY' && ok "channel_shuffle: the check's fail line covers the aborted sweep ('Device memory allocation failed')" || bad "channel_shuffle aborted-sweep rule"
+import re, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w512-h512")
+fail = hi.check_of(doc, inp)["fail_regex"]
+assert re.search(fail, "Device memory allocation failed. Exit"), fail
+assert re.search(fail, "Failed to pass channel shuffle (NCHW) check"), fail
+assert not re.search(fail, "Average time of channel shuffle (NCHW): 0.2 (ms)"), fail
+PY
+if [ -x "$R/build/gaussian_elimination/cuda/gaussian_elimination_cuda" ]; then :; fi
+python3 - "$R" <<'PY' && ok "gaussian_elimination verify.py: the -s branch rebuilds create_matrix's Toeplitz system (a[i][j] = 10 exp(-0.01|i-j|), b = 1) and accepts the exact solution" || bad "gaussian verify -s branch"
+import os, subprocess, sys, tempfile, numpy as np
+R = sys.argv[1]; n = 16
+idx = np.arange(n); a = 10.0 * np.exp(-0.01 * np.abs(idx[:, None] - idx[None, :])); x = np.linalg.solve(a, np.ones(n))
+d = tempfile.mkdtemp(); exe = os.path.join(d, "fake_gauss")
+open(exe, "w").write("#!/bin/sh\necho 'Create matrix internally in parse, size = 16'\necho 'The final solution is: '\necho '" + " ".join(f"{v:.12g}" for v in x) + "'\n"); os.chmod(exe, 0o755)
+r = subprocess.run(["python3", f"{R}/level1/gaussian_elimination/verify.py", exe, "-s", "16"], capture_output=True, text=True)
+assert r.returncode == 0 and r.stdout.startswith("PASS: residual"), r.stdout + r.stderr
+open(exe, "w").write("#!/bin/sh\necho 'The final solution is: '\necho '" + " ".join("1.0" for _ in x) + "'\n"); os.chmod(exe, 0o755)
+r = subprocess.run(["python3", f"{R}/level1/gaussian_elimination/verify.py", exe, "-s", "16"], capture_output=True, text=True)
+assert r.returncode == 1 and r.stdout.startswith("FAIL: residual"), r.stdout
+PY
+python3 - "$R" <<'PY' && ok "comb check_run.py: clean proc + summary files PASS; a mismatch line, a missing summary or no test-comm phase FAIL" || bad "comb check_run.py"
+import os, subprocess, sys, tempfile
+R = sys.argv[1]
+def run(files):
+    d = tempfile.mkdtemp()
+    for n, c in files.items(): open(os.path.join(d, n), "w").write(c)
+    r = subprocess.run(["python3", f"{R}/level2/comb/check_run.py", d], capture_output=True, text=True); return r.returncode, r.stdout
+ok = {"Comb_07_proc0000": "Starting test Comm mpi\ntest-comm:  num 1 avg 0.3 s\n", "Comb_07_summary": "Args x\ntest-comm:  num 1 avg 0.37 s min 0.37 s max 0.37 s\n", "Comb_07_summary.csv": "x"}
+assert run(ok)[0] == 0 and "PASS: Comb halo check" in run(ok)[1]
+bad = dict(ok); bad["Comb_07_proc0000"] = "test pre-comm 0x1 1 zone 5(1 2 3) g5(1 2 3) = 3.000000 expected -1.000000 next 7.000000\n"
+assert run(bad)[0] == 1 and "1 halo value mismatch" in run(bad)[1]
+assert run({"Comb_07_proc0000": ok["Comb_07_proc0000"]})[0] == 1
+nosum = dict(ok); nosum["Comb_07_summary"] = "Args x\nbench-comm: num 1\n"; assert run(nosum)[0] == 1 and "test-comm" in run(nosum)[1]
+PY
+python3 - "$R" <<'PY' && ok "branson check_log.py: conservation within 1e-9 with GPU transport PASSes; a violated balance, a CPU fallback or a missing FOM line FAILs; --steps N enforced" || bad "branson check_log.py"
+import os, subprocess, sys, tempfile
+R = sys.argv[1]
+def log(rad="1.0e-12", gpu=True, fom=True, steps=2):
+    s = ""
+    for i in range(steps):
+        s += "Step: %d\n" % (i + 1) + ("Transferring 25 cell(s) to the GPU\n" if gpu else "GPU kernel not available\n")
+        s += "Emission E: 1.0e3\nSource E: 0.0\nPre census E: 2.0e2\nPre mat E: 5.0e3\nPost mat E: 5.1e3\nAbsorption E: 1.0e2\nExit E: 1.0\n"
+        s += "Radiation conservation: %s\nMaterial conservation: 1.0e-12\n" % rad
+        s += "   0   1.5000   0.1   0.2\n   1   1.2000   0.1   0.2\n"          # T_e rows (cell, T_e, ...)
+    if fom: s += "Total Photons transported: 100\nPhotons Per Second (FOM): 1.0e6\n"
+    d = tempfile.mkdtemp(); p = os.path.join(d, "run.log"); open(p, "w").write(s); return p
+def run(*args):
+    r = subprocess.run(["python3", f"{R}/level2/branson/check_log.py"] + list(args), capture_output=True, text=True); return r.returncode, r.stdout
+assert run("gpu", log())[0] == 0 and "PASS: branson log check (gpu)" in run("gpu", log())[1]
+assert run("gpu", log(rad="1.0e-4"))[0] == 1 and run("gpu", log(gpu=False))[0] == 1 and run("gpu", log(fom=False))[0] == 1
+assert run("gpu", log(steps=2), "--steps", "5")[0] == 1 and run("gpu", log(steps=5), "--steps", "5")[0] == 0
+assert run("cmp", log(), log())[0] == 0
+PY
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

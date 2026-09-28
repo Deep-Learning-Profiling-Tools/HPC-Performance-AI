@@ -174,6 +174,8 @@ python3 tools/inputs/hpcperf_inputs.py compare  level3/lammps  <baseline.json> <
 python3 tools/inputs/hpcperf_inputs.py status   level2/hipbone <measurement.json>
 python3 tools/inputs/hpcperf_inputs.py migrate-baseline level2/hipbone <old baseline.json> --input coral2-nx24-p14 --evidence <its measurement.json> --note "..."
 python3 tools/inputs/hpcperf_inputs.py measure  level2/hipbone sweep-nx16-p8 --out <dir> [--warmup 1] [--reps 3] [--timeout 900] [--gpus 1]
+python3 tools/inputs/hpcperf_inputs.py check    level1/bfs graph4096 --out <dir> [--timeout S] [--gpus 1] [--dry-run]
+python3 tools/inputs/hpcperf_inputs.py verdict  level1/bfs graph4096 [--measurement <measurement.json>] [--check <check.json>]
 ```
 
 `measure` is the pilot calibration run: one complete warm-up run (kept, not
@@ -257,3 +259,63 @@ Tests: `tools/inputs/tests/run_all.sh` (no GPU; fixtures under `tests/fixtures/`
 run.sh guards through `HPCPERF_DRY_RUN=1`, and a fake benchmark under a temporary
 repository root for the `measure` negative cases: nonzero exit, exit 0 with a FAIL
 marker, NaN, missing timer line, stale log, record-only rules).
+
+## Correctness checks (`check:`)
+
+Every registered Level 1 / Level 2 input must have an executable correctness check that is
+separate from its timing runs. The registry describes it in a `check:` block -- benchmark-level,
+or per input (an input's own block replaces the benchmark's; `kind: none` with a `reason` states
+explicitly that an input has no check yet):
+
+```yaml
+check:
+  kind: standalone | post_run | none
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}']   # tokens, templated
+  env: {HPCPERF_HACCABANAPM_INDAT: '{param:indat}'}                 # checker environment (templated; null = unset)
+  run_env: {HPCPERF_SKIP_VERIFY: null}      # post_run only: the benchmark run's environment overrides
+  outputs: ['{repo}/build/level2/p3_vlp4d/cuda/run/nrj.out', {glob: '{repo}/build/level2/comb/cuda/Comb_*', new: true}]
+  cwd: '{run_dir}'                          # default
+  pass_regex: '^PASS: '
+  fail_regex: '^FAIL'                       # optional; any matching line is a failure
+  basis: <what is compared, the tolerance and where it comes from>
+  covers: all | [<quantity names>]          # the required quantities this check verifies
+  timeout: 3600                             # seconds, optional
+  reason: <why there is no check>           # kind none only
+```
+
+* `standalone`: the checker runs the benchmark itself (a `verify.py` that runs the binary and
+  recomputes the result on the CPU, a `validate.sh`); cwd = `<out>/run`.
+* `post_run`: the tool runs the benchmark once in `<out>/run` (stdout -> `stdout.log`; the
+  timing switch `HPCPERF_SKIP_VERIFY` is never set; `run_env` applied), copies the declared
+  `outputs` (paths or globs of files the application writes into shared directories; `new: true`
+  = only files modified by this run) into `<out>/outputs`, then runs the checker -- or, without
+  a `command`, reads the program's own pass/fail lines from `stdout.log`.
+* Templates: `{exe}` (the binary, or the run.sh entry), `{args}` (the input's whole argument
+  list, repository paths made absolute), `{arg:N}`, `{param:NAME}`, `{run_dir}`, `{log}` (the
+  post_run stdout), `{outputs}`, `{bench_dir}`, `{repo}`. `validate` renders every input's block
+  and refuses unknown parameters, arguments or placeholders.
+* Verdict (`check.json`, schema `hpcperf-inputs-check-1`, with the workload identity, command,
+  environment overrides, exit codes, log sha256, outputs with sha256, git head, host / GPU and
+  timestamps): FAIL when a fail line is seen, when the benchmark or the checker exits non-zero or
+  when no pass line is printed -- **exit 0 without the pass line is FAIL, never PASS**; PASS only
+  with a pass line, no fail line and exit 0; ERROR when the check could not be started.
+
+The verdict of an input combines the baseline comparison with the check
+(`correctness_verdict`, `verdict` sub-command, `hpcperf_inputs_audit.py --checks DIR`):
+FAIL when either failed; PASS when the comparison verified every required quantity, or when
+nothing failed and a check PASSED whose `covers` holds every still-pending required quantity
+(`all` covers everything) and whose recorded workload identity is the input's current one;
+INCOMPLETE otherwise (an ERRORed, stale or non-covering check counts as no check). A required
+`record` quantity is never downgraded by a check that does not cover it.
+
+Two smaller extensions serve the checks: a quantity may be read from a file instead of stdout
+(`source: {file: <path or glob relative to the run directory>, select_file: only|newest}`; a
+missing file is an error that satisfies nothing, not even `absent`), and the rule `near`
+compares a quantity with a reference constant (`value`) at a relative tolerance (`tol`) -- for
+analytic or upstream-published results (p3_heat3d's closed-form `L2_norm`).
+
+Principles (fixed for this project): upstream / native check > upstream reference > exact
+deterministic comparison > same-input unoptimized baseline; a tolerance needs an upstream or
+numerical basis and is never fitted to a candidate; runtime, FOM, iteration counts, sizes, exit
+0 and "no NaN" are diagnostics, never correctness; a required `record` is never downgraded to
+a diagnostic; correctness instrumentation stays outside the ROI.

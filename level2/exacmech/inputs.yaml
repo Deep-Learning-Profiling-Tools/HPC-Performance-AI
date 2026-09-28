@@ -17,7 +17,10 @@ timing:
   select: only
 baseline:
   method: upstream ships no reference; validate.sh compares GPU vs CPU on the upstream CPU deck. The registry keeps
-    the final volume-averaged stress components (required, recorded; no tolerance basis yet).
+    the final volume-averaged stress components, compared with the same-input baseline at validate.sh's RTOL 1e-5
+    (print precision; the GPU and CPU paths differ only by summation order; ATOL 1e-6 MPa is negligible at the
+    registered stress levels). The registry check (check_reference.sh) makes the same comparison against the
+    OpenMP/CPU execution path of the same miniapp for the registered deck.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: stress_s11_final
@@ -25,13 +28,15 @@ baseline:
     regex: '^Step# \d+ Stress: (?P<value>[0-9.eE+-]+) '
     select: last
     compare:
-      rule: record
+      rule: rel
+      tol: 1.0e-5      # validate.sh RTOL (6 printed significant digits)
   - name: stress_s33_final
     role: required
     regex: '^Step# \d+ Stress: [0-9.eE+-]+ [0-9.eE+-]+ (?P<value>[0-9.eE+-]+) '
     select: last
     compare:
-      rule: record
+      rule: rel
+      tol: 1.0e-5      # validate.sh RTOL
   - name: steps
     role: required
     regex: '^Number of steps: (?P<value>\d+)'
@@ -110,3 +115,17 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  # check_reference.sh generates the registered deck (points, steps, model) twice -- device GPU and the reference
+  # execution path -- runs both and compares all steps x 6 stress components (validate.sh's comparison, generalised
+  # from upstream's CPU deck to the registered configuration).
+  kind: standalone
+  command: [bash, '{bench_dir}/check_reference.sh', '{param:nqpts}', '{param:nsteps}', '{param:model}', CUDA]
+  env: {EXACMECH_REF_DEVICE: OpenMP}
+  pass_regex: '^ExaCMech CUDA reference check \(.*\): PASS'
+  fail_regex: '^ExaCMech CUDA reference check \(.*\): FAIL'
+  basis: '|gpu - ref| <= 1e-5 |ref| + 1e-6 MPa for every step and component (validate.sh RTOL/ATOL = print precision);
+    the reference is the OpenMP path of the same sources on the same random orientations (seed 42), an independent
+    execution path, not a stored result'
+  covers: all
+  timeout: 14400

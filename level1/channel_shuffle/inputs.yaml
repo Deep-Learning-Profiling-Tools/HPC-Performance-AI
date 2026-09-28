@@ -21,6 +21,19 @@ baseline:
     regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
     compare:
       rule: absent
+  # the "Average time" line of a layout is printed only after its memcmp against the CPU reference passed
+  # (cuda/main.cu); a run under HPCPERF_SKIP_VERIFY prints neither, so their presence is the evidence that the
+  # built-in check ran (the absence of the failure marker alone is not)
+  - name: nhwc_checked
+    role: required
+    regex: '^Average time of channel shuffle \(NHWC\):'
+    compare:
+      rule: present
+  - name: nchw_checked
+    role: required
+    regex: '^Average time of channel shuffle \(NCHW\):'
+    compare:
+      rule: present
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus a larger map and another group count
@@ -91,3 +104,17 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  # the program's own check: one run without HPCPERF_SKIP_VERIFY (the timing runs set it), every GPU result of
+  # every (N, C) combination memcmp'ed against the upstream CPU reference for both layouts.
+  kind: post_run
+  run_env: {HPCPERF_SKIP_VERIFY: null}
+  pass_regex: '^Average time of channel shuffle \(NCHW\):'
+  # An aborted sweep is a failure too: upstream computes numel as int (cuda/main.cu:149, "assume no
+  # integer overflow"); at N=16, C=512, W=H=512 it overflows, cudaMalloc fails and the program prints
+  # "Device memory allocation failed. Exit" and exits 0 -- g2-w512-h512 has never completed its sweep.
+  fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
+  basis: exact (memcmp) against the upstream CPU reference inside the program (cuda/main.cu); "Failed to pass ... check" on
+    any mismatch, the "Average time" lines only after a passed comparison
+  covers: all
+  timeout: 7200

@@ -97,3 +97,8 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+check:
+  kind: none
+  reason: the registered runs write no io section (no seismogram, no snapshots) and print nothing numeric; the program
+    needs a minimal final-state output (norms / checksums of velocity and stress after the time loop, outside the
+    ROI) before any comparison is possible (class E)

@@ -143,3 +143,8 @@ inputs:
     build_config: null
     backends_validated: [cuda]
     notes: the CTS-2 procurement problem (P2-type physics, total cross section 1.5227, dt 1.1e-7).
+check:
+  kind: none
+  reason: upstream's four CORAL PASS lines are already required rules; final_cycle_scalar_flux stays `record` --
+    a tolerance needs the Monte Carlo scatter of the tally from independent-seed runs of the reference build
+    (the seed is a deck parameter), to be decided

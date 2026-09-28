@@ -16,8 +16,8 @@ timing:
   regex: '^\s*(?P<value>[0-9.]+) s,\s+[0-9.]+ % : COMPUTE$'
   select: only
 baseline:
-  method: no PASS line; ctest's verify.py re-implements SRAD in numpy against image_out.pgm (not wired into the
-    registry)
+  method: no PASS line; verify.py re-implements SRAD in numpy float32 and compares image_out.pgm -- the registry's
+    correctness check (check:)
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: total_time_line
@@ -107,3 +107,13 @@ inputs:
   files:
   - data/image.pgm
   input_form: file
+check:
+  # verify.py runs the binary with the input's arguments (niter, lambda, rows, cols, image -> image_out.pgm in the run
+  # directory) and re-implements extract -> niter x (statistics, srad, srad2) -> compress in numpy float32.
+  kind: standalone
+  command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
+  pass_regex: '^PASS: srad output image matches CPU reference'
+  fail_regex: '^FAIL'
+  basis: verify.py's own tolerance on the 8-bit output image -- max pixel difference <= 3 and at most 0.1 % of the pixels
+    differ by more than 1 LSB (ctest, niter 100); at 500 / 2000 iterations established by running, not by adjusting
+  covers: all

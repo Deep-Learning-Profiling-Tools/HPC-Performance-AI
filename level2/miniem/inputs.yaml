@@ -43,6 +43,29 @@ coverage:
   - 'decks/maxwell-bdot-small.xml, maxwell-bdot-medium.xml, maxwell-blob-R1.xml (registered until 2026-09-26, removed -- they do not run with this driver: the equation-set ParameterList is unnamed while main.cpp:246 reads it by name, and the Exodus meshes they read (BDot.small.gen, BDot.medium.gen, blob-R1.g) are not distributed with the pinned Trilinos; upstream runs no test with them; level2/miniem/README.md, Warnings)'
 inputs:
 - id: maxwell-large-weak48
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
+    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
   case: maxwell-refmaxwell
   variant: default
   source:
@@ -69,6 +92,29 @@ inputs:
   - cuda
   input_form: file
 - id: maxwell-large-strong64
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
+    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
   case: maxwell-refmaxwell
   variant: size
   source:
@@ -95,6 +141,29 @@ inputs:
   - cuda
   input_form: file
 - id: maxwell-smoke-15
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
+    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
   case: maxwell-refmaxwell
   variant: size
   source:
@@ -121,6 +190,11 @@ inputs:
   - cuda
   input_form: file
 - id: darcy-hex
+  check:
+    kind: none
+    reason: darcyHex.xml has no Responses block, so nothing numeric is printed; the driver needs a minimal solution
+      functional printed outside the ROI first (class E; adding a response to the deck would change the registered
+      file's sha256)
   case: darcy-flow
   variant: case
   source:
