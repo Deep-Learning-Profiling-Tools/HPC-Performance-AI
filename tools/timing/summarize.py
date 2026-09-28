@@ -87,6 +87,7 @@ COLUMNS = [
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
     "app_timer_s", "roi_vs_app_timer",
     "input_id",
+    "placement_cpus_allowed", "placement_mems_allowed", "placement_gpus", "placement_consistent",
 ]
 OPS_COLUMNS = ["level", "app", "case", "platform", "run_id", "op", "category", "count",
                "total_s", "avg_s", "min_s", "max_s", "share"]
@@ -125,6 +126,69 @@ def read_run_txt(d):
 
 def sec(ns):
     return None if ns is None else finite("seconds", ns / 1e9)
+
+
+def read_bind_logs(d):
+    """The placement records (bind.<pid>, probes/bindprobe.c) of one run directory."""
+    procs = []
+    for p in sorted(glob.glob(os.path.join(d, "bind.*"))):
+        rec = {"tasks": [], "gpus": [], "env": {}}
+        with open(p, errors="replace") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if not line or line.startswith("#"):
+                    continue
+                k, _, v = line.partition(" ")
+                t = v.split()
+                if k == "task" and len(t) >= 6:          # tid cpus <set> last_cpu <n> name <comm>
+                    rec["tasks"].append({"tid": t[0], "cpus": t[2], "last_cpu": int(t[4]), "name": " ".join(t[6:])})
+                elif k == "gpu" and len(t) >= 4:         # minor <n> bus <pci>
+                    rec["gpus"].append({"minor": int(t[1]), "pci_bus_id": t[3]})
+                elif k == "env":
+                    n, _, val = v.partition("=")
+                    rec["env"][n] = val
+                else:
+                    rec[k] = v
+        procs.append(rec)
+    return procs
+
+
+def placement_of(procs):
+    """Per measured process: the CPU set, NUMA memory set and GPU it ran with (diagnostic context)."""
+    def num(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+    out = []
+    for r in procs:
+        masks = {}
+        for t in r["tasks"]:
+            masks[t["cpus"]] = masks.get(t["cpus"], 0) + 1
+        out.append({"pid": num(r.get("pid")), "exe": r.get("exe"), "roi_log": r.get("roi_log") == "1",
+                    "cpus_allowed": r.get("cpus_allowed_end"), "mems_allowed": r.get("mems_allowed_end"),
+                    "cpus_allowed_at_start": r.get("cpus_allowed_start"),
+                    "threads": num(r.get("threads")), "thread_cpusets": masks,
+                    "last_cpus": sorted({t["last_cpu"] for t in r["tasks"]}),
+                    "cpu_start": num(r.get("cpu_start")), "cpu_end": num(r.get("cpu_end")),
+                    "voluntary_ctxt_switches": num(r.get("voluntary_ctxt_switches")),
+                    "nonvoluntary_ctxt_switches": num(r.get("nonvoluntary_ctxt_switches")),
+                    "gpus": [g["pci_bus_id"] for g in r["gpus"]], "env": r["env"]})
+    return out
+
+
+def placement_block(meta, runs, prof_dir):
+    """The record's `placement`: what the probe saw in every run, and whether it was the same
+    CPU set / memory set / GPU in all of them. Never a metric."""
+    clean = [placement_of(read_bind_logs(r["dir"])) for r in runs]
+    prof = placement_of(read_bind_logs(prof_dir)) if os.path.isdir(prof_dir) else []
+    measured = [p for ps in clean for p in ps if p["roi_log"] or p["gpus"]]
+    cpus = sorted({p["cpus_allowed"] for p in measured if p["cpus_allowed"]})
+    mems = sorted({p["mems_allowed"] for p in measured if p["mems_allowed"]})
+    gpus = sorted({g for p in measured for g in p["gpus"]})
+    return {"probe": dash(meta.get("bind_probe")) or None, "clean_runs": clean, "profiled": prof,
+            "summary": {"processes_recorded": len(measured), "cpus_allowed": cpus, "mems_allowed": mems,
+                        "gpus": gpus, "consistent": bool(measured) and len(cpus) <= 1 and len(mems) <= 1 and len(gpus) <= 1}}
 
 
 def platform_conformance(platform_id):
@@ -285,7 +349,9 @@ def build_record(raw):
                 h.update(chunk)
         exe_sha = h.hexdigest()
     inputs = {"declared_env": declared_env, "declared_argv": dash(meta.get("argv")),
-              "processes": procs, "exe_sha256": exe_sha}
+              "processes": procs, "exe_sha256": exe_sha,
+              "exe_sha256_when": "measurement" if meta.get("exe_sha256") else ("summarize" if exe_sha else None)}
+    placement = placement_block(meta, runs, os.path.join(raw, "prof"))
 
     # ---- registry input (a --registry case): the workload identity stored by the engine
     registry = None
@@ -422,6 +488,7 @@ def build_record(raw):
         "fom": fom,
         "app_timer": app_timer,
         "launcher": {"audit": audit, "audit_ok": audit_ok},
+        "placement": placement,
         "platform_info": {"device": device_info, "host": host_info, "conformance": conformance},
         "profiler": {k: v for k, v in prof_info.items() if k != "recorded_env_names"} |
                     ({"recorded_env_name_count": len(recorded)} if recorded is not None else {}),
@@ -440,6 +507,7 @@ def flatten(rec):
     rt = rec.get("runtime_api") or {}
     rt_roi = rt.get("roi") or {}
     pdev, host = rec["platform_info"]["device"], rec["platform_info"]["host"]
+    plc = (rec.get("placement") or {}).get("summary") or {}
     ops = rec.get("ops") or []
     top = ops[0] if ops else None
 
@@ -497,6 +565,10 @@ def flatten(rec):
         "app_timer_s": v((rec.get("app_timer") or {}).get("value_s")),
         "roi_vs_app_timer": v((rec.get("app_timer") or {}).get("roi_diff_frac")),
         "input_id": v((rec.get("registry") or {}).get("input_id")),
+        "placement_cpus_allowed": ";".join(plc.get("cpus_allowed", [])),
+        "placement_mems_allowed": ";".join(plc.get("mems_allowed", [])),
+        "placement_gpus": ";".join(plc.get("gpus", [])),
+        "placement_consistent": "" if not plc.get("processes_recorded") else int(plc["consistent"]),
     })
     for c in CATEGORIES:
         row[f"device_{c}_s"] = v(dev.get(f"{c}_s")) if dev else ""

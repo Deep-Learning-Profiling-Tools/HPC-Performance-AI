@@ -1512,6 +1512,57 @@ if not st or two: bad.append(f"18d steady 20: {st} {two}")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
+echo "=== 19: placement probe (probes/bindprobe.c) and the record's placement block"
+BP="$TMP/bp"; mkdir -p "$BP"
+if command -v cc >/dev/null 2>&1 && cc -O2 -shared -fPIC -o "$BP/bindprobe.so" "$TOOLS/probes/bindprobe.c" 2> "$BP/cc.log"; then
+    # a process that wrote an ROI log records its placement; one that did not records nothing
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_BIND_LOG="$BP/bind" HPCPERF_ROI_LOG="$BP/roi" \
+        /bin/sh -c 'echo "# fake" > "$HPCPERF_ROI_LOG.$$"; exit 0'
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_BIND_LOG="$BP/bind_plain" HPCPERF_ROI_LOG="$BP/roi_plain" \
+        /bin/sh -c 'exit 0'
+    mine="$(/usr/bin/grep Cpus_allowed_list /proc/self/status | cut -f2)"
+    n=$(ls "$BP"/bind.* 2>/dev/null | wc -l); np=$(ls "$BP"/bind_plain.* 2>/dev/null | wc -l)
+    if [ "$n" = 1 ] && [ "$np" = 0 ] && /usr/bin/grep -q "^cpus_allowed_end $mine\$" "$BP"/bind.* \
+       && /usr/bin/grep -q "^roi_log 1$" "$BP"/bind.* && /usr/bin/grep -q "^task .* last_cpu [0-9]" "$BP"/bind.*; then
+        ok "19a: the probe records the ROI process's CPU set ($mine), thread placement; a plain shell writes nothing"
+    else
+        bad "19a: bind files: roi=$n plain=$np; $(cat "$BP"/bind.* 2>/dev/null | head -20 | tr '\n' '|')"
+    fi
+else
+    skip "19a: no C compiler for the placement probe"
+fi
+# summarize: bind.<pid> next to the ROI log -> placement block; consistent across clean runs
+mkraw "$RAW/appd/default/r1" none 1 "Rate: 1"
+echo "bind_probe=bindprobe.c@test" >> "$RAW/appd/default/r1/run_meta.txt"
+for i in 0 1; do
+    printf '# hpcperf-bind-log 1\npid 9\nexe /x/app\nroi_log 1\ncpu_start 3\ncpu_end 5\ncpus_allowed_start 0-7\nmems_allowed_start 0\ncpus_allowed_end 0-7\nmems_allowed_end 0\nthreads 2\nvoluntary_ctxt_switches 3\nnonvoluntary_ctxt_switches 1\ntask 9 cpus 0-7 last_cpu 5 name app\ntask 10 cpus 0-7 last_cpu 6 name cuda-EvtHandlr\ngpu minor 2 bus 0000:52:00.0\nenv CUDA_VISIBLE_DEVICES=GPU-abc\n' \
+        > "$RAW/appd/default/r1/clean.$i/bind.9"
+done
+mkraw "$RAW/appe/default/r1" none 1 "Rate: 1"
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/out19" --no-report >/dev/null 2>&1
+pycheck "19b: placement block from bind logs (consistent), empty without the probe" <<'PY'
+import json, os, glob
+bad = []
+d = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out19/level2/appd/default/*.json"))[0]))
+p = d["placement"]
+if p["probe"] != "bindprobe.c@test": bad.append(f"probe id {p['probe']}")
+if len(p["clean_runs"]) != 2 or len(p["clean_runs"][0]) != 1: bad.append("one process per clean run expected")
+q = p["clean_runs"][0][0]
+if q["cpus_allowed"] != "0-7" or q["gpus"] != ["0000:52:00.0"] or q["last_cpus"] != [5, 6] or q["thread_cpusets"] != {"0-7": 2}:
+    bad.append(f"process placement {q}")
+if q["env"].get("CUDA_VISIBLE_DEVICES") != "GPU-abc": bad.append("env not kept")
+s = p["summary"]
+if not (s["consistent"] and s["cpus_allowed"] == ["0-7"] and s["gpus"] == ["0000:52:00.0"] and s["processes_recorded"] == 2):
+    bad.append(f"summary {s}")
+e = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out19/level2/appe/default/*.json"))[0]))["placement"]
+if e["probe"] is not None or e["clean_runs"] != [[], []] or e["summary"]["consistent"]: bad.append(f"no-probe record {e}")
+import csv
+rows = {r["app"]: r for r in csv.DictReader(open(os.path.join(os.environ["TMP"], "out19/summary_level2.csv")))}
+if rows["appd"]["placement_gpus"] != "0000:52:00.0" or rows["appd"]["placement_consistent"] != "1" or rows["appe"]["placement_consistent"] != "":
+    bad.append(f"csv {rows['appd']['placement_gpus']} {rows['appd']['placement_consistent']!r} {rows['appe']['placement_consistent']!r}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

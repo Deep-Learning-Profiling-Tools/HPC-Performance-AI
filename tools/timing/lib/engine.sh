@@ -14,9 +14,12 @@
 #
 # Raw evidence: <RAW_ROOT>/level<L>/<app>/<case>/<run_id>/
 #   run_meta.txt              case, protocol, platform, provenance (key=value)
-#   warmup.<i>/run.log        discarded
-#   clean.<i>/{run.log,run.txt,roi.<pid>}
-#   prof/{run.log,run.txt,roi.<pid>,trace.*}
+#   warmup.<i>/{run.log,bind.<pid>}   discarded
+#   clean.<i>/{run.log,run.txt,roi.<pid>,bind.<pid>}
+#   prof/{run.log,run.txt,roi.<pid>,bind.<pid>,trace.*}
+# bind.<pid> is the placement record of the measured process (probes/bindprobe.c, injected
+# through LD_PRELOAD and written at process exit): the CPU set, NUMA memory set and GPU
+# device it actually ran with. Diagnostic context, outside the ROI, never a metric.
 # After the cases, the engine runs tools/timing/summarize.py on this run (JSON per case,
 # the per-level CSVs and the web page results/timing/report/) unless SUMMARIZE=0.
 
@@ -29,7 +32,7 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${LEVEL:?}" "${CLEAN_RUNS:=1}" "${WARMUP_RUNS:=0}" "${PROFILED_RUNS:=1}"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
-: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${REGISTRY:=0}"
+: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${REGISTRY:=0}" "${BIND_PROBE:=1}"
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
@@ -77,6 +80,34 @@ run_clean() {
 }
 
 now_ns() { date +%s%N; }
+
+# bind_env <run dir> -- the two variables that inject the placement probe into a run
+# (nothing when the probe is off or did not build). Word-split on purpose: the raw root
+# is refused when it contains whitespace (engine_setup).
+bind_env() { [ -n "${BINDPROBE_SO:-}" ] && echo "LD_PRELOAD=$BINDPROBE_SO HPCPERF_BIND_LOG=$1/bind"; return 0; }
+
+# bindprobe_setup: compile tools/timing/probes/bindprobe.c once per raw root (keyed by the
+# source hash) into <RAW_ROOT>/.bindprobe/. A build failure disables the probe for this
+# run and is reported; the measurement itself is unaffected.
+bindprobe_setup() {
+    BINDPROBE_SO=""; BINDPROBE_ID="none"
+    [ "$BIND_PROBE" = 1 ] || return 0
+    [ "$DRY_RUN" != 1 ] || { BINDPROBE_ID="not-built-in-dry-run"; return 0; }
+    local src="$TOOLS/probes/bindprobe.c" sha cc
+    sha=$(sha256sum "$src" | cut -c1-16)
+    cc="${HPCPERF_CC:-cc}"
+    command -v "$cc" >/dev/null 2>&1 || { echo "measure_level${LEVEL}: no C compiler ($cc): placement probe off" >&2; return 0; }
+    BINDPROBE_SO="$RAW_ROOT/.bindprobe/bindprobe-$sha.so"
+    if [ ! -f "$BINDPROBE_SO" ]; then
+        mkdir -p "$RAW_ROOT/.bindprobe"
+        if ! "$cc" -O2 -shared -fPIC -o "$BINDPROBE_SO" "$src" > "$BINDPROBE_SO.log" 2>&1; then
+            echo "measure_level${LEVEL}: placement probe did not build (see $BINDPROBE_SO.log): placement off" >&2
+            rm -f "$BINDPROBE_SO"; BINDPROBE_SO=""
+            return 0
+        fi
+    fi
+    BINDPROBE_ID="bindprobe.c@$sha"
+}
 
 # ROI seconds of one run directory: slowest process, sum(E-B) - excluded (x lines). "-" if none.
 roi_seconds() {
@@ -194,6 +225,7 @@ measure_case() {
         echo "env_script=${ENV_SCRIPT:--}"
         echo "env_allow=$(_env_allow | tr -s ' \n' '  ')"
         echo "env_deny_regex=$ENV_DENY"
+        echo "bind_probe=${BINDPROBE_ID:-none}"
         echo "platform_id=$PLATFORM_ID"
         echo "device_json=$DEVICE_JSON"
         echo "git_commit=$(git -C "$REPO" rev-parse HEAD 2>/dev/null)"
@@ -209,8 +241,8 @@ measure_case() {
     fi
     i=0
     while [ "$i" -lt "$WARMUP_RUNS" ]; do
-        mkdir -p "$out/warmup.$i"
-        run_clean "$out/warmup.$i/run.log" "$cwd" "${run_env[@]}" -- timeout "$tmo" "${cmd[@]}"
+        d="$out/warmup.$i"; mkdir -p "$d"
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
         i=$((i + 1))
     done
 
@@ -218,7 +250,7 @@ measure_case() {
     while [ "$i" -lt "$CLEAN_RUNS" ]; do
         d="$out/clean.$i"; mkdir -p "$d"
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" -- timeout "$tmo" "${cmd[@]}"
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         if [ "$rc" -ne 0 ]; then
@@ -235,13 +267,23 @@ measure_case() {
         [ "$i" -eq 0 ] && roi_s=$(roi_seconds "$d")
         i=$((i + 1))
     done
+    # The executable the ROI processes ran (from their own logs), hashed now, at measurement
+    # time: a Level 2 run.sh chooses its binary itself, so the front-end could not hash it
+    # up front the way Level 1 does. Written when every ROI process ran the same file.
+    if [ "$status" = ok ] && [ "$level" != 1 ]; then
+        local exes; exes=$(awk '/^exe /{print $2}' "$out"/clean.0/roi.* 2>/dev/null | sort -u)
+        if [ "$(printf '%s\n' "$exes" | /usr/bin/grep -c .)" = 1 ] && [ -f "$exes" ]; then
+            echo "exe_path=$exes" >> "$out/run_meta.txt"
+            echo "exe_sha256=$(sha256sum "$exes" | cut -d' ' -f1)" >> "$out/run_meta.txt"
+        fi
+    fi
 
     local prof_note=""
     if [ "$status" = ok ] && [ "$PROFILED_RUNS" -gt 0 ] && [ "$COLLECTOR" != none ]; then
         d="$out/prof"; mkdir -p "$d"
         collector_wrap "$COLLECTOR" "$d/trace" || return 2
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" -- \
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" $(bind_env "$d") -- \
             timeout "$((tmo * PROFILE_TIMEOUT_FACTOR))" "${COLLECTOR_ARGV[@]}" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
@@ -293,6 +335,8 @@ engine_setup() {
         collector_available "$COLLECTOR" || engine_die "collector $COLLECTOR is not available here"
     fi
     COLLECTOR_VERSION="$(collector_version "$COLLECTOR")"
+    case "$RAW_ROOT" in *[[:space:]]*) engine_die "raw root must not contain whitespace: $RAW_ROOT" ;; esac
+    bindprobe_setup
     RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 }
 
@@ -307,7 +351,8 @@ engine_main() {
 
     local n; n=$(printf '%s\n' "$rows" | wc -l)
     echo "measure_level${LEVEL}: run_id=$RUN_ID platform=$PLATFORM_ID collector=$COLLECTOR cases=$n" \
-         "protocol=warmup:$WARMUP_RUNS,clean:$CLEAN_RUNS,profiled:$PROFILED_RUNS skip_verify=$SKIP_VERIFY"
+         "protocol=warmup:$WARMUP_RUNS,clean:$CLEAN_RUNS,profiled:$PROFILED_RUNS skip_verify=$SKIP_VERIFY" \
+         "bind_probe=$BINDPROBE_ID"
     if [ "$COLLECTOR" = none ] && [ "$PROFILED_RUNS" -gt 0 ]; then
         echo "measure_level${LEVEL}: no profiler for $PLATFORM_ID -- ROI time and FOM only, device columns will be null"
     fi

@@ -65,6 +65,20 @@ class Trace:
                 # names only: the values are exactly what must never be copied anywhere
                 names = sorted({kv.split("=", 1)[0] for kv in row[0].split(";") if "=" in kv})
                 out["recorded_env_names"] = names
+        # which physical GPU(s) the profiled run's kernels executed on: nsys's own device
+        # table joined with the kernels' device ids (placement evidence, not a metric)
+        # A kernel's deviceId is the process's CUDA ordinal (0 = the first device CUDA_VISIBLE_DEVICES
+        # exposes); TARGET_INFO_CUDA_DEVICE maps it (cudaId) to the system-wide gpuId of TARGET_INFO_GPU.
+        if "TARGET_INFO_GPU" in self.tables:
+            try:
+                gpus = {r[0]: r[1] for r in self.db.execute("select id, busLocation from TARGET_INFO_GPU")}
+                out["gpus_visible"] = [gpus[k] for k in sorted(gpus)]
+                if "CUPTI_ACTIVITY_KIND_KERNEL" in self.tables and "TARGET_INFO_CUDA_DEVICE" in self.tables:
+                    cuda = {r[0]: r[1] for r in self.db.execute("select cudaId, gpuId from TARGET_INFO_CUDA_DEVICE")}
+                    used = [r[0] for r in self.db.execute("select distinct deviceId from CUPTI_ACTIVITY_KIND_KERNEL")]
+                    out["gpus_used"] = sorted({gpus.get(cuda.get(d), f"cuda device {d}") for d in used})
+            except sqlite3.Error:
+                pass
         return out
 
     # ------------------------------------------------------------------ markers

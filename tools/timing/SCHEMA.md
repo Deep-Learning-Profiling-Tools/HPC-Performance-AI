@@ -125,7 +125,7 @@ the collector must reproduce it exactly (`expected.json`).
 |---|---|
 | identity | `level`, `app`, `case`, `platform`, `run_id`, `utc`, `status` |
 | `measurement` | tool, protocol (warm-up / clean / profiled runs), collector (name, version, verified, capabilities), `skip_verify`, `verify_vs_roi`, `roi_where` (marker source lines), `roi_excludes`, backend, gpus, timeout, env script, env allow-list and deny rule, notes |
-| `inputs` | `declared_env`, `declared_argv`, and per process the argv / exe / cwd / host / rank the ROI log recorded, `exe_sha256` |
+| `inputs` | `declared_env`, `declared_argv`, and per process the argv / exe / cwd / host / rank the ROI log recorded, `exe_sha256` and `exe_sha256_when` (`measurement`: hashed by the engine right after the clean runs -- Level 1 up front, Level 2 from the ROI processes' own `exe` line; `summarize`: hashed later from the path, older runs only) |
 | `roi` | `wall_s` (median of the clean runs), `runs_s`, min / max / stddev, `entries`, `excluded_s`, `processes`, `imbalance_s`, `profiled_wall_s` (the same region in the trace), `profiled_marker_wall_s` (the profiled run's own ROI log), `profiler_inflation` |
 | `device` | inside the ROI: `busy_s` (union of all device activity), `busy_frac_of_roi`, `host_gap_s` = `roi.wall_s - busy_s`, `op_time_sum_s`, `overlap_s`, per category `<cat>_s` and `<cat>_ops`, copy/fill `<cat>_bytes` (pro rata when clipped). Null without a collector |
 | `runtime_api` | `name`, `roi` and `whole` call counts and time, synchronizing calls separately |
@@ -134,8 +134,9 @@ the collector must reproduce it exactly (`expected.json`).
 | `fom` | the application's own metric from the clean run: name, value, unit, better, source, regex, status (`ok`, `none`, `not_matched`, `log_missing`) |
 | `app_timer` | Level 2 only, null when the application prints no timer for its ROI region: `regex` (from `cases/level2_apps.tsv` at summarize time), `value_s` (clean run, last match), `roi_diff_frac` = (ROI - timer) / timer, `status`; a difference above 2% is caveated |
 | `launcher` | the common launcher's GPU-binding audit line and whether it is clean |
-| `platform_info` | device descriptor, host, conformance record |
-| `profiler` | collector metadata; `recorded_env_name_count` (names only -- values are never read) |
+| `placement` | where the measured processes actually ran, from `probes/bindprobe.c` (injected through `LD_PRELOAD`, read at process start and exit -- nothing inside the ROI): per clean run and for the profiled run, one entry per process that held a GPU open or wrote an ROI log: `cpus_allowed` / `mems_allowed` (the sets at exit, `cpus_allowed_at_start` too), `threads`, `thread_cpusets` (distinct per-thread CPU sets with counts), `last_cpus` (the CPU each thread last ran on), `cpu_start` / `cpu_end`, context-switch counts, `gpus` (PCI bus ids of the `/dev/nvidia<N>` devices held open), the placement environment (`CUDA_VISIBLE_DEVICES`, `OMP_*`, MPI/Slurm rank variables). `summary`: the distinct sets over all clean-run processes and `consistent` (one CPU set, one memory set, one GPU set throughout). `probe` names the probe source hash, `none` when it was off or did not build. Diagnostic context only, never a metric |
+| `platform_info` | device descriptor (`vendor_extras.selected_by` says how the described GPU was chosen when `CUDA_VISIBLE_DEVICES` is set; `visible_pci_bus_ids` lists all enumerated GPUs), host, conformance record |
+| `profiler` | collector metadata; `recorded_env_name_count` (names only -- values are never read); `gpus_visible` / `gpus_used` (PCI bus ids from the trace: the GPUs the profiled run's kernels ran on) |
 | `provenance` | git commit, dirty flag, raw directory |
 | `caveats` | every condition that limits how a number may be read, in words |
 

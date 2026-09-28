@@ -365,6 +365,20 @@ summarizer reads only the variable NAMES the profiler recorded and caveats any
 that match the deny rule; values are never read. The tests plant credentials and
 assert both rules.
 
+**Where the process ran (placement).** Every run also carries `probes/bindprobe.c`
+through `LD_PRELOAD` (`--no-bind-probe` turns it off). It reads, at process start
+and at exit -- never inside the ROI, without threads or signals -- the CPU set and
+NUMA memory set the process was allowed (`Cpus_allowed_list`, `Mems_allowed_list`),
+the CPU each thread last ran on, the `/dev/nvidia<N>` devices it held open (mapped to
+PCI bus ids) and the placement environment (`CUDA_VISIBLE_DEVICES`, `OMP_*`, MPI and
+Slurm rank variables). Only processes that used a GPU or wrote an ROI log leave a
+`bind.<pid>` file; the record's `placement` block summarizes them and says whether
+the placement was the same in every clean run. It is context for reading a number
+(was this the same GPU, the same cores?), never a metric. The GPU the profiled run's
+kernels executed on is taken from the trace as well (`profiler.gpus_used`), and the
+device descriptor names the GPU that CUDA device 0 resolves to when
+`CUDA_VISIBLE_DEVICES` is set (`vendor_extras.selected_by`).
+
 ## Profiler cost (why the headline comes from clean runs)
 
 Measured with the previous whole-process protocol (2026-09-22, nsys 2025.6.3):
