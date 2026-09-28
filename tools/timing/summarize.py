@@ -182,7 +182,9 @@ def placement_block(meta, runs, prof_dir):
     CPU set / memory set / GPU in all of them. Never a metric."""
     clean = [placement_of(read_bind_logs(r["dir"])) for r in runs]
     prof = placement_of(read_bind_logs(prof_dir)) if os.path.isdir(prof_dir) else []
-    measured = [p for ps in clean for p in ps if p["roi_log"] or p["gpus"]]
+    # the measured processes are the ones that wrote an ROI log; helpers that merely opened a
+    # GPU (a launcher's nvidia-smi audit, a profiler) count only when no process wrote one
+    measured = [p for ps in clean for p in ps if p["roi_log"]] or [p for ps in clean for p in ps if p["gpus"]]
     cpus = sorted({p["cpus_allowed"] for p in measured if p["cpus_allowed"]})
     mems = sorted({p["mems_allowed"] for p in measured if p["mems_allowed"]})
     gpus = sorted({g for p in measured for g in p["gpus"]})
