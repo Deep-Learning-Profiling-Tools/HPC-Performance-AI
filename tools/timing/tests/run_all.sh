@@ -1581,6 +1581,30 @@ if e["warmup_runs_s"] != []: bad.append(f"no warm-up dir -> {e['warmup_runs_s']}
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
+echo "=== 21: the GPU a profiled run's kernels executed on is joined per process"
+pycheck "21a: nsys gpus_used follows (pid, cudaId) -> gpuId, not the ordinal alone" <<'PY'
+import os, sqlite3, sys
+sys.path.insert(0, os.environ["TOOLS"])
+from collectors import nvidia_nsys
+d = os.path.join(os.environ["TMP"], "t21", "prof"); os.makedirs(d, exist_ok=True)
+db = sqlite3.connect(os.path.join(d, "trace.sqlite"))
+db.executescript("""
+create table TARGET_INFO_GPU (id int, busLocation text);
+insert into TARGET_INFO_GPU values (0, '0000:43:00.0'), (1, '0000:52:00.0');
+create table TARGET_INFO_CUDA_DEVICE (gpuId int, cudaId int, pid int);
+insert into TARGET_INFO_CUDA_DEVICE values (0, 0, 4000), (1, 1, 4000), (1, 0, 5000);  -- 4000: a helper seeing both GPUs; 5000: the app under CUDA_VISIBLE_DEVICES=<52:00.0>
+create table CUPTI_ACTIVITY_KIND_KERNEL (globalPid int, deviceId int);
+insert into CUPTI_ACTIVITY_KIND_KERNEL values (((1 << 24) | 5000) << 24, 0), (((1 << 24) | 5000) << 24, 0);
+""")
+db.commit(); db.close()
+t = nvidia_nsys.open(os.path.dirname(d) + "/prof")
+info = t.info(); t.close()
+bad = []
+if info.get("gpus_used") != ["0000:52:00.0"]: bad.append(f"gpus_used {info.get('gpus_used')} (the helper's ordinal 0 must not win)")
+if info.get("gpus_visible") != ["0000:43:00.0", "0000:52:00.0"]: bad.append(f"gpus_visible {info.get('gpus_visible')}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]
