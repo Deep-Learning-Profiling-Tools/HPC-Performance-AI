@@ -148,8 +148,8 @@ and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 `report.py` renders `results/timing/` as one self-contained interactive page
 (`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google
 Fonts with system fallbacks, light and dark theme) plus a Markdown twin (`README.md`)
-that the repository browser displays. The page holds only the Level 1 and Level 2
-timing results:
+that the repository browser displays. The page holds the Level 1, 2 and 3 timing
+results:
 
 1. **Level tab**, then **an application** from the list (each shows its number of
    inputs and how many input x platform combinations were measured).
@@ -169,7 +169,7 @@ timing results:
 
 The selection is kept in the URL hash (`index.html#L2/quicksilver/p200000/nvidia-b200.cuda13.2`),
 so a view can be linked. The Markdown twin lists the latest successful run of every
-measured combination as a Level 1 and a Level 2 table. Absolute paths of the checkout
+measured combination, one table per level. Absolute paths of the checkout
 are written as `{REPO}`; host names, the environment and GPU UUIDs are not in the page.
 The output depends only on the records and the case tables, so the same data gives
 the same bytes.
@@ -179,8 +179,15 @@ the same bytes.
 * **In the repository**: `python3 tools/timing/report.py --publish` writes the same page
   to `docs/timing/`; committing it is the deliberate step that shows it. That snapshot is
   the only measurement output that enters git -- raw evidence, JSON and CSV never do.
-  GitHub shows `docs/timing/README.md`; `index.html` needs a browser (or GitHub Pages
-  serving `docs/`).
+  GitHub shows `docs/timing/README.md`; `index.html` needs a browser or GitHub Pages.
+* **GitHub Pages**: `docs/` is ready to be served as it is -- `docs/.nojekyll` (no Jekyll
+  processing) and `docs/index.html` (the site root redirects to `timing/`). A repository
+  admin enables it once: Settings -> Pages -> Source "Deploy from a branch", branch `main`,
+  folder `/docs`. The page is then
+  https://deep-learning-profiling-tools.github.io/HPC-Performance-AI/timing/ and follows
+  every `--publish` that is merged into `main`. A Pages site is public unless the
+  organization's plan restricts its visibility: enabling it publishes the measurements
+  (the page carries no paths, host names or environment values).
 
 The own-timer check comes from `app_timer_regex` / `app_timer_unit` in
 `cases/level2_apps.tsv`: the timer an application prints for exactly the region its
