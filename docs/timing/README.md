@@ -16,8 +16,8 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
-| 1 | 133 | 1 | 0 | 0 |
-| 2 | 57 | 32 | 0 | 0 |
+| 1 | 134 | 0 | 0 | 0 |
+| 2 | 69 | 20 | 0 | 0 |
 | 3 | 18 | 18 | 0 | 7 |
 
 - Six Level 2 inputs (exampm dambreak-0.005 / dambreak-0.05-upstream; remhos cube-remap-rs1, periodic-hexagon-p0, periodic-square-p5, periodic-cube-p0) ran the run.sh default workload before 3c9aec2: their earlier records are INVALIDATED (kept as history), the corrected inputs were measured again.
@@ -39,7 +39,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | aes | plaintext-4mib | SUCCESS | nvidia-b200.cuda13.2 | 823 us | 5 | 8.1% | 3.3% | yes | 72% | 1 | 1.03 | PASS | PASS | e8be61b03f |
 | aes | plaintext-16mib | SUCCESS | nvidia-b200.cuda13.2 | 2.9 ms | 5 | 6.4% | 2.4% | yes | 100% | 1 | 1.10 | PASS | PASS | e8be61b03f |
 | all_pairs_distance | iter10000 | SUCCESS | nvidia-b200.cuda13.2 | 2.04 s | 5 | 0.0% | 0.0% | yes | 99% | 30,000 | 1.00 | PASS | PASS | e8be61b03f |
-| ao_bench | iter100 | SUCCESS | nvidia-b200.cuda13.2 | 17.8 ms | 5 | 0.4% | 0.1% | yes | 89% | 100 | 1.01 | PASS | INCOMPLETE | e8be61b03f |
+| ao_bench | iter100 | SUCCESS | nvidia-b200.cuda13.2 | 17.8 ms | 5 | 0.4% | 0.1% | yes | 89% | 100 | 1.01 | PASS | PASS | e8be61b03f |
 | atomic_reduction | default | SUCCESS | nvidia-b200.cuda13.2 | 168 ms | 5 | 0.0% | 0.0% | yes | 97% | 2,000 | 1.02 | PASS | PASS | e8be61b03f |
 | background_subtraction | w4096-h2048-merged0-r102 | SUCCESS | nvidia-b200.cuda13.2 | 74.8 ms | 5 | 5.0% | 2.0% | yes | 87% | 300 | 1.02 | PASS | PASS | e8be61b03f |
 | background_subtraction | w4096-h2048-merged1-r102 | SUCCESS | nvidia-b200.cuda13.2 | 70.4 ms | 5 | 2.2% | 1.0% | yes | 86% | 100 | 1.03 | PASS | PASS | e8be61b03f |
@@ -177,7 +177,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | amg2023 | p2-128cubed | SUCCESS | nvidia-b200.cuda13.2 | 161 ms | 3 | 1.2% | 0.6% | yes | 31% | 5,190 | 1.23 | PASS | PASS | e8be61b03f |
 | amg2023 | p1-320cubed | SUCCESS | nvidia-b200.cuda13.2 | 1.08 s | 3 | 0.3% | 0.2% | yes | 89% | 5,562 | 1.02 | PASS | PASS | e8be61b03f |
 | branson | hohlraum-single-node | SUCCESS | nvidia-b200.cuda13.2 | 10.3 s | 3 | 3.7% | 1.9% | yes | 40% | 85,448 | 1.10 | PASS | INCOMPLETE | e8be61b03f |
-| branson | marshak-wave-replicated | SUCCESS | nvidia-b200.cuda13.2 | 549 ms | 3 | 1.6% | 0.9% | yes | 1% | 1,315 | 1.07 | PASS | INCOMPLETE | e8be61b03f |
+| branson | marshak-wave-replicated | SUCCESS | nvidia-b200.cuda13.2 | 549 ms | 3 | 1.6% | 0.9% | yes | 1% | 1,315 | 1.07 | PASS | PASS | e8be61b03f |
 | branson | hohlraum-multi-node | SUCCESS | nvidia-b200.cuda13.2 | 377.2 s | 3 | 0.4% | 0.2% | yes | 59% | 40 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
 | branson | lb-hohlraum | SUCCESS | nvidia-b200.cuda13.2 | 95.4 s | 3 | 1.0% | 0.5% | yes | 60% | 35,087 | 1.02 | PASS | INCOMPLETE | e8be61b03f |
 | cabanapic | weibel-ny512-nppc2000 | SUCCESS | nvidia-b200.cuda13.2 | 60.2 s | 3 | 0.2% | 0.1% | yes | 93% | 2,016,000 | 1.00 | PASS | PASS | e8be61b03f |
@@ -198,9 +198,9 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | examinimd | lj-40cubed-100 | SUCCESS | nvidia-b200.cuda13.2 | 32.7 ms | 3 | 0.2% | 0.1% | yes | 67% | 1,033 | 1.05 | PASS | INCOMPLETE | e8be61b03f |
 | examinimd | lj-80cubed-1000 | SUCCESS | nvidia-b200.cuda13.2 | 1.38 s | 3 | 8.9% | 5.1% | yes | 91% | 10,330 | 1.01 | PASS | INCOMPLETE | e8be61b03f |
 | examinimd | snap-ta06a | SUCCESS | nvidia-b200.cuda13.2 | 98.1 ms | 3 | 1.3% | 0.7% | yes | 42% | 4,221 | 1.24 | PASS | INCOMPLETE | e8be61b03f |
-| exampm | dambreak-0.01 | SUCCESS | nvidia-b200.cuda13.2 | 9.04 s | 3 | 0.2% | 0.1% | yes | 93% | 43,133 | 1.03 | PASS | INCOMPLETE | e8be61b03f |
-| exampm | dambreak-0.05-upstream | SUCCESS | nvidia-b200.cuda13.2 | 50.4 ms | 3 | 1.4% | 0.8% | yes | 33% | 2,250 | 1.18 | PASS | INCOMPLETE | e8be61b03f |
-| exampm | dambreak-0.005 | SUCCESS | nvidia-b200.cuda13.2 | 22.7 s | 3 | 0.1% | 0.1% | yes | 99% | 17,910 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
+| exampm | dambreak-0.01 | SUCCESS | nvidia-b200.cuda13.2 | 9.04 s | 3 | 0.2% | 0.1% | yes | 93% | 43,133 | 1.03 | PASS | PASS | e8be61b03f |
+| exampm | dambreak-0.05-upstream | SUCCESS | nvidia-b200.cuda13.2 | 50.4 ms | 3 | 1.4% | 0.8% | yes | 33% | 2,250 | 1.18 | PASS | PASS | e8be61b03f |
+| exampm | dambreak-0.005 | SUCCESS | nvidia-b200.cuda13.2 | 22.7 s | 3 | 0.1% | 0.1% | yes | 99% | 17,910 | 1.00 | PASS | PASS | e8be61b03f |
 | exampm | freefall-0.01 | SUCCESS | nvidia-b200.cuda13.2 | 481.9 s | 3 | 0.5% | 0.3% | yes | 16% | 2,350,453 | 1.35 | PASS | PASS | e8be61b03f |
 | gamess_ri_mp2 | w30-rand | SUCCESS | nvidia-b200.cuda13.2 | 750 ms | 3 | 0.6% | 0.3% | yes | 99% | 604 | 1.01 | PASS | PASS | e8be61b03f |
 | gamess_ri_mp2 | benz-kern | SUCCESS | nvidia-b200.cuda13.2 | 1.64 ms | 3 | 1.5% | 0.7% | yes | 62% | 32 | 1.21 | PASS | PASS | e8be61b03f |
@@ -238,19 +238,19 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | p3_heat3d | n256-1000 | SUCCESS | nvidia-b200.cuda13.2 | 214 ms | 3 | 0.1% | 0.0% | yes | 96% | 1,000 | 1.01 | PASS | PASS | e8be61b03f |
 | p3_heat3d | n1024-200 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 0.0% | 0.0% | yes | 100% | 200 | 1.00 | PASS | PASS | e8be61b03f |
 | p3_vlp4d | sld10-large | SUCCESS | nvidia-b200.cuda13.2 | 2.31 s | 3 | 0.3% | 0.2% | yes | 99% | 2,445 | 1.00 | PASS | PASS | e8be61b03f |
-| p3_vlp4d | sld10 | SUCCESS | nvidia-b200.cuda13.2 | 727 ms | 3 | 0.0% | 0.0% | yes | 99% | 773 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
-| quicksilver | p1-profile-8c-100k-20s | SUCCESS | nvidia-b200.cuda13.2 | 7.86 s | 3 | 1.2% | 0.6% | yes | 55% | 410 | 0.89 | PASS | INCOMPLETE | e8be61b03f |
-| quicksilver | coral2-p1-1rank | SUCCESS | nvidia-b200.cuda13.2 | 53 s | 3 | 2.3% | 1.2% | yes | 42% | 2,085 | 0.82 | PASS | INCOMPLETE | e8be61b03f |
-| quicksilver | coral2-p2-1rank | SUCCESS | nvidia-b200.cuda13.2 | 161.8 s | 3 | 8.6% | 4.6% | yes | 60% | 11,844 | 1.45 | PASS | INCOMPLETE | e8be61b03f |
-| quicksilver | cts2-1rank | SUCCESS | nvidia-b200.cuda13.2 | 212.2 s | 3 | 3.7% | 2.0% | yes | 75% | 11,667 | 1.34 | PASS | INCOMPLETE | e8be61b03f |
+| p3_vlp4d | sld10 | SUCCESS | nvidia-b200.cuda13.2 | 727 ms | 3 | 0.0% | 0.0% | yes | 99% | 773 | 1.00 | PASS | PASS | e8be61b03f |
+| quicksilver | p1-profile-8c-100k-20s | SUCCESS | nvidia-b200.cuda13.2 | 7.86 s | 3 | 1.2% | 0.6% | yes | 55% | 410 | 0.89 | PASS | PASS | e8be61b03f |
+| quicksilver | coral2-p1-1rank | SUCCESS | nvidia-b200.cuda13.2 | 53 s | 3 | 2.3% | 1.2% | yes | 42% | 2,085 | 0.82 | PASS | PASS | e8be61b03f |
+| quicksilver | coral2-p2-1rank | SUCCESS | nvidia-b200.cuda13.2 | 161.8 s | 3 | 8.6% | 4.6% | yes | 60% | 11,844 | 1.45 | PASS | PASS | e8be61b03f |
+| quicksilver | cts2-1rank | SUCCESS | nvidia-b200.cuda13.2 | 212.2 s | 3 | 3.7% | 2.0% | yes | 75% | 11,667 | 1.34 | PASS | PASS | e8be61b03f |
 | remhos | cube-remap-rs4 | SUCCESS | nvidia-b200.cuda13.2 | 19.5 s | 3 | 1.3% | 0.7% | yes | 28% | 67,199 | 1.01 | PASS | PASS | e8be61b03f |
 | remhos | cube-remap-rs1 | SUCCESS | nvidia-b200.cuda13.2 | 113 ms | 3 | 0.1% | 0.1% | yes | 50% | 8,399 | 1.17 | PASS | PASS | e8be61b03f |
 | remhos | periodic-hexagon-p0 | SUCCESS | nvidia-b200.cuda13.2 | 1.89 s | 3 | 0.2% | 0.1% | yes | 35% | 154,000 | 1.34 | PASS | PASS | e8be61b03f |
 | remhos | periodic-square-p5 | SUCCESS | nvidia-b200.cuda13.2 | 265 ms | 3 | 10.0% | 5.6% | yes | 25% | 12,320 | 1.17 | PASS | PASS | e8be61b03f |
 | remhos | periodic-cube-p0 | SUCCESS | nvidia-b200.cuda13.2 | 720 ms | 3 | 1.2% | 0.7% | yes | 46% | 44,044 | 1.24 | PASS | PASS | e8be61b03f |
-| shaw | prem-1000x5000 | SUCCESS | nvidia-b200.cuda13.2 | 15.5 s | 3 | 0.1% | 0.1% | yes | 93% | 120,000 | 1.02 | PASS | INCOMPLETE | e8be61b03f |
-| shaw | prem-200x1000-demo1 | SUCCESS | nvidia-b200.cuda13.2 | 419 ms | 3 | 0.3% | 0.2% | yes | 36% | 24,000 | 1.23 | PASS | INCOMPLETE | e8be61b03f |
-| shaw | prem-500x2500 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 3.0% | 1.5% | yes | 77% | 60,000 | 1.05 | PASS | INCOMPLETE | e8be61b03f |
+| shaw | prem-1000x5000 | SUCCESS | nvidia-b200.cuda13.2 | 15.5 s | 3 | 0.1% | 0.1% | yes | 93% | 120,000 | 1.02 | PASS | PASS | e8be61b03f |
+| shaw | prem-200x1000-demo1 | SUCCESS | nvidia-b200.cuda13.2 | 419 ms | 3 | 0.3% | 0.2% | yes | 36% | 24,000 | 1.23 | PASS | PASS | e8be61b03f |
+| shaw | prem-500x2500 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 3.0% | 1.5% | yes | 77% | 60,000 | 1.05 | PASS | PASS | e8be61b03f |
 | sw4lite | pointsource-h0.04 | SUCCESS | nvidia-b200.cuda13.2 | 59.8 ms | 3 | 0.1% | 0.0% | yes | 92% | 575 | 1.01 | PASS | PASS | e8be61b03f |
 | sw4lite | pointsource-h0.02 | SUCCESS | nvidia-b200.cuda13.2 | 574 ms | 3 | 0.0% | 0.0% | yes | 99% | 1,125 | 1.00 | PASS | PASS | e8be61b03f |
 | tealeaf | bm4-1000sq-10steps | SUCCESS | nvidia-b200.cuda13.2 | 1.49 s | 3 | 0.1% | 0.1% | yes | 27% | 149,754 | 1.26 | PASS | PASS | e8be61b03f |
