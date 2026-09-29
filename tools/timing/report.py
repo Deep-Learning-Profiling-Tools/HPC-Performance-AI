@@ -637,6 +637,8 @@ def render_md_cases(data):
 
 def render_md_l3(data):
     apps = data["levels"].get("3", [])
+    if not apps:                      # a campaign without Level 3 records (Level 1/2 only, or an old page)
+        return []
     out = ["## Level 3", "",
            "No markers: the timed region is the application's own timer for its time-step loop "
            "(`tools/timing/apptimers.py` defines it per application). Device columns are for the whole process "

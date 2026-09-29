@@ -399,10 +399,3 @@ Latest record 2026-09-22T22:28:58Z, 79 records: the latest successful run of eve
 | sw4lite | default | nvidia-b200.cuda13.2 | 59.7 ms | null | 92% | 4.88 ms | 575 | 0.7% | 1.01 | none printed | - | 1 | first run |
 | tealeaf | default | nvidia-b200.cuda13.2 | 18.4 s | null | 77% | 4.26 s | 634,749 | 89.4% | 1.14 | 1.149e-06 s/cell | - | 1 | first run |
 | xsbench | default | nvidia-b200.cuda13.2 | 40.1 ms | null | 97% | 1.22 ms | 3 | 1.1% | 1.01 | 4.239e+08 lookups/s | +0.186% | 1 | first run |
-
-## Level 3
-
-No markers: the timed region is the application's own timer for its time-step loop (`tools/timing/apptimers.py` defines it per application). Device columns are for the whole process unless the application emits an NVTX range for its loop.
-
-| application | input | platform | timed region | spread | steps | per step | region share of process | device busy (whole process) | profiler x | FOM | runs | vs previous |
-|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
