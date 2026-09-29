@@ -50,11 +50,31 @@
 #define LEAP_FROG_RUN_FOM_HPP_
 
 #include "hpcperf_roi.h"
-#include "KokkosBlas1_nrm2.hpp"
+#include <cmath>
 #include "fom_update_kernels.hpp"
 #include "fom_complexities.hpp"
 
 namespace kokkosapp{
+
+// tools/inputs correctness signature: the 2-norm over all entries of a device state view (rank 1, or
+// rank 2 = one column per forcing), computed with a device reduction after the ROI. KokkosBlas::nrm2
+// takes rank-1 views only, hence this helper.
+template <class ViewT>
+double hpcperfFinalNorm(const ViewT & v)
+{
+  using exec_t = typename ViewT::execution_space;
+  double sumsq = 0.0;
+  if constexpr (ViewT::rank == 1) {
+    Kokkos::parallel_reduce("hpcperf_final_norm", Kokkos::RangePolicy<exec_t>(0, v.extent(0)),
+                            KOKKOS_LAMBDA(const int i, double & s) { s += v(i) * v(i); }, sumsq);
+  } else {
+    Kokkos::parallel_reduce("hpcperf_final_norm",
+                            Kokkos::MDRangePolicy<exec_t, Kokkos::Rank<2>>({0, 0}, {(long)v.extent(0), (long)v.extent(1)}),
+                            KOKKOS_LAMBDA(const int i, const int j, double & s) { s += v(i, j) * v(i, j); }, sumsq);
+  }
+  Kokkos::fence();
+  return std::sqrt(sumsq);
+}
 
 template <
   typename step_t,
@@ -161,8 +181,8 @@ void runFom(const step_t & numSteps,
   // velocity and stress states with full precision, for the exact comparison against the working baseline.
   // The computation of the run is not touched.
   {
-    const auto nrmVp = KokkosBlas::nrm2(xVp_d);
-    const auto nrmSp = KokkosBlas::nrm2(xSp_d);
+    const double nrmVp = hpcperfFinalNorm(xVp_d);
+    const double nrmSp = hpcperfFinalNorm(xSp_d);
     std::cout << "\nhpcperf final state: nrm2(vp) = " << std::scientific << std::setprecision(17) << nrmVp
               << " nrm2(sp) = " << nrmSp << std::defaultfloat << std::endl;
   }
