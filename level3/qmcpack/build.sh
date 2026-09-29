@@ -89,7 +89,10 @@ build_qmc() { # build_qmc <real|complex>
         -DQMC_GPU="openmp;cuda" "-DQMC_GPU_ARCHS=sm_$ARCH" -DQMC_MPI=ON -DQMC_COMPLEX="$cplx" -DQMC_MIXED_PRECISION=OFF \
         -DENABLE_PHDF5=ON "-DHDF5_ROOT=$INST/hdf5" "-DBOOST_ROOT=$INST/boost-1.90.0" \
         "-DBLAS_LIBRARIES=$BLAS" "-DLAPACK_LIBRARIES=$BLAS" -DBUILD_UNIT_TESTS=ON -DQMC_GPU_VISIBILITY_VARIABLE=CUDA_VISIBLE_DEVICES \
-        "-DCMAKE_INSTALL_PREFIX=$INST/qmcpack-$kind"
+        "-DCMAKE_INSTALL_PREFIX=$INST/qmcpack-$kind" \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON   # clang links PIE executables; nvcc's host compiler (a g++) must then emit PIC.
+                                               # The conda g++ defaults to PIE, the RHEL /usr/bin/g++ does not: without this a
+                                               # non-conda environment fails to link (cuBLAS_missing_functions.cu.o, R_X86_64_32)
     run "qmcpack-$kind-build.log" cmake --build "$L3_BUILD/$kind" -j "$JOBS"
     run "qmcpack-$kind-install.log" cmake --install "$L3_BUILD/$kind"
     local exe; exe="$(ls "$INST/qmcpack-$kind"/bin/qmcpack* | head -1)"
