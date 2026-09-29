@@ -1,6 +1,6 @@
 # Reference image of the registered aobench input
 
-`iter100.sha256` (not yet captured) holds the sha256 of `ao.ppm` rendered by the unoptimized
+`iter100.sha256` holds the sha256 of `ao.ppm` rendered by the unoptimized
 reference build of this repository for the registered input `iter100` (`./main 100`, 256x256),
 one line: `<sha256>  ao.ppm`. `iter100.sha256.txt` is its provenance: build directory, binary
 sha256, git commit, host/GPU, date, and the run's stdout log.
