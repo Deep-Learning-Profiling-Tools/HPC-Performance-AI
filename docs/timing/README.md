@@ -272,6 +272,39 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 - INVALIDATED remhos / periodic-square-p5: run 20260923T190616Z-2030182 (fd2fc6c6c8) ran another workload than the input
 - INVALIDATED remhos / periodic-cube-p0: run 20260923T190616Z-2030182 (fd2fc6c6c8) ran another workload than the input
 
+## Level 3 · 10 records as of 2026-09-29T06:23:01Z (from main-docs-timing-index.b8c6c13.html)
+
+Level 3 as published in main-docs-timing-index.b8c6c13.html (its records were summarized there; taken over as published, not re-summarized here).
+
+Latest record 2026-09-29T06:23:01Z, 10 records: the latest successful run of every measured (case, platform).
+
+### Level 1
+
+| application | input | platform | ROI | CV (stddev/median) | device busy | host gap | kernels in ROI | ROI share of process | profiler x | runs | vs previous |
+|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+
+### Level 2
+
+| application | input | platform | ROI | CV (stddev/median) | device busy | host gap | kernels in ROI | ROI share of process | profiler x | FOM | vs own timer | runs | vs previous |
+|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+
+## Level 3
+
+No markers: the timed region is the application's own timer for its time-step loop (`tools/timing/apptimers.py` defines it per application). Device columns are for the whole process unless the application emits an NVTX range for its loop.
+
+| application | input | platform | timed region | spread | steps | per step | region share of process | device busy (whole process) | profiler x | FOM | runs | vs previous |
+|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| cp2k | h2o128.strong | nvidia-b200.cuda13.2 | 54.9 s | null | 9 | 6.1 s | 52.3% | 7% | 1.02 | none printed | 1 | first run |
+| dftfe | al_md | nvidia-b200.cuda13.2 | 34.3 s | null | 3 | 11.4 s | 29.1% | 1% | 1.06 | none printed | 1 | first run |
+| exaca | strong.nz1024 | nvidia-b200.cuda13.2 | 15.2 s | null | null | null | 78.4% | 25% | 1.16 | none printed | 1 | first run |
+| lammps | strong.s8 | nvidia-b200.cuda13.2 | 49.9 s | null | 2,000 | 24.9 ms | 86.3% | 14% | 1.12 | 656.9 Matom-step/s | 1 | first run |
+| nekrs | strong.h10 | nvidia-b200.cuda13.2 | 46.2 s | null | 50 | 924 ms | 14.0% | 17% | 1.00 | none printed | 1 | first run |
+| nyx | synthetic.strong.g256 | nvidia-b200.cuda13.2 | 9.14 s | null | 10 | 914 ms | 51.2% | 10% | 1.11 | none printed | 1 | first run |
+| qmcpack | diamond2 | nvidia-b200.cuda13.2 | 286.9 s | null | 2,500 | 115 ms | 93.3% | 6% | 1.09 | none printed | 1 | first run |
+| sparta | strong.s300 | nvidia-b200.cuda13.2 | 13.2 s | null | 100 | 132 ms | 12.3% | 61% | 1.04 | 934.2 Mparticle-step/s | 1 | first run |
+| specfem3d | weak.f2 | nvidia-b200.cuda13.2 | 18.1 s | null | 20,000 | 903 us | 6.5% | 6% | 1.00 | none printed | 1 | first run |
+| warpx | strong.g256 | nvidia-b200.cuda13.2 | 20.5 s | null | 1,000 | 20.5 ms | 81.6% | 29% | 1.07 | none printed | 1 | first run |
+
 ## Earlier snapshot · 79 records as of 2026-09-22T22:28:58Z
 
 Kept verbatim from the earlier published page; its measurements are not part of the current results and are not compared with them. Spread column here: CV = stddev / median.

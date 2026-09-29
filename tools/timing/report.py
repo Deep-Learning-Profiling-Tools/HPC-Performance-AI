@@ -3,7 +3,7 @@
 
     tools/timing/report.py                               # results/timing  ->  results/timing/report/
     tools/timing/report.py --publish                     # results/timing  ->  docs/timing/ (tracked)
-    tools/timing/report.py --results-root DIR [--results-root DIR2 ...] [--history-page OLD.html] [--out DIR | --publish]
+    tools/timing/report.py --results-root DIR [--results-root DIR2 ...] [--history-page OLD.html] [--page-level PAGE.html:3] [--out DIR | --publish]
 
 The page (index.html) lists the applications of each level. Choosing one shows its
 inputs (the cases of tools/timing/cases/ plus anything measured) against the platforms
@@ -332,11 +332,35 @@ def load_history_page(path):
     return data
 
 
+def load_page_level(spec):
+    """One level of a published index.html, kept as a CURRENT campaign of its own: `PATH:LEVEL`.
+    Used to carry a level whose records live elsewhere (Level 3 measured in another checkout) next
+    to the levels rendered from local records; the page's own data is taken as it was published,
+    not re-summarized."""
+    path, _, level = spec.rpartition(":")
+    if not path or level not in ("1", "2", "3"):
+        raise SystemExit(f"report: --page-level needs PATH:LEVEL with LEVEL 1, 2 or 3, got {spec!r}")
+    import re
+    text = open(path).read()
+    m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', text, re.S)
+    data = json.loads(m.group(1).replace("<\\/", "</"))
+    if "campaigns" in data:
+        data = data["campaigns"][0]
+    apps = (data.get("levels") or {}).get(level, [])
+    n = sum(1 for a in apps for c in a.get("cases", []) for cell in (c.get("cells") or {}).values() if cell and cell.get("run"))
+    return {"kind": "cases", "historical": False, "source_page": os.path.basename(path), "level_only": level,
+            "generated_from": data.get("generated_from"), "platforms": data.get("platforms", []),
+            "levels": {level: apps}, "records": n,
+            "title": f"Level {level} · {n} records as of {data.get('generated_from') or '-'} (from {os.path.basename(path)})"}
+
+
 # ----------------------------------------------------------------- HTML
 
 def campaign_label(c):
     if c.get("kind") == "registry":
         return (c.get("campaign") or {}).get("title") or "Registered inputs"
+    if c.get("title"):
+        return c["title"]
     return ("Earlier snapshot" if c.get("historical") else "Case tables") + \
         f" · {c.get('records', 0)} records as of {c.get('generated_from') or '-'}"
 
@@ -562,7 +586,9 @@ def render_md(bundle, out_dir):
             out += [f"## {campaign_label(c)}", ""] + (
                 ["Kept verbatim from the earlier published page; its measurements are not part of the current "
                  "results and are not compared with them. Spread column here: CV = stddev / median.", ""]
-                if c.get("historical") else []) + render_md_cases(c)
+                if c.get("historical") else
+                [f"Level {c['level_only']} as published in {c['source_page']} (its records were summarized there; "
+                 "taken over as published, not re-summarized here).", ""] if c.get("source_page") else []) + render_md_cases(c)
     return "\n".join(out).rstrip("\n") + "\n"
 
 
@@ -650,7 +676,7 @@ def render_md_l3(data):
 
 # ----------------------------------------------------------------- entry points
 
-def build_bundle(results_roots, history_pages=()):
+def build_bundle(results_roots, history_pages=(), page_levels=()):
     roots = [os.path.realpath(r) for r in (results_roots if isinstance(results_roots, (list, tuple)) else [results_roots])]
     SCRUB_ROOTS[:] = sorted({os.path.dirname(r) for r in roots} | set(roots), key=len, reverse=True)
     recs = load(roots)
@@ -665,13 +691,14 @@ def build_bundle(results_roots, history_pages=()):
     SCRUB_HOSTS[:] = sorted((h for h in hosts if len(h) >= 4), key=len, reverse=True)
     registry = any(((r.get("registry") or {}).get("input_id")) for r in recs)
     campaigns = [build_registry(roots) if registry else build_data(recs)]
+    campaigns += [load_page_level(x) for x in page_levels]
     campaigns += [load_history_page(p) for p in history_pages]
     return {"campaigns": campaigns}
 
 
-def write(results_root, out_dir, history_pages=()):
+def write(results_root, out_dir, history_pages=(), page_levels=()):
     """Render the results root(s) into out_dir/index.html and out_dir/README.md; returns the two paths."""
-    bundle = build_bundle(results_root, history_pages)
+    bundle = build_bundle(results_root, history_pages, page_levels)
     os.makedirs(out_dir, exist_ok=True)
     page = os.path.join(out_dir, "index.html")
     md = os.path.join(out_dir, "README.md")
@@ -688,6 +715,9 @@ def main(argv=None):
                     help="results directory (repeatable: several directories of one campaign); default results/timing")
     ap.add_argument("--history-page", action="append", default=[],
                     help="an earlier published index.html to embed as a separate historical campaign (repeatable)")
+    ap.add_argument("--page-level", action="append", default=[], metavar="PATH:LEVEL",
+                    help="one level of a published index.html kept as a current campaign of its own (repeatable), e.g. "
+                         "the Level 3 sweep of another checkout next to the local Level 1/2 records")
     ap.add_argument("--out", default=None, help="output directory (default <first results-root>/report)")
     ap.add_argument("--publish", action="store_true", help=f"write to {os.path.relpath(PUBLISH_DIR, REPO)}/")
     a = ap.parse_args(argv)
@@ -699,7 +729,7 @@ def main(argv=None):
         if not os.path.isdir(r):
             print(f"report: no results directory {r} (run summarize.py first)", file=sys.stderr)
             return 1
-    for p in write(roots, out, a.history_page):
+    for p in write(roots, out, a.history_page, a.page_level):
         print(f"report: {os.path.relpath(p, REPO)}")
     return 0
 

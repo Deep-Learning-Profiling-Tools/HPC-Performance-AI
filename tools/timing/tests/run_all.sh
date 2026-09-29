@@ -1877,6 +1877,26 @@ if /usr/bin/grep -q 'Not profiled by default.*a planted reason for the test' "$T
     ok "13j: a record the table kept from the profiler carries the table's reason"
 else bad "13j: no 'not profiled by default' caveat with the reason"; fi
 
+echo "=== 22: --page-level keeps one level of a published page as a current campaign"
+python3 "$TOOLS/report.py" --results-root "$TMP/out19" --out "$TMP/page22a" >/dev/null 2>&1
+python3 "$TOOLS/report.py" --results-root "$TMP/out19" --page-level "$TMP/page22a/index.html:2" --out "$TMP/page22b" >/dev/null 2>&1
+pycheck "22a: the page's level 2 becomes a second, non-historical campaign; the Markdown names its source page" <<'PY'
+import json, os, re
+bad = []
+t = open(os.path.join(os.environ["TMP"], "page22b", "index.html")).read()
+d = json.loads(re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', t, re.S).group(1).replace("<\\/", "</"))
+c = d["campaigns"]
+if len(c) != 2: bad.append(f"{len(c)} campaigns")
+else:
+    x = c[1]
+    if x.get("historical") or x.get("kind") != "cases" or list(x["levels"].keys()) != ["2"]: bad.append(f"campaign {x.get('historical')} {x.get('kind')} {list(x['levels'].keys())}")
+    if x.get("source_page") != "index.html" or x.get("level_only") != "2" or not x.get("records"): bad.append(f"provenance {x.get('source_page')} {x.get('level_only')} {x.get('records')}")
+    if not str(x.get("title", "")).startswith("Level 2"): bad.append(f"title {x.get('title')}")
+md = open(os.path.join(os.environ["TMP"], "page22b", "README.md")).read()
+if "as published in index.html" not in md: bad.append("markdown lacks the source note")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

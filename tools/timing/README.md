@@ -16,6 +16,8 @@ tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 1 wa
 tools/timing/measure_level2.sh all                               # Level 2: 0 warm-up + 1 clean + 1 profiled run per case
 tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each (own loop timers)
 python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
+# --page-level PAGE.html:3 carries one level of an already published page (e.g. the Level 3 sweep of
+# another checkout) into the page as a current campaign of its own; --history-page embeds an old page as history
 bash tools/timing/tests/run_all.sh                               # self-tests, CPU only
 ```
 
@@ -513,7 +515,7 @@ and matching),
 Level 3 (case resolution and refusal, every application's
 timer extracted from synthetic evidence, a missing or incomplete timer failing loudly,
 every cited source line existing, the dry run, the record, CSV and page, QMCPACK's
-profile default and its override) -- 76 checks.
+profile default and its override) -- 77 checks.
 
 ## Scope and what is UNVERIFIED
 
