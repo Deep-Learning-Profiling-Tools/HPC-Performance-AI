@@ -128,7 +128,7 @@ if [ ! -x "$CPU_EXE" ]; then
     fi
 fi
 echo "== (C) CPU reference run: mpirun -np 1 $CPU_EXE $DECK ${DECK_ARGS[*]}"
-if ! mpirun -np 1 "$CPU_EXE" "$DECK" "${DECK_ARGS[@]}" > "$BUILD/validate_marshak_cpu.log" 2>&1; then
+if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" "${DECK_ARGS[@]}" > "$BUILD/validate_marshak_cpu.log" 2>&1; then
     tail -20 "$BUILD/validate_marshak_cpu.log"
     fail "CPU reference run exited non-zero (log: $BUILD/validate_marshak_cpu.log)"
 fi

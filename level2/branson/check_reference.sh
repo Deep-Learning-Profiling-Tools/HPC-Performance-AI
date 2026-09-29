@@ -49,7 +49,7 @@ fi
 echo "== CPU reference run: mpirun -np 1 $CPU_EXE $DECK  (cwd $PWD, log cpu_ref.log)"
 echo "   reference binary sha256: $(sha256sum "$CPU_EXE" | cut -d' ' -f1)"
 t0=$(date +%s)
-if ! mpirun -np 1 "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
+if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
     tail -20 cpu_ref.log
     fail "CPU reference run exited non-zero (log: $PWD/cpu_ref.log)"
 fi
