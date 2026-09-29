@@ -87,7 +87,16 @@ series (32 atoms per GPU; SYNTHETIC, same construction as upstream's
 dftfe-benchmarks Mo series); `llzo` (`parameterFile_LLZO.prm`, 192 atoms, 720
 states, ELPA) as the heavier fixed-size strong case. One MPI rank per GPU, 1
 thread per rank (upstream's GPU job scripts), decks used verbatim except the
-documented weak derivation.
+documented weak derivation and the output level: `run.sh` sets `VERBOSITY = 1` in its copy
+of the deck (`HPCPERF_DFTFE_VERBOSITY`, default 1; the decks ship 0; 0-4 accepted, 5 is
+refused because it adds energy evaluations). That is output only -- it prints DFT-FE's own
+per-SCF-iteration wall time and the per-MD-step `updateAtomPositionsAndMoveMesh` time that
+`tools/timing` reads -- and is recorded in `deck.diff` and the manifest (`verbosity=`).
+`REPRODUCIBLE OUTPUT = true` stays: besides the output format it fixes numerical settings
+(`pspCutOff = 30`, `src/dft/dft.cc:226-229`; ONCV tolerances), and it is also why DFT-FE
+does not time its force evaluation or print its per-MD-step timer in this deck.
+Re-validated with `VERBOSITY = 1` on 2026-09-29 (uv toolchain, 2 x B200): `validate.sh`
+PASS at 1 GPU (223 s) and 2 GPUs (130 s, also vs the 1-GPU run), audit clean.
 
 `validate.sh`: [0] ELPA GPU probe PASS; [1] `al_md` on N GPUs vs upstream's own GPU
 reference `accuracyBenchmarks/output_MD_0` through `dftfe_check.py` (pre-fixed:
