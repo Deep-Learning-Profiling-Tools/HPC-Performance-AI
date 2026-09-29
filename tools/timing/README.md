@@ -170,7 +170,9 @@ and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 `report.py` renders one or more results directories as one self-contained interactive page
 (`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google Fonts with system
 fallbacks, light and dark theme) plus a Markdown twin (`README.md`) generated from the same data model.
-The page holds only the Level 1 and Level 2 timing results. Several `--results-root` directories are
+The page holds the Level 1, 2 and 3 timing results (a level can also be taken over from an already
+published page with `--page-level PAGE.html:N`, as a current campaign of its own, when its records
+live in another checkout). Several `--results-root` directories are
 read as ONE campaign (e.g. the phases of a campaign kept in separate directories); `--history-page`
 embeds an earlier published `index.html` verbatim as a separate, labelled campaign (a campaign tab at
 the top) whose numbers are never mixed with, or compared against, the current ones.
@@ -232,6 +234,14 @@ gives the same bytes.
   the directories that hold the verified results of the campaign (all of its phases), not from a
   default `results/timing/` that may hold older data. GitHub shows `docs/timing/README.md`;
   `index.html` needs a browser (or GitHub Pages serving `docs/`).
+* **GitHub Pages**: `docs/` is ready to be served as it is -- `docs/.nojekyll` (no Jekyll
+  processing) and `docs/index.html` (the site root redirects to `timing/`). A repository
+  admin enables it once: Settings -> Pages -> Source "Deploy from a branch", branch `main`,
+  folder `/docs`. The page is then
+  https://deep-learning-profiling-tools.github.io/HPC-Performance-AI/timing/ and follows
+  every `--publish` that is merged into `main`. A Pages site is public unless the
+  organization's plan restricts its visibility: enabling it publishes the measurements
+  (the page carries no paths, host names or environment values).
 
 The own-timer check comes from `app_timer_regex` / `app_timer_unit` in
 `cases/level2_apps.tsv`: the timer an application prints for exactly the region its

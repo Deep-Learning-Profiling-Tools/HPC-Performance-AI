@@ -275,8 +275,10 @@ hardware; the page then shows the platform as a column and its device values as 
   - Several default Level 2 inputs are set-up dominated (MiniEM: 106.7 s before a
     1.31 s ROI; hipBone, SW4lite, XSBench similar); larger inputs would give more useful
     training points.
-  - GitHub Pages is not enabled; the repository browser shows `docs/timing/README.md`,
-    and `docs/timing/index.html` needs a browser or Pages serving `docs/`.
+  - GitHub Pages: `docs/` is prepared (`.nojekyll`, a root `index.html` redirecting to
+    `timing/`); enabling it (Settings -> Pages -> `main`, `/docs`) is a repository-admin
+    decision, and it makes the measurements public unless the plan restricts Pages
+    visibility. Until then the repository browser shows `docs/timing/README.md`.
 
 ## 8. Where to read further
 
