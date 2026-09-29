@@ -20,6 +20,9 @@ and a Trace provides
     info()                     dict: collector version, recorded-environment variable
                                NAMES (never values), anything the adapter wants to log
     markers()                  list[Marker]  -- ROI / exclude ranges as recorded by the tool
+    named_ranges(names)        OPTIONAL: list[Marker] of kind "roi" for the annotation ranges
+                               (NVTX / ROCTX) an application emits itself under one of `names`
+                               -- Level 3 has no markers; an adapter without it gives none
     intervals()                iterator of Interval sorted by start (ties arbitrary)
     op_names(keys)             dict key -> human-readable op name, for the ops table
     runtime_calls(windows)     {"calls","time_ns","sync_calls","sync_ns"} restricted to

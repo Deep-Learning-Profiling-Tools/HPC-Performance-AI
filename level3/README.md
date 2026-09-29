@@ -342,6 +342,26 @@ Exit codes, by program:
 A completed run is not a correctness result. PENDING, UNSUPPORTED_LAYOUT and REFUSED are never counted as
 passes and never enter a performance summary.
 
+## Runtime measurement
+
+`tools/timing/measure_level3.sh all` times the ten applications on 2 GPUs in the same record
+format as Level 1 and Level 2 ([tools/timing/README.md](../tools/timing/README.md)). Level 3
+carries **no ROI markers**: the measured region of each application is the timer it prints for
+its own loop, chosen by the markers' placement rule (loop in; start-up, set-up, the
+application's warm-up step and final output out) and defined with source citations in
+[tools/timing/apptimers.py](../tools/timing/apptimers.py). Two `run.sh` switch on a timer that
+exists but is off by default, output only: QMCPACK `--enable-timers=medium`
+(`HPCPERF_QMCPACK_TIMERS`), DFT-FE `VERBOSITY = 1` (`HPCPERF_DFTFE_VERBOSITY`); `validate.sh`
+passes with both at 1 and 2 GPUs. The timing inputs are larger than the smoke inputs
+(`tools/timing/cases/level3_cases.tsv`); only QMCPACK's and DFT-FE's are inputs `validate.sh`
+checks, the others are completeness runs and their records say so. Each run writes under
+`build/level3/<app>/<profile>/run.timing-<run id>-*/` and never touches a validated run
+directory. The profiled run goes through the tool's clean environment (`env -i` + allow-list
++ credential deny rule) -- the wrapper CLAUDE.md requires before profiling a Level 3 run; its device
+picture is the whole process except for WarpX, whose TinyProfiler emits an NVTX range for its
+loop. QMCPACK is timed without a profiled run by default (its trace is 24 GB for a 5-minute run;
+the reason is in `tools/timing/cases/level3_apps.tsv` and in its records).
+
 ## Known limitations
 
 * **Nyx**: the `LyA` heat/cool deck ends as `STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING` (exit 3) at 1/2/4
