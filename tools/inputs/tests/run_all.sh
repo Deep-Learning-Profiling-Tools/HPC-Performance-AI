@@ -1049,5 +1049,112 @@ assert run("gpu", log(steps=2), "--steps", "5")[0] == 1 and run("gpu", log(steps
 assert run("cmp", log(), log())[0] == 0
 PY
 
+
+# ---- 16. second-pass correctness checks: branson reference, exampm final state / dumps, shaw norms, vlp4d nrj, aobench image, quicksilver seed scatter ----
+P2="$TMP/p2"; mkdir -p "$P2"
+# branson check_log.py cmp: energies, T_e and the transported photon count of two logs
+bransonlog() {  # $1 file  $2 photons  $3 post-mat E
+printf 'Step: 1 of 1\nEmission E: 1.0\nSource E: 0.0\nPre census E: 0.5\nPre mat E: 2.0\nAbsorption E: 0.3\nExit E: 0.1\nPost mat E: %s\nRadiation conservation: 1e-13\nMaterial conservation: 1e-13\n 3 cell(s) to the GPU\n  0  1.5000  0.2  0.3\n  1  1.4000  0.2  0.3\nTotal Photons transported: %s\nPhotons Per Second (FOM): 1.0\n' "$3" "$2" > "$1"
+}
+bransonlog "$P2/b_gpu.log" 100000 2.10; bransonlog "$P2/b_cpu.log" 101000 2.12; bransonlog "$P2/b_cpu_far.log" 120000 2.12
+python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu.log" > "$P2/b1.out" 2>&1; rc1=$?
+python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu_far.log" > "$P2/b2.out" 2>&1; rc2=$?
+[ $rc1 -eq 0 ] && grep -q "^PASS: branson log check (cmp)" "$P2/b1.out" && grep -q "total photons transported: GPU 100000  CPU 101000" "$P2/b1.out" \
+    && [ $rc2 -eq 1 ] && grep -q "transported photon count differs" "$P2/b2.out" \
+    && ok "branson check_log.py cmp: energies / T_e / transported photons within the margins pass; a 20 % photon-count difference fails" \
+    || bad "branson cmp rc1=$rc1 rc2=$rc2 $(tail -2 "$P2/b1.out" "$P2/b2.out" | tr '\n' '|')"
+bash -n "$R/level2/branson/check_reference.sh" && ok "branson check_reference.sh: valid shell" || bad "branson check_reference.sh syntax"
+python3 "$TOOL" check "$R/level2/branson" hohlraum-multi-node --out "$P2/b_dry" --dry-run 2>/dev/null | python3 -c "
+import json, sys; d = json.load(sys.stdin)
+assert d['command'][:2] == ['bash', '$R/level2/branson/check_reference.sh'] and d['command'][3].endswith('/level2/branson/inputs/3D_hohlraum_multi_node.xml') and d['command'][2].endswith('/run/stdout.log'), d
+" && ok "branson check: the reference checker gets the run's log and the registered deck (dry run)" || bad "branson check dry-run"
+# exampm: the final-state line -> rules (count exact, bounds, volume within 1 %); dumps checker refuses an empty directory
+printf 'Time 0.000000 / 0.250000\nExaMPM final state: step 250 time 0.25 particles 15400000 initial 15400000 pos_min 0.0012 pos_max 0.9876 volume_ratio 1.0004 v_mean 0.1 -0.2 -0.3 x_mean 0.5 0.5 0.31\n' > "$P2/ex_ok.log"
+sed 's/particles 15400000 initial/particles 15399999 initial/' "$P2/ex_ok.log" > "$P2/ex_lost.log"
+sed 's/volume_ratio 1.0004/volume_ratio 1.02/' "$P2/ex_ok.log" > "$P2/ex_vol.log"
+sed 's/pos_max 0.9876/pos_max 1.5/' "$P2/ex_ok.log" > "$P2/ex_out.log"
+python3 "$TOOL" extract "$R/level2/exampm" "$P2/ex_ok.log" --input dambreak-0.005 > "$P2/ex_q.json" 2>/dev/null
+mkbase "$R/level2/exampm" dambreak-0.005 "$P2/ex_q.json" > "$P2/ex_base.json"
+python3 "$TOOL" compare "$R/level2/exampm" "$P2/ex_base.json" "$P2/ex_ok.log" --input dambreak-0.005 > "$P2/ex_c1.json" 2>/dev/null; rc1=$?
+python3 "$TOOL" compare "$R/level2/exampm" "$P2/ex_base.json" "$P2/ex_lost.log" --input dambreak-0.005 > /dev/null 2>&1; rc2=$?
+python3 "$TOOL" compare "$R/level2/exampm" "$P2/ex_base.json" "$P2/ex_vol.log" --input dambreak-0.005 > /dev/null 2>&1; rc3=$?
+python3 "$TOOL" compare "$R/level2/exampm" "$P2/ex_base.json" "$P2/ex_out.log" --input dambreak-0.005 > /dev/null 2>&1; rc4=$?
+[ $rc1 -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and not d['required_pending'], d" "$P2/ex_c1.json" \
+    && [ $rc2 -eq 1 ] && [ $rc3 -eq 1 ] && [ $rc4 -eq 1 ] \
+    && ok "exampm final-state rules: identical state PASS (no pending required quantity); a lost particle, a 2 % volume change and a particle outside the box each FAIL" \
+    || bad "exampm final-state rules rc=$rc1/$rc2/$rc3/$rc4"
+for id in dambreak-0.01 dambreak-0.05-upstream; do
+    python3 "$TOOL" extract "$R/level2/exampm" "$P2/ex_ok.log" --input $id 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['particles_final']['value']==15400000 and d['volume_ratio']['value']==1.0004, d" \
+        && ok "exampm $id: the same final-state quantities apply" || bad "exampm $id quantities"
+done
+python3 "$TOOL" extract "$R/level2/exampm" "$P2/ex_ok.log" --input freefall-0.01 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); assert set(d)=={'last_time_line'}, d" \
+    && ok "exampm freefall-0.01: keeps the benchmark-level quantities (the box of the free fall is not the unit cube)" || bad "exampm freefall quantities"
+mkdir -p "$P2/nodumps"; python3 "$R/level2/exampm/check_dambreak.py" "$P2/nodumps" > "$P2/db.out" 2>&1; rc=$?
+[ $rc -eq 1 ] && grep -q "^FAIL: exampm dam-break check" "$P2/db.out" && grep -q "at least 2 expected" "$P2/db.out" \
+    && ok "exampm check_dambreak.py: no dumps -> FAIL (nothing verified)" || bad "check_dambreak.py empty dir rc=$rc $(cat "$P2/db.out")"
+python3 "$TOOL" check "$R/level2/exampm" dambreak-0.01 --out "$P2/ex_dry" --dry-run 2>/dev/null | python3 -c "
+import json, sys; d = json.load(sys.stdin)
+assert d['outputs'][0]['new'] is True and d['outputs'][0]['glob'].endswith('build/level2/exampm/cuda/run/particles_*.h5') and d['command'][-2:] == ['--min-dumps', '2'], d
+" && ok "exampm check: only the dumps written by this run are captured (new: true), checker gets the outputs directory (dry run)" || bad "exampm check dry-run"
+# shaw: final-state norms, exact
+printf 'hpcperf final state: nrm2(vp) = 1.2345678901234567e-03 nrm2(sp) = 9.8765432109876543e+01\nloopTime = 1.5\n' > "$P2/sh_ok.log"
+sed 's/9.8765432109876543e+01/9.8765432109876700e+01/' "$P2/sh_ok.log" > "$P2/sh_diff.log"   # differs in the 15th digit
+python3 "$TOOL" extract "$R/level2/shaw" "$P2/sh_ok.log" --input prem-500x2500 > "$P2/sh_q.json" 2>/dev/null
+mkbase "$R/level2/shaw" prem-500x2500 "$P2/sh_q.json" > "$P2/sh_base.json"
+python3 "$TOOL" compare "$R/level2/shaw" "$P2/sh_base.json" "$P2/sh_ok.log" --input prem-500x2500 > "$P2/sh_c.json" 2>/dev/null; rc1=$?
+python3 "$TOOL" compare "$R/level2/shaw" "$P2/sh_base.json" "$P2/sh_diff.log" --input prem-500x2500 > /dev/null 2>&1; rc2=$?
+[ $rc1 -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS', d" "$P2/sh_c.json" && [ $rc2 -eq 1 ] \
+    && ok "shaw final-state norms: exact rule -- identical PASS, a 15th-digit change FAIL" || bad "shaw norms rc=$rc1/$rc2"
+# vlp4d sld10: file-sourced rows from outputs/nrj.out, exact; check_nrj.py structure
+mkdir -p "$P2/vl/outputs"; python3 -c "
+for i in range(41): print(f'{i*0.01:.13e} {-0.8-0.003*i:.13e} {(1e-15 if i%2 else -2e-16):.13e}')" > "$P2/vl/outputs/nrj.out"
+printf 'Number of total iterations : 40\n' > "$P2/vl/stdout.log"
+python3 - "$R" "$P2/vl" <<'PY' && ok "vlp4d sld10: e_norm_final / mass_final come from the captured nrj.out (last row), exact rules" || bad "vlp4d file-sourced quantities"
+import sys, json; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+from pathlib import Path
+doc = hi.load(sys.argv[1] + "/level2/p3_vlp4d"); inp = hi.get_input(doc, "sld10")
+q = hi.extract(doc, Path(sys.argv[2]) / "stdout.log", inp, run_dir=sys.argv[2])
+assert abs(q["e_norm_final"]["value"] - (-0.8 - 0.003 * 40)) < 1e-12 and q["mass_final"]["value"] == -2e-16 and q["iterations"]["value"] == 40, q
+r = hi.compare(doc, q, q, inp); assert r["verdict"] == "PASS" and not r["required_pending"], r
+q2 = dict(q); q2["e_norm_final"] = dict(q["e_norm_final"], value=q["e_norm_final"]["value"] + 1e-12)
+assert hi.compare(doc, q, q2, inp)["verdict"] == "FAIL"
+q3 = hi.extract(doc, Path(sys.argv[2]) / "stdout.log", hi.get_input(doc, "sld10-large"), run_dir=sys.argv[2])
+assert set(q3) == {"iterations"}, q3          # the large deck keeps its own quantities (the Landau fit is its check)
+PY
+python3 "$R/level2/p3_vlp4d/check_nrj.py" "$P2/vl/outputs/nrj.out" --lines 41 > "$P2/vl1.out" 2>&1; rc1=$?
+head -40 "$P2/vl/outputs/nrj.out" > "$P2/vl_short.out"; python3 "$R/level2/p3_vlp4d/check_nrj.py" "$P2/vl_short.out" --lines 41 > /dev/null 2>&1; rc2=$?
+sed '5s/.*/4.0000000000000e-02 -8.1e-01 1.0e-06/' "$P2/vl/outputs/nrj.out" > "$P2/vl_mass.out"; python3 "$R/level2/p3_vlp4d/check_nrj.py" "$P2/vl_mass.out" --lines 41 > /dev/null 2>&1; rc3=$?
+[ $rc1 -eq 0 ] && grep -q "^PASS: vlp4d nrj check" "$P2/vl1.out" && [ $rc2 -eq 1 ] && [ $rc3 -eq 1 ] \
+    && ok "vlp4d check_nrj.py: 41 finite rows PASS; 40 rows FAIL; a 1e-6 mass residual FAIL" || bad "check_nrj.py rc=$rc1/$rc2/$rc3"
+# aobench image check
+python3 -c "
+import sys; w,h=4,3; sys.stdout.buffer.write(b'P6\n%d %d\n255\n' % (w,h) + bytes(range(w*h*3)))" > "$P2/ao.ppm"
+sha="$(sha256sum "$P2/ao.ppm" | cut -d' ' -f1)"; echo "$sha  ao.ppm" > "$P2/ref.sha256"; echo "0000  ao.ppm" > "$P2/ref_wrong.sha256"
+python3 "$R/level1/ao_bench/check_ppm.py" "$P2/ao.ppm" --reference "$P2/ref.sha256" > "$P2/ao1.out" 2>&1; rc1=$?
+python3 "$R/level1/ao_bench/check_ppm.py" "$P2/ao.ppm" --reference "$P2/ref_wrong.sha256" > "$P2/ao2.out" 2>&1; rc2=$?
+python3 "$R/level1/ao_bench/check_ppm.py" "$P2/ao.ppm" --reference "$P2/ref_missing.sha256" > "$P2/ao3.out" 2>&1; rc3=$?
+[ $rc1 -eq 0 ] && grep -q "^PASS: aobench image check" "$P2/ao1.out" && [ $rc2 -eq 1 ] && grep -q "sha256 differs" "$P2/ao2.out" \
+    && [ $rc3 -eq 1 ] && grep -q "no reference image hash" "$P2/ao3.out" \
+    && ok "aobench check_ppm.py: byte-identical PASS; a different image FAIL; no captured reference FAIL (never PASS by default)" \
+    || bad "check_ppm.py rc=$rc1/$rc2/$rc3"
+python3 "$TOOL" check "$R/level1/ao_bench" iter100 --out "$P2/ao_dry" --dry-run 2>/dev/null | python3 -c "
+import json, sys; d = json.load(sys.stdin)
+assert d['outputs'][0]['glob'].endswith('/ao_dry/run/ao.ppm') and d['command'][-1].endswith('level1/ao_bench/reference/iter100.sha256'), d
+" && ok "aobench check: ao.ppm of the run directory is captured and compared with the repository reference (dry run)" || bad "aobench check dry-run"
+# quicksilver seed scatter statistics
+qslog() {  # $1 file  $2 flux
+printf '      99       150684        16384         3165            0        53241      1334462        66755       106691      1454458            0      2000      3000    %s    1.0    2.0    3.0\nPASS:: Absorption / Fission / Scatter Ratios maintained with 1%% tolerance\nPASS:: Collision to Facet Crossing Ratio maintained even balanced within 1%% tolerance\nPASS:: No Particles Lost During Run\nPASS:: Fluence is homogenous across cells with 6%% tolerance\n' "$2" > "$1"
+}
+for s in 11 22 33; do mkdir -p "$P2/qs/seed-$s"; echo "rc=0 seed=$s" > "$P2/qs/seed-$s/DONE"; done
+qslog "$P2/qs/seed-11/stdout.log" 1.00e+02; qslog "$P2/qs/seed-22/stdout.log" 1.02e+02; qslog "$P2/qs/seed-33/stdout.log" 0.98e+02
+python3 "$R/level2/quicksilver/seed_stats.py" "$P2/qs" --k 4 > "$P2/qs.out" 2>&1; rc=$?
+[ $rc -eq 0 ] && grep -q "seed-varied runs used: 3" "$P2/qs.out" && grep -qE "scalar_flux +mean 100 +sigma 2 " "$P2/qs.out" && grep -q "tol 8.000e-02" "$P2/qs.out" \
+    && ok "quicksilver seed_stats.py: mean / sigma of the final-cycle scalar flux over the seeds and the k-sigma near rule it implies (nothing written)" \
+    || bad "seed_stats.py rc=$rc $(cat "$P2/qs.out" | tr '\n' '|')"
+bash -n "$R/level2/quicksilver/seed_scatter.sh" && ok "quicksilver seed_scatter.sh: valid shell" || bad "seed_scatter.sh syntax"
+for d in level2/branson level2/exampm level2/shaw level2/p3_vlp4d level1/ao_bench level2/quicksilver level2/examinimd level2/hipbone level2/miniweather level2/miniem; do
+    python3 "$TOOL" validate "$R/$d" >/dev/null 2>&1 && ok "validate $d (second pass)" || bad "validate $d"
+done
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

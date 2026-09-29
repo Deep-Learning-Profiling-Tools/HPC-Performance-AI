@@ -14,8 +14,10 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: ExaMPM prints only the simulation time ('Time t / t_final'), no wall-clock timer
 baseline:
-  method: no built-in check; validate.sh checks its own case against an analytic solution. Nothing numeric is printed
-    to stdout (particle dumps go to HDF5), so no quantity can be verified from the log.
+  method: validate.sh checks its own free-fall case against the analytic solution and applies conservation criteria to
+    the dam-break dumps. Since ExaMPM_Solver.hpp printFinalState (outside the ROI) every run prints a final-state
+    summary (particle count, position bounds, volume ratio, mean velocity, centre of mass); the dam-break inputs
+    verify it through their own quantity rules (below, per input), the free-fall input through validate.sh.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: last_time_line
@@ -29,10 +31,37 @@ coverage:
 inputs:
 - id: dambreak-0.01
   check:
-    kind: none
-    reason: no reference; the proposed check (class D) is validate.sh's dam-break conservation checks on the last dump
-      plus a same-input baseline comparison of the final particle state (centre of mass, momentum, kinetic energy),
-      whose tolerance is not established
+    # validate.sh's dam-break conservation criteria on the run's own HDF5 dumps (written by the run into the shared
+    # build/level2/exampm/cuda/run directory, captured per run as `outputs`): particle count conserved, positions
+    # finite and inside [-0.02, 1.02]^3, total volume sum(J)/N_0 within 1 % of 1 on every dump. Together with the
+    # final-state rules (`baseline.quantities`) this is the correctness evidence of the dam-break inputs; no
+    # independent reference exists (see the notes).
+    kind: post_run
+    outputs: [{glob: '{repo}/build/level2/exampm/cuda/run/particles_*.h5', new: true}]
+    command: [python3, '{bench_dir}/check_dambreak.py', '{outputs}', '--min-dumps', '2']
+    pass_regex: '^PASS: exampm dam-break check'
+    fail_regex: '^FAIL: exampm dam-break check'
+    basis: 'every dump of the run (initial + evolved): particle count = initial count, positions finite and inside
+      [-0.02, 1.02]^3, sum(J)/N_0 within 1 % of 1 -- validate.sh dam-break criteria (conservation of particles and
+      volume, domain bounds); the same criteria hold for the final state through the registry rules'
+    covers: []
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
   case: dam-break
   variant: default
   source:
@@ -55,10 +84,37 @@ inputs:
   - cuda
 - id: dambreak-0.05-upstream
   check:
-    kind: none
-    reason: no reference; the proposed check (class D) is validate.sh's dam-break conservation checks on the last dump
-      plus a same-input baseline comparison of the final particle state (centre of mass, momentum, kinetic energy),
-      whose tolerance is not established
+    # validate.sh's dam-break conservation criteria on the run's own HDF5 dumps (written by the run into the shared
+    # build/level2/exampm/cuda/run directory, captured per run as `outputs`): particle count conserved, positions
+    # finite and inside [-0.02, 1.02]^3, total volume sum(J)/N_0 within 1 % of 1 on every dump. Together with the
+    # final-state rules (`baseline.quantities`) this is the correctness evidence of the dam-break inputs; no
+    # independent reference exists (see the notes).
+    kind: post_run
+    outputs: [{glob: '{repo}/build/level2/exampm/cuda/run/particles_*.h5', new: true}]
+    command: [python3, '{bench_dir}/check_dambreak.py', '{outputs}', '--min-dumps', '2']
+    pass_regex: '^PASS: exampm dam-break check'
+    fail_regex: '^FAIL: exampm dam-break check'
+    basis: 'every dump of the run (initial + evolved): particle count = initial count, positions finite and inside
+      [-0.02, 1.02]^3, sum(J)/N_0 within 1 % of 1 -- validate.sh dam-break criteria (conservation of particles and
+      volume, domain bounds); the same criteria hold for the final state through the registry rules'
+    covers: []
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
   case: dam-break
   variant: size
   source:
@@ -91,8 +147,26 @@ inputs:
 - id: dambreak-0.005
   check:
     kind: none
-    reason: the registered write_freq 2000 exceeds the 250 steps, so no evolved dump exists; the program needs a
-      final-state summary outside the ROI first (class E)
+    reason: the registered write_freq 2000 exceeds the 250 steps, so no evolved dump exists and the per-dump check
+      does not apply; the final-state summary the solver prints after the time loop (particle count, position
+      bounds, volume ratio) is verified through this input's `baseline.quantities` rules instead
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
   case: dam-break
   variant: size
   source:

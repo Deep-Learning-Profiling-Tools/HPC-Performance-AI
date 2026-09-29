@@ -17,10 +17,25 @@ timing:
   regex: ^loopTime = (?P<value>[0-9.]+)
   select: only
 baseline:
-  method: no reference in stdout (seismogram optional); validate.sh runs the upstream fomInnerDomain regression
-    with compare.py. Nothing numeric is printed to verify from the log.
+  method: validate.sh runs the upstream fomInnerDomain regression with compare.py (a fixed small case). The registered
+    runs write no io section, so since fom_run.hpp prints the 2-norms of the final velocity and stress states after
+    the time loop (outside the ROI, full precision) these are the result quantities, compared exactly against the
+    working baseline of the same input (deterministic explicit time stepping; a candidate that reorders
+    floating-point work needs a stated tolerance first).
   reference: this build's first measured run (self baseline); see method
   quantities:
+  - name: vp_norm_final
+    role: required
+    regex: '^hpcperf final state: nrm2\(vp\) = (?P<value>[-+0-9.eE]+) nrm2\(sp\)'
+    select: last
+    compare:
+      rule: exact
+  - name: sp_norm_final
+    role: required
+    regex: '^hpcperf final state: nrm2\(vp\) = [-+0-9.eE]+ nrm2\(sp\) = (?P<value>[-+0-9.eE]+)'
+    select: last
+    compare:
+      rule: exact
   - name: loop_time_line
     role: diagnostic
     regex: '^loopTime = '
@@ -99,6 +114,6 @@ inputs:
   - cuda
 check:
   kind: none
-  reason: the registered runs write no io section (no seismogram, no snapshots) and print nothing numeric; the program
-    needs a minimal final-state output (norms / checksums of velocity and stress after the time loop, outside the
-    ROI) before any comparison is possible (class E)
+  reason: no separate checker -- the final-state norms fom_run.hpp prints after the time loop (outside the ROI) are
+    verified by the exact rules of `baseline.quantities` against the working baseline (two independent runs of the
+    reference build)

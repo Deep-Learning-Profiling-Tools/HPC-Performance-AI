@@ -53,7 +53,16 @@ inputs:
   backends_validated:
   - cuda
 check:
-  kind: none
-  reason: no reference exists for the rendered image (upstream ships none; verify.py checks structure and determinism
-    only); a same-input comparison of ao.ppm against the unoptimized baseline's image is the proposed check (class D),
-    its per-channel tolerance for reordered floating point not established
+  # The rendered image (ao.ppm, written into the run directory) against the image the unoptimized reference build of
+  # this repository rendered for the same input: exact bytes (deterministic per-pixel RNG, verify.py). The reference
+  # hash lives in reference/iter100.sha256 with its provenance sidecar; it is captured once from the reference build
+  # (correctness_runs2.sh) -- until then the check fails with "no reference image hash". A per-channel tolerance for a
+  # candidate that reorders floating-point work is not established (decision).
+  kind: post_run
+  outputs: ['{run_dir}/ao.ppm']
+  command: [python3, '{bench_dir}/check_ppm.py', '{outputs}/ao.ppm', '--reference', '{bench_dir}/reference/iter100.sha256']
+  pass_regex: '^PASS: aobench image check'
+  fail_regex: '^FAIL: aobench image check'
+  basis: 'well-formed 256x256 P6 PPM, byte-identical (sha256) to the image rendered by the unoptimized reference build
+    for the same iteration count (reference/iter100.sha256, provenance in the sidecar); exact deterministic comparison'
+  covers: all

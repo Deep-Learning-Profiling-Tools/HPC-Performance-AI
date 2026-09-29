@@ -17,7 +17,9 @@ check B, mode cmp = its check C), usable on the log of any deck.
       the final step's Post mat E, Absorption E and Exit E must agree to 5 % relative and every
       cell's T_e to 0.02 absolute between the GPU run and a CPU-only Branson built from the
       same sources (validate.sh: > 6 sigma of the seed-to-seed scatter, yet catches a broken
-      transport kernel).
+      transport kernel); the "Total Photons transported" count of the two runs must agree to
+      5 % relative as well (the same deck and seed source the same photons; the count is a
+      tally of the transport, compared with the same margin as the energies).
 Prints the per-step / per-quantity figures and "   ERROR: ..." lines, then
 "PASS: branson log check ..." / "FAIL: branson log check ..."; exit 0/1.
 """
@@ -91,7 +93,7 @@ def main(argv):
     else:  # compare final step of gpu vs cpu
         if len(logs) < 2:
             print('FAIL: branson log check: cmp needs <gpu.log> <cpu.log>'); return 2
-        cpu_steps, _ = parse(logs[1])
+        cpu_steps, cpu_text = parse(logs[1])
         if len(cpu_steps) != len(gpu_steps) or not gpu_steps:
             errors.append(f'step count differs: GPU {len(gpu_steps)} vs CPU {len(cpu_steps)}')
         else:
@@ -113,7 +115,17 @@ def main(argv):
                       f'front cells GPU {[round(x,4) for x in g["Te"][:3]]} CPU {[round(x,4) for x in c["Te"][:3]]}')
                 if dmax > 0.02:
                     errors.append(f'T_e differs by {dmax:.4f} (> 0.02) at cell {imax}')
-        what = 'final Post-mat/Absorption/Exit E within 5 % and T_e within 0.02 of the CPU reference'
+        gp = re.search(r'Total Photons transported: (\d+)', gpu_text)
+        cp = re.search(r'Total Photons transported: (\d+)', cpu_text)
+        if not gp or not cp:
+            errors.append('"Total Photons transported" line missing in a log')
+        else:
+            g_n, c_n = int(gp.group(1)), int(cp.group(1))
+            rel = abs(g_n - c_n) / c_n if c_n else float('inf')
+            print(f'   total photons transported: GPU {g_n}  CPU {c_n}  rel diff {rel:.3e}')
+            if rel > 0.05:
+                errors.append(f'transported photon count differs by {rel:.3e} (> 5e-2)')
+        what = 'final Post-mat/Absorption/Exit E within 5 %, T_e within 0.02 and transported photons within 5 % of the CPU reference'
     for e in errors:
         print('   ERROR:', e)
     print(('FAIL' if errors else 'PASS') + f': branson log check ({mode}): {what}')
