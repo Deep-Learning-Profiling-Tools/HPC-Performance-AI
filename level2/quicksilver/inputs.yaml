@@ -42,15 +42,21 @@ baseline:
     Upstream's own CORAL-2 correctness checks (coralBenchmark: the four "PASS::" lines --
     absorption/fission/scatter ratios within 1 %, collision-to-facet-crossing ratio within 1 %,
     no particles lost, fluence homogeneous within 6 %) must all be present and no "FAIL::"
-    line. Quicksilver is a Monte Carlo code with a fixed seed (1029384756 in every deck) but
-    GPU tracking order is not bitwise reproducible: the final-cycle tallies (census population,
-    segments, scalar flux) are RECORDED for statistical comparison; their tolerance is not yet
-    fixed (NEEDS_VALIDATION for exact rules beyond upstream's checks).
+    line. The last-cycle tallies (census population, segments, scalar flux) are compared EXACTLY
+    against the working baseline of the same input, on a deterministic basis established on
+    2026-09-28/29: this build reproduces all three bit for bit over independent runs (the 3
+    native-campaign runs of every input, and 5 runs per input with different deck seeds -- the deck's
+    `seed:` is parsed and printed (source/cuda/Parameters.cc) but never used: every particle's
+    random-number stream is spawned from the source-particle index (MC_SourceNow.cc,
+    PopulationControl.cc), so the tallies do not depend on the deck seed at all). A candidate that
+    keeps the per-particle streams and the reduction order reproduces them exactly; one that changes
+    the RNG consumption or reduction order needs a statistical basis the deck seed cannot provide
+    (results directory, correctness_decisions_needed.md).
   reference: >-
     upstream coralBenchmark PASS checks (statistical, candidate-side markers only: no baseline value
-    is consulted for them); the last-cycle tallies are recorded from baseline and candidate but not
-    numerically compared (no tolerance basis) -- scalar flux is the required science result and keeps
-    the comparison INCOMPLETE, census / num_seg are diagnostics
+    is consulted for them); the last-cycle tallies of the working baseline, compared exactly
+    (deterministic build, see method) -- scalar flux is the required science result, census /
+    num_seg are diagnostics
   quantities:
     - name: pass_ratios
       role: required
@@ -73,20 +79,20 @@ baseline:
       regex: '^FAIL::'
       compare: {rule: absent}
     - name: final_cycle_census
-      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
+      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; the tally is exact (deterministic build, see method)
       regex: '^\s+\d+(\s+\d+){10}\s+(?P<value>\d+)\s+\d+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
-      compare: {rule: record}
+      compare: {rule: exact}
     - name: final_cycle_num_seg
-      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; tallies have no upstream tolerance
+      role: diagnostic   # upstream acceptance = the four coralBenchmark checks; the tally is exact (deterministic build, see method)
       regex: '^\s+\d+(\s+\d+){11}\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
-      compare: {rule: record}
+      compare: {rule: exact}
     - name: final_cycle_scalar_flux
-      role: required     # the physical result of the transport run; no tolerance basis yet -> record -> the baseline-vs-candidate numeric comparison is NOT ready (INCOMPLETE)
+      role: required     # the physical result of the transport run; exact against the working baseline (deterministic basis, see method)
       regex: '^\s+\d+(\s+\d+){12}\s+(?P<value>[0-9.eE+-]+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
       select: last
-      compare: {rule: record}
+      compare: {rule: exact}
 coverage:
   status: MULTI_INPUT
   reason: >-
@@ -145,7 +151,8 @@ inputs:
     notes: the CTS-2 procurement problem (P2-type physics, total cross section 1.5227, dt 1.1e-7).
 check:
   kind: none
-  reason: upstream's four CORAL PASS lines are already required rules; final_cycle_scalar_flux stays `record` --
-    its tolerance needs the Monte Carlo scatter of the tally from independent-seed runs of the reference build
-    (seed_scatter.sh runs the same deck with other seeds, seed_stats.py prints mean / sigma and the `near` rule
-    |candidate - mean| <= k sigma it supports; k and the use of the seed-varied envelope are a decision)
+  reason: upstream's four CORAL PASS lines and the exact last-cycle tallies are registry rules (baseline.quantities);
+    no separate checker. seed_scatter.sh / seed_stats.py were meant to measure the Monte Carlo scatter of the tally
+    over deck seeds -- the 2026-09-29 runs (5 seeds x 4 inputs) gave identical tallies because the deck seed is
+    never used by the transport (see baseline.method); a statistical envelope for candidates that change the RNG
+    consumption order therefore has no basis yet (correctness_decisions_needed.md)

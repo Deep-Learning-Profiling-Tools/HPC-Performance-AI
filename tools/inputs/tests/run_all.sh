@@ -680,14 +680,16 @@ python3 -c "import json,sys; s=json.load(open(sys.argv[1]))['summary']; assert s
 python3 "$TOOL" extract "$R/level2/quicksilver" "$FX/quicksilver_two_tables.log" > "$TMP/qsq.json" 2>/dev/null
 mkbase "$R/level2/quicksilver" p1-profile-8c-100k-20s "$TMP/qsq.json" > "$TMP/qs_baseline.json"
 python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$FX/quicksilver_two_tables.log" >"$TMP/c.json" 2>/dev/null; rc=$?
-[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['verdict']=='INCOMPLETE' and d['required_pending']==['final_cycle_scalar_flux'] and d['diagnostic_recorded']==['final_cycle_census','final_cycle_num_seg'] and all(c[k]['ok'] for k in ('pass_ratios','pass_facet','pass_no_loss','pass_fluence','fail_marker'))" "$TMP/c.json" 2>/dev/null \
-    && ok "quicksilver coverage: identical log -> native checks ok, scalar flux only recorded -> exit 3 INCOMPLETE (no numeric baseline comparison exists)" || bad "quicksilver coverage control rc=$rc $(cat "$TMP/c.json")"
-# change the extracted science result (scalar flux x 1.5) but keep every PASS:: line
+# the last-cycle tallies are compared exactly (deterministic build: the deck seed is never used by the
+# transport, every run of an input reproduces census / segments / scalar flux bit for bit)
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['verdict']=='PASS' and d['required_pending']==[] and c['final_cycle_scalar_flux']['rule']=='exact' and c['final_cycle_scalar_flux']['ok'] and all(c[k]['ok'] for k in ('pass_ratios','pass_facet','pass_no_loss','pass_fluence','fail_marker','final_cycle_census','final_cycle_num_seg'))" "$TMP/c.json" 2>/dev/null \
+    && ok "quicksilver coverage: identical log -> native checks ok and the exact tally comparison verifies the scalar flux -> exit 0 PASS" || bad "quicksilver coverage control rc=$rc $(cat "$TMP/c.json")"
+# change the extracted science result (scalar flux x 1.5) but keep every PASS:: line -> the exact rule catches it
 sed -E 's/^(\s+19\s.*\s)5\.918521e\+05(\s)/\18.877782e+05\2/' "$FX/quicksilver_two_tables.log" > "$TMP/qs_flux_changed.log"
 grep -q '8.877782e+05' "$TMP/qs_flux_changed.log" || bad "quicksilver fixture edit did not apply"
 python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$TMP/qs_flux_changed.log" >"$TMP/c.json" 2>/dev/null; rc=$?
-[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert d['ok'] and d['verdict']=='INCOMPLETE' and c['final_cycle_scalar_flux']['ok'] and abs(c['final_cycle_scalar_flux']['value']-887778.2)<1 and abs(c['final_cycle_scalar_flux']['baseline']-591852.1)<1 and c['final_cycle_scalar_flux']['rule']=='record'" "$TMP/c.json" 2>/dev/null \
-    && ok "quicksilver coverage: scalar flux changed x1.5 with all PASS:: lines kept -> NOT detected as a failure (record: 591852.1 -> 887778.2 shown), exit 3 INCOMPLETE -- the differential comparison is not ready" || bad "quicksilver coverage flux rc=$rc $(cat "$TMP/c.json")"
+[ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert (not d['ok']) and d['verdict']=='FAIL' and d['failed']==['final_cycle_scalar_flux'] and abs(c['final_cycle_scalar_flux']['value']-887778.2)<1 and abs(c['final_cycle_scalar_flux']['baseline']-591852.1)<1" "$TMP/c.json" 2>/dev/null \
+    && ok "quicksilver coverage: scalar flux changed x1.5 with all PASS:: lines kept -> detected: exit 1 FAIL on final_cycle_scalar_flux (591852.1 -> 887778.2)" || bad "quicksilver coverage flux rc=$rc $(cat "$TMP/c.json")"
 sed -e '/^PASS:: Fluence/d' "$FX/quicksilver_two_tables.log" > "$TMP/qs_nofluence.log"
 python3 "$TOOL" compare "$R/level2/quicksilver" "$TMP/qs_baseline.json" "$TMP/qs_nofluence.log" >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 1 ] && grep -q '"failed": \[' "$TMP/c.json" && grep -q '"pass_fluence"' "$TMP/c.json" && ok "quicksilver coverage: a missing upstream PASS:: line -> exit 1 FAIL (the native checks are what is verified)" || bad "quicksilver coverage marker rc=$rc"
