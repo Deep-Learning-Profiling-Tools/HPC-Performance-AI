@@ -37,6 +37,9 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
+# the sources include tools/timing/ROI markers (header-only, a no-op unless measured): the same
+# include path build.sh exports, so the CPU-only reference configures from the same main.cc
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in

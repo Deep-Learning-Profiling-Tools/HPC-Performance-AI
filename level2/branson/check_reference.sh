@@ -16,6 +16,9 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
+# the sources include tools/timing/ROI markers (header-only, a no-op unless measured): the same
+# include path build.sh exports, so the CPU-only reference configures from the same main.cc
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 GPU_LOG="${1:?usage: check_reference.sh <gpu.log> <deck.xml>}"
 DECK="${2:?usage: check_reference.sh <gpu.log> <deck.xml>}"
 NO_BUILD=0; [ "${3:-}" = "--no-build" ] && NO_BUILD=1
