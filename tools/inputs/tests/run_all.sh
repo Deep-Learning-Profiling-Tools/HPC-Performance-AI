@@ -1065,6 +1065,15 @@ python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu_far.log"
     && [ $rc2 -eq 1 ] && grep -q "transported photon count differs" "$P2/b2.out" \
     && ok "branson check_log.py cmp: energies / T_e / transported photons within the margins pass; a 20 % photon-count difference fails" \
     || bad "branson cmp rc1=$rc1 rc2=$rc2 $(tail -2 "$P2/b1.out" "$P2/b2.out" | tr '\n' '|')"
+# the hohlraum decks print no per-cell temperature table: the T_e criterion does not apply, energies and
+# the photon count are still compared (a table on one side only stays an error)
+sed '/^  [0-9]  [0-9.]*  0\.2  0\.3$/d; /cell(s) to the GPU/d' "$P2/b_gpu.log" > "$P2/b_gpu_note.log"
+sed '/^  [0-9]  [0-9.]*  0\.2  0\.3$/d; /cell(s) to the GPU/d' "$P2/b_cpu.log" > "$P2/b_cpu_note.log"
+python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu_note.log" "$P2/b_cpu_note.log" > "$P2/b3.out" 2>&1; rc3=$?
+python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu_note.log" > "$P2/b4.out" 2>&1; rc4=$?
+[ $rc3 -eq 0 ] && grep -q "no per-cell temperature table" "$P2/b3.out" && [ $rc4 -eq 1 ] && grep -q "T_e cell count differs" "$P2/b4.out" \
+    && ok "branson check_log.py cmp: no T_e table in either log -> criterion not applicable, PASS on energies and photons; a table on one side only -> FAIL" \
+    || bad "branson cmp without T_e rc3=$rc3 rc4=$rc4 $(tail -2 "$P2/b3.out" "$P2/b4.out" | tr '\n' '|')"
 bash -n "$R/level2/branson/check_reference.sh" && ok "branson check_reference.sh: valid shell" || bad "branson check_reference.sh syntax"
 python3 "$TOOL" check "$R/level2/branson" hohlraum-multi-node --out "$P2/b_dry" --dry-run 2>/dev/null | python3 -c "
 import json, sys; d = json.load(sys.stdin)

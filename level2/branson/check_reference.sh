@@ -46,14 +46,24 @@ if [ ! -x "$CPU_EXE" ]; then
         fail "CPU reference build failed (log: $CPU_BUILD.cfg.log)"
     fi
 fi
-echo "== CPU reference run: mpirun -np 1 $CPU_EXE $DECK  (cwd $PWD, log cpu_ref.log)"
-echo "   reference binary sha256: $(sha256sum "$CPU_EXE" | cut -d' ' -f1)"
-t0=$(date +%s)
-if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
-    tail -20 cpu_ref.log
-    fail "CPU reference run exited non-zero (log: $PWD/cpu_ref.log)"
+# A finished CPU reference run of the same deck may be reused (HPCPERF_BRANSON_CPU_REF_LOG=<log>): the
+# single-threaded references of the hohlraum decks take hours, and a re-run of the check must not have
+# to repeat them. The reused log is named and hashed here, so check.log carries its provenance.
+if [ -n "${HPCPERF_BRANSON_CPU_REF_LOG:-}" ]; then
+    [ -f "$HPCPERF_BRANSON_CPU_REF_LOG" ] || fail "HPCPERF_BRANSON_CPU_REF_LOG=$HPCPERF_BRANSON_CPU_REF_LOG missing"
+    grep -q 'Photons Per Second (FOM)' "$HPCPERF_BRANSON_CPU_REF_LOG" || fail "reused CPU reference log did not finish (no FOM line): $HPCPERF_BRANSON_CPU_REF_LOG"
+    cp "$HPCPERF_BRANSON_CPU_REF_LOG" cpu_ref.log
+    echo "== CPU reference: reusing the finished run $HPCPERF_BRANSON_CPU_REF_LOG (sha256 $(sha256sum cpu_ref.log | cut -d' ' -f1))"
+else
+    echo "== CPU reference run: mpirun -np 1 $CPU_EXE $DECK  (cwd $PWD, log cpu_ref.log)"
+    echo "   reference binary sha256: $(sha256sum "$CPU_EXE" | cut -d' ' -f1)"
+    t0=$(date +%s)
+    if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
+        tail -20 cpu_ref.log
+        fail "CPU reference run exited non-zero (log: $PWD/cpu_ref.log)"
+    fi
+    echo "   CPU reference run: $(( $(date +%s) - t0 )) s"
 fi
-echo "   CPU reference run: $(( $(date +%s) - t0 )) s"
 if python3 "$HERE/check_log.py" cmp "$GPU_LOG" cpu_ref.log; then
     echo "PASS: branson reference check ($(basename "$DECK")): GPU vs CPU-only Branson, same deck and seed -- final energies within 5 %, T_e within 0.02, transported photons within 5 %"
 else

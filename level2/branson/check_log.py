@@ -105,8 +105,12 @@ def main(argv):
                 print(f'   final {key:<10s} E: GPU {g[key]:.6e}  CPU {c[key]:.6e}  rel diff {rel:.3e}')
                 if rel > 0.05:
                     errors.append(f'{key} E differs by {rel:.3e} (> 5e-2)')
-            if len(g['Te']) != len(c['Te']) or not g['Te']:
+            if len(g['Te']) != len(c['Te']):
                 errors.append(f'T_e cell count differs: GPU {len(g["Te"])} vs CPU {len(c["Te"])}')
+            elif not g['Te']:
+                # the hohlraum decks print no per-cell temperature table (only the marshak deck does):
+                # the T_e criterion does not apply; energies and the photon count are compared
+                print('   final T_e: no per-cell temperature table in this deck (criterion not applicable)')
             else:
                 dmax = max(abs(a - b) for a, b in zip(g['Te'], c['Te']))
                 imax = max(range(len(g['Te'])), key=lambda i: abs(g['Te'][i] - c['Te'][i]))
