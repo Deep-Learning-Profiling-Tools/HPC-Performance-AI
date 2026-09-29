@@ -17,7 +17,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
-| 2 | 69 | 20 | 0 | 0 |
+| 2 | 71 | 18 | 0 | 0 |
 | 3 | 18 | 18 | 0 | 7 |
 
 - Six Level 2 inputs (exampm dambreak-0.005 / dambreak-0.05-upstream; remhos cube-remap-rs1, periodic-hexagon-p0, periodic-square-p5, periodic-cube-p0) ran the run.sh default workload before 3c9aec2: their earlier records are INVALIDATED (kept as history), the corrected inputs were measured again.
@@ -176,9 +176,9 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-29T00:14:28Z (490 records). 134 + 89 re
 | amg2023 | p2-256cubed | SUCCESS | nvidia-b200.cuda13.2 | 418 ms | 3 | 10.0% | 5.8% | yes | 67% | 6,055 | 1.07 | PASS | PASS | e8be61b03f |
 | amg2023 | p2-128cubed | SUCCESS | nvidia-b200.cuda13.2 | 161 ms | 3 | 1.2% | 0.6% | yes | 31% | 5,190 | 1.23 | PASS | PASS | e8be61b03f |
 | amg2023 | p1-320cubed | SUCCESS | nvidia-b200.cuda13.2 | 1.08 s | 3 | 0.3% | 0.2% | yes | 89% | 5,562 | 1.02 | PASS | PASS | e8be61b03f |
-| branson | hohlraum-single-node | SUCCESS | nvidia-b200.cuda13.2 | 10.3 s | 3 | 3.7% | 1.9% | yes | 40% | 85,448 | 1.10 | PASS | INCOMPLETE | e8be61b03f |
+| branson | hohlraum-single-node | SUCCESS | nvidia-b200.cuda13.2 | 10.3 s | 3 | 3.7% | 1.9% | yes | 40% | 85,448 | 1.10 | PASS | PASS | e8be61b03f |
 | branson | marshak-wave-replicated | SUCCESS | nvidia-b200.cuda13.2 | 549 ms | 3 | 1.6% | 0.9% | yes | 1% | 1,315 | 1.07 | PASS | PASS | e8be61b03f |
-| branson | hohlraum-multi-node | SUCCESS | nvidia-b200.cuda13.2 | 377.2 s | 3 | 0.4% | 0.2% | yes | 59% | 40 | 1.00 | PASS | INCOMPLETE | e8be61b03f |
+| branson | hohlraum-multi-node | SUCCESS | nvidia-b200.cuda13.2 | 377.2 s | 3 | 0.4% | 0.2% | yes | 59% | 40 | 1.00 | PASS | PASS | e8be61b03f |
 | branson | lb-hohlraum | SUCCESS | nvidia-b200.cuda13.2 | 95.4 s | 3 | 1.0% | 0.5% | yes | 60% | 35,087 | 1.02 | PASS | INCOMPLETE | e8be61b03f |
 | cabanapic | weibel-ny512-nppc2000 | SUCCESS | nvidia-b200.cuda13.2 | 60.2 s | 3 | 0.2% | 0.1% | yes | 93% | 2,016,000 | 1.00 | PASS | PASS | e8be61b03f |
 | cabanapic | weibel-ny32-nppc100 | SUCCESS | nvidia-b200.cuda13.2 | 821 ms | 3 | 1.0% | 0.5% | yes | 52% | 126,000 | 1.42 | PASS | PASS | bd28f8ad09 |
