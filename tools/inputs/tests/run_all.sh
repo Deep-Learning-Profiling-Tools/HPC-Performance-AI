@@ -988,7 +988,7 @@ printf '(N=1 C=32 W=224 H=224)\n' > "$TMP/cs_skip.log"
 python3 - "$R" "$TMP/cs_ok.log" "$TMP/cs_skip.log" <<'PY' && ok "channel_shuffle: the 'Average time' lines are required evidence that the built-in memcmp ran -- a skip-verify style log no longer passes on the absent failure marker alone" || bad "channel_shuffle evidence rule"
 import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
 from pathlib import Path
-doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w512-h512")
+doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w255-h255")
 assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[2]), inp), inp)["verdict"] == "PASS"
 assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[3]), inp), inp)["verdict"] == "FAIL"
 PY
@@ -996,7 +996,7 @@ PY
 # failure of the check, not a pass on the configurations that ran before it
 python3 - "$R" <<'PY' && ok "channel_shuffle: the check's fail line covers the aborted sweep ('Device memory allocation failed')" || bad "channel_shuffle aborted-sweep rule"
 import re, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
-doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w512-h512")
+doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w255-h255")
 fail = hi.check_of(doc, inp)["fail_regex"]
 assert re.search(fail, "Device memory allocation failed. Exit"), fail
 assert re.search(fail, "Failed to pass channel shuffle (NCHW) check"), fail

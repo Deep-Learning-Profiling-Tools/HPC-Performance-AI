@@ -36,7 +36,18 @@ baseline:
       rule: present
 coverage:
   status: MULTI_INPUT
-  reason: upstream run line plus a larger map and another group count
+  reason: upstream run line plus the largest map the program can sweep completely and another group count
+  # The earlier derived input g2-w512-h512 (feature map 512x512) was deregistered on 2026-09-28: upstream's
+  # main.cu computes `const int numel = N * C * W * H` ("assume no integer overflow", cuda/main.cu:149) and
+  # the sweep N in {1,4,16,64} x C in {32,128,512} overflows at (N=16, C=512, 512x512); cudaMalloc fails,
+  # the program prints "Device memory allocation failed. Exit" and exits 0 after 8 of its 12 configurations.
+  # Every measurement of that input ran the truncated sweep and is INVALIDATED (results directory
+  # inputs-roi-timing-2026-09-23/invalidations.json). HeCBench master still has the int numel (checked
+  # 2026-09-28); the kernels take `int numel` and index in int, so a size_t change is not a pure
+  # representation fix and was not applied. The sweep completes for W*H < 65536 (64 * 512 * W * H < 2^31):
+  # g2-w255-h255 is the largest square map that runs the whole intended workload.
+  upstream_inputs_not_added:
+  - 'feature maps of 256x256 and larger (the full N/C sweep overflows the int element count)'
 inputs:
 - id: g2-w224-h224
   case: channel-shuffle
@@ -62,21 +73,22 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-- id: g2-w512-h512
+- id: g2-w255-h255
   case: channel-shuffle
   variant: size
   source:
     kind: derived
-    derivation: feature map 512x512
+    derivation: feature map 255x255 -- the largest square map for which the program's N x C sweep completes
+      (64 * 512 * 255 * 255 = 2 130 739 200 < 2^31; replaces the deregistered 512x512 input, see coverage)
   params:
     group: 2
-    width: 512
-    height: 512
+    width: 255
+    height: 255
     repeat: 100
   args:
   - '2'
-  - '512'
-  - '512'
+  - '255'
+  - '255'
   - '100'
   runtime_config:
     gpus: 1
@@ -111,8 +123,9 @@ check:
   run_env: {HPCPERF_SKIP_VERIFY: null}
   pass_regex: '^Average time of channel shuffle \(NCHW\):'
   # An aborted sweep is a failure too: upstream computes numel as int (cuda/main.cu:149, "assume no
-  # integer overflow"); at N=16, C=512, W=H=512 it overflows, cudaMalloc fails and the program prints
-  # "Device memory allocation failed. Exit" and exits 0 -- g2-w512-h512 has never completed its sweep.
+  # integer overflow"); for maps of 256x256 and larger it overflows at N=16, C=512, cudaMalloc fails and
+  # the program prints "Device memory allocation failed. Exit" and exits 0 (this is how the deregistered
+  # g2-w512-h512 was found never to complete its sweep).
   fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
   basis: exact (memcmp) against the upstream CPU reference inside the program (cuda/main.cu); "Failed to pass ... check" on
     any mismatch, the "Average time" lines only after a passed comparison

@@ -45,7 +45,7 @@ cg	class-b	class-b	1	{REPO}/build/cg/cuda/cg_cuda	-	{REPO}/build/cg/cuda	-	1800
 cg	class-a	class-a	1	{REPO}/build/cg/cuda-classA/cg_cuda	-	{REPO}/build/cg/cuda-classA	-	1800
 cg	class-c	class-c	1	{REPO}/build/cg/cuda-classC/cg_cuda	-	{REPO}/build/cg/cuda-classC	-	1800
 channel_shuffle	g2-w224-h224	g2-w224-h224	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	2 224 224 100	{REPO}/build/channel_shuffle/cuda	-	1800
-channel_shuffle	g2-w512-h512	g2-w512-h512	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	2 512 512 100	{REPO}/build/channel_shuffle/cuda	-	1800
+channel_shuffle	g2-w255-h255	g2-w255-h255	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	2 255 255 100	{REPO}/build/channel_shuffle/cuda	-	1800
 channel_shuffle	g4-w224-h224	g4-w224-h224	1	{REPO}/build/channel_shuffle/cuda/channel_shuffle_cuda	4 224 224 100	{REPO}/build/channel_shuffle/cuda	-	1800
 color_histogram	x1048576	x1048576	1	{REPO}/build/color_histogram/cuda/color_histogram_cuda	-x 1048576	{REPO}/build/color_histogram/cuda	-	1800
 color_histogram	x4194304	x4194304	1	{REPO}/build/color_histogram/cuda/color_histogram_cuda	-x 4194304	{REPO}/build/color_histogram/cuda	-	1800
