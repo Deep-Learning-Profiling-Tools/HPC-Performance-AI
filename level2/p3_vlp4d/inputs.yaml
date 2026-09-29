@@ -66,9 +66,40 @@ inputs:
   input_form: file
 - id: sld10
   check:
-    kind: none
-    reason: 40 steps at dt 0.01 (t_end 0.4) is less than one plasma period, so the Landau-damping fit does not apply;
-      the proposed check (class D) is a same-input baseline comparison of the nrj.out rows, tolerance not established
+    # 40 steps at dt 0.01 (t_end 0.4) is less than one plasma period, so the Landau-damping fit of the large deck does
+    # not apply. The run's diagnostics file (nrj.out, written into the shared build/level2/p3_vlp4d/cuda/run) is
+    # captured per run; the checker verifies its structure (41 rows = 40 steps + initial state, three finite columns,
+    # t increasing, |sum(phi)| <= 1e-9) and the science comparison is the exact rule on its last row (below).
+    kind: post_run
+    outputs: ['{repo}/build/level2/p3_vlp4d/cuda/run/nrj.out']
+    command: [python3, '{bench_dir}/check_nrj.py', '{outputs}/nrj.out', '--lines', '41']
+    pass_regex: '^PASS: vlp4d nrj check'
+    fail_regex: '^FAIL: vlp4d nrj check'
+    basis: 'nrj.out of the run: 41 rows (t = 0 .. 0.4 in steps of 0.01), three finite numbers each, t strictly
+      increasing, |sum(phi)| <= 1e-9 (the discrete mass residual, printed at round-off) -- the run completed the deck;
+      the final log||E||_2 and sum(phi) rows are compared exactly against the working baseline (deterministic
+      double-precision semi-Lagrangian scheme; a reordered candidate needs a stated tolerance first)'
+    covers: []
+  baseline:
+    reference: 'the last row of the run''s own nrj.out (captured as outputs/nrj.out); working baseline of this input'
+    quantities:
+    - name: iterations
+      role: diagnostic
+      regex: '^Number of total iterations : (?P<value>\d+)'
+      select: last
+      compare: {rule: exact}
+    - name: e_norm_final
+      role: required
+      source: {file: outputs/nrj.out}
+      regex: '^\s*[-+0-9.eE]+\s+(?P<value>[-+0-9.eE]+)\s+[-+0-9.eE]+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: mass_final
+      role: required
+      source: {file: outputs/nrj.out}
+      regex: '^\s*[-+0-9.eE]+\s+[-+0-9.eE]+\s+(?P<value>[-+0-9.eE]+)\s*$'
+      select: last
+      compare: {rule: exact}
   case: landau-damping-2d
   variant: size
   source:

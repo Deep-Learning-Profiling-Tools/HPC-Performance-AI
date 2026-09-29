@@ -152,13 +152,19 @@ inputs:
   - inputs/3D_lb_hohlraum.xml
   input_form: file
 check:
-  # Branson's own per-step energy balances on the run's log (check_log.py gpu, the parser validate.sh uses):
-  # a consistency check of the transport, not a comparison with an independent result -- photons_transported stays
-  # `record` until the CPU-reference run of the same deck (check_log.py cmp, validate.sh check C) is established.
+  # validate.sh check C generalised to the registered deck (check_reference.sh): the GPU run of the deck is compared
+  # with a CPU-only Branson built from the same sources, same deck and seed, one rank -- final Post-mat / Absorption /
+  # Exit energies within 5 %, T_e of every cell within 0.02, transported photon count within 5 % (check_log.py cmp;
+  # validate.sh: > 6 sigma of the seed-to-seed scatter, catches a broken transport kernel). The per-step conservation
+  # check (check_log.py gpu) is not repeated here: it is a consistency check, not a comparison with an independent
+  # result. The CPU reference run is single-threaded: seconds for the marshak deck, minutes for the single-node
+  # hohlraum, hours for the two 250 M-photon decks (cost not established; timeout 12 h).
   kind: post_run
-  command: [python3, '{bench_dir}/check_log.py', gpu, '{log}']
-  pass_regex: '^PASS: branson log check'
-  fail_regex: '^FAIL: branson log check'
-  basis: '|Radiation conservation| <= 1e-9 (Emission + Source + Pre census E) and |Material conservation| <= 1e-9 Pre mat E
-    in every step (Branson diagnostics, validate.sh check B; observed 1e-13..1e-15), GPU transport used, run finished'
-  covers: []
+  command: [bash, '{bench_dir}/check_reference.sh', '{log}', '{bench_dir}/{param:deck}']
+  pass_regex: '^PASS: branson reference check'
+  fail_regex: '^FAIL: branson reference check'
+  basis: 'GPU vs CPU-only Branson (same sources, deck, seed, one rank): final Post-mat / Absorption / Exit E within 5 %
+    relative, T_e within 0.02 absolute in every cell, Total Photons transported within 5 % relative -- validate.sh check C
+    (check_log.py cmp); the 5 % / 0.02 margins are validate.sh''s, stated as > 6 sigma of the seed-to-seed scatter'
+  covers: [photons_transported]
+  timeout: 43200

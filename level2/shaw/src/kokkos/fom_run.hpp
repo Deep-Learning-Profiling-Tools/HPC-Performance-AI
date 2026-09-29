@@ -50,6 +50,7 @@
 #define LEAP_FROG_RUN_FOM_HPP_
 
 #include "hpcperf_roi.h"
+#include "KokkosBlas1_nrm2.hpp"
 #include "fom_update_kernels.hpp"
 #include "fom_complexities.hpp"
 
@@ -156,6 +157,15 @@ void runFom(const step_t & numSteps,
   }
 
   HPCPERF_ROI_END_SYNC();
+  // tools/inputs correctness signature (level2/shaw/inputs.yaml), after the ROI: the 2-norms of the final
+  // velocity and stress states with full precision, for the exact comparison against the working baseline.
+  // The computation of the run is not touched.
+  {
+    const auto nrmVp = KokkosBlas::nrm2(xVp_d);
+    const auto nrmSp = KokkosBlas::nrm2(xSp_d);
+    std::cout << "\nhpcperf final state: nrm2(vp) = " << std::scientific << std::setprecision(17) << nrmVp
+              << " nrm2(sp) = " << nrmSp << std::defaultfloat << std::endl;
+  }
   const auto finishTime = std::chrono::high_resolution_clock::now();
   const std::chrono::duration<double> elapsed = finishTime - startTime;
   std::cout << "\nloopTime = " << std::fixed << std::setprecision(10) << elapsed.count();

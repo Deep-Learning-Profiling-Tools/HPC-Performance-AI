@@ -146,5 +146,6 @@ inputs:
 check:
   kind: none
   reason: upstream's four CORAL PASS lines are already required rules; final_cycle_scalar_flux stays `record` --
-    a tolerance needs the Monte Carlo scatter of the tally from independent-seed runs of the reference build
-    (the seed is a deck parameter), to be decided
+    its tolerance needs the Monte Carlo scatter of the tally from independent-seed runs of the reference build
+    (seed_scatter.sh runs the same deck with other seeds, seed_stats.py prints mean / sigma and the `near` rule
+    |candidate - mean| <= k sigma it supports; k and the use of the seed-varied envelope are a decision)
