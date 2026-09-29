@@ -30,7 +30,10 @@
 #
 # Controls: HPCPERF_GPUS=N|all, HPCPERF_CPUS_PER_RANK=T (OpenMP threads per rank, default 8),
 #           HPCPERF_SCALE_MODE=smoke|strong|weak, HPCPERF_QMCPACK_PROFILE, HPCPERF_DRY_RUN=1,
-#           HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU (default 300), HPCPERF_QMCPACK_FORCE_POPULATION=1
+#           HPCPERF_QMCPACK_MAX_WALKERS_PER_GPU (default 300), HPCPERF_QMCPACK_FORCE_POPULATION=1,
+#           HPCPERF_QMCPACK_TIMERS=none|coarse|medium|fine (default medium): qmcpack --enable-timers=<level>,
+#           the level of its stack timer profile (upstream's own timers; medium adds the drivers' Production /
+#           RunSteps / Hamiltonian / WaveFunction timers that tools/timing reads; timers never change results)
 # OMP_TARGET_OFFLOAD=MANDATORY: a failed offload aborts the run instead of silently falling back to the host.
 # Output: <run_dir>/qmc.out (stdout+stderr incl. the launcher audit), <prefix>.s00N.scalar.dat, run_manifest.txt.
 set -euo pipefail
@@ -95,8 +98,10 @@ export OMP_NUM_THREADS="$THREADS" OMP_TARGET_OFFLOAD=MANDATORY OMP_PROC_BIND=fal
 echo "# QMCPACK $BACKEND profile=$PROFILE case=$CASE mode=$MODE ($DERIV) ranks=$N_RANKS threads/rank=$THREADS deck=$(realpath --relative-to="$SRC" "$INP") run_dir=$RUN_DIR"
 cd "$RUN_DIR"
 RUN_ID="$(l3_run_id)"
+TIMERS="${HPCPERF_QMCPACK_TIMERS:-medium}"
+case "$TIMERS" in none|coarse|medium|fine) ;; *) echo "run.sh: HPCPERF_QMCPACK_TIMERS=$TIMERS (none|coarse|medium|fine)" >&2; exit 2 ;; esac
 set +e; set -o pipefail
-"$L3_LAUNCHER" --gpus "$N_RANKS" --cpus-per-rank "$THREADS" --bind wrapper -- "$EXE" "$(basename "$DECK")" 2>&1 | tee "$RUN_DIR/qmc.out"
+"$L3_LAUNCHER" --gpus "$N_RANKS" --cpus-per-rank "$THREADS" --bind wrapper -- "$EXE" --enable-timers="$TIMERS" "$(basename "$DECK")" 2>&1 | tee "$RUN_DIR/qmc.out"
 rc=$?
 set +o pipefail; set -e
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
@@ -104,7 +109,7 @@ if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
         "ranks=$N_RANKS" "threads_per_rank=$THREADS" "walkers_per_gpu=$WPR" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
         "upstream_input=$INP" "upstream_input_sha256=$(l3_sha_file "$INP")" "deck_sha256=$(l3_sha_file "$DECK")" \
         "orbitals_h5_sha256=$(l3_sha_file "$CASE_DIR/pwscf.pwscf.h5")" "pseudo_sha256=$(l3_sha_file "$CASE_DIR/C.BFD.xml")" \
-        "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" "prefix=$PREFIX" "omp_target_offload=MANDATORY" "utc=$(date -u +%FT%TZ)"
+        "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" "prefix=$PREFIX" "omp_target_offload=MANDATORY" "timers=$TIMERS" "utc=$(date -u +%FT%TZ)"
     /usr/bin/grep -aE 'offload to accelerators|CUDA acceleration|OpenMP device|devices|MPI Nodes|MPI ranks|OMP 1st level|Rank.*device' "$RUN_DIR/qmc.out" 2>/dev/null | head -12 | sed 's/^/gpu_evidence: /' >> "$RUN_DIR/run_manifest.txt" || true
 fi
 exit "$rc"
