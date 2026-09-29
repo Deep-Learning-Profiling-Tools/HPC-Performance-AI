@@ -57,8 +57,26 @@ prof/               the same for the profiled run, plus the collector's files
                     (nvidia_nsys: trace.nsys-rep, trace.sqlite, export.log)
 ```
 
+Level 3 (no markers) replaces the ROI logs with the application's own timer:
+
+```
+clean.<i>/run.log         stdout+stderr of level3/<app>/run.sh (the timer is usually printed here)
+clean.<i>/app/<run>/...   files copied from the run directory run.sh wrote under
+                          build/level3/<app>/<profile>/run.timing-<run_id>-c<i>/ (HPCPERF_L3_RUN_SUBDIR):
+                          run_manifest.txt plus the files apptimers.py reads (output_solver.txt, *.ener)
+clean.<i>/run_tree.txt    that run directory tree, relative to the repository
+clean.<i>/app_timer.json  apptimers.py's extraction at measurement time (summarize re-extracts)
+prof/                     the same for the profiled run (tree ...-prof)
+```
+
+run_meta.txt adds `region` (`markers` or `app_timer`), `nvtx_roi` (the NVTX range the
+application emits for its loop, `-` = none), `profile_default` (`yes` or `no (<reason>)` from the
+case table) and `profile_skipped` (that reason when the profiled run was skipped because of it,
+`-` otherwise; `profiled_runs` is then 0 and `collector` none).
+
 `status`: `ok`, `clean_failed`, `clean_timeout`, `roi_missing` (a clean run wrote no
-ROI record), `prof_failed`, `export_failed`; `summarize.py` adds
+ROI record), `app_timer_missing` (Level 3: the clean run does not contain the
+application's timer), `prof_failed`, `export_failed`; `summarize.py` adds
 `roi_missing_in_trace` (the profiler did not see the markers). Only `ok` is a result.
 
 ## Canonical activity model
@@ -124,15 +142,17 @@ the collector must reproduce it exactly (`expected.json`).
 | block | content |
 |---|---|
 | identity | `level`, `app`, `case`, `platform`, `run_id`, `utc`, `status` |
-| `measurement` | tool, protocol (warm-up / clean / profiled runs), collector (name, version, verified, capabilities), `skip_verify`, `verify_vs_roi`, `roi_where` (marker source lines), `roi_excludes`, backend, gpus, timeout, env script, env allow-list and deny rule, notes |
-| `inputs` | `declared_env`, `declared_argv`, and per process the argv / exe / cwd / host / rank the ROI log recorded, `exe_sha256` and `exe_sha256_when` (`measurement`: hashed by the engine right after the clean runs -- Level 1 up front, Level 2 from the ROI processes' own `exe` line; `summarize`: hashed later from the path, older runs only) |
-| `roi` | `wall_s` (median of the clean runs), `runs_s`, min / max / stddev, `entries`, `excluded_s`, `processes`, `imbalance_s`, `profiled_wall_s` (the same region in the trace), `profiled_marker_wall_s` (the profiled run's own ROI log), `profiler_inflation`; `warmup_runs_s`: the ROI time of each discarded warm-up run (null when it left no ROI log or failed) -- never part of any statistic, kept so the cost of the first contact with the input is visible |
-| `device` | inside the ROI: `busy_s` (union of all device activity), `busy_frac_of_roi`, `host_gap_s` = `roi.wall_s - busy_s`, `op_time_sum_s`, `overlap_s`, per category `<cat>_s` and `<cat>_ops`, copy/fill `<cat>_bytes` (pro rata when clipped). Null without a collector |
+| `measurement` | tool, protocol (warm-up / clean / profiled runs), collector (name, version, verified, capabilities), `skip_verify`, `verify_vs_roi` (`outside` / `inside` / `excluded`, or `none` when nothing checks this input numerically -- Level 3 inputs without acceptance), `roi_where` (marker source lines), `roi_excludes`, backend, gpus, timeout, env script, env allow-list and deny rule, notes, `region` (`markers` / `app_timer`), `nvtx_roi`, `profile_skipped` (the case table's reason for not profiling, or null) |
+| `inputs` | `declared_env`, `declared_argv`, and per process the argv / exe / cwd / host / rank the ROI log recorded, `exe_sha256` and `exe_sha256_when` (`measurement`: hashed by the engine right after the clean runs -- Level 1 up front, Level 2 from the ROI processes' own `exe` line; `summarize`: hashed later from the path, older runs only); Level 3: the executable and its sha256 from run.sh's `run_manifest.txt`, and `run_manifest` (case, mode, ranks, profile, input / binary / fingerprint hashes) |
+| `roi` | `wall_s` (median of the clean runs), `runs_s`, min / max / stddev, `entries`, `excluded_s`, `processes`, `imbalance_s`, `profiled_wall_s` (the same region in the trace), `profiled_marker_wall_s` (the profiled run's own ROI log), `profiler_inflation`, `source` (`markers`, or `app_timer` for Level 3); `warmup_runs_s`: the ROI time of each discarded warm-up run (null when it left no ROI log or failed) -- never part of any statistic, kept so the cost of the first contact with the input is visible |
+| `roi`, Level 3 only | `definition`, `where` (source lines, relative to `level3/<app>/src/`), `reduction` (how ranks are combined), `device_sync` (whether the timer waits for the device), `steps`, `setup_s` (set-up the application reports), `parts` (its own sub-timers of the region, seconds), `evidence` (files read). `wall_s` is the application's timer; `excluded_s` what it reports inside the loop and the region leaves out (checkpoints, plotfiles); `profiled_wall_s` the same timer in the profiled run |
+| `device` | inside the ROI: `busy_s` (union of all device activity per process, summed over processes), `processes`, `busy_frac_of_roi` and `host_gap_s` = `roi.wall_s - busy_s / processes` (per process = per GPU on average; identical to the plain values at one process), `op_time_sum_s`, `overlap_s`, per category `<cat>_s` and `<cat>_ops`, copy/fill `<cat>_bytes` (pro rata when clipped). Null without a collector |
 | `runtime_api` | `name`, `roi` and `whole` call counts and time, synchronizing calls separately |
 | `ops` | per device operation inside the ROI: name, category, count, total / avg / min / max, share |
-| `context` | `process_wall_s`, `pre_roi_s`, `post_roi_s`, `whole_process` (device activity of the whole run) -- context only, never the headline |
+| `ops_scope` | `roi`, or `whole_process` (Level 3 without an NVTX range: the ops of the whole profiled process) |
+| `context` | `process_wall_s`, `pre_roi_s`, `post_roi_s`, `whole_process` (device activity of the whole run; `busy_frac_of_process` against the profiled process), Level 3: `outside_region_s` (process - region), `profiled_process_wall_s` -- context only, never the headline |
 | `fom` | the application's own metric from the clean run: name, value, unit, better, source, regex, status (`ok`, `none`, `not_matched`, `log_missing`) |
-| `app_timer` | Level 2 only, null when the application prints no timer for its ROI region: `regex` (from `cases/level2_apps.tsv` at summarize time), `value_s` (clean run, last match), `roi_diff_frac` = (ROI - timer) / timer, `status`; a difference above 2% is caveated |
+| `app_timer` | Level 2 only, null when the application prints no timer for its ROI region: `regex` (from `cases/level2_apps.tsv` at summarize time), `value_s` (clean run, last match), `roi_diff_frac` = (ROI - timer) / timer, `status`; a difference above 2% is caveated. Null for Level 3, where the timer IS the region |
 | `launcher` | the common launcher's GPU-binding audit line and whether it is clean |
 | `placement` | where the measured processes actually ran, from `probes/bindprobe.c` (injected through `LD_PRELOAD`, read at process start and exit -- nothing inside the ROI): per clean run and for the profiled run, one entry per process that held a GPU open or wrote an ROI log: `cpus_allowed` / `mems_allowed` (the sets at exit, `cpus_allowed_at_start` too), `threads`, `thread_cpusets` (distinct per-thread CPU sets with counts), `last_cpus` (the CPU each thread last ran on), `cpu_start` / `cpu_end`, context-switch counts, `gpus` (PCI bus ids of the `/dev/nvidia<N>` devices held open), the placement environment (`CUDA_VISIBLE_DEVICES`, `OMP_*`, MPI/Slurm rank variables). `summary`: the distinct sets over all clean-run processes and `consistent` (one CPU set, one memory set, one GPU set throughout). `probe` names the probe source hash, `none` when it was off or did not build. Diagnostic context only, never a metric |
 | `platform_info` | device descriptor (`vendor_extras.selected_by` says how the described GPU was chosen when `CUDA_VISIBLE_DEVICES` is set; `visible_pci_bus_ids` lists all enumerated GPUs), host, conformance record |
@@ -142,6 +162,8 @@ the collector must reproduce it exactly (`expected.json`).
 
 `summary_level<L>.csv` flattens one record per row with a fixed column list
 (`summarize.py: COLUMNS`, new columns are only ever appended: `app_timer_s`,
-`roi_vs_app_timer`); `ops_level<L>.csv` has one row per (run, operation).
+`roi_vs_app_timer`, then `roi_source`, `roi_steps`, `roi_setup_s`, `ops_scope`,
+`whole_compute_s`, `whole_copy_{h2d,d2h,d2d}_s`, `whole_fill_s`,
+`whole_runtime_api_calls`); `ops_level<L>.csv` has one row per (run, operation).
 Levels are separate files so runs under different protocols are never averaged
 together. Both are regenerated from the JSONs, never appended.

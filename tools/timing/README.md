@@ -1,4 +1,4 @@
-# tools/timing -- runtime measurement for Level 1 and Level 2
+# tools/timing -- runtime measurement for Level 1, Level 2 and Level 3
 
 Measures **how long the computation of each benchmark takes** and what the device
 did during it, in a form that stays comparable when applications, inputs and
@@ -12,8 +12,9 @@ the inputs come from and in the protocol defaults.
 with the front-ends' defaults:
 
 ```bash
-tools/timing/measure_level1.sh --build-root build/gcc13 all      # 1 warm-up + 5 clean + 1 profiled run per case
-tools/timing/measure_level2.sh all                               # 0 warm-up + 1 clean + 1 profiled run per case
+tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 1 warm-up + 5 clean + 1 profiled run per case
+tools/timing/measure_level2.sh all                               # Level 2: 0 warm-up + 1 clean + 1 profiled run per case
+tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each (own loop timers)
 python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
 bash tools/timing/tests/run_all.sh                               # self-tests, CPU only
 ```
@@ -73,16 +74,70 @@ One set of markers serves two measurements:
 | **clean** | none | the markers log their own timestamps (`HPCPERF_ROI_LOG`) -> **`roi_wall_s`**, the headline; the application's FOM; the launcher audit |
 | **profiled** | yes | device activity **clipped to the same markers** -> busy time, per-category time, ops, runtime API calls |
 
-| | Level 1 | Level 2 |
-|---|---|---|
-| unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` |
-| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 clean + 1 profiled |
-| verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called |
-| FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) |
+| | Level 1 | Level 2 | Level 3 |
+|---|---|---|---|
+| unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` | 10 cases of 10 `level3/<app>/run.sh`, 2 GPUs each |
+| region | ROI markers | ROI markers | **the application's own loop timer** (no markers, see below) |
+| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
+| verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
+| FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) | LAMMPS and SPARTA print one |
 
 The headline therefore carries **no profiler overhead**: the profiler's cost shows
 up only as `roi_profiler_inflation` (profiled ROI / clean ROI), and device-side
 durations come from device timestamps, which it barely perturbs.
+
+## Level 3: the applications' own timers
+
+Level 3 applications are full production codes (LAMMPS, CP2K, QMCPACK, ...): marking
+their loops by hand is not practical, and every one of them already times its loop
+itself. So the measured region of a Level 3 application is **its own timer**, chosen
+once per application by the same rule as the markers -- the time-step / iteration
+loop, without start-up, set-up, a warm-up step the application charges set-up to,
+verification and final output -- and fixed with source citations in
+[apptimers.py](apptimers.py) (`python3 tools/timing/apptimers.py describe` prints the
+definitions; every record carries its own). The record keeps the Level 1/2 schema:
+`roi.wall_s` is the timer (median of the clean runs), `roi.source = "app_timer"`.
+
+| application | the region (application timer) | ranks combined | waits for the GPU |
+|---|---|---|---|
+| LAMMPS | `Loop time` of the last `run` (sections: Pair/Neigh/Comm/...) | average, barriers | total yes; **sections no** (asynchronous kernel time lands in Comm) |
+| SPARTA | `Loop time` of the last `run` (the deck's first run is warm-up) | average, barriers | total yes |
+| WarpX | final `Evolve time` (in-loop diagnostics included) | rank 0 | yes (TinyProfiler regions synchronize) |
+| Nyx | sum of `[STEP n] Coarse TimeStep time`; checkpoint / plotfile writes excluded | max over ranks | step totals effectively |
+| nekRS | runtime statistics `solve` minus its `checkpointing` row | max over ranks | yes (barriers, blocking event syncs) |
+| SPECFEM3D | `Elapsed time` of the last stability report (`output_solver.txt`) | rank 0 after a max reduction | yes (the report synchronizes the stream) |
+| ExaCA | `Time spent performing CA calculations` | rank 0, barriers | yes (fences) |
+| CP2K | per-MD-step `UsedTime` (`.ener`) of steps 2..N; step 1 carries the initial force evaluation | rank 0 | back-ends synchronize their streams |
+| QMCPACK | `DMCBatched::Production` of the stack timer profile (`--enable-timers=medium`) | rank 0, barrier at start | total yes; nested timers no |
+| DFT-FE | per MD step `updateAtomPositionsAndMoveMesh` + the step's SCF iterations | barrier + max | implicit only; **force evaluation untimed** |
+
+Two applications needed their `run.sh` to switch on a timer that already exists:
+QMCPACK runs with `--enable-timers=medium` (`HPCPERF_QMCPACK_TIMERS`, default medium;
+the default coarse level has no Production timer), DFT-FE with `VERBOSITY = 1` in its
+deck copy (`HPCPERF_DFTFE_VERBOSITY`; the upstream decks ship 0, and `REPRODUCIBLE
+OUTPUT = true` must stay because it also fixes numerical settings -- it is why DFT-FE
+does not time its force evaluation). Both are output-only; `validate.sh` passes with
+them at 1 and 2 GPUs.
+
+Without markers the profiled run cannot be clipped to the region: its device picture
+(`context.whole_process`, the ops table with `ops_scope = whole_process`) covers the
+**whole process** -- set-up included -- and is context, not a breakdown of the region.
+The exception is an application that emits an NVTX range for its loop itself: WarpX's
+AMReX TinyProfiler pushes `WarpX::Evolve()`, and its device activity is clipped to that
+range (`cases/level3_apps.tsv: nvtx_roi`).
+
+**QMCPACK is not profiled by default** (`cases/level3_apps.tsv`, column `profile = no (<reason>)`;
+the reason is repeated as a caveat in each of its records): its profiled run of the timing input
+writes a 24 GB trace (57M kernels, 72M copies, 274M CUDA API calls) and cost about 55 of the 100
+minutes of the first sweep for a 5-minute application, while its timed region grew only 9% under
+nsys and the device picture would still be whole-process context, not the DMC loop.
+`measure_level3.sh --profile-all` profiles it anyway; `--no-profile` skips every profiled run.
+
+A clean run whose output does not contain the timer is `app_timer_missing` (FAIL); a
+Level 3 run never falls back to the process wall clock. Each run writes its run
+directory under `build/level3/<app>/<profile>/run.timing-<run id>-<c0|prof>/`
+(`HPCPERF_L3_RUN_SUBDIR`), so no validated or historical run directory is touched, and
+the files the timer is read from are copied into the raw evidence.
 
 ## Headline fields (`summary_level<N>.csv`)
 
@@ -91,8 +146,8 @@ durations come from device timestamps, which it barely perturbs.
 | `roi_wall_s` (+ `_min`, `_max`, `_stddev`, `roi_runs`) | median ROI time of the clean runs |
 | `roi_entries`, `roi_excluded_s` | how often the ROI was entered; time carved out by excludes |
 | `roi_profiled_wall_s`, `roi_profiler_inflation` | the same region in the profiled run, and the ratio |
-| `device_busy_s`, `device_busy_frac_of_roi` | union of all device activity inside the ROI -- concurrent operations count once |
-| `host_gap_s`, `host_gap_frac_of_roi` | `roi_wall_s - device_busy_s`: time in the ROI when the device was idle, i.e. the host was the bottleneck |
+| `device_busy_s`, `device_busy_frac_of_roi` | union of all device activity inside the ROI -- concurrent operations count once; summed over processes, the fraction is per process (= per GPU) on average |
+| `host_gap_s`, `host_gap_frac_of_roi` | `roi_wall_s - device_busy_s / processes`: time in the ROI when the device was idle, i.e. the host was the bottleneck |
 | `device_<category>_s`, `device_*_ops`, `device_copy_*_bytes` | per category inside the ROI: `compute`, `copy_h2d`, `copy_d2h`, `copy_d2d`, `copy_other`, `fill`, `collective`, `other` |
 | `device_op_time_sum_s`, `device_overlap_s` | naive sum of op durations, and sum - union (concurrency) |
 | `runtime_api_calls`, `runtime_api_sync_calls`, ... | host runtime API calls inside the ROI |
@@ -101,6 +156,8 @@ durations come from device timestamps, which it barely perturbs.
 | `fom_*` | the application's own metric, from the clean run |
 | `device_*`, `driver_version`, `runtime_version`, `host_*` | the platform descriptor |
 | `collector`, `conformance` | which profiler adapter produced the device columns, and whether the platform passed the conformance probe |
+| `roi_source`, `roi_steps`, `roi_setup_s` | `markers` or `app_timer` (Level 3); steps in the region and the set-up the application reports (Level 3) |
+| `ops_scope`, `whole_<category>_s`, `whole_runtime_api_calls` | `roi` or `whole_process`; the whole profiled process per category (Level 3 context) |
 
 A device column is **empty when the platform cannot observe it** (no collector, or
 a category outside the collector's capabilities) -- never 0. A 0 means observed
@@ -408,6 +465,14 @@ followed, and `HPCPERF_ROI_LOG` reaches the ranks through the environment
 (verified at one rank with quicksilver: `bash` -> `mpirun` -> `mpi_gpu_bind.sh` -> exe
 wrote its ROI log, audit clean).
 
+## Launching Level 3
+
+The same as Level 2, at 2 GPUs: the collector wraps `run.sh` from the outside, the
+launcher's audit stays clean, and nsys follows `mpirun` into both ranks. This is the
+clean-environment wrapper CLAUDE.md asks for before profiling a Level 3 run: every
+run starts from `env -i` + the allow-list + the credential deny rule. `--env-script`
+must set up what `run.sh` needs (the toolchain, the MPI transport profile).
+
 ## Level 1 verification switch
 
 Most Level 1 benchmarks validate by recomputing the whole workload on one CPU core.
@@ -443,7 +508,12 @@ only through explicit measurement groups (linked 3 + 2, unlinked or cross-campai
 configuration kept apart, inconsistent or malformed groups refused, duplicate records counted once) and
 input-file identity through declared copies and logged reads (changed deck or solver configuration
 refused; a supplementary identity only when complete -- basis, evidence sources, bound to its record --
-and matching) -- 61 checks.
+and matching),
+
+Level 3 (case resolution and refusal, every application's
+timer extracted from synthetic evidence, a missing or incomplete timer failing loudly,
+every cited source line existing, the dry run, the record, CSV and page, QMCPACK's
+profile default and its override) -- 76 checks.
 
 ## Scope and what is UNVERIFIED
 
@@ -452,8 +522,11 @@ and matching) -- 61 checks.
 * **Multi-process ROI** (job ROI = slowest rank): implemented, but this allocation
   exposes one GPU, so Level 2 is measured at `HPCPERF_GPUS=1`.
 * **Hardware counters** (`ncu`, occupancy, achieved bandwidth): not collected.
-* **Level 3**: not covered; its run path is not yet wrapped in the clean
-  environment.
+* **Level 3**: measured with the applications' own timers at 2 GPUs (one node,
+  2 x B200). Only QMCPACK's and DFT-FE's timing inputs have numerical acceptance
+  (`validate.sh`); the larger inputs of the other eight are completeness runs, and
+  their records say so (`verify_vs_roi = none`). The device picture is whole-process
+  except for WarpX.
 
 ## First ROI sweep (2026-09-22)
 
@@ -511,3 +584,51 @@ Findings that need a decision rather than a fix:
 
 `device_overlap_s` is non-zero only for quicksilver (0.22-0.35 s: unified-memory
 migrations overlap its kernel); everything else is single-stream.
+
+## First Level 3 sweep (2026-09-29)
+
+dgx003, **2 x NVIDIA B200** (one MPI rank per GPU, `--mca pml ob1 --mca btl self,sm,smcuda`),
+CUDA 13.2.78, Nsight Systems 2025.6.3, uv toolchain (GCC 13.3.0 / system GCC 14.2.1 for CP2K and
+DFT-FE, Open MPI 5.0.10), private LLVM 23.1.0 for QMCPACK. One clean + one profiled run per case,
+run ids `20260929T045201Z-2209081` (ExaCA) and `20260929T045434Z-2212883` (the other nine);
+the whole sweep took 99 min, 10 / 10 ok, launcher audit `2 verified, 0 mismatch` in every clean run.
+
+| application | input (2 GPUs) | timed region | steps | per step | region share of process | profiler x | device busy per GPU | numerical acceptance |
+|---|---|--:|--:|--:|--:|--:|--:|---|
+| CP2K | H2O-128 MD (10 steps) | 54.9 s | 9 | 6.1 s | 52% | 1.02 | 7% (whole process) | none (validate.sh: H2O-64) |
+| DFT-FE | al_md (32 Al, 4 MD steps) | 34.3 s | 3 | 11.4 s | 29% | 1.06 | 1% (whole process) | validate.sh |
+| ExaCA | 512x256x1024 | 15.2 s | -- | -- | 78% | 1.16 | 25% (whole process) | none |
+| LAMMPS | LJ 16.4M atoms, 2000 steps | 49.9 s | 2000 | 24.9 ms | 86% | 1.12 | 14% (whole process) | none |
+| nekRS | ethier 32k elements N=7, 50 steps | 46.2 s | 50 | 924 ms | 14% | 1.00 | 17% (whole process) | none |
+| Nyx | synthetic 256^3, 10 steps | 9.1 s | 10 | 914 ms | 51% | 1.11 | 10% (whole process) | none |
+| QMCPACK | diamondC_2x1x1, 256 walkers | 286.9 s | 2500 | 115 ms | 93% | 1.09 | 6% (whole process) | validate.sh |
+| SPARTA | collide 270M particles, 100 steps | 13.2 s | 100 | 132 ms | 12% | 1.04 | 61% (whole process) | none |
+| SPECFEM3D | half-space 331,776 elements, 20000 steps | 18.1 s | 20000 | 0.90 ms | 6.5% | 1.00 | 6% (whole process) | none |
+| WarpX | uniform plasma 256^3, 1000 steps | 20.5 s | 1000 | 20.5 ms | 82% | 1.07 | **70% inside `WarpX::Evolve()`** | none |
+
+What the numbers say, and what they do not:
+
+* **Set-up still dominates several processes even at these sizes**: SPECFEM3D spends 241 s
+  generating its databases on the CPU (plus 2.8 s meshing) before an 18 s time loop; nekRS reports
+  278 s of initialization (JIT compilation for this polynomial order, first run, and kernel
+  autotuning) before a 46 s solve; SPARTA 62 s creating 270M particles plus its 8.7 s 30-step
+  warm-up run before the 13.2 s timed run. The region excludes all of it by definition; "region
+  share of process" makes it visible.
+* **Whole-process device busy is not the region's device busy.** Only WarpX can be clipped
+  (70% busy per GPU inside its loop vs 29% over the whole process); for the others the device
+  column mixes set-up and loop. DFT-FE's 1% reflects a 32-atom problem whose MD step is dominated
+  by host-side re-initialization (`updateAtomPositionsAndMoveMesh`, 17.8 s of each step at 1 GPU).
+* **LAMMPS strong is communication-bound on this site at 2 GPUs**: 24.9 ms/step against
+  ~11 ms/step at 1 GPU in its README (the 4-GPU run was also slower than 1 GPU there); its
+  section table puts 97% in Comm, but those sections are not device-synchronized (caveat in
+  the record), so that split is not a GPU breakdown. Recorded, not generalized.
+* **The profiler costs QMCPACK a 24 GB trace**: 57M kernels, 72M copies and 274M CUDA API calls.
+  The timed region grows only 9% under nsys (312 vs 287 s), but the profiled process took 35 min
+  against 5 min clean (nsys writing its 1 GB report), the sqlite export 12 min and most of the
+  8.6 min summary -- about 55 of the sweep's 100 minutes; `--no-profile` skips it.
+* **Sweep cost**: the ten clean runs took 1367 s (23 min) -- that is what `--no-profile` costs.
+  The profiled runs took 3301 s, their sqlite exports 790 s and the summary 8.6 min: with nsys the
+  sweep took 100 min, 4.4x. Per case the profiled run plus export costs 1.1x (SPARTA, SPECFEM3D)
+  to 3.6x (Nyx) a clean run, QMCPACK 9.1x; nekRS's profiled run was shorter than its clean run
+  (234 vs 331 s) because the clean run, first at this polynomial order, paid the JIT compilation.
+* One clean run per case: the spread column is null until `--clean-runs 3` is used.

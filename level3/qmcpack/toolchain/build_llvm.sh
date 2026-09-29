@@ -45,6 +45,8 @@ ARCH="${HPCPERF_CUDA_ARCH:-$(l3_gpu_arch)}"; [ -n "$ARCH" ] || ARCH=100
 # clean host environment: system GCC 14 as host compiler; cmake/ninja from the project conda env
 # (tools only -- conda is NOT on CMAKE_PREFIX_PATH so no conda libraries are linked)
 CONDA_BIN="$R/.conda_env/bin"
+# no project conda env: fall back to the project .venv (same cmake 3.28.4 / ninja 1.13.2 pins as environment.yml)
+[ -x "$CONDA_BIN/cmake" ] || CONDA_BIN="$R/.venv/bin"
 export PATH="/usr/bin:/usr/sbin:/bin:$CUDA_ROOT/bin"; unset CMAKE_PREFIX_PATH LD_LIBRARY_PATH CPATH LIBRARY_PATH CMAKE_GENERATOR CUDAARCHS CC CXX
 CMAKE="$CONDA_BIN/cmake"; NINJA="$CONDA_BIN/ninja"
 [ -x "$CMAKE" ] && [ -x "$NINJA" ] || { echo "build_llvm.sh: cmake/ninja not found under $CONDA_BIN" >&2; exit 1; }

@@ -103,7 +103,7 @@
   function readHash() {
     var h = (location.hash || "").replace(/^#/, "").split("/");
     if (/^c[0-9]+$/.test(h[0]) && CAMPS[+h[0].slice(1)]) { setCamp(+h[0].slice(1)); h.shift(); }
-    if (h[0] === "L1" || h[0] === "L2") st.level = h[0].slice(1);
+    if (h[0] === "L1" || h[0] === "L2" || h[0] === "L3") st.level = h[0].slice(1);
     if (h[1] && findApp(h[1])) {
       st.app = h[1];
       if (h[2] && h[3] && cellOf(findApp(h[1]), h[2], h[3])) { st.kase = h[2]; st.plat = h[3]; }
@@ -215,6 +215,7 @@
   }
 
   function detail(app, kase, platId, cell, reg) {
+    if (cell.run.roi && cell.run.roi.source === "app_timer") return detailL3(app, kase, platId, cell);
     // reg: the registered-input row when the campaign is a registry campaign (same layout, plus its panel)
     var run = cell.run, R = run.roi, dv = run.device, ctx = run.context, plat = platById(platId) || {id: platId};
     var S = run.set || null;
@@ -376,6 +377,150 @@
     return box;
   }
 
+  // ---------------------------------------------------------------- Level 3: the application's own timer
+  function catTable(d, withBytes) {
+    var rows = CATS.map(function (c) {
+      return el("tr", {}, [el("th", {text: CAT_NAME[c]}), el("td", {cls: "n"}, [valOrNull(fmtT(d[c + "_s"]))]),
+        el("td", {cls: "n"}, [valOrNull(num(d[c + "_ops"]))])].concat(withBytes ?
+        [el("td", {cls: "n"}, [d.hasOwnProperty(c + "_bytes") ? valOrNull(bytes(d[c + "_bytes"])) : nul("–")])] : []));
+    });
+    rows.push(el("tr", {}, [el("th", {text: "busy (union)"}), el("td", {cls: "n em", text: fmtT(d.busy_s)}),
+      el("td", {})].concat(withBytes ? [el("td", {})] : [])));
+    return el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, [el("th", {text: "category"}),
+      el("th", {cls: "n", text: "time"}), el("th", {cls: "n", text: "ops"})].concat(withBytes ?
+      [el("th", {cls: "n", text: "bytes"})] : []))]), el("tbody", {}, rows)])]);
+  }
+
+  function detailL3(app, kase, platId, cell) {
+    var run = cell.run, R = run.roi, dv = run.device, ctx = run.context, plat = platById(platId) || {id: platId};
+    var whole = ctx.whole || {};
+    var box = el("section", {cls: "detail", id: "detail", "aria-label": "measurement"});
+    box.appendChild(el("h2", {text: app.app + " · " + kase + " · " + (plat.label || platId)}));
+    box.appendChild(el("div", {cls: "runline", text: "run " + run.run_id + " · " + (run.utc || "") +
+      " · source " + (run.git_commit || "-") + " · collector " +
+      ((run.measurement.collector || {}).name || "-") + " · platform " + platId}));
+    if (cell.latest_status !== "ok") {
+      box.appendChild(el("div", {cls: "banner", text: run.status === "ok"
+        ? "The latest run of this combination ended with status " + cell.latest_status + "; showing the last successful run."
+        : "No successful run of this combination: status " + run.status + "."}));
+    }
+    if (run.status !== "ok") { box.appendChild(history(cell)); return box; }
+
+    var wall = R.wall_s, proc = ctx.process_wall_s, steps = R.steps;
+    var cv = (isNum(R.wall_s_stddev) && (R.runs_s || []).length > 1 && wall) ? R.wall_s_stddev / wall : null;
+    var f = run.fom || {};
+    box.appendChild(el("div", {cls: "figs"}, [
+      fig(fmtT(wall), "timed region (application timer, median of " + (R.runs_s || []).length + " clean)"),
+      fig(pct(cv, 1), "clean-run spread"),
+      fig(isNum(steps) && wall ? fmtT(wall / steps) : "null", "per step" + (isNum(steps) ? " (" + num(steps) + " steps)" : "")),
+      fig(pct(wall && proc ? wall / proc : null, 1), "region share of the process"),
+      fig(dv ? pct(dv.busy_frac_of_roi, 0, true) : pct(whole.busy_frac_of_process, 0, true),
+          dv ? "device busy in the region" : "device busy, whole process"),
+      fig(isNum(R.profiler_inflation) ? R.profiler_inflation.toFixed(2) + "×" : "null", "profiler inflation"),
+      fig(isNum(f.value) ? (Math.abs(f.value) >= 1e5 || Math.abs(f.value) < 1e-2 ? f.value.toPrecision(4)
+            : f.value.toLocaleString("en-US", {maximumFractionDigits: 1})) : "null",
+          f.name ? "FOM: " + f.name + (f.unit ? " (" + f.unit + ")" : "") : "FOM: none printed")]));
+
+    // what is timed
+    box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "What is timed (no markers: the application's own timer)"}),
+      kv([["region", R.definition || "null"],
+          ["timed in", el("code", {text: (R.where || []).join("  ") || "null"})],
+          ["ranks combined as", R.reduction || "null"],
+          ["waits for the device", R.device_sync || "null"]])]));
+
+    // process breakdown: the region vs the rest
+    var setup = isNum(R.setup_s) ? Math.min(R.setup_s, Math.max((proc || 0) - wall, 0)) : 0;
+    var rest = Math.max((proc || 0) - wall - setup, 0);
+    var segs = [["s-pre", setup], ["s-roi", wall], ["s-excl", rest]];
+    var tot = segs.reduce(function (s, x) { return s + x[1]; }, 0) || 1;
+    box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Where the process spends its time"}),
+      el("div", {cls: "pbar", role: "img", "aria-label": "process breakdown"}, segs.filter(function (x) {
+        return x[1] > 0; }).map(function (x) { return el("i", {cls: x[0], style: "width:" + (100 * x[1] / tot).toFixed(2) + "%"}); })),
+      el("div", {cls: "legend"}, [
+        el("span", {}, [el("b", {cls: "s-pre"}), "application set-up it reports " + fmtT(isNum(R.setup_s) ? R.setup_s : null)]),
+        el("span", {}, [el("b", {cls: "s-roi"}), "timed region " + fmtT(wall)]),
+        el("span", {}, [el("b", {cls: "s-excl"}), "rest: start-up, launcher, output, warm-up step " + fmtT(rest)]),
+        el("span", {}, ["process " + fmtT(proc)])])]));
+
+    // the timer and the application's own sub-timers
+    var timerRows = [["median", fmtT(wall)], ["min / max", fmtT(R.wall_s_min) + " / " + fmtT(R.wall_s_max)],
+      ["clean runs", (R.runs_s || []).map(fmtT).join(", ") || "null"], ["steps", num(steps)],
+      ["left out inside the loop", fmtT(R.excluded_s)], ["set-up the application reports", fmtT(R.setup_s)],
+      ["same timer, profiled run", fmtT(R.profiled_wall_s)], ["process wall clock", fmtT(proc)]];
+    var parts = R.parts || {};
+    var pk = Object.keys(parts).sort(function (a, b) { return (parts[b] || 0) - (parts[a] || 0); });
+    var partsTable = pk.length ? el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, [
+        el("th", {text: "application sub-timer"}), el("th", {cls: "n", text: "time"}), el("th", {cls: "n", text: "of region"})])]),
+      el("tbody", {}, pk.map(function (k) {
+        return el("tr", {}, [el("th", {text: k}), el("td", {cls: "n", text: fmtT(parts[k])}),
+          el("td", {cls: "n", text: wall ? pct(parts[k] / wall, 1) : "null"})]); }))])])
+      : el("p", {cls: "lede", text: "The application prints no sub-timers for this region."});
+    box.appendChild(el("div", {cls: "panel two"}, [
+      el("div", {}, [el("h3", {text: "Timed region"}), kv(timerRows)]),
+      el("div", {}, [el("h3", {text: "The application's own breakdown"}), partsTable])]));
+
+    // device activity: clipped (NVTX) or whole process
+    var devBlock, devTitle;
+    if (dv) { devTitle = "Device activity inside the application's NVTX range '" + (run.measurement.nvtx_roi || "") + "'";
+              devBlock = catTable(dv, true); }
+    else if (whole && isNum(whole.busy_s)) { devTitle = "Device activity, whole process (not clipped: includes set-up)";
+              devBlock = catTable(whole, false); }
+    else { devTitle = "Device activity"; devBlock = el("p", {cls: "lede"}, [nul("null"), " — no profiled run."]); }
+    var rt = run.runtime_api, rtAll = rt && rt.whole;
+    var auditCell = run.audit_ok === true ? el("span", {cls: "pill ok", text: "clean"})
+      : run.audit_ok === false ? el("span", {cls: "pill bad", text: "not clean"})
+      : el("span", {cls: "pill na", text: "no launcher"});
+    var conf = plat.conformance;
+    box.appendChild(el("div", {cls: "panel two"}, [
+      el("div", {}, [el("h3", {text: devTitle}), devBlock]),
+      el("div", {}, [el("h3", {text: "Checks"}), kv([
+        ["launcher GPU audit", auditCell],
+        ["runtime API calls, whole process", rtAll ? num(rtAll.calls) + " calls, " + fmtT(rtAll.time_s) : "null"],
+        ["profiled process wall clock", fmtT(ctx.profiled_process_wall_s)],
+        ["verification", "outside (level3/<app>/validate.sh, not run here)"],
+        ["platform conformance", conf ? el("span", {cls: "pill " + (conf.status === "pass" ? "ok" : "warn"),
+          text: conf.status + " " + conf.checks + " · " + conf.date}) : nul("no record")]])])]));
+
+    if (run.ops && run.ops.length) {
+      var opsRows = run.ops.map(function (o) {
+        return el("tr", {}, [el("td", {cls: "opname", title: o.name, text: o.name}), el("td", {text: o.category}),
+          el("td", {cls: "n", text: num(o.count)}), el("td", {cls: "n em", text: fmtT(o.total_s)}),
+          el("td", {cls: "n", text: fmtT(o.avg_s)}), el("td", {cls: "n", text: pct(o.share, 1)})]);
+      });
+      box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Top operations " +
+        (run.ops_scope === "whole_process" ? "of the whole process" : "inside the NVTX range") +
+        (run.ops_total > run.ops.length ? " (" + run.ops.length + " of " + run.ops_total + ")" : "")}),
+        el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, ["operation", "category", "count",
+          "total", "average", "share"].map(function (h, i) { return el("th", {cls: i > 1 ? "n" : null, text: h}); }))]),
+          el("tbody", {}, opsRows)])])]));
+    }
+
+    var env = run.inputs.declared_env || {};
+    var envText = Object.keys(env).sort().map(function (k) { return k + "=" + env[k]; }).join(" ");
+    var argv = run.inputs.argv;
+    var proto = run.measurement.protocol || {};
+    var coll = run.measurement.collector || {};
+    var di = run.device_info || {};
+    box.appendChild(el("div", {cls: "panel two"}, [
+      el("div", {}, [el("h3", {text: "Input as run"}), kv([
+        ["declared variables", envText || "none (application defaults)"],
+        ["command", el("code", {text: Array.isArray(argv) ? argv.join(" ") : (argv || "null")})],
+        ["GPUs (one MPI rank each)", run.measurement.gpus || "1"]])]),
+      el("div", {}, [el("h3", {text: "Measurement and device"}), kv([
+        ["protocol", (proto.warmup_runs || 0) + " warm-up, " + (proto.clean_runs || 0) + " clean, " +
+                     (proto.profiled_runs || 0) + " profiled"],
+        ["collector", (coll.name || "null") + (coll.version ? " " + coll.version : "")],
+        ["device", [di.count_visible, "×", di.product, di.arch].filter(function (x) { return x !== null && x !== undefined; }).join(" ") || "null"],
+        ["driver", di.driver_version || "null"],
+        ["host CPU", run.host_cpu || "null"]])])]));
+    if (run.caveats && run.caveats.length) {
+      box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Caveats"}),
+        el("ul", {cls: "caveats"}, run.caveats.map(function (c) { return el("li", {text: c}); }))]));
+    }
+    box.appendChild(history(cell));
+    return box;
+  }
+
   function history(cell) {
     var okPrev = null;
     var rows = cell.history.map(function (h) {
@@ -390,7 +535,8 @@
         el("td", {cls: "n em", text: h.status === "ok" ? fmtT(h.roi_s) : "–"}), el("td", {cls: "n", text: change})]);
     }).reverse();
     return el("div", {cls: "panel"}, [el("h3", {text: "Runs of this combination"}),
-      el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, ["run", "UTC", "status", "ROI",
+      el("div", {cls: "tscroll"}, [el("table", {}, [el("thead", {}, [el("tr", {}, ["run", "UTC", "status",
+        st.level === "3" ? "timed region" : "ROI",
         "vs previous"].map(function (h, i) { return el("th", {cls: i > 2 ? "n" : null, text: h}); }))]),
         el("tbody", {}, rows)])])]);
   }

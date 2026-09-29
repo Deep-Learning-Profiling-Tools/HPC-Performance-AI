@@ -17,6 +17,10 @@ averaged by accident. Level 0 is the conformance probe (probes/conformance/).
 
 What the numbers mean -- everything is about the region of interest (ROI): the
 computation between the markers, without start-up, set-up, warm-up and verification.
+Level 3 has no markers: its region is the application's own timer for the time-step loop
+(apptimers.py, roi.source = "app_timer"), and without markers the profiled run's device
+picture is the whole process (context) unless the application emits an NVTX range for
+its loop itself.
 
   roi_wall_s              clean runs (no profiler), timed by the markers; median
   roi_profiled_wall_s     the same region in the profiled run; the ratio is
@@ -49,6 +53,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import analysis  # noqa: E402
+import apptimers  # noqa: E402
 import cases as case_tables  # noqa: E402
 import collectors  # noqa: E402
 import report  # noqa: E402
@@ -88,6 +93,9 @@ COLUMNS = [
     "app_timer_s", "roi_vs_app_timer",
     "input_id",
     "placement_cpus_allowed", "placement_mems_allowed", "placement_gpus", "placement_consistent",
+    "roi_source", "roi_steps", "roi_setup_s", "ops_scope",
+    "whole_compute_s", "whole_copy_h2d_s", "whole_copy_d2h_s", "whole_copy_d2d_s", "whole_fill_s",
+    "whole_runtime_api_calls",
 ]
 OPS_COLUMNS = ["level", "app", "case", "platform", "run_id", "op", "category", "count",
                "total_s", "avg_s", "min_s", "max_s", "share"]
@@ -248,6 +256,21 @@ def extract_app_timer(log_path, spec):
     return out
 
 
+def l3_timer(app, d):
+    """The application's own timer of one Level 3 run directory, or (None, reason)."""
+    try:
+        return apptimers.extract(app, d), None
+    except (apptimers.TimerMissing, OSError, ValueError, IndexError) as exc:
+        return None, str(exc)
+
+
+def l3_manifest(d):
+    """run_manifest.txt of the (first) run directory harvested into <d>/app/, as a dict."""
+    for p in sorted(glob.glob(os.path.join(d, "app", "*", "run_manifest.txt"))):
+        return read_meta(p)
+    return {}
+
+
 def launcher_audit(log_path):
     if not log_path or not os.path.isfile(log_path):
         return None, None
@@ -282,15 +305,25 @@ def build_record(raw):
     host_info = dev_desc.get("host", {})
     platform_id = meta.get("platform_id") or device_info.get("platform_id")
 
-    # ---- clean runs: the ROI time
+    # ---- clean runs: the ROI time (Level 3: the application's own timer)
+    app = meta["app"]
     runs = []
     for d in sorted(glob.glob(os.path.join(raw, "clean.*")), key=lambda p: int(p.rsplit(".", 1)[1])):
         rt = read_run_txt(d)
+        if level == 3:
+            timer, err = l3_timer(app, d)
+            runs.append({"dir": d, "run": rt, "logs": [], "roi": None, "timer": timer, "timer_err": err})
+            continue
         logs = [analysis.parse_roi_log(p) for p in sorted(glob.glob(os.path.join(d, "roi.*")))]
         roi = analysis.clean_roi(logs)
         runs.append({"dir": d, "run": rt, "logs": logs, "roi": roi})
-    good = [r for r in runs if r["run"] and r["run"].get("rc") == 0 and r["roi"] and r["roi"]["entries"] > 0]
-    walls = [sec(r["roi"]["wall_ns"]) for r in good]
+    if level == 3:
+        good = [r for r in runs if r["run"] and r["run"].get("rc") == 0 and r["timer"]]
+        walls = [finite("app timer", r["timer"]["wall_s"]) for r in good]
+    else:
+        good = [r for r in runs if r["run"] and r["run"].get("rc") == 0 and r["roi"] and r["roi"]["entries"] > 0]
+        walls = [sec(r["roi"]["wall_ns"]) for r in good]
+
     # warm-up runs: discarded from every statistic, recorded (when the engine logged their ROI)
     # so the cost of the first contact with the input is visible next to the clean runs
     warm = []
@@ -302,9 +335,38 @@ def build_record(raw):
 
     roi = {"wall_s": None, "runs_s": walls, "warmup_runs_s": warm, "wall_s_min": None, "wall_s_max": None,
            "wall_s_stddev": None, "entries": None, "excluded_s": None, "processes": None, "imbalance_s": None,
-           "profiled_wall_s": None, "profiled_marker_wall_s": None, "profiler_inflation": None}
+           "profiled_wall_s": None, "profiled_marker_wall_s": None, "profiler_inflation": None,
+           "source": "app_timer" if level == 3 else "markers"}
     context = {"process_wall_s": None, "pre_roi_s": None, "post_roi_s": None}
-    if walls:
+    if level == 3:
+        desc = apptimers.describe(app)
+        roi.update({"definition": desc["definition"], "where": desc["where"], "reduction": desc["reduction"],
+                    "device_sync": desc["device_sync"], "steps": None, "setup_s": None, "parts": {},
+                    "evidence": []})
+        if desc.get("caveat"):
+            caveats.append(desc["caveat"])
+    if walls and level == 3:
+        t0 = good[0]["timer"]
+        excl = [r["timer"]["excluded_s"] for r in good if r["timer"]["excluded_s"] is not None]
+        roi.update({
+            "wall_s": finite("timer median", statistics.median(walls)),
+            "wall_s_min": min(walls), "wall_s_max": max(walls),
+            "wall_s_stddev": finite("timer stddev", statistics.stdev(walls)) if len(walls) > 1 else 0.0,
+            "excluded_s": finite("excluded", statistics.median(excl)) if excl else None,
+            "steps": t0["steps"], "setup_s": t0["setup_s"], "parts": t0["parts"], "evidence": t0["files"],
+        })
+        pw = [(r["run"]["end_ns"] - r["run"]["start_ns"]) / 1e9 for r in good]
+        context["process_wall_s"] = finite("wall", statistics.median(pw))
+        context["outside_region_s"] = finite("outside", context["process_wall_s"] - roi["wall_s"])
+        if len({r["timer"]["steps"] for r in good}) > 1:
+            caveats.append("The number of steps inside the timed region differs between clean runs.")
+    elif level == 3:
+        if status == "ok":
+            status = "app_timer_missing"
+        errs = [r["timer_err"] for r in runs if r.get("timer_err")]
+        if errs:
+            caveats.append(f"The application's timer was not found in the clean run: {errs[0]}")
+    elif walls:
         r0 = good[0]["roi"]
         roi.update({
             "wall_s": finite("roi median", statistics.median(walls)),
@@ -351,6 +413,10 @@ def build_record(raw):
             procs.append({"rank": log.get("rank"), "argv": log.get("argv"), "exe": log.get("exe"),
                           "cwd": log.get("cwd"), "host": log.get("host")})
     exe_sha = meta.get("exe_sha256")
+    manifest = l3_manifest(runs[0]["dir"]) if (level == 3 and runs) else {}
+    if manifest:
+        exe_sha = exe_sha or manifest.get("binary_sha256")
+        procs = [{"rank": None, "argv": None, "exe": manifest.get("binary"), "cwd": None, "host": None}]
     if not exe_sha and procs and procs[0]["exe"] and os.path.isfile(procs[0]["exe"]):
         import hashlib
         h = hashlib.sha256()
@@ -361,6 +427,11 @@ def build_record(raw):
     inputs = {"declared_env": declared_env, "declared_argv": dash(meta.get("argv")),
               "processes": procs, "exe_sha256": exe_sha,
               "exe_sha256_when": "measurement" if meta.get("exe_sha256") else ("summarize" if exe_sha else None)}
+    if manifest:
+        inputs["run_manifest"] = {k: manifest[k] for k in sorted(manifest)
+                                  if k in ("app", "case", "mode", "ranks", "profile", "backend", "input_sha256",
+                                           "binary_sha256", "fingerprint_sha256", "source_tree_sha256",
+                                           "threads", "steps")}
     placement = placement_block(meta, runs, os.path.join(raw, "prof"))
 
     # ---- registry input (a --registry case): the workload identity stored by the engine
@@ -405,15 +476,60 @@ def build_record(raw):
     mod = collectors.get(name)
     caps = mod.CAPABILITIES
     device = runtime = whole = None
-    ops, prof_info = [], {}
+    ops, prof_info, ops_scope = [], {}, None
     prof_dir = os.path.join(raw, "prof")
-    if name != "none" and os.path.isdir(prof_dir) and status == "ok":
+    nvtx_roi = dash(meta.get("nvtx_roi"))
+    if level == 3 and name != "none" and os.path.isdir(prof_dir) and status == "ok":
+        trace = mod.open(prof_dir)
+        try:
+            marks = trace.named_ranges([nvtx_roi]) if (nvtx_roi and hasattr(trace, "named_ranges")) else []
+            res = analysis.analyze_trace(trace, caps, markers=marks, whole_ops=True)
+            prof_info = trace.info()
+        finally:
+            trace.close()
+        whole = res["whole_process"]
+        runtime = {"name": mod.RUNTIME, "roi": res["runtime_api_roi"], "whole": res["runtime_api_whole"]}
+        ops, ops_scope = res["ops"], res["ops_scope"]
+        prt = read_run_txt(prof_dir)
+        if prt:
+            context["profiled_process_wall_s"] = finite("profiled wall", (prt["end_ns"] - prt["start_ns"]) / 1e9)
+            if whole and whole.get("busy_s") is not None:
+                whole["busy_frac_of_process"] = finite(
+                    "busy/process", whole["busy_s"] / (context["profiled_process_wall_s"] * max(whole["processes"], 1)))
+        ptimer, _ = l3_timer(app, prof_dir)
+        if ptimer and roi["wall_s"]:
+            roi["profiled_wall_s"] = ptimer["wall_s"]
+            roi["profiler_inflation"] = finite("inflation", ptimer["wall_s"] / roi["wall_s"])
+        if res["profiled_roi"]["found"]:
+            device = res["device"]
+            if device and roi["wall_s"]:
+                per = device["busy_s"] / max(device["processes"], 1)       # per process (GPU), on average
+                gap = roi["wall_s"] - per
+                device["host_gap_s"] = finite("host gap", gap)
+                device["host_gap_frac_of_roi"] = finite("host gap frac", gap / roi["wall_s"])
+                device["busy_frac_of_roi"] = finite("busy frac", per / roi["wall_s"])
+            caveats.append(f"Device activity is clipped to the application's own NVTX range {nvtx_roi!r} "
+                           f"({res['profiled_roi']['entries']} entries in the profiled run), which may differ "
+                           f"slightly from the printed timer's region.")
+        else:
+            if nvtx_roi:
+                caveats.append(f"The profiled run contains no NVTX range {nvtx_roi!r}: device activity is "
+                               f"whole-process only.")
+            caveats.append("Level 3 has no markers: the device activity and the operations table cover the "
+                           "WHOLE process (start-up, set-up and output included), not only the timed region.")
+        infl = roi["profiler_inflation"]
+        if infl is not None and infl > INFLATION_NOTE:
+            caveats.append(f"The profiler stretched the timed region {infl:.2f}x (profiled {roi['profiled_wall_s']:.4f} s "
+                           f"vs clean {roi['wall_s']:.4f} s). Device-side durations are unaffected; the headline "
+                           f"is the clean value.")
+    elif name != "none" and os.path.isdir(prof_dir) and status == "ok":
         trace = mod.open(prof_dir)
         try:
             res = analysis.analyze_trace(trace, caps)
             prof_info = trace.info()
         finally:
             trace.close()
+        ops_scope = "roi"
         pr = res["profiled_roi"]
         if not pr["found"]:
             status = "roi_missing_in_trace"
@@ -435,10 +551,11 @@ def build_record(raw):
             runtime = {"name": mod.RUNTIME, "roi": res["runtime_api_roi"], "whole": res["runtime_api_whole"]}
             ops = res["ops"]
             if device and roi["wall_s"]:
-                gap = roi["wall_s"] - device["busy_s"]
+                per = device["busy_s"] / max(device.get("processes") or 1, 1)   # per process (GPU), on average
+                gap = roi["wall_s"] - per
                 device["host_gap_s"] = finite("host gap", gap)
                 device["host_gap_frac_of_roi"] = finite("host gap frac", gap / roi["wall_s"])
-                device["busy_frac_of_roi"] = finite("busy frac", device["busy_s"] / roi["wall_s"])
+                device["busy_frac_of_roi"] = finite("busy frac", per / roi["wall_s"])
                 if gap < -HOST_GAP_TOLERANCE * roi["wall_s"]:
                     caveats.append(f"Device busy time inside the ROI ({device['busy_s']:.6f} s, profiled run) "
                                    f"exceeds the clean ROI ({roi['wall_s']:.6f} s): the two runs differ by "
@@ -449,8 +566,16 @@ def build_record(raw):
                                f"clean {roi['wall_s']:.4f} s). Device-side durations are unaffected; "
                                f"roi_wall_s is the clean value.")
     elif name == "none":
-        caveats.append("No collector for this platform: device columns are null (not observable), "
-                       "only the ROI time and the FOM were measured.")
+        skipped = dash(meta.get("profile_skipped"))
+        if skipped:
+            caveats.append(f"Not profiled by default (tools/timing/cases/level{level}_apps.tsv, "
+                           f"measure_level{level}.sh --profile-all overrides): {skipped}. Device columns are null "
+                           f"(not observed), only the application's timer and the FOM were measured.")
+        else:
+            caveats.append("No collector for this platform: device columns are null (not observable), "
+                           "only the ROI time and the FOM were measured." if level != 3 else
+                           "No profiled run: device columns are null (not observable), only the application's "
+                           "timer and the FOM were measured.")
     if name != "none" and not mod.VERIFIED:
         caveats.append(f"Collector {name} is interface-only and UNVERIFIED.")
 
@@ -458,6 +583,10 @@ def build_record(raw):
     if level > 0 and name != "none" and not (conformance and conformance.get("status") == "pass"):
         caveats.append(f"Platform {platform_id} has no passing conformance record for collector "
                        f"{name} (tools/timing/probes/conformance/run_conformance.sh).")
+    if meta.get("verify_vs_roi") == "none":
+        caveats.append("No numerical acceptance for this input: nothing checks its results against a reference "
+                       "(the application's validate.sh checks a smaller input). The run completed with exit 0; "
+                       "the time is a completeness record of a run whose results were not verified.")
     if meta.get("verify_vs_roi") == "inside":
         caveats.append("This benchmark's correctness check runs inside a timed kernel and cannot be "
                        "separated from the ROI; it is included in the measured time.")
@@ -487,6 +616,9 @@ def build_record(raw):
             "env_allow": meta.get("env_allow", "").split(),
             "env_deny_regex": meta.get("env_deny_regex"),
             "notes": dash(meta.get("notes")) or None,
+            "region": meta.get("region") or "markers",
+            "profile_skipped": dash(meta.get("profile_skipped")) or None,
+            "nvtx_roi": nvtx_roi or None,
         },
         "inputs": inputs,
         "registry": registry,
@@ -494,6 +626,7 @@ def build_record(raw):
         "device": device,
         "runtime_api": runtime,
         "ops": ops,
+        "ops_scope": ops_scope,
         "context": dict(context, whole_process=whole),
         "fom": fom,
         "app_timer": app_timer,
@@ -579,6 +712,12 @@ def flatten(rec):
         "placement_mems_allowed": ";".join(plc.get("mems_allowed", [])),
         "placement_gpus": ";".join(plc.get("gpus", [])),
         "placement_consistent": "" if not plc.get("processes_recorded") else int(plc["consistent"]),
+        "roi_source": v(roi.get("source") or "markers"), "roi_steps": v(roi.get("steps")),
+        "roi_setup_s": v(roi.get("setup_s")), "ops_scope": v(rec.get("ops_scope")),
+        "whole_compute_s": v(whole.get("compute_s")), "whole_copy_h2d_s": v(whole.get("copy_h2d_s")),
+        "whole_copy_d2h_s": v(whole.get("copy_d2h_s")), "whole_copy_d2d_s": v(whole.get("copy_d2d_s")),
+        "whole_fill_s": v(whole.get("fill_s")),
+        "whole_runtime_api_calls": v((rt.get("whole") or {}).get("calls")),
     })
     for c in CATEGORIES:
         row[f"device_{c}_s"] = v(dev.get(f"{c}_s")) if dev else ""

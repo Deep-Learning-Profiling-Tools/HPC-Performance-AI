@@ -42,9 +42,9 @@ fi
 mkdir -p "$TMP/fb/level1"
 rows="$(python3 "$TOOLS/cases.py" resolve --level 1 --build-root "$TMP/fb" --no-env-check all 2>&1 | noise)"
 n1="$(printf '%s\n' "$rows" | /usr/bin/grep -c .)"
-nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=18' | wc -l)"
+nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=20' | wc -l)"
 nbm="$(ls -d "$REPO"/level1/*/CMakeLists.txt 2>/dev/null | wc -l)"
-if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 18 fields ($nbm benchmarks)"
+if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 20 fields ($nbm benchmarks)"
 else bad "1c: level 1 resolve: $n1 rows, $nbad malformed"; fi
 if printf '%s\n' "$rows" | awk -F'\t' '$9 ~ /verify\.py|python/' | /usr/bin/grep -q .; then
     bad "1d: a Level 1 case runs a python wrapper instead of the binary"
@@ -1604,6 +1604,278 @@ if info.get("gpus_used") != ["0000:52:00.0"]: bad.append(f"gpus_used {info.get('
 if info.get("gpus_visible") != ["0000:43:00.0", "0000:52:00.0"]: bad.append(f"gpus_visible {info.get('gpus_visible')}")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+
+echo "=== 13: Level 3 (the applications' own timers)"
+rows3="$(python3 "$TOOLS/cases.py" resolve --level 3 --no-env-check all 2>&1 | noise)"
+n3="$(printf '%s\n' "$rows3" | /usr/bin/grep -c .)"
+nbad3="$(printf '%s\n' "$rows3" | awk -F'\t' 'NF!=20' | wc -l)"
+napps3="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import cases; print(len(cases.level3_apps_in_suite()))' "$TOOLS" 2>&1 | noise)"
+if [ "$nbad3" -eq 0 ] && [ "$n3" -ge "$napps3" ] && [ "$napps3" -gt 0 ]; then
+    ok "13a: level 3 resolves to $n3 cases of 20 fields ($napps3 applications)"
+else bad "13a: level 3 resolve: $n3 rows, $nbad3 malformed, $napps3 apps: $(printf '%s' "$rows3" | head -3)"; fi
+# every case is a declared input of a real run.sh; an undeclared variable in the shell is refused
+out="$(HPCPERF_LAMMPS_STEPS=7 python3 "$TOOLS/cases.py" resolve --level 3 lammps 2>&1 | noise)"
+case "$out" in *"not declared by the case"*) bad "13b: a declared variable was reported as undeclared: $out" ;;
+               *) ok "13b: a variable the case declares may also be set in the shell" ;; esac
+out="$(HPCPERF_EXACA_SEED=3 python3 "$TOOLS/cases.py" resolve --level 3 exaca 2>&1 | noise)"
+case "$out" in *"not declared by the case"*HPCPERF_EXACA_SEED*) ok "13c: an undeclared Level 3 input set in the shell is refused" ;;
+               *) bad "13c: undeclared HPCPERF_EXACA_SEED not refused: $out" ;; esac
+
+# synthetic evidence of one clean run per application (the lines each extractor anchors on,
+# numbers taken from real 2-GPU runs on dgx003); the expected region time follows the definition
+python3 - <<'PY'
+import os
+T = os.environ["TMP"] + "/l3"
+def w(app, rel, text):
+    p = os.path.join(T, app, rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    open(p, "w").write(text)
+w("lammps", "run.log", """Loop time of 0.5 on 2 procs for 10 steps with 32000 atoms
+
+Loop time of 0.0709434 on 2 procs for 100 steps with 32000 atoms
+
+Performance: 608936.013 tau/day, 1409.574 timesteps/s, 45.106 Matom-step/s
+99.1% CPU use with 2 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0011158  | 0.0011724  | 0.0012289  |   0.2 |  1.65
+Comm    | 0.065329   | 0.065331   | 0.065334   |   0.0 | 92.09
+Other   |            | 0.0007312  |            |       |  1.03
+
+Nlocal:  16000 ave
+""")
+w("sparta", "run.log", """Loop time of 0.0529465 on 2 procs for 30 steps with 10000 particles
+
+Loop time of 0.0411685 on 2 procs for 100 steps with 10000 particles
+
+Performance: 2429.041 timesteps/s, 24.290 Mparticle-step/s
+""")
+w("warpx", "run.log", """STEP 1 ends. TIME = 1.7e-15 DT = 1.7e-15
+Evolve time = 0.01901006 s; This step = 0.01901006 s; Avg. per step = 0.01901006 s
+STEP 2 ends. TIME = 3.4e-15 DT = 1.7e-15
+Evolve time = 0.0242073 s; This step = 0.00519724 s; Avg. per step = 0.01210365 s
+Total Time                     : 0.211231649
+""")
+w("nyx", "run.log", """[STEP 1] Coarse TimeStep time: 0.044260893
+checkPoint() time = 0.010267096 secs.
+Write plotfile time = 0.009074775  seconds
+[STEP 2] Coarse TimeStep time: 0.035151909
+Run time = 0.467080722
+""")
+w("nekrs", "run.log", """initialization took 43.4189 s
+>>> runtime statistics (step= 30  totalElapsed= 44.2363s):
+name                    time          abs%  rel%  calls
+  solve                 8.17425e-01s  100.0
+    min                 2.55411e-02s
+    max                 6.43613e-02s
+    flops/rank          2.60077e+10
+    checkpointing       8.04749e-03s   1.0        3
+    pressureSolve       4.86723e-01s  59.5        30
+      preconditioner    4.34207e-01s  53.1  89.2  121
+
+occa max memory usage:     32311330 bytes
+""")
+w("specfem3d", "run.log", "solver done\n")
+w("specfem3d", "app/smoke.np2/OUTPUT_FILES/output_solver.txt", """ Elapsed time in seconds =    7.6978100000002492E-004
+ Time steps done =            5  out of         5000
+ Elapsed time in seconds =   0.56034900799999998
+ Time steps done =         5000  out of         5000
+ Writing the seismograms in parallel took    3.92535515E-02  seconds
+ Total elapsed time in seconds =   0.59985799399999995
+""")
+w("exaca", "run.log", """Time spent initializing data = 0.0388126 s
+Time spent performing CA calculations = 1.6139 s
+Time spent collecting and printing output data = 0.0607356 s
+Max/min rank time in CA cell capture = 0.760942 / 0.734621 s
+""")
+w("qmcpack", "run.log", """Stack timer profile
+Timer         Inclusive_time  Exclusive_time  Calls       Time_per_call
+Total          289.5648     0.9414              1     289.564786534
+  DMCBatched   277.1801     1.1801              1     277.180135472
+    DMCBatched::Production   270.0000     2.0000              1     270.000000000
+      DMCBatched::RunSteps   260.0000     10.0000           2500     0.104000000
+    DMCBatched::Startup   6.0000     6.0000              1     6.000000000
+  Startup        0.5827     0.5827              1       0.582700529
+  VMCBatched    10.8606    0.8606              1      10.860585595
+    VMCBatched::Production   10.0000     10.0000              1     10.000000000
+
+QMCPACK execution completed successfully
+""")
+w("dftfe", "run.log", """Wall time for the above scf iteration: 8.87e-01 seconds
+Wall time for the above scf iteration: 2.51e-01 seconds
+---------------MD STEP 0 ------------------
+Time taken for updateAtomPositionsAndMoveMesh: 17.94307
+Wall time for the above scf iteration: 0.38868 seconds
+Wall time for the above scf iteration: 0.25 seconds
+---------------MD STEP 1 ------------------
+Time taken for updateAtomPositionsAndMoveMesh: 17.75514
+Wall time for the above scf iteration: 0.3 seconds
+---------------MD STEP 2 ------------------
+DFT-FE Program ends. Elapsed wall time since start of the program: 218.90105 seconds.
+""")
+w("cp2k", "run.log", "cp2k done\n")
+w("cp2k", "app/h2o64.smoke.np2.t8/H2O-64-1.ener", """#     Step Nr.          Time[fs]        Kin.[a.u.]          Temp[K]            Pot.[a.u.]        Cons Qty[a.u.]        UsedTime[s]
+         0            0.000000         0.272187779       300.000000000     -1101.031005889     -1100.758818110         0.000000000
+         1            0.500000         0.273748897       301.720633893     -1101.039289568     -1100.765540671        17.978639553
+         2            1.000000         0.273748897       301.720633893     -1101.039289568     -1100.765540671         2.260197000
+         3            1.500000         0.273748897       301.720633893     -1101.039289568     -1100.765540671         2.291654000
+""")
+PY
+pycheck "13d: every extractor reads its application's own timer from synthetic evidence" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import apptimers
+T = os.environ["TMP"] + "/l3"
+want = {"lammps": (0.0709434, 100), "sparta": (0.0411685, 100), "warpx": (0.0242073, 2),
+        "nyx": (0.044260893 + 0.035151909, 2), "nekrs": (0.817425 - 0.00804749, 30),
+        "specfem3d": (0.560349008, 5000), "exaca": (1.6139, None), "cp2k": (2.260197 + 2.291654, 2),
+        "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2)}
+bad = []
+for app, (wall, steps) in want.items():
+    try:
+        r = apptimers.extract(app, os.path.join(T, app))
+    except Exception as exc:
+        bad.append(f"{app}: {exc}")
+        continue
+    if abs(r["wall_s"] - wall) > 1e-9 or r["steps"] != steps:
+        bad.append(f"{app}: got {r['wall_s']} / {r['steps']}, want {wall} / {steps}")
+r = apptimers.extract("nekrs", os.path.join(T, "nekrs"))
+if abs(r["excluded_s"] - 0.00804749) > 1e-12 or r["setup_s"] != 43.4189:
+    bad.append(f"nekrs excluded/setup {r['excluded_s']} {r['setup_s']}")
+r = apptimers.extract("nyx", os.path.join(T, "nyx"))
+if abs(r["excluded_s"] - (0.010267096 + 0.009074775)) > 1e-12:
+    bad.append(f"nyx excluded {r['excluded_s']}")
+missing = sorted(set(apptimers.TIMERS) - set(want))
+if missing:
+    bad.append(f"no synthetic evidence for {missing}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "13e: a run without the timer fails loudly (no fallback to the process wall clock)" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import apptimers
+d = os.environ["TMP"] + "/l3empty"
+os.makedirs(d, exist_ok=True)
+open(os.path.join(d, "run.log"), "w").write("the application printed nothing useful\nLoop time of garbage\n")
+bad = []
+for app in sorted(apptimers.TIMERS):
+    try:
+        r = apptimers.extract(app, d)
+        bad.append(f"{app}: returned {r['wall_s']} from a log without its timer")
+    except apptimers.TimerMissing:
+        pass
+    except Exception as exc:
+        bad.append(f"{app}: {type(exc).__name__} instead of TimerMissing: {exc}")
+# an incomplete SPECFEM run (last report before the final step) is not a result
+p = os.path.join(d, "app", "r", "OUTPUT_FILES")
+os.makedirs(p, exist_ok=True)
+open(os.path.join(p, "output_solver.txt"), "w").write(
+    " Elapsed time in seconds =   0.5\n Time steps done =         500  out of         5000\n")
+try:
+    apptimers.extract("specfem3d", d)
+    bad.append("specfem3d: incomplete run accepted")
+except apptimers.TimerMissing:
+    pass
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "13f: every timer definition cites source lines that exist in the frozen tree (when materialized)" <<'PY'
+import os, re, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import apptimers
+R = os.environ["REPO"]
+bad, checked = [], 0
+for app, t in apptimers.TIMERS.items():
+    src = os.path.join(R, "level3", app, "src")
+    if not os.path.isdir(src):
+        continue
+    for w in t.where:
+        path, _, lines = w.partition(":")
+        full = os.path.normpath(os.path.join(src, path))
+        if not os.path.isfile(full):
+            bad.append(f"{app}: {w}: no such file")
+            continue
+        n = sum(1 for _ in open(full, errors="replace"))
+        last = max(int(x) for x in re.findall(r"\d+", lines)) if lines else 0
+        if last > n:
+            bad.append(f"{app}: {w}: file has {n} lines")
+        checked += 1
+    if not (t.definition and t.reduction and t.device_sync):
+        bad.append(f"{app}: incomplete definition")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+out="$(bash "$TOOLS/measure_level3.sh" --dry-run --collector none lammps 2>&1 | noise)"
+if echo "$out" | /usr/bin/grep -q 'HPCPERF_L3_RUN_SUBDIR=run.timing-' && ! echo "$out" | /usr/bin/grep -q 'HPCPERF_ROI_LOG' \
+   && echo "$out" | /usr/bin/grep -q "application's own timer" && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=2'; then
+    ok "13g: a Level 3 dry run uses its own run-directory tree, no ROI log, 2 GPUs"
+else bad "13g: level 3 dry run: $out"; fi
+
+# summarize: a synthetic Level 3 raw run -> an app_timer record; a run without its timer -> app_timer_missing
+mkraw3() {   # mkraw3 <run_id> <with timer: 1|0>
+    local d="$TMP/raw3/level3/lammps/strong.s8/$1"
+    mkdir -p "$d/clean.0"
+    cp "$TMP/l3/lammps/run.log" "$d/clean.0/run.log"
+    [ "$2" = 1 ] || echo "nothing" > "$d/clean.0/run.log"
+    echo "hpcperf-launch: audit summary: 2 verified, 0 mismatch, 0 unverified (of 2 ranks)" >> "$d/clean.0/run.log"
+    echo "start_ns=1000000000 end_ns=5000000000 rc=0" > "$d/clean.0/run.txt"
+    printf '%s\n' "schema=hpcperf-timing-raw-2" "run_id=$1" "utc=2026-09-29T00:00:00Z" "level=3" "app=lammps" \
+        "case=strong.s8" "backend=CUDA" "gpus=2" "case_env=HPCPERF_SCALE_MODE=strong" "argv=bash level3/lammps/run.sh CUDA" \
+        "fom_name=Performance" "fom_unit=Matom-step/s" "fom_better=higher" "fom_source=stdout" \
+        "fom_regex=^Performance: .*?([0-9.eE+-]+) Matom-step/s" "verify_vs_roi=none" "nvtx_roi=-" "region=app_timer" \
+        "warmup_runs=0" "clean_runs=1" "profiled_runs=0" "collector=none" "platform_id=test-platform" "status=ok" > "$d/run_meta.txt"
+}
+mkraw3 20260929T000000Z-1 1; mkraw3 20260929T000001Z-2 0
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw3" --out-root "$TMP/res4" > "$TMP/sum4.log" 2>&1
+pycheck "13h: summarize turns Level 3 evidence into the common record (roi.source app_timer, caveats, CSV, page)" <<'PY'
+import csv, glob, json, os
+T = os.environ["TMP"]
+bad = []
+recs = {os.path.basename(p): json.load(open(p)) for p in glob.glob(T + "/res4/level3/lammps/strong.s8/*.json")}
+a, b = recs.get("20260929T000000Z-1.json"), recs.get("20260929T000001Z-2.json")
+if not a or not b:
+    bad.append(f"records: {sorted(recs)} ({open(T + '/sum4.log').read()[-300:]})")
+else:
+    R = a["roi"]
+    if a["status"] != "ok" or R["source"] != "app_timer" or abs(R["wall_s"] - 0.0709434) > 1e-12 or R["steps"] != 100:
+        bad.append(f"ok record: {a['status']} {R.get('source')} {R.get('wall_s')} {R.get('steps')}")
+    if not R.get("definition") or not R.get("where") or a["app_timer"] is not None:
+        bad.append("definition / where missing, or app_timer filled for Level 3")
+    if a["fom"]["value"] != 45.106:
+        bad.append(f"fom {a['fom']}")
+    if not any("No numerical acceptance" in c for c in a["caveats"]):
+        bad.append("no caveat for an input without numerical acceptance")
+    if not any("not device-synchronized" in c for c in a["caveats"]):
+        bad.append("LAMMPS section caveat missing")
+    if abs(a["context"]["outside_region_s"] - (4.0 - 0.0709434)) > 1e-9:
+        bad.append(f"outside_region_s {a['context'].get('outside_region_s')}")
+    if b["status"] != "app_timer_missing":
+        bad.append(f"record without timer has status {b['status']}")
+rows = list(csv.DictReader(open(T + "/res4/summary_level3.csv")))
+if len(rows) != 2 or {r["roi_source"] for r in rows} != {"app_timer"}:
+    bad.append(f"summary_level3.csv rows {len(rows)}")
+page = open(T + "/res4/report/index.html").read()
+md = open(T + "/res4/report/README.md").read()
+if 'data-level="3"' not in page or "## Level 3" not in md or "strong.s8" not in md:
+    bad.append("page / README has no Level 3")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+# an application the table does not profile by default: skipped with its reason, --profile-all overrides
+out="$(bash "$TOOLS/measure_level3.sh" --dry-run qmcpack 2>&1 | noise)"
+out2="$(bash "$TOOLS/measure_level3.sh" --dry-run --profile-all qmcpack 2>&1 | noise)"
+if echo "$out" | /usr/bin/grep -q 'profiled=0 collector=none' && echo "$out" | /usr/bin/grep -q 'skipped by default' \
+   && echo "$out2" | /usr/bin/grep -q 'profiled=1' && ! echo "$out2" | /usr/bin/grep -q 'skipped by default'; then
+    ok "13i: QMCPACK is not profiled by default (reason shown), --profile-all profiles it"
+else bad "13i: profile default: $out // $out2"; fi
+d="$TMP/raw3/level3/lammps/strong.s8/20260929T000002Z-3"
+mkdir -p "$d"; cp -r "$TMP/raw3/level3/lammps/strong.s8/20260929T000000Z-1/clean.0" "$d/"
+sed -e 's/20260929T000000Z-1/20260929T000002Z-3/' "$TMP/raw3/level3/lammps/strong.s8/20260929T000000Z-1/run_meta.txt" > "$d/run_meta.txt"
+echo "profile_skipped=no (a planted reason for the test)" >> "$d/run_meta.txt"
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw3" --out-root "$TMP/res5" --run-id 20260929T000002Z-3 --no-report > /dev/null 2>&1
+if /usr/bin/grep -q 'Not profiled by default.*a planted reason for the test' "$TMP/res5/level3/lammps/strong.s8/20260929T000002Z-3.json" 2>/dev/null; then
+    ok "13j: a record the table kept from the profiler carries the table's reason"
+else bad "13j: no 'not profiled by default' caveat with the reason"; fi
 
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"

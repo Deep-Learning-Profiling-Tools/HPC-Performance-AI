@@ -47,6 +47,7 @@ The requirements that shaped the design:
 | Measurement identity is **(level, app, case, platform)**; inputs are declared in case tables; an input variable set in the caller's shell but not declared is **refused** | Every run starts from `env -i`, so a stray variable would be dropped silently and the default input measured under another name | Adding an input is one table row; sweeps (`NAME=a\|b`) expand to one case per value |
 | Every run starts from **`env -i` + allow-list + credential deny rule** | Profilers store the whole process environment (nsys: 349 variables incl. session tokens from a login shell) | Only variable names are ever read back from a trace; tests plant credentials |
 | **Failures are loud**: a clean run that writes no ROI record is `roi_missing` (FAIL); every limitation of a record is a sentence in `caveats` | A silent fallback to the process wall clock would be a wrong label that looks right | Onboarding an application without markers fails the tests and the measurement |
+| **Level 3: the application's own timer is the region** (no markers), defined once per application with source citations in `apptimers.py`; same record schema, `roi.source = "app_timer"` | Full production codes cannot reasonably be marked by hand, and each already times its loop; choosing WHICH timer by the marker placement rule keeps the label comparable | A missing timer is `app_timer_missing` (FAIL); the profiled run is whole-process context unless the application emits an NVTX range for its loop (WarpX) |
 | Outputs are **deterministic** and raw data **never enters git** | Reviewable diffs; no measurement noise in the repository | The only committed measurement output is the rendered page `docs/timing/` (`report.py --publish`, deliberate) |
 
 ## 3. How the pieces fit
@@ -83,7 +84,8 @@ The requirements that shaped the design:
 | `roi/hpcperf_roi.f90`, `roi/hpcperf_roi_fortran.c` | Fortran module + C entry points (used by GAMESS RI-MP2) |
 | `roi/hpcperf_roi.py` | Python twin with the same log format (the TPU / XLA path) |
 | `roi/hpcperf_vendor/nvtx3/` | NVTX v3 headers copied verbatim from CUDA 13.2 (Apache-2.0, `SHA256SUMS`) |
-| `measure_level1.sh`, `measure_level2.sh` | front-ends: option parsing, then `lib/engine.sh` |
+| `measure_level1.sh`, `measure_level2.sh`, `measure_level3.sh` | front-ends: option parsing, then `lib/engine.sh` |
+| `apptimers.py` | Level 3: per application, which printed timer is the region, its definition, source lines, rank reduction and device synchronization, the extractor, and the files to copy out of the run directory |
 | `lib/engine.sh` | clean environment, warm-up / clean / profiled runs, raw layout, automatic summarize |
 | `lib/collectors.sh` | measurement side of each collector, per-backend environment allow-list |
 | `collectors/` | canonical model + adapters: `nvidia_nsys` (verified), `none`, `amd_rocprofv3` and `tpu_xprof` (contracts) |
@@ -95,7 +97,7 @@ The requirements that shaped the design:
 | `gen_cases.py` | generates `cases/level1.tsv` from ctest (one case per ctest test) |
 | `summarize.py` | raw data -> JSON per run, CSV per level, then the page |
 | `report.py`, `report_assets/` | the interactive page and its Markdown twin |
-| `tests/run_all.sh` | 44 CPU-only checks |
+| `tests/run_all.sh` | 54 CPU-only checks |
 | `README.md`, `SCHEMA.md`, `roi/README.md`, this file | documentation |
 
 Removed: the first-generation whole-process tables `cases.tsv` / `cases_l2.tsv` and
@@ -126,7 +128,18 @@ their schema (`hpcperf-timing-1`).
   records upstream's checksums).
 * `level2/README.md`: the runtime-measurement section.
 
-### 4.4 Elsewhere
+### 4.4 Level 3 (`level3/`)
+
+* No markers. `qmcpack/run.sh` passes `--enable-timers=$HPCPERF_QMCPACK_TIMERS` (default
+  `medium`: the coarse default has no Production timer) and records it in the manifest;
+  `dftfe/run.sh` sets `VERBOSITY = $HPCPERF_DFTFE_VERBOSITY` (default 1, the decks ship 0)
+  in its copy of the deck and records the change in `deck.diff` and the manifest. Both
+  are output-only; `validate.sh` passes with them at 1 and 2 GPUs.
+* `cases/level3_apps.tsv`, `cases/level3_cases.tsv`: the applications and the timing
+  inputs (larger than the smoke inputs; `acceptance` says whether `validate.sh` checks
+  that input).
+
+### 4.5 Elsewhere
 
 * `CLAUDE.md`: the `tools/timing` working notes and the rule on what may be committed.
 * `docs/timing/`: the published page (a rendered snapshot; regenerate, do not edit).
@@ -164,6 +177,22 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
    not see the header, and for a `run.sh` without a case row.
 6. Measure. A run without an ROI record is `roi_missing` (FAIL).
 
+### 5.2b Adding a Level 3 application
+
+1. Pick the application's own timer for its loop by the placement rule (loop in, set-up,
+   warm-up step and final output out) and read its implementation: what it covers, how
+   ranks are combined, whether it waits for the device.
+2. Add a `Timer` to `apptimers.py`: the extractor (raise `TimerMissing`, never guess),
+   the files to copy out of the run directory, the definition, the source lines, the
+   reduction, the device synchronization, and a caveat if a sub-timer is misleading.
+   If the timer has to be switched on, do it in `run.sh` as an output-only variable and
+   re-run `validate.sh`.
+3. A row in `cases/level3_apps.tsv` (FOM if it prints one, `nvtx_roi` if it emits an
+   NVTX range around its loop, `profile = no (<reason>)` if its profiled run is not worth
+   its cost -- QMCPACK) and a case in `cases/level3_cases.tsv` with its `acceptance`.
+4. Synthetic evidence for the extractor in `tests/run_all.sh` (13d), then
+   `bash tools/timing/tests/run_all.sh` (13f checks the cited source lines exist).
+
 ### 5.3 Adding an input
 
 * A benchmark with an `inputs.yaml`: add the input there (the registry is the source of truth) and
@@ -200,6 +229,8 @@ hardware; the page then shows the platform as a column and its device values as 
 |---|---|
 | `tools/timing/measure_level1.sh --build-root build/gcc13 all\|<bm>\|<bm>/<case>` | Level 1: 1 warm-up + 5 clean + 1 profiled per case; options `--clean-runs`, `--warmup`, `--no-profile`, `--collector`, `--backend`, `--keep-verify`, `--raw-root`, `--results-root`, `--no-summary`, `--dry-run` |
 | `tools/timing/measure_level2.sh all\|<app>\|<app>/<case>` | Level 2: 1 clean + 1 profiled per case; `--env-script` (or `HPCPERF_TIMING_ENV_SCRIPT`) and the same options |
+| `tools/timing/measure_level3.sh all\|<app>\|<app>/<case>` | Level 3: the same protocol and options; the region is the application's own timer; QMCPACK is not profiled unless `--profile-all` |
+| `python3 tools/timing/apptimers.py describe\|extract <app> <dir>` | Level 3 timer definitions / extraction from one run's evidence |
 | `python3 tools/timing/summarize.py [--run-id ID] [--csv-only] [--no-report]` | raw -> JSON / CSV / page (the front-ends run it on their own run) |
 | `python3 tools/timing/report.py [--publish \| --out DIR]` | the page; `--publish` writes `docs/timing/` |
 | `python3 tools/timing/cases.py check \| resolve --level N ... \| allowed-env <app>` | validate / resolve the case tables |
@@ -235,8 +266,9 @@ hardware; the page then shows the platform as a column and its device values as 
 * **UNVERIFIED**: HIP/ROCm builds and the AMD collector (no ROCm on the node); TPU
   (interface only, by decision); the multi-process ROI (implemented; the allocation
   exposes one GPU, so Level 2 ran at one rank); hardware counters (`ncu`) are not
-  collected; Level 3 is not covered (its run path is not yet wrapped in the clean
-  environment).
+  collected. Level 3 is measured with the applications' own timers (2 GPUs); its device
+  picture is whole-process except for WarpX, and 8 of its 10 timing inputs have no
+  numerical acceptance (completeness runs, caveated).
 * **Decisions for the maintainers**:
   - Level 2 uses one clean run per case; quicksilver's ROI varies 4-7% run to run (its
     own timers agree), so `--clean-runs 3` or `5` may be worth the cost.

@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
-"""Render the Level 1 / Level 2 timing results as an interactive web page (+ Markdown twin).
+"""Render the Level 1 / 2 / 3 timing results as an interactive web page (+ Markdown twin).
 
     tools/timing/report.py                               # results/timing  ->  results/timing/report/
     tools/timing/report.py --publish                     # results/timing  ->  docs/timing/ (tracked)
     tools/timing/report.py --results-root DIR [--results-root DIR2 ...] [--history-page OLD.html] [--out DIR | --publish]
+
+The page (index.html) lists the applications of each level. Choosing one shows its
+inputs (the cases of tools/timing/cases/ plus anything measured) against the platforms
+(every platform with a measurement or a conformance record); a combination that was
+never measured is shown as null. Only after an application, an input and a platform
+are chosen does it show that measurement: ROI time and runs, the process breakdown,
+device activity inside the ROI per category, the top operations, runtime API calls,
+the FOM, the application's own timer, the launcher audit, the caveats, the input as
+run, and the run history of that combination. Level 3 has no markers: its measurement
+shows the application's own timer as the timed region, with its definition (what it
+includes, the source lines, how ranks are combined, whether it waits for the device), the
+application's sub-timers, and the device activity of the whole process.
+
+README.md next to it is the plain-text twin the repository browser displays: the
+latest successful run of every measured (case, platform) as one table per level.
 
 Two kinds of results are rendered, both from the same records:
 
@@ -57,7 +72,7 @@ PUBLISH_DIR = os.path.join(REPO, "docs", "timing")
 ASSETS = os.path.join(HERE, "report_assets")
 PLATFORMS = os.path.join(HERE, "platforms")
 TOP_OPS = 15
-LEVEL_NAMES = {1: "Level 1", 2: "Level 2"}
+LEVEL_NAMES = {1: "Level 1", 2: "Level 2", 3: "Level 3"}
 
 
 # ----------------------------------------------------------------- inputs
@@ -99,7 +114,7 @@ def load(results_root):
 
 def defined_inputs():
     """{level: {app: {case: {"env", "args", "gpus"}}}} from the case tables, and {app: suite}."""
-    out, suites = {1: {}, 2: {}}, {}
+    out, suites = {1: {}, 2: {}, 3: {}}, {}
     try:
         rows, apps = case_tables.level1_rows(None, "CUDA")
         suites = {a: r["suite"] for a, r in apps.items()}
@@ -116,6 +131,13 @@ def defined_inputs():
         for r in rows:
             argv = shlex.split(r["argv"])
             out[2][r["app"]][r["case"]] = {"env": r["env"], "args": " ".join(shlex.quote(a) for a in argv[3:]),
+                                           "gpus": r["gpus"]}
+        rows, apps = case_tables.level3_rows("CUDA")
+        for a in apps:
+            out[3].setdefault(a, {})
+        for r in rows:
+            argv = shlex.split(r["argv"])
+            out[3][r["app"]][r["case"]] = {"env": r["env"], "args": " ".join(shlex.quote(a) for a in argv[3:]),
                                            "gpus": r["gpus"]}
     except case_tables.CaseError:
         pass
@@ -167,19 +189,22 @@ def compact(rec):
         "run_id": rec["run_id"], "utc": rec.get("utc"), "status": rec["status"],
         "roi": {k: R.get(k) for k in ("wall_s", "runs_s", "wall_s_min", "wall_s_max", "wall_s_stddev", "entries",
                                       "excluded_s", "processes", "imbalance_s", "profiled_wall_s",
-                                      "profiler_inflation")},
+                                      "profiler_inflation", "source", "definition", "where", "reduction",
+                                      "device_sync", "steps", "setup_s", "parts")},
         "device": rec.get("device"),
         "runtime_api": rec.get("runtime_api"),
         "ops": (rec.get("ops") or [])[:TOP_OPS], "ops_total": len(rec.get("ops") or []),
+        "ops_scope": rec.get("ops_scope") or "roi",
         "context": {"process_wall_s": ctx.get("process_wall_s"), "pre_roi_s": ctx.get("pre_roi_s"),
-                    "post_roi_s": ctx.get("post_roi_s"),
-                    "whole": {k: (ctx.get("whole_process") or {}).get(k) for k in ("busy_s", "compute_ops")}},
+                    "post_roi_s": ctx.get("post_roi_s"), "outside_region_s": ctx.get("outside_region_s"),
+                    "profiled_process_wall_s": ctx.get("profiled_process_wall_s"),
+                    "whole": ctx.get("whole_process") or {}},
         "fom": rec.get("fom"), "app_timer": rec.get("app_timer"),
         "audit_ok": (rec.get("launcher") or {}).get("audit_ok"),     # the raw audit line names the node: not copied
         "measurement": {"protocol": meas.get("protocol"), "collector": meas.get("collector"),
                         "skip_verify": meas.get("skip_verify"), "verify_vs_roi": meas.get("verify_vs_roi"),
                         "roi_excludes": meas.get("roi_excludes"), "backend": meas.get("backend"),
-                        "gpus": meas.get("gpus")},
+                        "gpus": meas.get("gpus"), "nvtx_roi": meas.get("nvtx_roi")},
         "inputs": {"declared_env": inp.get("declared_env"),
                    "argv": (procs[0].get("argv") if procs else None) or inp.get("declared_argv"),
                    "processes": len(procs)},
@@ -335,7 +360,7 @@ def render_html(bundle):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HPC-Performance-AI Timing</title>
-<meta name="description" content="Region-of-interest timing of the HPC-Performance-AI Level 1 and Level 2 suites">
+<meta name="description" content="Region-of-interest timing of the HPC-Performance-AI Level 1, 2 and 3 suites">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -348,13 +373,15 @@ def render_html(bundle):
   <div class="eyebrow">tools/timing &middot; latest measurement {as_of}</div>
   <h1>Timing results</h1>
   <p class="sub">Region-of-interest (ROI) timing of the Level&nbsp;1 benchmarks and the Level&nbsp;2 mini-applications:
-  the computation between the markers in each source, without start-up, set-up, warm-up and verification. Choose an
-  application, then an input and a platform.</p>
+  the computation between the markers in each source, without start-up, set-up, warm-up and verification. The
+  Level&nbsp;3 applications carry no markers: their timed region is the time-step loop as the application times it
+  itself. Choose an application, then an input and a platform.</p>
 </header>
 <noscript><p class="lede">This page needs JavaScript. README.md next to it has the same results as plain tables.</p></noscript>
 {campaign_nav}<nav class="tabs levels" role="tablist" aria-label="Level">
   <button type="button" role="tab" id="tab-1" data-level="1" aria-selected="true">Level 1 <span>{n_apps.get("1", 0)} benchmarks</span></button>
   <button type="button" role="tab" id="tab-2" data-level="2" aria-selected="false">Level 2 <span>{n_apps.get("2", 0)} applications</span></button>
+  <button type="button" role="tab" id="tab-3" data-level="3" aria-selected="false">Level 3 <span>{n_apps.get("3", 0)} applications</span></button>
 </nav>
 <div class="board">
   <aside class="apps">
@@ -524,7 +551,8 @@ def render_md_registry(c):
 
 def render_md(bundle, out_dir):
     out = ["# Timing results", "",
-           "Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-applications, generated by "
+           "Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-applications and the applications' "
+           "own loop timers for Level 3, generated by "
            "tools/timing/report.py from the timing records (the same data as [index.html](index.html), which adds the "
            "per-input detail and history). `null`: not observable or not collected.", ""]
     for i, c in enumerate(bundle["campaigns"]):
@@ -577,6 +605,46 @@ def render_md_cases(data):
                     row += [str(len(cell["history"])), dl]
                     out.append("| " + " | ".join(row) + " |")
         out.append("")
+    out += render_md_l3(data)
+    return out
+
+
+def render_md_l3(data):
+    apps = data["levels"].get("3", [])
+    out = ["## Level 3", "",
+           "No markers: the timed region is the application's own timer for its time-step loop "
+           "(`tools/timing/apptimers.py` defines it per application). Device columns are for the whole process "
+           "unless the application emits an NVTX range for its loop.", ""]
+    head = ["application", "input", "platform", "timed region", "spread", "steps", "per step",
+            "region share of process", "device busy (whole process)", "profiler x", "FOM", "runs", "vs previous"]
+    out.append("| " + " | ".join(head) + " |")
+    out.append("|" + "|".join("---" if i < 3 else "--:" for i in range(len(head))) + "|")
+    for a in apps:
+        for c in a["cases"]:
+            for pid, cell in sorted(c["cells"].items()):
+                if cell is None:
+                    continue
+                run = cell["run"]
+                R, ctx = run["roi"], run["context"]
+                wall, proc = R.get("wall_s"), ctx.get("process_wall_s")
+                runs = R.get("runs_s") or []
+                cv = (R["wall_s_stddev"] / wall) if (wall and R.get("wall_s_stddev") is not None
+                                                    and len(runs) > 1) else None
+                steps = R.get("steps")
+                whole = ctx.get("whole") or {}
+                prev = cell["prev"]
+                dl = "first run" if not prev or not wall else f"{100 * (wall - prev['roi_s']) / prev['roi_s']:+.1f}%"
+                status = "" if cell["latest_status"] == "ok" else f" (latest: {cell['latest_status']})"
+                out.append("| " + " | ".join([
+                    md_cell(a["app"]) + status, md_cell(c["case"]), md_cell(pid),
+                    fmt_plain(wall) if run["status"] == "ok" else run["status"], md_pct(cv, 1),
+                    "null" if steps is None else f"{steps:,}",
+                    fmt_plain(wall / steps) if (wall and steps) else "null",
+                    md_pct(wall / proc if (wall and proc) else None, 1),
+                    md_pct(whole.get("busy_frac_of_process"), 0, cap=True),
+                    "null" if R.get("profiler_inflation") is None else f"{R['profiler_inflation']:.2f}",
+                    md_cell(fom_plain(run.get("fom"))), str(len(cell["history"])), dl]) + " |")
+    out.append("")
     return out
 
 

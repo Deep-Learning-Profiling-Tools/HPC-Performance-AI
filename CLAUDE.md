@@ -194,10 +194,10 @@ level3/<app>/
   deny-rule that beats the allow-list): the login shell carries credentials that
   must never land in a `declare -x` dump or a profiler report. Never print a full
   `env` into a log; report variable names only. For **Level 3** the common
-  launcher/run.sh path is still NOT wrapped (follow-up): do not profile a Level 3
-  science run with nsys/ncu without the wrapper. **Level 1/2 timing is wrapped**
-  by `tools/timing/` (see below), which carries its own self-contained allow-list
-  plus deny rule and does not use the Level 3 helpers.
+  launcher/run.sh path itself is still NOT wrapped: profile a Level 3 run only
+  through `tools/timing/measure_level3.sh` (its engine starts every run from its own
+  self-contained allow-list plus deny rule; it does not use the Level 3 helpers),
+  never with a bare nsys/ncu around run.sh.
 - Queues: run every step through `l3_run_recorded <rc-file> <label> -- cmd`
   (records the exit code, never aborts), classify with `level3/tools/l3_verdict.py`
   (PASS / PENDING / UNSUPPORTED_LAYOUT / FAIL / MISSING). Exit 3 and 4 are never
@@ -221,7 +221,7 @@ Level 2 specifics (mini-apps; the tree above is Level 3's):
   `mpirun -np 2` themselves need the PRRTE slot relaxation as a command-local
   `env` (Branson pattern), never an export.
 
-Runtime measurement (Level 1 and Level 2) lives in `tools/timing/`, self-contained
+Runtime measurement (Level 1, 2 and 3) lives in `tools/timing/`, self-contained
 (bash + python stdlib + an optional profiler; it reads nothing from `level2/tools` or `level3/`).
 Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
 - The measured time is the **ROI** (region of interest) the sources mark with
@@ -233,7 +233,20 @@ Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
   no-op unless `HPCPERF_ROI_LOG` is set or a profiler is injected, so ctest and
   validate.sh are unchanged. Placement rule: `tools/timing/roi/README.md`. A new
   app without markers fails `tools/timing/tests/run_all.sh` and measures `roi_missing` (FAIL).
-- Protocol: Level 1 1 warm-up + 5 clean + 1 profiled; Level 2 1 clean + 1 profiled.
+- **Level 3 has no markers**: its measured region is each application's OWN loop
+  timer, defined with source citations in `tools/timing/apptimers.py` (same record
+  schema, `roi.source = "app_timer"`; a missing timer is `app_timer_missing`, never
+  the process wall clock). QMCPACK runs with `--enable-timers=medium`, DFT-FE with
+  `VERBOSITY = 1` (both output-only, `validate.sh` PASS at 1/2 GPUs; DFT-FE's
+  `REPRODUCIBLE OUTPUT = true` must stay -- it also fixes numerics). Timing inputs
+  (`cases/level3_cases.tsv`, 2 GPUs) are larger than smoke; only QMCPACK's and
+  DFT-FE's have numerical acceptance (`verify_vs_roi = none` + caveat for the rest).
+  Without markers the profiled run is whole-process context, except WarpX (its
+  TinyProfiler's NVTX range `WarpX::Evolve()`). QMCPACK is NOT profiled by default
+  (`cases/level3_apps.tsv` profile = no: 24 GB trace, ~55 of the sweep's 100 min for a
+  5-min run; `--profile-all` overrides). Runs write under
+  `build/level3/<app>/<profile>/run.timing-<run id>-*`.
+- Protocol: Level 1 1 warm-up + 5 clean + 1 profiled; Level 2 and 3 1 clean + 1 profiled.
   The headline `roi_wall_s` comes from the CLEAN runs (the markers' own log, no
   profiler); the profiled run only gives device activity clipped to the same
   markers. FOMs (16 of 24 Level 2 apps; the other 8 BLANK) are read from the clean run.
@@ -395,8 +408,9 @@ Build systems
   UNVERIFIED); QMCPACK per-walker device memory / cuSOLVER (<= 300
   walkers/GPU); numerical acceptance of strong/weak runs; multi-node and HIP;
   2+/4-GPU validation of Comb/Quicksilver/SW4lite/GAMESS RI-MP2 and multi-GPU
-  decks for hipBone/miniWeather; wrapping the Level 3 run/profiler path in the
-  clean environment (Level 1/2 is done, `tools/timing/`); Level 2 multi-rank
+  decks for hipBone/miniWeather; wrapping the common Level 3 run.sh/launcher path
+  itself in the clean environment (Level 1/2/3 timing and profiling go through
+  `tools/timing/`, which is wrapped); Level 2 multi-rank
   timing (this allocation exposes one GPU, so it is UNVERIFIED); the site's device-buffer (smcuda) MPI path that hangs Tpetra
   (MiniEM runs with `TPETRA_ASSUME_GPU_AWARE_MPI=0`).
 

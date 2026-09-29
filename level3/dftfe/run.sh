@@ -19,7 +19,12 @@
 #                    GPU); upstream reference accuracyBenchmarks/outputLLZO. smoke/strong verbatim only
 #                    (a heavier fixed-size strong-scaling case).
 # Controls: HPCPERF_GPUS=N|all, HPCPERF_CPUS_PER_RANK (CPU cores bound per rank, default 4; threads
-#           stay 1), HPCPERF_SCALE_MODE=smoke|strong|weak, HPCPERF_DFTFE_PROFILE, HPCPERF_DRY_RUN=1
+#           stay 1), HPCPERF_SCALE_MODE=smoke|strong|weak, HPCPERF_DFTFE_PROFILE, HPCPERF_DRY_RUN=1,
+#           HPCPERF_DFTFE_VERBOSITY (default 1; the decks ship 0): output only -- 1 prints DFT-FE's own
+#           per-SCF-iteration wall time ("Wall time for the above scf iteration", dft.cc:3656), which
+#           tools/timing reads. REPRODUCIBLE OUTPUT stays true (it also fixes numerical settings, e.g.
+#           pspCutOff = 30, dft.cc:226-229, so it may not be switched off); 5 would add energy
+#           evaluations (dftParameters.cc:2252) and is refused. The change is recorded in deck.diff.
 # Output: <run_dir>/dftfe.out (stdout+stderr incl. launcher audit), run_manifest.txt.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -85,10 +90,17 @@ if not (c1 == c2 == c3 == c4 == 1): sys.exit(f"run.sh: deck derivation touched u
 open(f"{out}/parameters.prm", "w").write(txt)
 print(f"# derived Al supercell: {rx}x{ry}x{rz} replication -> {n} atoms, {nwf} Kohn-Sham states")
 PY
-    diff -u "$PRM" "$RUN_DIR/parameters.prm" > "$RUN_DIR/deck.diff" || true
 else
     cp "$PRM" "$RUN_DIR/parameters.prm"
 fi
+VERB="${HPCPERF_DFTFE_VERBOSITY:-1}"
+case "$VERB" in 0|1|2|3|4) ;; *) echo "run.sh: HPCPERF_DFTFE_VERBOSITY=$VERB (0..4; 5 adds computation)" >&2; exit 2 ;; esac
+if [ "$VERB" != "$(sed -n 's/^set VERBOSITY *= *\([0-9-]*\).*/\1/p' "$RUN_DIR/parameters.prm" | head -1)" ]; then
+    /usr/bin/grep -q '^set VERBOSITY *=' "$RUN_DIR/parameters.prm" || { echo "run.sh: no 'set VERBOSITY' line in the deck" >&2; exit 1; }
+    sed -i "s/^set VERBOSITY *= *[0-9-]*/set VERBOSITY = $VERB/" "$RUN_DIR/parameters.prm"
+    DERIV="$DERIV + VERBOSITY=$VERB (output only)"
+fi
+diff -u "$PRM" "$RUN_DIR/parameters.prm" > "$RUN_DIR/deck.diff" || true
 export OMP_NUM_THREADS=1 DFTFE_NUM_THREADS=1 DEAL_II_NUM_THREADS=1
 echo "# DFT-FE $BACKEND profile=$PROFILE case=$CASE mode=$MODE ($DERIV) ranks=$N_RANKS deck=$(realpath --relative-to="$SRC" "$PRM") run_dir=$RUN_DIR"
 cd "$RUN_DIR"
@@ -99,7 +111,7 @@ rc=$?
 set +o pipefail; set -e
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
     l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=dftfe" "backend=$BACKEND" "profile=$PROFILE" "case=$CASE" "label=$LABEL" "mode=$MODE" "deck_derivation=$DERIV" \
-        "ranks=$N_RANKS" "threads_per_rank=1" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
+        "ranks=$N_RANKS" "threads_per_rank=1" "verbosity=$VERB" "exit_code=$rc" "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" \
         "upstream_prm=$PRM" "upstream_prm_sha256=$(l3_sha_file "$PRM")" "deck_sha256=$(l3_sha_file "$RUN_DIR/parameters.prm")" "reference_output=$REF" "reference_sha256=$(l3_sha_file "$REF")" \
         "fingerprint_sha256=$(l3_sha_file "$INST/.hpcperf-l3-fingerprint")" "elpa_gpu_probe=$(/usr/bin/grep -m1 '^RESULT' "$INST/elpa/ELPA_GPU_PROBE.txt" 2>/dev/null || echo NOT_RUN)" "utc=$(date -u +%FT%TZ)"
     /usr/bin/grep -aE 'Device|GPU|device' "$RUN_DIR/dftfe.out" 2>/dev/null | head -6 | sed 's/^/gpu_evidence: /' >> "$RUN_DIR/run_manifest.txt" || true

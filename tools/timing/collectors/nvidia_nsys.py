@@ -99,6 +99,18 @@ class Trace:
                 out.append(Marker(proc, "exclude", start, end))
         return out
 
+    def named_ranges(self, names):
+        """NVTX push/pop ranges the application itself emits (Level 3, e.g. AMReX TinyProfiler
+        regions), as ROI markers. Only exact names; nothing when the trace has no NVTX."""
+        wanted = set(names)
+        if not wanted or "NVTX_EVENTS" not in self.tables:
+            return []
+        q = ("select coalesce(n.text, s.value), n.start, n.end, n.globalTid >> 24 "
+             "from NVTX_EVENTS n left join StringIds s on n.textId = s.id "
+             "where n.eventType = ? and n.end is not null")
+        return [Marker(proc, "roi", start, end) for text, start, end, proc in self.db.execute(q, (NVTX_PUSHPOP,))
+                if text in wanted]
+
     # ------------------------------------------------------------------ activity
     def intervals(self):
         parts = []

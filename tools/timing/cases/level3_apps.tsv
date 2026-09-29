@@ -1,0 +1,32 @@
+# tools/timing/cases/level3_apps.tsv -- per-application facts for Level 3 (hand-maintained).
+#
+# Tab-separated, "-" = empty (tabs collapse in bash `read`, so a bare empty field would shift columns).
+#   app          directory under level3/
+#   backends     comma list of backends its build.sh accepts (HIP is UNTESTED everywhere: no ROCm)
+#   timeout_s    default hard limit for a clean run; the profiled run gets 3x
+#   fom_*        the metric the application prints itself; "-" in all five when it prints none.
+#                fom_regex: python regex with exactly one capture group on run.sh's stdout, the
+#                LAST match wins; a case may override it (level3_cases.tsv)
+#   extra_env    input variables a case may set beyond those run.sh and level3/tools/l3_common.sh
+#                read (normally "-")
+#   nvtx_roi     the NVTX range the application ITSELF emits around its time-step loop; the
+#                profiled run's device activity is clipped to it. "-" = none: the device picture is
+#                the whole process (context only)
+#   profile      "yes": one profiled run by default (the Level 3 protocol); "no (<reason>)": the
+#                application is NOT profiled by default and its records carry the reason as a caveat;
+#                measure_level3.sh --profile-all profiles it anyway
+#   notes        free text
+#
+# There are no ROI markers in Level 3: the timed region of every application is its own timer,
+# defined with source citations in tools/timing/apptimers.py (`apptimers.py describe`).
+#app	backends	timeout_s	fom_name	fom_unit	fom_better	fom_source	fom_regex	extra_env	nvtx_roi	profile	notes
+cp2k	cuda	3600	-	-	-	-	-	-	-	yes	per-MD-step times from the .ener file; full T I M I N G call tree at the end of cp2k.out (GLOBAL%TIMINGS)
+dftfe	cuda	3600	-	-	-	-	-	-	-	yes	per-SCF-iteration wall times (VERBOSITY >= 1); REPRODUCIBLE OUTPUT = true (upstream reference deck) suppresses the per-MD-step timer
+exaca	cuda	1800	-	-	-	-	-	-	-	yes	also writes the same timers into its JSON log (Timing block)
+lammps	cuda	1800	Performance	Matom-step/s	higher	stdout	^Performance: .*?([0-9.eE+-]+) Matom-step/s	-	-	yes	also prints tau/day and timesteps/s
+nekrs	cuda	3600	-	-	-	-	-	-	-	yes	runtime statistics table (solve, velocity/pressure/scalar solves, pMG smoother, coarse grid, flops/rank)
+nyx	cuda	1800	-	-	-	-	-	-	-	yes	no TinyProfiler in this build (AMReX_TINY_PROFILE=OFF): per-step totals only
+qmcpack	cuda	3600	-	-	-	-	-	-	-	no (the profiled run of the timing input is too expensive for what it adds: nsys records 57M kernels, 72M copies and 274M CUDA API calls into a 24 GB trace; the profiled run took 35 min against 5 min clean, the sqlite export 12 min and the summary most of 9 min -- about 55 of the 100 minutes of the 2026-09-29 sweep -- while the timed region itself grew only 9% (312 vs 287 s) and the device picture would still be whole-process context, not the DMC loop)	stack timer profile (--enable-timers); also in <title>.info.xml
+sparta	cuda	1800	Performance	Mparticle-step/s	higher	stdout	^Performance: .*?([0-9.eE+-]+) Mparticle-step/s	-	-	yes	also prints timesteps/s
+specfem3d	cuda	1800	-	-	-	-	-	-	-	yes	output_solver.txt: elapsed time and mean time per step at every stability report
+warpx	cuda	1800	-	-	-	-	-	-	WarpX::Evolve()	yes	AMReX TinyProfiler is compiled in and device-synchronized; it also pushes one NVTX range per region
