@@ -1,0 +1,32 @@
+# tools/timing/cases/level3_cases.tsv -- Level 3 measurement cases (hand-maintained).
+#
+# One row per case; a case is (app, case) and must be unique. Tab-separated, "-" = empty.
+#   gpus       HPCPERF_GPUS for the run (one MPI rank per GPU through the common launcher)
+#   env        NAME=VALUE;NAME=VALUE -- only variables the application's run.sh reads, plus
+#              HPCPERF_SCALE_MODE (`tools/timing/cases.py allowed-env --level 3 <app>` lists them).
+#              A variable set in your shell but not declared here is REFUSED: every run starts
+#              from `env -i`. One variable may sweep, NAME=a|b|c, with {} in the case name.
+#   args       extra arguments appended to run.sh
+#   timeout_s  "-" = the application's default
+#   fom_regex  "-" = the application's pattern
+#   acceptance "validate.sh" when level3/<app>/validate.sh checks exactly this input numerically;
+#              "-" when nothing does (the record then says verify_vs_roi = none and carries a caveat:
+#              the run completed, its results were not checked against a reference)
+#
+# The timing cases are larger than the smoke inputs (those run the loop for 0.04-2 s on 2 GPUs):
+# a main loop of tens of seconds to minutes on 2 x B200. Sizes and the recorded times they were
+# chosen from: each application's README (RESULTS) and benchmark.yaml. Only the smoke inputs of
+# CP2K (H2O-64), QMCPACK and DFT-FE have numerical acceptance; the strong / weak inputs of the other
+# applications are completeness runs in their READMEs ("numerical acceptance of strong/weak runs"
+# is an open item in CLAUDE.md).
+#app	case	gpus	env	args	timeout_s	fom_regex	acceptance	notes
+cp2k	h2o128.strong	2	HPCPERF_CP2K_CASE=h2o;HPCPERF_SCALE_MODE=strong;HPCPERF_CP2K_SYSTEM=128	-	3600	-	-	H2O-128 Born-Oppenheimer MD, 10 steps (GPW, DBCSR/DBM on the GPU); validate.sh checks H2O-64
+dftfe	al_md	2	HPCPERF_DFTFE_CASE=al_md;HPCPERF_SCALE_MODE=smoke	-	3600	-	validate.sh	upstream's GPU regression deck (32-atom Al, 4 MD steps), VERBOSITY=1 for the per-SCF timer; smoke = strong for this deck
+exaca	strong.nz1024	2	HPCPERF_SCALE_MODE=strong;HPCPERF_EXACA_NZ=1024	-	1800	-	-	512x256x1024 cells (67M per rank, the size of the 1-GPU strong run per GPU)
+lammps	strong.s8	2	HPCPERF_SCALE_MODE=strong;HPCPERF_LAMMPS_STRONG=8;HPCPERF_LAMMPS_STEPS=2000	-	1800	-	-	LJ melt (bench/in.lj) 160^3 cells = 16.4M atoms, 2000 steps
+nekrs	strong.h10	2	HPCPERF_SCALE_MODE=strong;HPCPERF_NEKRS_HREFINE=10;HPCPERF_NEKRS_STEPS=50	-	3600	-	-	ethier refined to 32,000 elements, N=7, 50 steps (checkpoint every 10 steps, excluded)
+nyx	synthetic.strong.g256	2	HPCPERF_NYX_CASE=scaling_synthetic;HPCPERF_SCALE_MODE=strong;HPCPERF_NYX_GLOBAL=256	-	1800	-	-	synthetic 256^3 cosmology box, 10 coarse steps
+qmcpack	diamond2	2	HPCPERF_QMCPACK_CASE=diamond2;HPCPERF_SCALE_MODE=smoke	-	3600	-	validate.sh	upstream deck verbatim (256 walkers: VMC 1 block + DMC 25 x 100 steps), --enable-timers=medium
+sparta	strong.s300	2	HPCPERF_SCALE_MODE=strong;HPCPERF_SPARTA_STRONG=300	-	1800	-	-	collide benchmark 300^3 cells = 270M particles; the timed run is the deck's second (100-step) run
+specfem3d	weak.f2	2	HPCPERF_SCALE_MODE=weak;HPCPERF_SPECFEM_LOCAL=2;HPCPERF_SPECFEM_STEPS=20000	-	1800	-	-	homogeneous half-space, 144x72x32 elements (165,888 per rank), 20000 steps
+warpx	strong.g256	2	HPCPERF_SCALE_MODE=strong;HPCPERF_WARPX_GLOBAL=256;HPCPERF_WARPX_STEPS=1000;HPCPERF_WARPX_GPU_AWARE=0	-	1800	-	-	uniform plasma 256^3 (33.6M particles), 1000 steps, host-staged MPI (GPU-aware smcuda is 3x slower for WarpX here)

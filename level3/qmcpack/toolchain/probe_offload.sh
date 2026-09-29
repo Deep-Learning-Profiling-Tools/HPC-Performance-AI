@@ -79,7 +79,10 @@ rc=0; CUDA_VISIBLE_DEVICES=0 LIBOMPTARGET_INFO=16 "$W/probe" > "$L3_LOGS/probe-1
 [ "$rc" -eq 0 ] || { echo "probe_offload.sh: FAIL -- single-process offload probe exited $rc (see $L3_LOGS/probe-1gpu.log)"; exit 1; }
 echo "# [5] MPI + one rank per GPU (conda Open MPI wrappers with OMPI_CXX=clang++)"
 mpicxx "${FLAGS[@]}" -DUSE_MPI -o "$W/probe_mpi" "$W/probe.cpp" > "$L3_LOGS/probe-mpi-compile.log" 2>&1 || { tail -20 "$L3_LOGS/probe-mpi-compile.log"; echo "probe_offload.sh: FAIL -- MPI probe did not compile"; exit 1; }
-for n in 2 4; do
+# MPI rank counts (default 2 4); an allocation with fewer GPUs sets HPCPERF_PROBE_GPU_COUNTS, and the
+# record names the counts that ran, so a smaller probe is never read as the full one.
+MPI_COUNTS="${HPCPERF_PROBE_GPU_COUNTS:-2 4}"
+for n in $MPI_COUNTS; do
     rc=0; "$L3_LAUNCHER" --gpus "$n" --bind wrapper -- "$W/probe_mpi" > "$L3_LOGS/probe-mpi-np$n.log" 2>&1 || rc=$?
     /usr/bin/grep -aE 'probe rank [0-9]|audit summary|hpcperf-bind:' "$L3_LOGS/probe-mpi-np$n.log" | head -12
     [ "$rc" -eq 0 ] || { echo "probe_offload.sh: FAIL -- MPI probe with $n ranks exited $rc"; exit 1; }
@@ -88,5 +91,5 @@ for n in 2 4; do
     good="$(/usr/bin/grep -acE 'probe rank [0-9]+/[0-9]+: num_devices=1 default_device=0 initial_device=1 target_ran_on_initial_device=0 ' "$L3_LOGS/probe-mpi-np$n.log")"
     [ "$good" -eq "$n" ] || { echo "probe_offload.sh: FAIL -- only $good of $n ranks report exactly one device with the target region on it"; exit 1; }
 done
-echo "probe_offload.sh: PASS -- clang $("$CLANG" --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+') offload to sm_$ARCH: target regions run on the device (not the initial device), numerics match the host to <1e-12, MANDATORY offload, 2 and 4 MPI ranks each with exactly one GPU"
-echo "PASS $(date -u +%FT%TZ) clang=$("$CLANG" --version | head -1) arch=sm_$ARCH" > "$L3_INSTALL/llvm/OFFLOAD_PROBE.txt"
+echo "probe_offload.sh: PASS -- clang $("$CLANG" --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+') offload to sm_$ARCH: target regions run on the device (not the initial device), numerics match the host to <1e-12, MANDATORY offload, MPI ranks $MPI_COUNTS each with exactly one GPU"
+echo "PASS $(date -u +%FT%TZ) clang=$("$CLANG" --version | head -1) arch=sm_$ARCH mpi_ranks=$(echo $MPI_COUNTS | tr ' ' ,)" > "$L3_INSTALL/llvm/OFFLOAD_PROBE.txt"

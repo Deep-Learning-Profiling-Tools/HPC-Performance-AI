@@ -1,6 +1,6 @@
-# tools/timing/lib/engine.sh -- the measurement engine shared by measure_level1.sh and
-# measure_level2.sh. Sourced, not executed. The front-end sets the protocol variables
-# below, then calls engine_main with the case selection.
+# tools/timing/lib/engine.sh -- the measurement engine shared by measure_level1.sh,
+# measure_level2.sh and measure_level3.sh. Sourced, not executed. The front-end sets the
+# protocol variables below, then calls engine_main with the case selection.
 #
 # What one case costs, and why (the ROI is the unit of measurement):
 #   WARMUP_RUNS    whole-process runs, discarded (first-touch file and JIT caches)
@@ -12,11 +12,18 @@
 # environment into their reports (measured with nsys: 349 variables incl. session
 # tokens from a login shell, 101 with the allow-list).
 #
+# Level 3 has no markers: the region is the application's own timer (apptimers.py). Each
+# run gets its own HPCPERF_L3_RUN_SUBDIR (run.timing-<run_id>-<tag>), so it never touches
+# another run's directory; afterwards the files the timer is read from are copied into the
+# raw evidence (app/) and the timer is extracted once -- a clean run without it is
+# app_timer_missing (FAIL), never a fallback to the process wall clock.
+#
 # Raw evidence: <RAW_ROOT>/level<L>/<app>/<case>/<run_id>/
 #   run_meta.txt              case, protocol, platform, provenance (key=value)
 #   warmup.<i>/run.log        discarded
-#   clean.<i>/{run.log,run.txt,roi.<pid>}
-#   prof/{run.log,run.txt,roi.<pid>,trace.*}
+#   clean.<i>/{run.log,run.txt,roi.<pid>}           Level 1/2
+#   clean.<i>/{run.log,run.txt,app/,app_timer.json}  Level 3
+#   prof/{run.log,run.txt,roi.<pid>|app/,trace.*}
 # After the cases, the engine runs tools/timing/summarize.py on this run (JSON per case,
 # the per-level CSVs and the web page results/timing/report/) unless SUMMARIZE=0.
 
@@ -29,7 +36,7 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${LEVEL:?}" "${CLEAN_RUNS:=1}" "${WARMUP_RUNS:=0}" "${PROFILED_RUNS:=1}"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
-: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}"
+: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${FORCE_PROFILE:=0}"
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
@@ -92,6 +99,7 @@ roi_seconds() {
 
 roi_where() {           # source locations of the ROI markers for this app (relative paths)
     local dir
+    if [ "$LEVEL" = 3 ]; then echo "tools/timing/apptimers.py:$1"; return; fi
     if [ "$LEVEL" = 1 ]; then dir="level1/$1"; else dir="level2/$1"; fi
     ( cd "$REPO" && /usr/bin/grep -rnE 'HPCPERF_ROI_(BEGIN|END)(_SYNC)?\(|hpcperf_roi_(begin|end)(_sync)?\(' \
         --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cu' --include='*.hip' \
@@ -99,13 +107,42 @@ roi_where() {           # source locations of the ROI markers for this app (rela
         --include='*.f' --include='*.F' "$dir" 2>/dev/null | cut -d: -f1,2 | tr '\n' ' ' )
 }
 
+# ---------------------------------------------------------------- Level 3: the app's own timer
+# l3_subdir <tag>: the run-directory tree name of one run (plain name, see level3/tools/l3_common.sh)
+l3_subdir() { echo "run.timing-$RUN_ID-$1"; }
+
+# l3_collect <app> <tag> <dir>: copy the timer's files out of the run tree(s) of this run into
+# <dir>/app/, then extract the timer into <dir>/app_timer.json. Prints the seconds; fails
+# when the run left no tree or no timer.
+l3_collect() {
+    local app="$1" sub; sub="$(l3_subdir "$2")"
+    local d="$3" tree n=0
+    for tree in "$REPO"/build/level3/"$app"/*/"$sub"; do
+        [ -d "$tree" ] || continue
+        python3 "$TOOLS/apptimers.py" harvest "$app" "$tree" "$d/app" > /dev/null || return 1
+        echo "${tree#$REPO/}" >> "$d/run_tree.txt"
+        n=$((n + 1))
+    done
+    [ "$n" -gt 0 ] || { echo "no run directory build/level3/$app/*/$sub" > "$d/app_timer.err"; return 1; }
+    python3 "$TOOLS/apptimers.py" extract "$app" "$d" > "$d/app_timer.json" 2> "$d/app_timer.err" || return 1
+    python3 -c 'import json,sys; print("%.6f" % json.load(open(sys.argv[1]))["wall_s"])' "$d/app_timer.json"
+}
+
 # ---------------------------------------------------------------- one case
 # fields: level app case backend gpus cwd timeout_s env argv fom_name fom_unit fom_better
-#         fom_source fom_regex roi_excludes verify_vs_roi notes
+#         fom_source fom_regex roi_excludes verify_vs_roi notes [nvtx_roi] [profile]
+# profile: "yes", or "no (<reason>)" -- the case table's default says not to profile this
+# application (Level 3: QMCPACK); FORCE_PROFILE=1 (--profile-all) profiles it anyway.
 measure_case() {
     local level="$1" app="$2" case="$3" backend="$4" gpus="$5" cwd="$6" tmo="$7" env="$8" argv="$9"
     local fom_name="${10}" fom_unit="${11}" fom_better="${12}" fom_source="${13}" fom_regex="${14}"
-    local roi_excl="${15}" verify="${16}" notes="${17}"
+    local roi_excl="${15}" verify="${16}" notes="${17}" nvtx_roi="${18:--}" profile="${19:-yes}"
+    local prof_runs="$PROFILED_RUNS" coll="$COLLECTOR" coll_ver="$COLLECTOR_VERSION" prof_skip=""
+    case "$profile" in
+        no*) if [ "$FORCE_PROFILE" != 1 ] && [ "$prof_runs" -gt 0 ]; then
+                 prof_runs=0; coll=none; coll_ver="-"; prof_skip="$profile"
+             fi ;;
+    esac
     local -a cmd case_env=() run_env=()
     local kv
     eval "cmd=( $argv )"                       # argv was shlex-quoted by cases.py
@@ -116,7 +153,7 @@ measure_case() {
         printf '%s' "${kv%%=*}" | /usr/bin/grep -qE "$ENV_DENY" && { echo "  $app/$case: refusing variable ${kv%%=*}" >&2; return 1; }
     done
     run_env=("${case_env[@]}")
-    [ "$level" = 2 ] && run_env+=("HPCPERF_GPUS=$gpus")
+    case "$level" in 2|3) run_env+=("HPCPERF_GPUS=$gpus") ;; esac
     [ "$SKIP_VERIFY" = 1 ] && run_env+=("HPCPERF_SKIP_VERIFY=1")
 
     local out="$RAW_ROOT/level$level/$app/$case/$RUN_ID"
@@ -125,9 +162,16 @@ measure_case() {
     if [ "$DRY_RUN" = 1 ]; then
         echo "  $label"
         echo "    cwd      $cwd"
-        echo "    env      env -i $(_allowed_pairs | cut -d= -f1 | tr '\n' ' ')${run_env[*]:+${run_env[*]} }HPCPERF_ROI_LOG=<run dir>/roi"
+        if [ "$level" = 3 ]; then
+            echo "    env      env -i $(_allowed_pairs | cut -d= -f1 | tr '\n' ' ')${run_env[*]:+${run_env[*]} }HPCPERF_L3_RUN_SUBDIR=$(l3_subdir c0)"
+            local nv="${nvtx_roi#-}"
+            echo "    region   the application's own timer (tools/timing/apptimers.py: $app)${nv:+; profiled run clipped to NVTX range '$nv'}"
+        else
+            echo "    env      env -i $(_allowed_pairs | cut -d= -f1 | tr '\n' ' ')${run_env[*]:+${run_env[*]} }HPCPERF_ROI_LOG=<run dir>/roi"
+        fi
         [ -n "$ENV_SCRIPT_ABS" ] && echo "    source   ${ENV_SCRIPT_ABS#$REPO/} (inside the clean environment)"
-        echo "    runs     warmup=$WARMUP_RUNS clean=$CLEAN_RUNS profiled=$PROFILED_RUNS collector=$COLLECTOR"
+        echo "    runs     warmup=$WARMUP_RUNS clean=$CLEAN_RUNS profiled=$prof_runs collector=$coll"
+        [ -n "$prof_skip" ] && echo "    profile  skipped by default (cases table): ${prof_skip:0:120}... (--profile-all overrides)"
         echo "    command  timeout $tmo ${cmd[*]}"
         return 0
     fi
@@ -154,13 +198,17 @@ measure_case() {
         echo "roi_excludes=$roi_excl"
         echo "verify_vs_roi=$verify"
         echo "notes=$notes"
+        echo "nvtx_roi=$nvtx_roi"
+        echo "region=$([ "$level" = 3 ] && echo app_timer || echo markers)"
         echo "roi_where=$(roi_where "$app")"
         echo "warmup_runs=$WARMUP_RUNS"
         echo "clean_runs=$CLEAN_RUNS"
-        echo "profiled_runs=$PROFILED_RUNS"
+        echo "profiled_runs=$prof_runs"
         echo "skip_verify=$SKIP_VERIFY"
-        echo "collector=$COLLECTOR"
-        echo "collector_version=$COLLECTOR_VERSION"
+        echo "collector=$coll"
+        echo "collector_version=$coll_ver"
+        echo "profile_default=$profile"
+        echo "profile_skipped=${prof_skip:--}"
         echo "env_script=${ENV_SCRIPT:--}"
         echo "env_allow=$(_env_allow | tr -s ' \n' '  ')"
         echo "env_deny_regex=$ENV_DENY"
@@ -173,24 +221,39 @@ measure_case() {
 
     local i t0 t1 rc d status=ok roi_s="-"
     i=0
+    local -a sub_env=()
     while [ "$i" -lt "$WARMUP_RUNS" ]; do
         mkdir -p "$out/warmup.$i"
-        run_clean "$out/warmup.$i/run.log" "$cwd" "${run_env[@]}" -- timeout "$tmo" "${cmd[@]}"
+        sub_env=(); [ "$level" = 3 ] && sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir "w$i")")
+        run_clean "$out/warmup.$i/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- timeout "$tmo" "${cmd[@]}"
         i=$((i + 1))
     done
 
     i=0
     while [ "$i" -lt "$CLEAN_RUNS" ]; do
         d="$out/clean.$i"; mkdir -p "$d"
+        if [ "$level" = 3 ]; then sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir "c$i")"); else sub_env=("HPCPERF_ROI_LOG=$d/roi"); fi
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" -- timeout "$tmo" "${cmd[@]}"
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- timeout "$tmo" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         if [ "$rc" -ne 0 ]; then
             status="clean_failed"
             [ "$rc" -eq 124 ] && status="clean_timeout"
             echo "  $label FAIL (clean run $i: exit $rc, see ${d#$REPO/}/run.log)"
+            [ "$level" = 3 ] && l3_collect "$app" "c$i" "$d" > /dev/null 2>&1   # keep what there is, for diagnosis
             break
+        fi
+        if [ "$level" = 3 ]; then
+            local t_s
+            if ! t_s="$(l3_collect "$app" "c$i" "$d")"; then
+                status="app_timer_missing"
+                echo "  $label FAIL (clean run $i: the application's timer was not found: $(head -c 300 "$d/app_timer.err" 2>/dev/null))"
+                break
+            fi
+            [ "$i" -eq 0 ] && roi_s="$t_s"
+            i=$((i + 1))
+            continue
         fi
         if ! ls "$d"/roi.* >/dev/null 2>&1; then
             status="roi_missing"
@@ -202,26 +265,30 @@ measure_case() {
     done
 
     local prof_note=""
-    if [ "$status" = ok ] && [ "$PROFILED_RUNS" -gt 0 ] && [ "$COLLECTOR" != none ]; then
+    if [ "$status" = ok ] && [ "$prof_runs" -gt 0 ] && [ "$coll" != none ]; then
         d="$out/prof"; mkdir -p "$d"
-        collector_wrap "$COLLECTOR" "$d/trace" || return 2
+        collector_wrap "$coll" "$d/trace" || return 2
+        if [ "$level" = 3 ]; then sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir prof)"); else sub_env=("HPCPERF_ROI_LOG=$d/roi"); fi
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "HPCPERF_ROI_LOG=$d/roi" -- \
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- \
             timeout "$((tmo * PROFILE_TIMEOUT_FACTOR))" "${COLLECTOR_ARGV[@]}" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         if [ "$rc" -ne 0 ]; then
             status="prof_failed"
             echo "  $label FAIL (profiled run: exit $rc, see ${d#$REPO/}/run.log)"
-        elif ! collector_export "$COLLECTOR" "$d/trace" "$d"; then
+        elif ! collector_export "$coll" "$d/trace" "$d"; then
             status="export_failed"
             echo "  $label FAIL (collector export, see ${d#$REPO/}/export.log)"
+        elif [ "$level" = 3 ]; then
+            prof_note=" prof_timer=$(l3_collect "$app" prof "$d" 2>/dev/null || echo -)s"
         else
             prof_note=" prof_roi=$(roi_seconds "$d")s"
         fi
     fi
     echo "status=$status" >> "$out/run_meta.txt"
-    [ "$status" = ok ] && echo "  $label ok   roi=${roi_s}s${prof_note}  raw=${out#$REPO/}"
+    [ -n "$prof_skip" ] && prof_note=" (not profiled by default, see cases table)"
+    [ "$status" = ok ] && echo "  $label ok   $([ "$level" = 3 ] && echo timer || echo roi)=${roi_s}s${prof_note}  raw=${out#$REPO/}"
     [ "$status" = ok ]
 }
 
@@ -273,7 +340,7 @@ engine_main() {
     local rc_all=0
     local -a f
     while IFS=$'\t' read -r -a f; do
-        [ "${#f[@]}" -eq 17 ] || engine_die "malformed case row (${#f[@]} fields)"
+        [ "${#f[@]}" -eq 19 ] || engine_die "malformed case row (${#f[@]} fields)"
         measure_case "${f[@]}" < /dev/null || rc_all=1
     done <<< "$rows"
     if [ "$DRY_RUN" != 1 ] && [ "$SUMMARIZE" = 1 ]; then

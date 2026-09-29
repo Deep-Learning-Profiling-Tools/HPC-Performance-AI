@@ -48,6 +48,19 @@ logged). Record: `install/llvm/OFFLOAD_PROBE.txt`.
 
 ## Build / run / validate
 
+Timers: `run.sh` passes `--enable-timers=$HPCPERF_QMCPACK_TIMERS` (default `medium`; `none`,
+`coarse`, `fine` accepted) to qmcpack and records `timers=` in the manifest. The level only
+selects which of upstream's own timers print in the final "Stack timer profile" (coarse, the
+executable's default, has only the driver totals; medium adds `DMCBatched::Production`,
+`RunSteps`, `MovePbyP`, `Hamiltonian`, `WalkerControl::branch`, which `tools/timing` reads);
+timers never change results. Re-validated with `medium` on 2026-09-29 (uv toolchain, 2 x B200):
+`validate.sh` PASS at 1 GPU (unit 64/64, deterministic 526/526, DMC within the 3-sigma
+reference; 995 s) and 2 GPUs (also consistent with 1 GPU; 313 s), audit clean.
+`tools/timing/measure_level3.sh` times QMCPACK without an nsys run by default: profiling the
+timing input (this deck at 2 GPUs) recorded 57M kernels, 72M copies and 274M CUDA API calls into
+a 24 GB trace and took 35 min + 12 min export for a 5-minute run, while the timed region grew only
+9%; `--profile-all` profiles it anyway.
+
 `build.sh` (deps + QMCPACK real; `HPCPERF_QMCPACK_COMPLEX=1` adds the complex
 build) refuses to run unless the probe PASSED. Stages: OpenBLAS 0.3.30
 (`TARGET=SAPPHIRERAPIDS`, single-threaded) -> HDF5 1.14.5 (parallel, clang MPI

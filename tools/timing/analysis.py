@@ -207,13 +207,19 @@ def roi_windows(markers):
     return windows, stats
 
 
-def analyze_trace(trace, capabilities, top_ops=None):
+def analyze_trace(trace, capabilities, top_ops=None, markers=None, whole_ops=False):
     """Clip device activity to the ROI windows the trace itself recorded.
 
     Returns the ROI-scoped device picture, the whole-process one (context), the ops
     table and runtime API calls. A category outside `capabilities` is None.
+
+    markers: the ROI markers to clip to (default: the trace's own HPCPERF ranges; Level 3
+    passes the application's own NVTX range, or nothing). whole_ops: when there is no ROI
+    window at all, build the ops table over the whole process instead of leaving it empty
+    (Level 3; the result says which scope it has).
     """
-    windows, wstats = roi_windows(trace.markers())
+    windows, wstats = roi_windows(trace.markers() if markers is None else markers)
+    whole_table = whole_ops and not windows
     ends = {p: [w[1] for w in ws] for p, ws in windows.items()}
 
     roi_cat = {c: 0 for c in CATEGORIES}
@@ -240,6 +246,15 @@ def analyze_trace(trace, capabilities, top_ops=None):
 
         wins = windows.get(proc)
         if not wins:
+            if whole_table:
+                t = table.get(iv.key)
+                if t is None:
+                    table[iv.key] = [cat, 1, e - s, e - s, e - s]
+                else:
+                    t[1] += 1
+                    t[2] += e - s
+                    t[3] = min(t[3], e - s)
+                    t[4] = max(t[4], e - s)
             continue
         i = bisect.bisect_right(ends[proc], s)
         clipped = 0
@@ -278,9 +293,12 @@ def analyze_trace(trace, capabilities, top_ops=None):
     observable = bool(capabilities)
     device = None
     if observable and windows:
+        # busy_s is summed over processes (one per GPU); fractions are per process on average
+        nproc = max(len(windows), 1)
         device = {
             "busy_s": sec(busy),
-            "busy_frac_of_profiled_roi": finite("busy/roi", busy / prof_wall) if prof_wall > 0 else None,
+            "processes": len(windows),
+            "busy_frac_of_profiled_roi": finite("busy/roi", busy / (prof_wall * nproc)) if prof_wall > 0 else None,
             "op_time_sum_s": sec(roi_op_sum),
             "overlap_s": sec(roi_op_sum - busy),
         }
@@ -293,7 +311,7 @@ def analyze_trace(trace, capabilities, top_ops=None):
 
     whole = None
     if observable:
-        whole = {"busy_s": sec(whole_busy), "op_time_sum_s": sec(whole_op_sum)}
+        whole = {"busy_s": sec(whole_busy), "op_time_sum_s": sec(whole_op_sum), "processes": len(whole_union)}
         for c in CATEGORIES:
             whole[f"{c}_s"] = sec(cap(c, whole_cat[c]))
             whole[f"{c}_ops"] = cap(c, whole_ops[c])
@@ -331,4 +349,5 @@ def analyze_trace(trace, capabilities, top_ops=None):
         "runtime_api_roi": rt(rt_roi),
         "runtime_api_whole": rt(rt_whole),
         "ops": ops,
+        "ops_scope": "whole_process" if whole_table else "roi",
     }
