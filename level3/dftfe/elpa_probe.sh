@@ -32,6 +32,9 @@ l3_paths_profile dftfe "$PROFILE"
 EB="$L3_BUILD_DEPS/elpa"; INST="$L3_INSTALL"
 [ -f "$INST/elpa/.hpcperf-stage-done" ] || { echo "elpa_probe.sh: ELPA stage not built for profile $PROFILE" >&2; exit 1; }
 NA="${HPCPERF_ELPA_NA:-2000}"; NEV="${HPCPERF_ELPA_NEV:-1000}"; NBLK="${HPCPERF_ELPA_NBLK:-32}"
+# GPU rank counts of the GPU runs (default 1 2 4). An allocation with fewer GPUs sets e.g. "1 2";
+# the record names the counts that ran, so a smaller probe is never read as the full one.
+GPU_COUNTS="${HPCPERF_PROBE_GPU_COUNTS:-1 2 4}"
 TOL_EV=5e-14; TOL_Z=6e-10     # test_analytic_template.F90: tol_eigenvalues / tol_eigenvectors (real double)
 export LD_LIBRARY_PATH="$EB/.libs:$INST/elpa/lib:$INST/scalapack/lib:$INST/openblas/lib:${LD_LIBRARY_PATH:-}"
 OUT="$L3_BUILD/elpa_probe"; mkdir -p "$OUT"
@@ -77,9 +80,9 @@ PY
     [ "$verdict" = PASS ] || ok=0
     note "$verdict $prog ranks=$n gpu=$gpu na=$NA nev=$NEV nblk=$NBLK exit=$rc max_err_eigenvalues=${ev:-NA} (tol $TOL_EV) max_err_eigenvectors=${zv:-NA} (tol $TOL_Z) gpu_timer_lines=$gpu_evidence audit=[${audit:-none}] log=$log"
 }
-note "# ELPA 2026.02.001 GPU kernel probe, profile $PROFILE, $(date -u +%FT%TZ); limits: max eigenvalue error <= $TOL_EV, max eigenvector error <= $TOL_Z (ELPA's own real-double analytic-test tolerances), exit 0, GPU timers present, launcher audit 0 mismatch"
+note "# ELPA 2026.02.001 GPU kernel probe, profile $PROFILE, $(date -u +%FT%TZ); limits: max eigenvalue error <= $TOL_EV, max eigenvector error <= $TOL_Z (ELPA's own real-double analytic-test tolerances), exit 0, GPU timers present, launcher audit 0 mismatch; GPU rank counts: $GPU_COUNTS"
 for prog in validate_real_double_eigenvectors_1stage_gpu_analytic validate_real_double_eigenvectors_2stage_default_kernel_gpu_analytic; do   # (the *_default names are ELPA's .sh wrappers; these are the programs)
-    for n in 1 2 4; do run_case "$prog" "$n" yes; done
+    for n in $GPU_COUNTS; do run_case "$prog" "$n" yes; done
 done
 for prog in validate_real_double_eigenvectors_1stage_analytic validate_real_double_eigenvectors_2stage_default_kernel_analytic; do
     run_case "$prog" 1 no
