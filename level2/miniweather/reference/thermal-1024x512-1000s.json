@@ -19,6 +19,6 @@
  ],
  "rule": {
   "d_mass": "abs <= 1e-09",
-  "d_te": "abs diff to reference <= 1e-08"
+  "d_te": "abs diff to reference <= 1e-07"
  }
 }

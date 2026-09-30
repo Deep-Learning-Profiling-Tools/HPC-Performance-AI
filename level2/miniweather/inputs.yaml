@@ -162,13 +162,14 @@ check:
   # Every registered grid has a CPU reference run of the same parallel_for source (build.sh OPENMP: YAKL's OpenMP
   # backend, -O3, no fast-math; reference/<key>.json with provenance and log hashes, 2026-09-30). check_reference.py
   # applies one benchmark-wide rule fixed before any candidate existed: |d_mass| <= 1e-9 (upstream's own criterion)
-  # and |d_te - d_te_reference| <= 1e-8 absolute (the docstring states the observed CPU-vs-GPU agreement per grid).
+  # and |d_te - d_te_reference| <= 1e-7 absolute (the docstring states the observed CPU-vs-GPU agreement per grid:
+  # identical to 7 digits at three grids, 3.95e-8 apart at gravity waves where d_te is round-off).
   kind: post_run
   command: [python3, '{bench_dir}/check_reference.py', --log, '{log}', --nx, '{param:nx}', --nz, '{param:nz}',
             --sim-time, '{param:sim_time}', --data-spec, '{param:data_spec}']
   pass_regex: '^PASS: miniweather reference check'
   fail_regex: '^FAIL: miniweather reference check'
   basis: 'same-grid CPU (OpenMP, no fast-math) reference build of the same source: |d_mass| <= 1e-9 (upstream
-    check_output.sh) and |d_te - d_te_reference| <= 1e-8 absolute, one rule for every registered grid, set from the
+    check_output.sh) and |d_te - d_te_reference| <= 1e-7 absolute, one rule for every registered grid, set from the
     unoptimized CUDA build''s agreement with the CPU references (check_reference.py, reference/<key>.json)'
   covers: [d_te]

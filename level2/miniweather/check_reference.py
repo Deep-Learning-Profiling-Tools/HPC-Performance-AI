@@ -10,25 +10,29 @@ and data spec (a compile-time configuration in miniWeather), run to completion o
 (2026-09-30; provenance in reference/<key>.json). miniWeather prints two numbers after the run:
 d_mass and d_te, the relative change of the domain-integrated mass and total energy.
 
-Benchmark-wide rule (one rule for every registered grid, fixed BEFORE any candidate exists):
+Benchmark-wide rule (one rule for every registered grid, fixed from the reference agreement BEFORE any
+candidate exists):
   |d_mass| <= 1e-9                              upstream check_output.sh's own mass criterion, unchanged
   |d_te - d_te_reference| <= D_TE_ABS_TOL       the same-grid CPU reference, absolute
-D_TE_ABS_TOL = 1e-8. Observed before the rule was fixed (2026-09-30): the unoptimized CUDA build
-(--use_fast_math) reproduced the CPU reference's d_te to all 7 printed digits at thermal 1024x512
-(1.239597e-04 on both); the GPU's own 10 repeats (2026-09-28) reproduced d_te to all printed digits
-at the three thermal / collision grids and scattered by 1.8e-11 absolute at gravity waves (d_te =
-3.16e-8, atomics). The remaining grids' CPU values are recorded in reference/<key>.json as their runs
-finish, with the observed difference. 1e-8 is >= 100 x the largest difference seen between two correct
-realisations and about a third of the smallest registered |d_te|, while the physics the number
-describes -- the energy the hyper-viscosity removes over 1000 s -- moves d_te by 1e-5 or more when it
-is wrong (upstream's own validation bound is 4.5e-5). Nothing here is derived from a candidate.
+D_TE_ABS_TOL = 1e-7. Observed (2026-09-30, the unoptimized CUDA build with --use_fast_math vs the CPU
+references, both correct realisations of the same source): thermal 2048x1024 and 1024x512 and collision
+-- CPU and CUDA d_te identical to all 7 printed digits (1.255246e-04, 1.239597e-04, 8.383598e-04);
+gravity waves -- CUDA +3.16e-8 vs CPU -7.84e-9, |diff| 3.95e-8: at this grid d_te is round-off (the CUDA
+build's own 10 repeats scatter by 1.8e-11, the fast-math / no-fast-math difference by 4e-8, with opposite
+signs). 1e-7 is 2.5 x that largest reference-vs-baseline difference, >= 100 x below upstream's own
+validation bound (4.5e-5) and below the O(1e-4) physical energy change of the thermal / collision runs by
+a factor 1000: it detects a change of the conserved-energy budget above round-off on every grid, and at
+gravity waves it states that the energy change stays at round-off level. Revision note: the first
+version of this rule (1e-8) was fixed when only the thermal 1024x512 reference existed; the complete
+four-grid reference data replaced it before any candidate was checked (nothing here is derived from a
+candidate).
 """
 import argparse, hashlib, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF_DIR = os.path.join(HERE, "reference")
 D_MASS_ABS_TOL = 1e-9
-D_TE_ABS_TOL = 1e-8
+D_TE_ABS_TOL = 1e-7
 RX_MASS = re.compile(r"^d_mass:\s*([0-9.eE+-]+)", re.M)
 RX_TE = re.compile(r"^d_te:\s*([0-9.eE+-]+)", re.M)
 

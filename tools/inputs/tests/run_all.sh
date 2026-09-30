@@ -1200,8 +1200,8 @@ python3 - "$R/level2/miniweather/reference/thermal-1024x512-1000s.json" "$P3" <<
 import json, sys
 ref = json.load(open(sys.argv[1])); d = sys.argv[2]
 def log(path, dm, dte): open(path, "w").write(f"CPU Time: 1.0\nd_mass: {dm:e}\nd_te:   {dte:e}\n")
-log(f"{d}/mw_ok.log", 1.5e-13, ref["d_te"] + 4e-9)      # within 1e-8
-log(f"{d}/mw_bad_te.log", 0.0, ref["d_te"] + 2e-8)      # 2e-8 > 1e-8
+log(f"{d}/mw_ok.log", 1.5e-13, ref["d_te"] + 4e-8)      # within 1e-7
+log(f"{d}/mw_bad_te.log", 0.0, ref["d_te"] + 2e-7)      # 2e-7 > 1e-7
 log(f"{d}/mw_bad_mass.log", 5e-9, ref["d_te"])          # 5e-9 > 1e-9
 PY
 MWA=(--nx 1024 --nz 512 --sim-time 1000 --data-spec DATA_SPEC_THERMAL)
@@ -1210,10 +1210,10 @@ python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_bad_te.log" "${
 python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_bad_mass.log" "${MWA[@]}" > "$P3/mw3.out" 2>&1; rc3=$?
 python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_ok.log" --nx 7 --nz 7 --sim-time 1 --data-spec DATA_SPEC_THERMAL > "$P3/mw4.out" 2>&1; rc4=$?
 [ $rc1 -eq 0 ] && grep -q "^PASS: miniweather reference check (thermal-1024x512-1000s)" "$P3/mw1.out" \
-    && [ $rc2 -eq 1 ] && grep -q "|diff| 2.00e-08 > 1e-08" "$P3/mw2.out" \
+    && [ $rc2 -eq 1 ] && grep -q "|diff| 2.00e-07 > 1e-07" "$P3/mw2.out" \
     && [ $rc3 -eq 1 ] && grep -q "|d_mass| = 5.000e-09 > 1e-09" "$P3/mw3.out" \
     && [ $rc4 -eq 1 ] && grep -q "no CPU reference for thermal-7x7-1s" "$P3/mw4.out" \
-    && ok "miniweather check_reference.py: PASS within the rule; FAIL on d_te off by 2e-8, on d_mass 5e-9, on a grid without a reference (negative tests)" \
+    && ok "miniweather check_reference.py: PASS within the rule; FAIL on d_te off by 2e-7, on d_mass 5e-9, on a grid without a reference (negative tests)" \
     || bad "miniweather check_reference.py rc=$rc1/$rc2/$rc3/$rc4: $(tail -1 "$P3/mw2.out")"
 # ExaMiniMD SNAP: initial state and completeness
 printf '#Timestep Temperature PotE ETot Time Atomsteps/s\n0 300.000000 0.000000 0.038172 0.000000 0.000000e+00\n50 332.570495 0.000000 0.042316 0.049562 6.440771e+04\n100 468.041359 0.000000 0.059554 0.097955 6.654094e+04\n' > "$P3/snap_ok.log"

@@ -1,0 +1,24 @@
+{
+ "schema": "hpcperf-miniweather-reference-1",
+ "key": "gravity-waves-2048x1024-1000s",
+ "nx": 2048,
+ "nz": 1024,
+ "sim_time": 1000,
+ "data_spec": "DATA_SPEC_GRAVITY_WAVES",
+ "note": "CPU reference 2026-09-30 on dgx003 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; d_te at this grid is round-off: the fast-math CUDA build gives +3.16e-8, this build -7.84e-9",
+ "d_mass": -9.210783e-13,
+ "d_te": -7.842791e-09,
+ "d_te_spread_abs": 0.0,
+ "runs": [
+  {
+   "log": "gravity-waves-2048x1024-1000s.openmp.1.log",
+   "sha256": "9cd5bf50c97bc901089b4015aa60575075f7b92116668e750c3f3400e005623d",
+   "d_mass": -9.210783e-13,
+   "d_te": -7.842791e-09
+  }
+ ],
+ "rule": {
+  "d_mass": "abs <= 1e-09",
+  "d_te": "abs diff to reference <= 1e-07"
+ }
+}
