@@ -18,8 +18,8 @@ Benchmark-wide rule (one rule for every registered size, fixed BEFORE any candid
 R_FINAL_LOG10_TOL = 0.1 (a factor 1.26). Observed before the rule was fixed (2026-09-30, the
 unoptimized CUDA build vs the CPU references; Serial and OpenMP agreed to all 13 printed digits at
 every size where both were run): sweep-nx9-p14 |log10| 0.0022, sweep-nx16-p8 0.0029, sweep-nx32-p4
-0.0268, coral2-nx24-p14 0.0010 -- the remaining size is added to reference/<id>.json as their CPU runs finish and the
-observed deviation is recorded there. 0.1 is about four times the largest of these deviations
+0.0268, coral2-nx24-p14 0.0010, nx40-p14 0.0005 (reference/<id>.json holds the values and log hashes). 0.1 is
+about four times the largest of these deviations
 between two correct realisations of the arithmetic, and ten times tighter than the factor 10
 validate.sh allows for its 27-element case. It is a rounding-accumulation bound, not a convergence
 criterion: a wrong operator changes the residual by orders of magnitude. Nothing here is derived
