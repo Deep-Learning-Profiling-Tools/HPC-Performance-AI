@@ -193,6 +193,18 @@ energy tolerance to 1e-6 makes `check_output.sh` fail as expected; a 2-rank
 run (`mpirun --oversubscribe -np 2 ./parallelfor_test`, exercises the MPI
 halo exchange) gives d_mass = 1.95e-16, d_te = -4.141519e-05.
 
+## Correctness check of the registered inputs (2026-09-30)
+
+Every registered grid has a **CPU reference run of the same `parallel_for` source**, built with
+`build.sh OPENMP` (YAKL's OpenMP backend, `-O3`, no fast-math) for the exact compile-time grid /
+simulation time / data spec of the input (`reference/<key>.json`: `d_mass`, `d_te`, log hashes,
+provenance; 4 threads on dgx003). `check_reference.py` applies one benchmark-wide rule fixed before
+any candidate existed: `|d_mass| <= 1e-9` (upstream's own `check_output.sh` criterion, unchanged) and
+`|d_te - d_te_reference| <= 1e-8` absolute (the docstring states the CPU-vs-GPU agreement observed
+per grid). The registry's `check:` block passes the input's `nx`, `nz`, `sim_time` and `data_spec`
+to it. Negative tests in `tools/inputs/tests/run_all.sh` show the checker failing on `d_te` off by
+2e-8, on `d_mass` = 5e-9 and on a grid without a reference.
+
 ## Warnings
 
 After the build (CUDA, nvcc 13.2, two compilations of the same source):

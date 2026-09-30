@@ -24,8 +24,8 @@ baseline:
     the measured |d_te| is 1.26e-4 (thermal 2048x1024, 1000 s), 8.4e-4 (colliding thermals), 3.2e-8
     (gravity waves) and 1.24e-4 (thermal 1024x512) -- physical energy change of the longer/larger runs,
     not a defect indication, but without a basis for a threshold. d_mass (exact conservation, 0.0 in
-    every run) keeps the upstream rule; d_te is RECORDED (required, NEEDS_VALIDATION) until a
-    per-configuration tolerance has a basis.
+    every run) keeps the upstream rule; d_te is compared, per grid, with the CPU (OpenMP) reference
+    build of the same source under the benchmark-wide rule of check_reference.py (2026-09-30).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: d_mass
@@ -159,7 +159,16 @@ inputs:
   - cuda
   input_form: compile-time
 check:
-  kind: none
-  reason: d_te stays `record` -- upstream's |d_te| < 4.5e-5 is defined for its 100x50 / 400 s validation problem only,
-    and the physical energy change of the registered 1000 s runs is 1e-4 .. 8e-4; a tolerance needs a basis
-    independent of any candidate (repeat / serial runs of the reference build), to be decided
+  # Every registered grid has a CPU reference run of the same parallel_for source (build.sh OPENMP: YAKL's OpenMP
+  # backend, -O3, no fast-math; reference/<key>.json with provenance and log hashes, 2026-09-30). check_reference.py
+  # applies one benchmark-wide rule fixed before any candidate existed: |d_mass| <= 1e-9 (upstream's own criterion)
+  # and |d_te - d_te_reference| <= 1e-8 absolute (the docstring states the observed CPU-vs-GPU agreement per grid).
+  kind: post_run
+  command: [python3, '{bench_dir}/check_reference.py', --log, '{log}', --nx, '{param:nx}', --nz, '{param:nz}',
+            --sim-time, '{param:sim_time}', --data-spec, '{param:data_spec}']
+  pass_regex: '^PASS: miniweather reference check'
+  fail_regex: '^FAIL: miniweather reference check'
+  basis: 'same-grid CPU (OpenMP, no fast-math) reference build of the same source: |d_mass| <= 1e-9 (upstream
+    check_output.sh) and |d_te - d_te_reference| <= 1e-8 absolute, one rule for every registered grid, set from the
+    unoptimized CUDA build''s agreement with the CPU references (check_reference.py, reference/<key>.json)'
+  covers: [d_te]
