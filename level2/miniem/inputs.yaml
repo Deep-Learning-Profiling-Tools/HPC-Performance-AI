@@ -58,11 +58,23 @@ inputs:
       compare:
         rule: record
     # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
-    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
-    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
     - name: em_energy_final
       role: required
       regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
         rule: record
@@ -107,11 +119,23 @@ inputs:
       compare:
         rule: record
     # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
-    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
-    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
     - name: em_energy_final
       role: required
       regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
         rule: record
@@ -156,11 +180,23 @@ inputs:
       compare:
         rule: record
     # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
-    # ROI): the result quantity of the Maxwell decks; required, recorded until a tolerance is decided (candidate
-    # basis: the Belos solver tolerance 1e-8 of the deck -- not established)
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
     - name: em_energy_final
       role: required
       regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
         rule: record
@@ -190,11 +226,30 @@ inputs:
   - cuda
   input_form: file
 - id: darcy-hex
-  check:
-    kind: none
-    reason: darcyHex.xml has no Responses block, so nothing numeric is printed; the driver needs a minimal solution
-      functional printed outside the ROI first (class E; adding a response to the deck would change the registered
-      file's sha256)
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: ^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: ^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)
+      select: last
+      compare:
+        rule: record
+    # darcyHex.xml has no Responses block; the driver now prints the 2-norm of the final solution vector after the
+    # synchronized ROI end (main.cpp, 15 significant digits, 2026-09-30) -- a deterministic functional of the result
+    # without touching the registered deck. Required; the tolerance is set from the reference build's repeat scatter
+    # once measured with the changed binary.
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
   case: darcy-flow
   variant: case
   source:
