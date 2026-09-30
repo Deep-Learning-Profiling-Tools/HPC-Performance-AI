@@ -41,6 +41,7 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
 : "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${REGISTRY:=0}" "${BIND_PROBE:=1}" "${FORCE_PROFILE:=0}"
+: "${BIND_POLICY:=explicit}"     # Level 2 CPU binding: explicit (cases/level2_binding.tsv) | runtime (the MPI runtime's default)
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
@@ -188,6 +189,22 @@ measure_case() {
     run_env=("${case_env[@]}")
     case "$level" in 2|3) run_env+=("HPCPERF_GPUS=$gpus") ;; esac
     [ "$SKIP_VERIFY" = 1 ] && run_env+=("HPCPERF_SKIP_VERIFY=1")
+    # Level 2 CPU binding: the per-application policy of cases/level2_binding.tsv reaches the launcher
+    # through its HPCPERF_CPUS_PER_RANK interface (mpirun --map-by ppr:N:node:PE=<c> --bind-to core),
+    # with the OpenMP threads pinned one per core where the application has several; --bind-policy
+    # runtime leaves the MPI runtime's default (one core for a <= 2-rank job with Open MPI 5, as in the
+    # campaigns before 2026-09-30). What was applied is written to run_meta.txt (record: placement.policy).
+    local bind_meta="bind_policy=none"
+    if [ "$level" = 2 ]; then
+        local bind_out
+        bind_out="$(python3 "$TOOLS/cases.py" binding-meta --policy "$BIND_POLICY" "$app")" \
+            || { echo "  $app/$case: no CPU-binding policy in cases/level2_binding.tsv" >&2; return 1; }
+        bind_meta="$bind_out"
+        if [ "$BIND_POLICY" = explicit ]; then
+            local bkv
+            while IFS= read -r bkv; do [ -n "$bkv" ] && run_env+=("$bkv"); done < <(python3 "$TOOLS/cases.py" binding-env "$app")
+        fi
+    fi
 
     local out="$RAW_ROOT/level$level/$app/$case/$RUN_ID"
     local label; label=$(printf 'level%s %-34s' "$level" "$app/$case")
@@ -276,6 +293,7 @@ measure_case() {
         echo "env_allow=$(_env_allow | tr -s ' \n' '  ')"
         echo "env_deny_regex=$ENV_DENY"
         echo "bind_probe=${BINDPROBE_ID:-none}"
+        echo "$bind_meta"
         echo "platform_id=$PLATFORM_ID"
         echo "device_json=$DEVICE_JSON"
         echo "git_commit=$(git -C "$REPO" rev-parse HEAD 2>/dev/null)"
@@ -427,7 +445,7 @@ engine_main() {
     local n; n=$(printf '%s\n' "$rows" | wc -l)
     echo "measure_level${LEVEL}: run_id=$RUN_ID platform=$PLATFORM_ID collector=$COLLECTOR cases=$n" \
          "protocol=warmup:$WARMUP_RUNS,clean:$CLEAN_RUNS,profiled:$PROFILED_RUNS skip_verify=$SKIP_VERIFY" \
-         "bind_probe=$BINDPROBE_ID"
+         "bind_probe=$BINDPROBE_ID$([ "$LEVEL" = 2 ] && echo " bind_policy=$BIND_POLICY")"
     if [ "$COLLECTOR" = none ] && [ "$PROFILED_RUNS" -gt 0 ]; then
         echo "measure_level${LEVEL}: no profiler for $PLATFORM_ID -- ROI time and FOM only, device columns will be null"
     fi

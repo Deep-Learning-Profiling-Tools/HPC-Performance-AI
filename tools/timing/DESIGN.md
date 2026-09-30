@@ -171,7 +171,9 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
    regenerates `cases/level1.tsv`, plus a row in `cases/level1_apps.tsv`; Level 2 -- a
    row in `cases/level2_apps.tsv` (backends, timeout, FOM pattern if it prints one,
    `roi_excludes`, and `app_timer_regex` / `app_timer_unit` if it prints a timer for
-   exactly its ROI) and a `default` row in `cases/level2_cases.tsv`.
+   exactly its ROI), a `default` row in `cases/level2_cases.tsv`, and its CPU-binding
+   policy in `cases/level2_binding.tsv` (mpirun-launched: `cpus_per_rank` = its host
+   threads, `omp_pin` when it has several; direct-exec: no binding).
 5. `python3 tools/timing/cases.py check` and `bash tools/timing/tests/run_all.sh` must
    pass: the tests fail for a Level 1/2 source without BEGIN/END or a build that does
    not see the header, and for a `run.sh` without a case row.

@@ -13,7 +13,7 @@ with the front-ends' defaults:
 
 ```bash
 tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 1 warm-up + 5 clean + 1 profiled run per case
-tools/timing/measure_level2.sh all                               # Level 2: 0 warm-up + 1 clean + 1 profiled run per case
+tools/timing/measure_level2.sh all                               # Level 2: 1 discarded warm-up + 3 clean + 1 profiled run per case, ranks bound explicitly
 tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each (own loop timers)
 python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
 # --page-level PAGE.html:3 carries one level of an already published page (e.g. the Level 3 sweep of
@@ -27,7 +27,7 @@ campaign (section [Registered inputs](#registered-inputs---registry) below):
 ```bash
 python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
 tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
-tools/timing/measure_level2.sh --registry --collector nvidia_nsys --clean-runs 3 all              # 0 warm-up + 3 clean + 1 nsys profiled
+tools/timing/measure_level2.sh --registry --collector nvidia_nsys all                             # 1 discarded warm-up + 3 clean + 1 nsys profiled (the defaults), explicit CPU binding
 tools/timing/measure_level2.sh --registry --collector nvidia_nsys --clean-runs 2 <app>/<input> ... # adaptive +2 (see below)
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
@@ -80,7 +80,7 @@ One set of markers serves two measurements:
 |---|---|---|---|
 | unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` | 10 cases of 10 `level3/<app>/run.sh`, 2 GPUs each |
 | region | ROI markers | ROI markers | **the application's own loop timer** (no markers, see below) |
-| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
+| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 warm-up (discarded) + 3 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
 | verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
 | FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) | LAMMPS and SPARTA print one |
 
@@ -335,7 +335,12 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   it is evidence of a bug and never a result of anything. A *superseded* record is a correct measurement
   of an earlier definition of the input (e.g. remhos `periodic-hexagon-p0` before order 3 was made
   explicit): valid history of that workload, but not of the current one, and never compared with it.
-* **Protocol of campaign B.** The current results (phase 5, 2026-09-26/27) follow the PR #14 structure:
+* **Final Level 2 protocol (2026-09-30).** `measure_level2.sh` defaults: 1 whole-process warm-up run,
+  discarded from every statistic (its ROI time is kept in the record as `roi.warmup_runs_s`, a diagnostic
+  of the first-run effect), then 3 measured clean runs (headline = their median) and 1 nsys-profiled run;
+  every rank bound explicitly (`--bind-policy explicit`, above); one GPU, strictly serial. The warm-up is
+  defined before the runs, never removed afterwards. The campaigns before it (below) are kept as history.
+* **Protocol of campaign B.** The results of phase 5 (2026-09-26/27) follow the PR #14 structure:
   Level 1: 1 warm-up + 5 clean runs + 1 nsys-profiled run (`HPCPERF_SKIP_VERIFY=1`, as in A); Level 2: no
   whole-process warm-up, 3 clean runs + 1 nsys-profiled run. The ROI time comes from the clean runs, the
   device activity from the profiled run of the same measurement. An earlier no-profile pass (2026-09-23/24)
@@ -477,6 +482,21 @@ followed, and `HPCPERF_ROI_LOG` reaches the ranks through the environment
 (verified at one rank with quicksilver: `bash` -> `mpirun` -> `mpi_gpu_bind.sh` -> exe
 wrote its ROI log, audit clean).
 
+**CPU binding (explicit since 2026-09-30).** A Slurm allocation's CPU count is capacity, not rank
+binding: with the launcher's runtime default, Open MPI 5.0.10 binds a <= 2-rank job to ONE core, so
+the 17 mpirun-launched applications ran their main thread, the CUDA runtime's helper threads and --
+for hipBone -- four OpenMP threads on the first core of the cpuset (binding audit 2026-09-28; hipBone
+showed 4261 nonvoluntary context switches per run there). `cases/level2_binding.tsv` therefore states
+a policy per application -- `cpus_per_rank` = the application's host threads (1 for the single-host-
+thread applications, 4 for hipBone), `omp_pin` for the applications with several -- and
+`measure_level2.sh` (default `--bind-policy explicit`) sets `HPCPERF_CPUS_PER_RANK` so the launcher
+runs `mpirun --map-by ppr:<ranks>:node:PE=<cpus_per_rank> --bind-to core`, plus `OMP_NUM_THREADS`
+`OMP_PLACES=cores OMP_PROC_BIND=close` where `omp_pin` is yes. The seven direct-exec applications
+(no launcher) get nothing and stay unbound inside the cpuset, as before. The record's
+`placement.policy` says what was applied and its `placement` block what the process was actually
+allowed; `--bind-policy runtime` reproduces the earlier campaigns' default binding. The A/B of the
+two policies (2026-09-30) is in the results directory of that round, not here.
+
 ## Launching Level 3
 
 The same as Level 2, at 2 GPUs: the collector wraps `run.sh` from the outside, the
@@ -525,7 +545,7 @@ and matching),
 Level 3 (case resolution and refusal, every application's
 timer extracted from synthetic evidence, a missing or incomplete timer failing loudly,
 every cited source line existing, the dry run, the record, CSV and page, QMCPACK's
-profile default and its override) -- 77 checks.
+profile default and its override), and the Level 2 CPU-binding policy (the table, its checks, the front-end defaults and the record) -- 82 checks.
 
 ## Scope and what is UNVERIFIED
 

@@ -1,0 +1,43 @@
+# tools/timing/cases/level2_binding.tsv -- the CPU-binding policy of every Level 2 application (hand-maintained).
+#
+# Tab-separated, "-" = empty. The engine (measure_level2.sh, default --bind-policy explicit) puts the policy
+# into effect through the launcher's existing interface: HPCPERF_CPUS_PER_RANK=<cpus_per_rank> makes
+# level2/tools/hpcperf_mpi_launch.sh run `mpirun --map-by ppr:<ranks>:node:PE=<cpus_per_rank> --bind-to core`,
+# so every rank owns cpus_per_rank cores of the allocation's cpuset (Open MPI takes them in order, which on
+# dgx003 means the GPU-local socket first; the record's placement block shows what was actually allowed).
+#   launcher      mpirun: run.sh goes through hpcperf_mpi_launch.sh; direct: run.sh execs the program itself,
+#                 nothing binds it (it stays unbound inside the cpuset, as in every earlier campaign)
+#   host_threads  application host threads per rank beyond the CUDA runtime's helper threads: OMP_NUM_THREADS
+#                 as run.sh sets it, or 1 for an application that runs one host thread (binding audit 2026-09-28,
+#                 probe thread counts: 4 = main + cuda + cuda-EvtHandlr + 1)
+#   cpus_per_rank cores bound per rank = host_threads (one core per host thread; no idle bound cores)
+#   omp_pin       yes: OMP_NUM_THREADS=<host_threads> OMP_PLACES=cores OMP_PROC_BIND=close are set too, so the
+#                 OpenMP threads take one core each inside the bound set (verified 2026-09-30: hipBone's four
+#                 threads on cores 16-19, one each, instead of five threads on core 16)
+# --bind-policy runtime leaves the MPI runtime's default: Open MPI 5.0.10 binds a <= 2-rank job to ONE core,
+# which is where the 17 mpirun-launched applications ran in the campaigns before 2026-09-30.
+# app	launcher	host_threads	cpus_per_rank	omp_pin	basis
+amg2023	mpirun	1	1	no	one host thread + CUDA helpers (4 threads on one core in the audit)
+branson	mpirun	1	1	no	one host thread + CUDA helpers
+cabanapic	direct	-	-	no	direct exec; Kokkos OpenMP host backend starts one thread per cpuset core, unbound
+cloverleaf	mpirun	1	1	no	one host thread + CUDA helpers
+comb	mpirun	1	1	no	one host thread + CUDA helpers
+exacmech	direct	-	-	no	direct exec, host-light GPU application, unbound
+examinimd	mpirun	1	1	no	run.sh sets OMP_NUM_THREADS=1 (all work on the GPU)
+exampm	mpirun	1	1	no	run.sh sets OMP_NUM_THREADS=1 (all work on the GPU)
+gamess_ri_mp2	mpirun	1	1	no	one host thread + CUDA helpers (libnvomp linked, OMP_NUM_THREADS unset -> one thread on one core)
+haccabanapm	mpirun	1	1	no	one host thread + CUDA helpers (libgomp linked, OMP_NUM_THREADS unset -> one thread on one core)
+hipbone	mpirun	4	4	yes	run.sh OMP_NUM_THREADS default 4: OpenMP regions inside the CG loop (README "Run")
+kripke	mpirun	1	1	no	one host thread + CUDA helpers
+laghos	mpirun	1	1	no	one host thread + CUDA helpers
+minibude	direct	-	-	no	direct exec, host-light GPU application, unbound
+miniem	mpirun	1	1	no	one host thread + CUDA helpers
+miniweather	mpirun	1	1	no	one host thread + CUDA helpers
+p3_heat3d	direct	-	-	no	direct exec, host-light GPU application, unbound
+p3_vlp4d	direct	-	-	no	direct exec, host-light GPU application, unbound
+quicksilver	mpirun	1	1	no	one host thread + CUDA helpers
+remhos	mpirun	1	1	no	one host thread + CUDA helpers
+shaw	direct	-	-	no	direct exec; Kokkos OpenMP host backend starts one thread per cpuset core, unbound
+sw4lite	mpirun	1	1	no	one host thread + CUDA helpers (2 threads on one core in the audit)
+tealeaf	mpirun	1	1	no	one host thread + CUDA helpers
+xsbench	direct	-	-	no	direct exec, host-light GPU application, unbound

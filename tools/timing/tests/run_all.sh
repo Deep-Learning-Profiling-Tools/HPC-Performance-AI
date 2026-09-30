@@ -1897,6 +1897,55 @@ if "as published in index.html" not in md: bad.append("markdown lacks the source
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
+echo "=== 23: Level 2 CPU-binding policy (cases/level2_binding.tsv, --bind-policy)"
+be_h="$(python3 "$TOOLS/cases.py" binding-env hipbone 2>&1 | noise | tr '\n' ' ')"
+be_a="$(python3 "$TOOLS/cases.py" binding-env amg2023 2>&1 | noise | tr '\n' ' ')"
+be_x="$(python3 "$TOOLS/cases.py" binding-env xsbench 2>&1 | noise | tr '\n' ' ')"
+if [ "$be_h" = "HPCPERF_CPUS_PER_RANK=4 OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close " ] \
+   && [ "$be_a" = "HPCPERF_CPUS_PER_RANK=1 " ] && [ -z "$be_x" ]; then
+    ok "23a: hipBone gets PE=4 + pinned OpenMP threads, a single-host-thread MPI app PE=1, a direct-exec app nothing"
+else bad "23a: binding env hipbone=[$be_h] amg2023=[$be_a] xsbench=[$be_x]"; fi
+o_e="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none hipbone/default 2>&1 | noise)"
+o_r="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none --bind-policy runtime hipbone/default 2>&1 | noise)"
+if echo "$o_e" | /usr/bin/grep -q 'protocol=warmup:1,clean:3,profiled:1' && echo "$o_e" | /usr/bin/grep -q 'bind_policy=explicit' \
+   && echo "$o_e" | /usr/bin/grep -q 'HPCPERF_CPUS_PER_RANK=4' && echo "$o_e" | /usr/bin/grep -q 'OMP_PROC_BIND=close' \
+   && echo "$o_r" | /usr/bin/grep -q 'bind_policy=runtime' && ! echo "$o_r" | /usr/bin/grep -q 'HPCPERF_CPUS_PER_RANK'; then
+    ok "23b: Level 2 defaults are 1 warm-up + 3 clean + 1 profiled with explicit binding; --bind-policy runtime adds no binding variables"
+else bad "23b: dry runs: $(echo "$o_e" | /usr/bin/grep -E 'protocol|env ' | head -2 | cut -c1-160 | tr '\n' ' ') / $(echo "$o_r" | /usr/bin/grep -E 'protocol' | cut -c1-160)"; fi
+o_b="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none --bind-policy nowhere hipbone/default 2>&1 | noise)"
+case "$o_b" in *"--bind-policy must be explicit or runtime"*) ok "23c: an unknown binding policy is refused" ;;
+               *) bad "23c: unknown policy not refused: $(echo "$o_b" | head -2 | tr '\n' ' ')" ;; esac
+mkdir -p "$TMP/bind"; cp "$TOOLS/cases/level2_binding.tsv" "$TMP/bind/keep.tsv"
+printf 'zzz_not_an_app\tmpirun\t1\t1\tno\tplanted\n' >> "$TOOLS/cases/level2_binding.tsv"
+o_c="$(python3 "$TOOLS/cases.py" check 2>&1 | noise)"; cp "$TMP/bind/keep.tsv" "$TOOLS/cases/level2_binding.tsv"
+sed -i 's/^hipbone\tmpirun\t4\t4\tyes/hipbone\tmpirun\t4\t2\tyes/' "$TOOLS/cases/level2_binding.tsv"
+o_d="$(python3 "$TOOLS/cases.py" check 2>&1 | noise)"; cp "$TMP/bind/keep.tsv" "$TOOLS/cases/level2_binding.tsv"
+if echo "$o_c" | /usr/bin/grep -q 'zzz_not_an_app, which is not a level2 application' \
+   && echo "$o_d" | /usr/bin/grep -q 'cpus_per_rank must equal host_threads'; then
+    ok "23d: cases.py check refuses a binding row without an application and idle bound cores"
+else bad "23d: $(echo "$o_c" | tail -1) / $(echo "$o_d" | tail -1)"; fi
+d="$TMP/raw23/level2/x/default/20260930T000000Z-9"
+mkraw "$d" none 1 "Rate: 5.0"
+if [ -d "$d" ]; then
+    printf 'bind_policy=explicit\nbind_launcher=mpirun\nbind_host_threads=4\nbind_cpus_per_rank=4\nbind_omp_pin=yes\nbind_env=HPCPERF_CPUS_PER_RANK=4;OMP_NUM_THREADS=4;OMP_PLACES=cores;OMP_PROC_BIND=close\n' >> "$TMP/raw23/level2/x/default/20260930T000000Z-9/run_meta.txt"
+    python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw23" --out-root "$TMP/res23" --no-report > /dev/null 2>&1
+    pycheck "23e: the record carries placement.policy (kind, cpus_per_rank, env) and the CSV a placement_policy column" <<'PY'
+import csv, glob, json, os
+bad = []
+rs = glob.glob(os.path.join(os.environ["TMP"], "res23", "level2", "x", "default", "*.json"))
+if not rs: bad.append("no record")
+else:
+    p = json.load(open(rs[0]))["placement"]["policy"]
+    if p.get("kind") != "explicit" or p.get("cpus_per_rank") != 4 or p.get("omp_pin") != "yes" or "OMP_PLACES=cores" not in p.get("env", []):
+        bad.append(f"policy {p}")
+    rows = list(csv.DictReader(open(os.path.join(os.environ["TMP"], "res23", "summary_level2.csv"))))
+    if not rows or rows[0].get("placement_policy") != "explicit:PE=4:omp_pin": bad.append(f"csv {rows and rows[0].get('placement_policy')}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+else
+    bad "23e: the synthetic Level 2 raw run was not created"
+fi
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

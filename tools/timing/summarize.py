@@ -92,7 +92,7 @@ COLUMNS = [
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
     "app_timer_s", "roi_vs_app_timer",
     "input_id",
-    "placement_cpus_allowed", "placement_mems_allowed", "placement_gpus", "placement_consistent",
+    "placement_cpus_allowed", "placement_mems_allowed", "placement_gpus", "placement_consistent", "placement_policy",
     "roi_source", "roi_steps", "roi_setup_s", "ops_scope",
     "whole_compute_s", "whole_copy_h2d_s", "whole_copy_d2h_s", "whole_copy_d2d_s", "whole_fill_s",
     "whole_runtime_api_calls",
@@ -185,9 +185,24 @@ def placement_of(procs):
     return out
 
 
+def bind_policy_of(meta):
+    """The CPU-binding policy the engine applied (run_meta.txt bind_*): explicit (cases/level2_binding.tsv
+    through the launcher's HPCPERF_CPUS_PER_RANK interface, with the pairs it added to the run's
+    environment), runtime (the MPI runtime's default binding: the campaigns before 2026-09-30), none
+    (Level 1 / 3: no policy, the process stays unbound inside the allocation) or not recorded."""
+    out = {"kind": meta.get("bind_policy") or "not recorded"}
+    for k in ("launcher", "host_threads", "cpus_per_rank", "omp_pin"):
+        v = meta.get(f"bind_{k}")
+        if v not in (None, "", "-"):
+            out[k] = int(v) if v.isdigit() else v
+    env = meta.get("bind_env")
+    out["env"] = [e for e in env.split(";") if e] if env else []
+    return out
+
+
 def placement_block(meta, runs, prof_dir):
     """The record's `placement`: what the probe saw in every run, and whether it was the same
-    CPU set / memory set / GPU in all of them. Never a metric."""
+    CPU set / memory set / GPU in all of them, plus the binding policy the engine applied. Never a metric."""
     clean = [placement_of(read_bind_logs(r["dir"])) for r in runs]
     prof = placement_of(read_bind_logs(prof_dir)) if os.path.isdir(prof_dir) else []
     # the measured processes are the ones that wrote an ROI log; helpers that merely opened a
@@ -196,7 +211,7 @@ def placement_block(meta, runs, prof_dir):
     cpus = sorted({p["cpus_allowed"] for p in measured if p["cpus_allowed"]})
     mems = sorted({p["mems_allowed"] for p in measured if p["mems_allowed"]})
     gpus = sorted({g for p in measured for g in p["gpus"]})
-    return {"probe": dash(meta.get("bind_probe")) or None, "clean_runs": clean, "profiled": prof,
+    return {"probe": dash(meta.get("bind_probe")) or None, "policy": bind_policy_of(meta), "clean_runs": clean, "profiled": prof,
             "summary": {"processes_recorded": len(measured), "cpus_allowed": cpus, "mems_allowed": mems,
                         "gpus": gpus, "consistent": bool(measured) and len(cpus) <= 1 and len(mems) <= 1 and len(gpus) <= 1}}
 
@@ -712,6 +727,8 @@ def flatten(rec):
         "placement_mems_allowed": ";".join(plc.get("mems_allowed", [])),
         "placement_gpus": ";".join(plc.get("gpus", [])),
         "placement_consistent": "" if not plc.get("processes_recorded") else int(plc["consistent"]),
+        "placement_policy": (lambda p: p.get("kind", "") + (f":PE={p['cpus_per_rank']}" if p.get("cpus_per_rank") else "")
+                             + (":omp_pin" if p.get("omp_pin") == "yes" else ""))((rec.get("placement") or {}).get("policy") or {}),
         "roi_source": v(roi.get("source") or "markers"), "roi_steps": v(roi.get("steps")),
         "roi_setup_s": v(roi.get("setup_s")), "ops_scope": v(rec.get("ops_scope")),
         "whole_compute_s": v(whole.get("compute_s")), "whole_copy_h2d_s": v(whole.get("copy_h2d_s")),

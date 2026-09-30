@@ -106,6 +106,62 @@ L2_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_bett
                "fom_regex", "extra_env", "roi_excludes", "app_timer_regex", "app_timer_unit", "notes")
 APP_TIMER_UNITS = {"s": 1.0, "ms": 1e-3, "us": 1e-6}
 L2_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "notes")
+L2_BIND_COLS = ("app", "launcher", "host_threads", "cpus_per_rank", "omp_pin", "basis")
+OMP_PIN_ENV = ("OMP_PLACES=cores", "OMP_PROC_BIND=close")
+
+
+def binding_table():
+    """cases/level2_binding.tsv: the CPU-binding policy of every Level 2 application, checked."""
+    rows = {r["app"]: r for r in read_table("level2_binding.tsv", L2_BIND_COLS)}
+    for r in rows.values():
+        if r["launcher"] not in ("mpirun", "direct"):
+            raise CaseError(f"{r['_where']}: launcher must be mpirun|direct")
+        if r["omp_pin"] not in ("yes", "no"):
+            raise CaseError(f"{r['_where']}: omp_pin must be yes|no")
+        if r["launcher"] == "direct":
+            if r["host_threads"] or r["cpus_per_rank"] or r["omp_pin"] == "yes":
+                raise CaseError(f"{r['_where']}: a direct-exec application has no binding (host_threads / cpus_per_rank '-', omp_pin no)")
+            continue
+        if not (r["host_threads"].isdigit() and r["cpus_per_rank"].isdigit()) or int(r["host_threads"]) < 1:
+            raise CaseError(f"{r['_where']}: host_threads and cpus_per_rank must be positive integers")
+        if int(r["cpus_per_rank"]) != int(r["host_threads"]):
+            raise CaseError(f"{r['_where']}: cpus_per_rank must equal host_threads (one core per host thread, no idle bound cores)")
+        if r["omp_pin"] == "yes" and int(r["host_threads"]) < 2:
+            raise CaseError(f"{r['_where']}: omp_pin yes needs more than one host thread")
+    return rows
+
+
+def binding_policy(app):
+    """The explicit CPU-binding policy of one Level 2 application."""
+    rows = binding_table()
+    if app not in rows:
+        raise CaseError(f"level2/{app} has no row in cases/level2_binding.tsv (its CPU-binding policy)")
+    return rows[app]
+
+
+def binding_env(app):
+    """NAME=VALUE pairs that put the explicit policy into effect through the launcher's interface
+    (HPCPERF_CPUS_PER_RANK -> mpirun --map-by ppr:N:node:PE=<cpus_per_rank> --bind-to core) and, for an
+    application with several host threads, pin its OpenMP threads one per core inside that set.
+    Empty for a direct-exec application (nothing to bind through)."""
+    r = binding_policy(app)
+    if r["launcher"] == "direct":
+        return []
+    out = [f"HPCPERF_CPUS_PER_RANK={r['cpus_per_rank']}"]
+    if r["omp_pin"] == "yes":
+        out += [f"OMP_NUM_THREADS={r['host_threads']}", *OMP_PIN_ENV]
+    return out
+
+
+def binding_meta(app, policy):
+    """run_meta.txt lines (bind_*) that record the policy applied to a run."""
+    if policy == "runtime":
+        r = binding_policy(app)
+        return [f"bind_policy=runtime", f"bind_launcher={r['launcher']}"]
+    r = binding_policy(app)
+    return ["bind_policy=explicit", f"bind_launcher={r['launcher']}", f"bind_host_threads={r['host_threads'] or '-'}",
+            f"bind_cpus_per_rank={r['cpus_per_rank'] or '-'}", f"bind_omp_pin={r['omp_pin']}",
+            "bind_env=" + ";".join(binding_env(app))]
 L1_REG_COLS = ("app", "case", "input_id", "materialized", "exe", "args", "cwd", "env", "timeout_s")
 L2_REG_COLS = ("app", "case", "input_id", "materialized", "selector", "registry_knobs", "gpus", "timeout_s")
 
@@ -557,6 +613,15 @@ def check_all(build_root=None):
     for r in l2:
         if r["fom_regex"] and re.compile(r["fom_regex"], re.M).groups != 1:
             raise CaseError(f"{r['app']}/{r['case']}: fom_regex needs exactly one capture group")
+    bind = binding_table()
+    for a in l2apps:
+        if a not in bind:
+            raise CaseError(f"level2/{a} has no row in cases/level2_binding.tsv (its CPU-binding policy)")
+    for a in bind:
+        if a not in l2apps:
+            raise CaseError(f"cases/level2_binding.tsv lists {a}, which is not a level2 application")
+    msgs.append(f"level2 binding policy: {sum(1 for r in bind.values() if r['launcher'] == 'mpirun')} mpirun-launched applications "
+                f"bound through HPCPERF_CPUS_PER_RANK, {sum(1 for r in bind.values() if r['launcher'] == 'direct')} direct-exec unbound")
     r1, _ = level1_registry_rows("CUDA")
     r2, _ = level2_registry_rows("CUDA")
     msgs.append(f"registry: {len(r1)} Level 1 and {len(r2)} Level 2 registered inputs (cases/level<N>_registry.tsv)")
@@ -603,6 +668,11 @@ def main(argv):
     e = sub.add_parser("allowed-env")
     e.add_argument("--level", choices=("2", "3"), default="2")
     e.add_argument("app")
+    b = sub.add_parser("binding-env", help="NAME=VALUE pairs of the explicit CPU-binding policy of a Level 2 application")
+    b.add_argument("app")
+    bm = sub.add_parser("binding-meta", help="run_meta.txt lines recording the binding policy applied")
+    bm.add_argument("--policy", choices=("explicit", "runtime"), default="explicit")
+    bm.add_argument("app")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "resolve":
@@ -623,6 +693,10 @@ def main(argv):
         elif a.cmd == "check":
             for m in check_all(a.build_root):
                 print(f"cases: {m}")
+        elif a.cmd == "binding-env":
+            sys.stdout.write("".join(f"{kv}\n" for kv in binding_env(a.app)))
+        elif a.cmd == "binding-meta":
+            sys.stdout.write("".join(f"{line}\n" for line in binding_meta(a.app, a.policy)))
         else:
             lvl = int(a.level)
             table, cols = ("level2_apps.tsv", L2_APP_COLS) if lvl == 2 else ("level3_apps.tsv", L3_APP_COLS)
