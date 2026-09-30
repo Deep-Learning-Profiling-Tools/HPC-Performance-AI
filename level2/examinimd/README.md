@@ -254,6 +254,28 @@ comm 0.10 s), **1.64-1.67e9 atom-steps/s** over two runs, energy -4.232812
 `input/snap/in.snap.Ta06A` (64 Ta atoms, 100 steps, run from its directory)
 were also run once each; the LJ variants give identical thermo rows.
 
+## Correctness criterion of the registered inputs (2026-09-30)
+
+Upstream ships no reference output and no acceptance criterion (its `--correctness` option compares a
+run with a binary dump of an earlier run of itself; no dump ships). The acceptance criterion adopted
+for the registered LJ inputs is the one `validate.sh` already enforces and `validate_lj.py`
+generalises to every registered lattice (section Validation above): the t = 0 state against the
+analytic fcc lattice sums and the NVE energy-conservation bound over the run, cross-checked against
+LAMMPS' published log of the identical `bench/in.lj` problem. The final thermo row's temperature and
+potential energy are **diagnostics** (recorded and reported, never pass/fail): an MD trajectory is
+chaotic, a candidate that merely reorders floating-point work reaches a different sample of the same
+ensemble, and no upstream value exists to pin them to. This follows the only reference-backed
+criterion that exists for the code; it does not manufacture a pass -- the check still fails on a wrong
+initial state or a non-conserving integration. The step count of the last row stays required and
+exact.
+
+The SNAP input (`snap-ta06a`) cannot use `validate_lj.py`: ExaMiniMD's SNAP kernel computes forces
+only (PotE prints 0 in every row), so neither the lattice sums nor a conservation bound apply.
+`validate_snap.py` checks what is reference-backed -- T(0) = 300 K, the deck's velocity-create target
+(scaled exactly, 3N-3 convention), every thermo row finite with T > 0, the run complete (100 steps) --
+and reports the final temperature as a diagnostic. No CPU reference run exists here (this repository
+builds ExaMiniMD for CUDA / HIP only); that is stated in the registry rather than worked around.
+
 ## Warnings
 
 Compiler (nvcc 13.2.78 through nvcc_wrapper + GCC 13.3, 24 translation

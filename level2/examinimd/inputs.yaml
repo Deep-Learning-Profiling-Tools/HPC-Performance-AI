@@ -17,9 +17,17 @@ timing:
   regex: '^\d+ \d+ \| (?P<value>[0-9.]+) [0-9.]+ [0-9.]+ [0-9.]+ [0-9.]+ \| '
   select: last
 baseline:
-  method: upstream ships no reference; validate.sh checks the LJ melt against independent references. The registry
-    keeps the final thermo row (step exact; temperature and potential energy recorded, required, no tolerance basis
-    yet -- the registry check pins the t=0 state and bounds the energy drift, it does not pin the final values).
+  method: >-
+    upstream ships no reference outputs and no acceptance criterion (its --correctness option only compares a run
+    with a binary dump of an earlier run of itself). The acceptance criterion adopted here (2026-09-30) is the one
+    validate.sh already enforces and validate_lj.py generalises to every registered lattice -- the t=0 state against
+    the analytic fcc lattice sums and the NVE energy-conservation bound over the run, cross-checked against LAMMPS'
+    published log of the identical bench/in.lj problem -- because it is the only reference-backed criterion that
+    exists for this code. The final thermo row's temperature and potential energy are DIAGNOSTIC (recorded,
+    reported, never a pass/fail): an MD trajectory is chaotic, so a candidate that merely reorders floating-point
+    work reaches a different sample of the same ensemble, and no upstream value exists to pin them to. This follows
+    the reference-backed criterion; it does not manufacture a pass (the check still fails on a wrong initial state
+    or a non-conserving integration). The step count of the last row stays required and exact.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: final_step
@@ -29,13 +37,13 @@ baseline:
     compare:
       rule: exact
   - name: temperature_final
-    role: required
+    role: diagnostic   # chaotic trajectory, no upstream reference: reported, not a criterion (see method)
     regex: ^\d+ (?P<value>[0-9.eE+-]+) -?[0-9.eE+-]+ -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
     select: last
     compare:
       rule: record
   - name: pote_final
-    role: required
+    role: diagnostic   # as temperature_final; the SNAP deck prints 0 (no SNAP energy is computed)
     regex: ^\d+ [0-9.eE+-]+ (?P<value>-?[0-9.eE+-]+) -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
     select: last
     compare:
@@ -141,10 +149,19 @@ inputs:
   - input/snap/Ta06A.snapparam
   input_form: file
   check:
-    kind: none
-    reason: SNAP deck -- the thermo row prints PE = 0.000000 (the SNAP energy is not computed) and validate_lj.py's
-      Lennard-Jones references do not apply; the only reference is LAMMPS' upstream examples/snap Ta06A log, not
-      vendored (class C, pending)
+    # validate_lj.py does not apply (no SNAP energy is computed: PE = 0 in every row, so no conservation bound, and no
+    # analytic lattice sum exists for SNAP); validate_snap.py checks what is reference-backed: T(0) = 300 K, the deck's
+    # velocity-create target (scaled exactly, 3N-3 convention), every thermo row finite, the run complete (100 steps).
+    # The final temperature is a diagnostic. No CPU reference run exists here (this repository builds ExaMiniMD for
+    # CUDA / HIP only; upstream ships no reference output for this case) -- stated, not worked around.
+    kind: post_run
+    command: [python3, '{bench_dir}/validate_snap.py', --log, '{log}', --temp, '300.0', --steps, '100']
+    pass_regex: '^ExaMiniMD SNAP check: PASS'
+    fail_regex: '^ExaMiniMD SNAP check: FAIL'
+    basis: 'validate_snap.py: T(0) = 300.0 (in.snap.Ta06A velocity create; rel 1e-5), all thermo rows finite with T > 0,
+      last row = step 100; temperature_final diagnostic (chaotic 64-atom NVE trajectory, no upstream reference), PotE
+      not computed by the SNAP kernel (no energy-conservation bound possible)'
+    covers: []
 check:
   # the run through run.sh (the registered deck / lattice / steps), then validate_lj.py on its stdout: T(0), the
   # analytic fcc lattice energy at t=0 and the NVE energy-conservation bound over the whole run.
@@ -154,6 +171,6 @@ check:
   fail_regex: '^ExaMiniMD LJ check: FAIL'
   basis: 'validate_lj.py (= validate.sh deck A generalised to the registered lattice): T(0) = 1.4 (in.lj velocity create;
     abs 1e-5), PE(0)/atom and ETot(0)/atom vs the analytic fcc lattice sum with ExaMiniMD''s cutoff shift (rel 1e-5),
-    max |ETot(t) - ETot(0)| / |ETot(0)| <= 1e-3 over all thermo rows; temperature_final / pote_final are bounded, not
-    pinned, by this check'
+    max |ETot(t) - ETot(0)| / |ETot(0)| <= 1e-3 over all thermo rows. This IS the acceptance criterion (see
+    baseline.method): temperature_final / pote_final are diagnostics, bounded but not pinned by it'
   covers: []
