@@ -209,6 +209,18 @@ Result on this machine (fresh shell, cwd `/tmp`):
 `PASS: branson CUDA (ctest 11/11 excl. test_input_1pe; Marshak 5 steps: rad/mat conservation <= 1e-9 rel; GPU vs CPU final Post-mat/Absorption/Exit E within 5%, T_e within 0.02)`
 -- 42 s including the one-time CPU reference build.
 
+## Correctness check of `lb-hohlraum` (2026-09-30)
+
+The single-threaded CPU reference of the 250 M-photon `3D_lb_hohlraum.xml` deck did not finish its
+first time step in 12 h (2026-09-29). The registered input therefore declares its reference as a
+**4-rank CPU run** (`check_reference.sh --cpu-ref-ranks 4`: same deck, seed and global photon count;
+Branson's CPU build is MPI-parallel, `mpirun --map-by ppr:4:node:OVERSUBSCRIBE` within the one Slurm
+task slot). The comparison criteria are unchanged and statistical (final energies and transported
+photons within 5 %; the deck prints no per-cell T_e table), so the rank count does not enter them:
+it is reference provenance, printed with the result. A finished reference log is reused through
+`HPCPERF_BRANSON_CPU_REF_LOG` (hashed in `check.log`; `HPCPERF_BRANSON_CPU_REF_NOTE` adds the
+provenance line).
+
 ## Warnings
 
 After the fixes above, the clean CUDA build prints 2 warnings:

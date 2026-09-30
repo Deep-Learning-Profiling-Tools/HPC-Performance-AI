@@ -3,7 +3,7 @@
 # sources (validate.sh check C, generalised to any deck): the correctness check of the registered
 # inputs (level2/branson/inputs.yaml, `check:`).
 #
-#   check_reference.sh <gpu.log> <deck.xml> [--no-build]
+#   check_reference.sh <gpu.log> <deck.xml> [--no-build] [--cpu-ref-ranks N]
 #
 # 1. builds build/level2/branson/cpu_ref once (USE_GPU=OFF, the options validate.sh uses);
 # 2. runs `mpirun -np 1 cpu_ref/BRANSON <deck>` in the current directory -> cpu_ref.log
@@ -19,9 +19,22 @@ R="$(cd "$HERE/../.." && pwd)"
 # the sources include tools/timing/ROI markers (header-only, a no-op unless measured): the same
 # include path build.sh exports, so the CPU-only reference configures from the same main.cc
 export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
-GPU_LOG="${1:?usage: check_reference.sh <gpu.log> <deck.xml>}"
-DECK="${2:?usage: check_reference.sh <gpu.log> <deck.xml>}"
-NO_BUILD=0; [ "${3:-}" = "--no-build" ] && NO_BUILD=1
+GPU_LOG="${1:?usage: check_reference.sh <gpu.log> <deck.xml> [--no-build] [--cpu-ref-ranks N]}"
+DECK="${2:?usage: check_reference.sh <gpu.log> <deck.xml> [--no-build] [--cpu-ref-ranks N]}"
+shift 2
+# --cpu-ref-ranks N: the CPU reference with N MPI ranks (same deck, seed and global photon count; Branson's CPU
+# build is MPI-parallel). The comparison criteria are statistical (5 % / 0.02), so the rank count does not enter
+# them; it is reference provenance and is printed with the result. Used for the 250 M-photon lb-hohlraum deck,
+# whose single-threaded reference did not finish its first step in 12 h.
+NO_BUILD=0; REF_RANKS=1
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-build) NO_BUILD=1; shift ;;
+        --cpu-ref-ranks) REF_RANKS="${2:?}"; shift 2 ;;
+        *) echo "check_reference.sh: unknown option $1" >&2; exit 2 ;;
+    esac
+done
+case "$REF_RANKS" in ''|*[!0-9]*|0) echo "check_reference.sh: --cpu-ref-ranks must be a positive integer" >&2; exit 2 ;; esac
 CPU_BUILD="$R/build/level2/branson/cpu_ref"
 CPU_EXE="$CPU_BUILD/BRANSON"
 JOBS="${MAKE_JOBS:-4}"
@@ -53,19 +66,21 @@ if [ -n "${HPCPERF_BRANSON_CPU_REF_LOG:-}" ]; then
     [ -f "$HPCPERF_BRANSON_CPU_REF_LOG" ] || fail "HPCPERF_BRANSON_CPU_REF_LOG=$HPCPERF_BRANSON_CPU_REF_LOG missing"
     grep -q 'Photons Per Second (FOM)' "$HPCPERF_BRANSON_CPU_REF_LOG" || fail "reused CPU reference log did not finish (no FOM line): $HPCPERF_BRANSON_CPU_REF_LOG"
     cp "$HPCPERF_BRANSON_CPU_REF_LOG" cpu_ref.log
-    echo "== CPU reference: reusing the finished run $HPCPERF_BRANSON_CPU_REF_LOG (sha256 $(sha256sum cpu_ref.log | cut -d' ' -f1))"
+    echo "== CPU reference: reusing the finished run $HPCPERF_BRANSON_CPU_REF_LOG (sha256 $(sha256sum cpu_ref.log | cut -d' ' -f1)); declared ranks: $REF_RANKS${HPCPERF_BRANSON_CPU_REF_NOTE:+; $HPCPERF_BRANSON_CPU_REF_NOTE}"
 else
-    echo "== CPU reference run: mpirun -np 1 $CPU_EXE $DECK  (cwd $PWD, log cpu_ref.log)"
+    MPI_MAP=()
+    [ "$REF_RANKS" -gt 1 ] && MPI_MAP=(--map-by "ppr:$REF_RANKS:node:OVERSUBSCRIBE")   # one Slurm task slot, as the launcher does
+    echo "== CPU reference run: mpirun -np $REF_RANKS ${MPI_MAP[*]} $CPU_EXE $DECK  (cwd $PWD, log cpu_ref.log)"
     echo "   reference binary sha256: $(sha256sum "$CPU_EXE" | cut -d' ' -f1)"
     t0=$(date +%s)
-    if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
+    if ! mpirun -np "$REF_RANKS" "${MPI_MAP[@]}" --bind-to none "$CPU_EXE" "$DECK" > cpu_ref.log 2>&1; then
         tail -20 cpu_ref.log
         fail "CPU reference run exited non-zero (log: $PWD/cpu_ref.log)"
     fi
     echo "   CPU reference run: $(( $(date +%s) - t0 )) s"
 fi
 if python3 "$HERE/check_log.py" cmp "$GPU_LOG" cpu_ref.log; then
-    echo "PASS: branson reference check ($(basename "$DECK")): GPU vs CPU-only Branson, same deck and seed -- final energies within 5 %, T_e within 0.02, transported photons within 5 %"
+    echo "PASS: branson reference check ($(basename "$DECK")): GPU vs CPU-only Branson ($REF_RANKS rank(s)), same deck and seed -- final energies within 5 %, T_e within 0.02, transported photons within 5 %"
 else
     fail "$(basename "$DECK"): GPU vs CPU reference comparison failed (see above; logs: $GPU_LOG, $PWD/cpu_ref.log)"
 fi
