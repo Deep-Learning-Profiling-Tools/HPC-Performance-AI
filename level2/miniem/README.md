@@ -134,9 +134,11 @@ implicit steps (the driver's `--numTimeSteps` is superseded by the deck's final 
 * **Every deck**: `main.cpp` now prints `hpcperf: final solution 2-norm = ...` (15 significant
   digits) after the synchronized end of the ROI -- a deterministic functional of the final state,
   outside the measured region, for decks without a Responses block (`darcyHex.xml`) as well. The
-  registry compares it (`solution_norm_final`, required); its tolerance is set from the reference
-  build's repeat scatter with the changed binary. The change alters the binary's sha256, so the
-  MiniEM timing inputs are re-measured with it (the 2026-09-30 Level 2 campaign).
+  registry compares it (`solution_norm_final`, required) at `rel 1e-8`, the deck's Belos convergence
+  tolerance (`solverMueLu.xml`): two solves that satisfy the deck's own convergence criterion agree in
+  the solution to the order of that tolerance. The reference build's 7 runs per input (2026-09-30
+  campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics). The change alters the
+  binary's sha256, so the MiniEM timing inputs were re-measured with it (the 2026-09-30 Level 2 campaign).
 
 ## Warnings
 

@@ -71,13 +71,18 @@ inputs:
         rule: rel
         tol: 1.0e-04
     # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
-    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
     - name: solution_norm_final
       role: required
       regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
-        rule: record
+        rule: rel
+        tol: 1.0e-08
   case: maxwell-refmaxwell
   variant: default
   source:
@@ -132,13 +137,18 @@ inputs:
         rule: rel
         tol: 1.0e-04
     # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
-    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
     - name: solution_norm_final
       role: required
       regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
-        rule: record
+        rule: rel
+        tol: 1.0e-08
   case: maxwell-refmaxwell
   variant: size
   source:
@@ -193,13 +203,18 @@ inputs:
         rule: rel
         tol: 1.0e-04
     # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
-    # digits, 2026-09-30): required; the tolerance is set from the reference build's repeat scatter once measured
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
     - name: solution_norm_final
       role: required
       regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
-        rule: record
+        rule: rel
+        tol: 1.0e-08
   case: maxwell-refmaxwell
   variant: size
   source:
@@ -242,14 +257,16 @@ inputs:
         rule: record
     # darcyHex.xml has no Responses block; the driver now prints the 2-norm of the final solution vector after the
     # synchronized ROI end (main.cpp, 15 significant digits, 2026-09-30) -- a deterministic functional of the result
-    # without touching the registered deck. Required; the tolerance is set from the reference build's repeat scatter
-    # once measured with the changed binary.
+    # without touching the registered deck. Compared at rel 1e-8 = the deck's Belos convergence tolerance
+    # (solverMueLu.xml 1.0e-8; see the Maxwell inputs); the reference build's 7 runs agree to 2 ulps (6.804576196336858e-03
+    # .. ...860e-03, rel 3e-16, the assembly's atomics).
     - name: solution_norm_final
       role: required
       regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
       select: last
       compare:
-        rule: record
+        rule: rel
+        tol: 1.0e-08
   case: darcy-flow
   variant: case
   source:
