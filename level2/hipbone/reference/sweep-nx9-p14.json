@@ -1,0 +1,54 @@
+{
+ "schema": "hpcperf-hipbone-reference-1",
+ "input_id": "sweep-nx9-p14",
+ "note": "CPU reference runs 2026-09-30 on dgx003 (Slurm job 1397595), the same build/level2/hipbone/cuda/hipBone binary, OCCA Serial and OpenMP (8 threads, cores 100-107) backends, exact registered arguments",
+ "dofs": 1953125,
+ "cg_iterations": 100,
+ "r_norm_initial": 988.576225155911,
+ "r_norm_final": 7.619353900899e-09,
+ "r_norm_final_spread_log10": 0.0,
+ "runs": [
+  {
+   "log": "sweep-nx9-p14.OpenMP.1.log",
+   "sha256": "9c3e70fc4b4ece44934dda3fdf8659705293a8353e229955974a17dc5a7e3fcf",
+   "backend": "?",
+   "dofs": 1953125,
+   "cg_iterations": 100,
+   "r_norm_initial": 988.576225155911,
+   "r_norm_final": 7.619353900899e-09
+  },
+  {
+   "log": "sweep-nx9-p14.OpenMP.2.log",
+   "sha256": "ae231130cacd821246a8ae0b25b396dbbb59292750c00fd7c42345a8cc75b1b0",
+   "backend": "?",
+   "dofs": 1953125,
+   "cg_iterations": 100,
+   "r_norm_initial": 988.576225155911,
+   "r_norm_final": 7.619353900899e-09
+  },
+  {
+   "log": "sweep-nx9-p14.OpenMP.3.log",
+   "sha256": "218bbcfcd7c1dd0df09fcad8b6414dc13509de1fa18af08709ace322aaf88f44",
+   "backend": "?",
+   "dofs": 1953125,
+   "cg_iterations": 100,
+   "r_norm_initial": 988.576225155911,
+   "r_norm_final": 7.619353900899e-09
+  },
+  {
+   "log": "sweep-nx9-p14.Serial.1.log",
+   "sha256": "9fb3d5a64cc15c39e2bf7fe869ebf903f3a63ad2bd248f05288f9de0050666a8",
+   "backend": "?",
+   "dofs": 1953125,
+   "cg_iterations": 100,
+   "r_norm_initial": 988.576225155911,
+   "r_norm_final": 7.619353900899e-09
+  }
+ ],
+ "rule": {
+  "r_norm_initial": "rel 0.01",
+  "r_norm_final": "|log10 ratio| <= 0.1",
+  "dofs": "exact",
+  "cg_iterations": "exact"
+ }
+}

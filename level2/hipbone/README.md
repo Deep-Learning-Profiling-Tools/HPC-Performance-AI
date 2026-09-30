@@ -293,6 +293,21 @@ monotonically by ~0.77 per iteration there, so this is convergence rate at
 smaller problems tested: `-nx 8 -ny 8 -nz 8 -p 8` 4.40e-08 Serial vs
 4.43e-08 CUDA).
 
+## Correctness check of the registered inputs (2026-09-30)
+
+Every registered input (`inputs.yaml`) is checked against a **CPU reference run of the same hipBone
+build and problem**: OCCA's Serial and OpenMP backends (kernels JIT-compiled for the host), the exact
+registered argument list, on dgx003 (`reference/<id>.json`: values, log hashes, provenance).
+`check_reference.py` applies one benchmark-wide rule, fixed from the unoptimized CUDA build's agreement
+with those references over all registered sizes before any candidate existed: `dofs` and
+`cg_iterations` exact, `r_norm_initial` within 1 % (validate.sh check 4), and
+`|log10(r_norm_final / reference)| <= 0.1` -- a rounding-accumulation bound (the docstring of
+`check_reference.py` lists the observed CPU-vs-GPU deviations), not a convergence criterion. The
+Serial and OpenMP references agreed to all 13 printed digits where both were run. A negative test in
+`tools/inputs/tests/run_all.sh` shows the checker failing on a 1.5x final residual, a different dof
+count and a 2 % initial residual. Serial reference runs of the two largest sizes (single-threaded:
+8+ h / 30+ h) were not made; their references are OpenMP runs.
+
 ## Warnings
 
 None: 0 compiler warnings in the clean `build.sh CUDA` log (hipBone is

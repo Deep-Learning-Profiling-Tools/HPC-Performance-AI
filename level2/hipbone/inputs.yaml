@@ -31,14 +31,12 @@ baseline:
     validate.sh problem and for sweep-nx9-p14 (7.7e-9) but NOT at the larger sizes (nx24 p14:
     3.58e-8, README "Note for the default run.sh problem"; nx16 p8: 1.7e-7; nx32 p4: 9.8e-6) --
     unpreconditioned CG converges more slowly there, which is a convergence rate, not a defect.
-    The final residual is therefore RECORDED per input; the proposed comparison for an
-    optimized build is the relative error of r_norm_final against this baseline, tolerance to
-    be fixed with the correctness protocol (NEEDS_VALIDATION); cg_iterations and dofs must
-    match exactly. The 1 % rule on r_norm_initial is taken from validate.sh check 4, where it
-    compares the CUDA backend with OCCA's Serial backend (two libm realisations of the
-    pseudo-random RHS); applied here to CUDA-baseline vs CUDA-candidate on the same GPU it is
-    a loose guard (the value was identical to all printed digits in every pilot run), not a
-    statement that a 1 % change of the initial residual would be acceptable.
+    The final residual is therefore compared, per input, with a CPU reference run of the same build
+    and problem (OCCA Serial / OpenMP backends, reference/<id>.json, 2026-09-30) under one
+    benchmark-wide rule fixed from the unoptimized build's CPU-vs-GPU agreement over all registered
+    sizes, |log10(r_norm_final / reference)| <= 0.1 (check_reference.py); cg_iterations and dofs must
+    match exactly, and r_norm_initial within 1 % (validate.sh check 4: two libm realisations of the
+    pseudo-random RHS, a loose guard -- identical to all digits on the same GPU).
   reference: this build's first measured run per input (deterministic RHS); CORAL-2 threshold informational
   quantities:
     - name: cg_iterations
@@ -143,7 +141,17 @@ inputs:
       device memory, ~90 s wall of which ~70 s is host mesh setup; r_norm after 100 iterations
       7.77e-8 (recorded), 100 iterations, deterministic.
 check:
-  kind: none
-  reason: r_norm_final stays `record` -- upstream's 'generally < 1e-8' does not hold at the registered sizes and no
-    independent reference run exists for them; candidate basis (needs a decision) = validate.sh's CUDA-vs-Serial
-    criterion, |log10(candidate / baseline)| <= 1, or a Serial reference run per input (cost not established)
+  # Every registered input has a CPU reference run of the SAME build and problem (reference/<id>.json: OCCA Serial
+  # and OpenMP backends, exact registered arguments, 2026-09-30, provenance and log hashes inside). check_reference.py
+  # applies one benchmark-wide rule, fixed from the CPU-vs-GPU agreement of the unoptimized build across all sizes
+  # before any candidate existed: dofs and cg_iterations exact, r_norm_initial within 1 % (validate.sh check 4),
+  # |log10(r_norm_final / reference)| <= 0.1 (the docstring of check_reference.py states the observed deviations).
+  kind: post_run
+  command: [python3, '{bench_dir}/check_reference.py', --log, '{log}']
+  pass_regex: '^PASS: hipBone reference check'
+  fail_regex: '^FAIL: hipBone reference check'
+  basis: 'CPU reference run per input (same hipBone build, OCCA Serial / OpenMP, same -nx -ny -nz -p): dofs and CG
+    iterations exact, initial residual within 1 % (two libm realisations of the pseudo-random RHS, validate.sh check 4),
+    final residual within |log10 ratio| 0.1 -- a rounding-accumulation bound set from the unoptimized CUDA build''s
+    deviation from the CPU references over all registered sizes (check_reference.py, reference/<id>.json)'
+  covers: [r_norm_final]
