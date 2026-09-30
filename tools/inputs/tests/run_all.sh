@@ -966,8 +966,9 @@ assert d["kind"] == "standalone" and d["command"][:2] == ["python3", f"{R}/level
 PY
 python3 "$TOOL" check "$R/level1/hotspot" g512-p2-t200 --out "$TMP/ck_hs" --dry-run > "$TMP/ck_hs.json" 2>/dev/null
 python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['command'][3:6]==['512','2','200'] and d['command'][6].endswith('/data/temp_512'), d['command']" "$TMP/ck_hs.json" && ok "hotspot: check renders grid / pyramid height / sim_time from the params and the data files from the args" || bad "hotspot check render: $(cat "$TMP/ck_hs.json")"
-python3 "$TOOL" check "$R/level2/examinimd" snap-ta06a --out "$TMP/x" --dry-run >/dev/null 2>"$TMP/e"; rc=$?
-[ $rc -eq 2 ] && grep -q "SNAP deck" "$TMP/e" && ok "examinimd: the SNAP input's per-input 'kind: none' overrides the benchmark check with its reason" || bad "examinimd snap rc=$rc"
+python3 "$TOOL" check "$R/level2/examinimd" snap-ta06a --out "$TMP/x" --dry-run > "$TMP/snap.json" 2>"$TMP/e"; rc=$?
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['command'][1].endswith('validate_snap.py') and d['command'][-1]=='100', d['command']" "$TMP/snap.json" \
+    && ok "examinimd: the SNAP input's per-input check overrides the LJ check with validate_snap.py (initial state, completeness)" || bad "examinimd snap rc=$rc $(head -c 300 "$TMP/e")"
 for d in level1/bfs level1/hotspot level1/srad_v1 level1/gaussian_elimination level1/channel_shuffle level2/haccabanapm level2/examinimd level2/exacmech level2/kripke level2/comb level2/branson level2/exampm level2/p3_vlp4d level2/p3_heat3d level2/miniem level2/cabanapic level2/hipbone level2/miniweather level2/quicksilver level2/shaw level1/ao_bench; do
     python3 "$TOOL" validate "$R/$d" >/dev/null 2>&1 || bad "validate $d after the correctness wiring: $(python3 "$TOOL" validate "$R/$d" 2>&1 | noise | head -3)"
 done; ok "every registry touched by the correctness wiring validates"
@@ -1166,6 +1167,75 @@ bash -n "$R/level2/quicksilver/seed_scatter.sh" && ok "quicksilver seed_scatter.
 for d in level2/branson level2/exampm level2/shaw level2/p3_vlp4d level1/ao_bench level2/quicksilver level2/examinimd level2/hipbone level2/miniweather level2/miniem; do
     python3 "$TOOL" validate "$R/$d" >/dev/null 2>&1 && ok "validate $d (second pass)" || bad "validate $d"
 done
+
+# --- CPU-reference checkers (2026-09-30): PASS on values equal to the reference, FAIL on a perturbation
+P3="$TMP/refchk"; mkdir -p "$P3"
+# hipBone: a synthetic log with the reference values of sweep-nx9-p14 (reference/<id>.json)
+python3 - "$R/level2/hipbone/reference/sweep-nx9-p14.json" "$P3" <<'PY'
+import json, sys
+ref = json.load(open(sys.argv[1])); d = sys.argv[2]
+def log(path, r0, r100, dofs=ref["dofs"], it=ref["cg_iterations"]):
+    open(path, "w").write(f"== hipBone CUDA: mpirun ./hipBone -m CUDA -nx 9 -ny 9 -nz 9 -p 14 -v  (OMP_NUM_THREADS=4, input=sweep-nx9-p14)\n"
+                          f"CG: initial res norm {r0:.15g}\nCG: it 100, r norm {r100:.12e}, alpha = 5.1e-01\nhipBone: 1, {dofs}, 1.0, {it}, 0.5\n")
+log(f"{d}/hb_ok.log", ref["r_norm_initial"] * (1 + 5e-3), ref["r_norm_final"] * 1.05)      # within 1 % / |log10| 0.021
+log(f"{d}/hb_bad_final.log", ref["r_norm_initial"], ref["r_norm_final"] * 1.5)                # |log10 1.5| = 0.176 > 0.1
+log(f"{d}/hb_bad_dofs.log", ref["r_norm_initial"], ref["r_norm_final"], dofs=ref["dofs"] + 1)
+log(f"{d}/hb_bad_init.log", ref["r_norm_initial"] * 1.02, ref["r_norm_final"])               # 2 % > 1 %
+PY
+python3 "$R/level2/hipbone/check_reference.py" --log "$P3/hb_ok.log" > "$P3/hb1.out" 2>&1; rc1=$?
+python3 "$R/level2/hipbone/check_reference.py" --log "$P3/hb_bad_final.log" > "$P3/hb2.out" 2>&1; rc2=$?
+python3 "$R/level2/hipbone/check_reference.py" --log "$P3/hb_bad_dofs.log" > "$P3/hb3.out" 2>&1; rc3=$?
+python3 "$R/level2/hipbone/check_reference.py" --log "$P3/hb_bad_init.log" > "$P3/hb4.out" 2>&1; rc4=$?
+[ $rc1 -eq 0 ] && grep -q "^PASS: hipBone reference check (sweep-nx9-p14)" "$P3/hb1.out" \
+    && [ $rc2 -eq 1 ] && grep -q "|log10 ratio| 0.1761 > 0.1" "$P3/hb2.out" \
+    && [ $rc3 -eq 1 ] && grep -q "dofs .* != reference" "$P3/hb3.out" \
+    && [ $rc4 -eq 1 ] && grep -q "r_norm_initial .* > 0.01" "$P3/hb4.out" \
+    && ok "hipbone check_reference.py: PASS within the rule; FAIL on a 1.5x final residual, a different dof count, a 2 % initial residual (negative tests)" \
+    || bad "hipbone check_reference.py rc=$rc1/$rc2/$rc3/$rc4: $(tail -1 "$P3/hb2.out")"
+for i in $(python3 -c "import yaml; print(' '.join(x['id'] for x in yaml.safe_load(open('$R/level2/hipbone/inputs.yaml'))['inputs']))"); do
+    [ -f "$R/level2/hipbone/reference/$i.json" ] || { echo "   (hipbone reference/$i.json not yet written)"; }
+done
+# miniWeather: synthetic logs against reference/thermal-1024x512-1000s.json
+python3 - "$R/level2/miniweather/reference/thermal-1024x512-1000s.json" "$P3" <<'PY'
+import json, sys
+ref = json.load(open(sys.argv[1])); d = sys.argv[2]
+def log(path, dm, dte): open(path, "w").write(f"CPU Time: 1.0\nd_mass: {dm:e}\nd_te:   {dte:e}\n")
+log(f"{d}/mw_ok.log", 1.5e-13, ref["d_te"] + 4e-9)      # within 1e-8
+log(f"{d}/mw_bad_te.log", 0.0, ref["d_te"] + 2e-8)      # 2e-8 > 1e-8
+log(f"{d}/mw_bad_mass.log", 5e-9, ref["d_te"])          # 5e-9 > 1e-9
+PY
+MWA=(--nx 1024 --nz 512 --sim-time 1000 --data-spec DATA_SPEC_THERMAL)
+python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_ok.log" "${MWA[@]}" > "$P3/mw1.out" 2>&1; rc1=$?
+python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_bad_te.log" "${MWA[@]}" > "$P3/mw2.out" 2>&1; rc2=$?
+python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_bad_mass.log" "${MWA[@]}" > "$P3/mw3.out" 2>&1; rc3=$?
+python3 "$R/level2/miniweather/check_reference.py" --log "$P3/mw_ok.log" --nx 7 --nz 7 --sim-time 1 --data-spec DATA_SPEC_THERMAL > "$P3/mw4.out" 2>&1; rc4=$?
+[ $rc1 -eq 0 ] && grep -q "^PASS: miniweather reference check (thermal-1024x512-1000s)" "$P3/mw1.out" \
+    && [ $rc2 -eq 1 ] && grep -q "|diff| 2.00e-08 > 1e-08" "$P3/mw2.out" \
+    && [ $rc3 -eq 1 ] && grep -q "|d_mass| = 5.000e-09 > 1e-09" "$P3/mw3.out" \
+    && [ $rc4 -eq 1 ] && grep -q "no CPU reference for thermal-7x7-1s" "$P3/mw4.out" \
+    && ok "miniweather check_reference.py: PASS within the rule; FAIL on d_te off by 2e-8, on d_mass 5e-9, on a grid without a reference (negative tests)" \
+    || bad "miniweather check_reference.py rc=$rc1/$rc2/$rc3/$rc4: $(tail -1 "$P3/mw2.out")"
+# ExaMiniMD SNAP: initial state and completeness
+printf '#Timestep Temperature PotE ETot Time Atomsteps/s\n0 300.000000 0.000000 0.038172 0.000000 0.000000e+00\n50 332.570495 0.000000 0.042316 0.049562 6.440771e+04\n100 468.041359 0.000000 0.059554 0.097955 6.654094e+04\n' > "$P3/snap_ok.log"
+sed 's/^0 300.000000/0 299.000000/' "$P3/snap_ok.log" > "$P3/snap_bad_t0.log"
+head -3 "$P3/snap_ok.log" > "$P3/snap_short.log"
+python3 "$R/level2/examinimd/validate_snap.py" --log "$P3/snap_ok.log" > "$P3/sn1.out" 2>&1; rc1=$?
+python3 "$R/level2/examinimd/validate_snap.py" --log "$P3/snap_bad_t0.log" > "$P3/sn2.out" 2>&1; rc2=$?
+python3 "$R/level2/examinimd/validate_snap.py" --log "$P3/snap_short.log" > "$P3/sn3.out" 2>&1; rc3=$?
+[ $rc1 -eq 0 ] && grep -q "^ExaMiniMD SNAP check: PASS" "$P3/sn1.out" && grep -q "diagnostic: T(100) = 468.041359" "$P3/sn1.out" \
+    && [ $rc2 -eq 1 ] && grep -q "T(0) = 299.0 differs" "$P3/sn2.out" \
+    && [ $rc3 -eq 1 ] && grep -q "last thermo row is step 50" "$P3/sn3.out" \
+    && ok "examinimd validate_snap.py: PASS on T(0) = 300 and a complete run; FAIL on T(0) = 299 and on an incomplete run; final T reported as diagnostic" \
+    || bad "validate_snap.py rc=$rc1/$rc2/$rc3"
+python3 "$TOOL" verdict level2/examinimd lj-40cubed-100 --measurement "$P3/no-such.json" >/dev/null 2>&1 || true
+python3 -c "
+import yaml, sys
+d = yaml.safe_load(open('$R/level2/examinimd/inputs.yaml'))
+roles = {q['name']: q.get('role', 'required') for q in d['baseline']['quantities']}
+assert roles == {'final_step': 'required', 'temperature_final': 'diagnostic', 'pote_final': 'diagnostic'}, roles
+assert 'acceptance criterion' in d['baseline']['method'] and 'DIAGNOSTIC' in d['baseline']['method']
+" && ok "examinimd: final temperature / potential energy are diagnostics, the step count required; the method states the adopted criterion" \
+   || bad "examinimd roles"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]
