@@ -1249,7 +1249,7 @@ echo "=== 15: registered-input report (registry_view.py + report.py)"
 # miniem darcy-hex: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
 # record plus a 2-run adaptive extension of the same configuration, a newer 3-run record built from
 # another binary (a separate measurement), and a failed MiniEM attempt.
-pycheck "15a-15h: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism" <<'PY'
+pycheck "15a-15h, 15k: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism, vs previous only within one protocol" <<'PY'
 import json, os, sys
 sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
 import hpcperf_inputs as hi, report, registry_view as RV
@@ -1261,7 +1261,7 @@ base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m
         "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
 PLAT = "test-platform"
 def rec(run_id, wl, argv, runs, exe_sha="aa", commit="c0ffee", app="remhos", case="periodic-hexagon-p0", status="ok",
-        invalid=False, sel="HPCPERF_REMHOS_INPUT", order=3):
+        invalid=False, sel="HPCPERF_REMHOS_INPUT", order=3, warm=0):
     raw = os.path.join(T, "raw", app, case, run_id); os.makedirs(raw, exist_ok=True)
     ident = dict(cur, workload=wl, benchmark=app, input_id=case, selector=sel)
     for i, v in enumerate(runs if status == "ok" else [None]):
@@ -1278,7 +1278,7 @@ def rec(run_id, wl, argv, runs, exe_sha="aa", commit="c0ffee", app="remhos", cas
          "registry": {"input_id": case, "identity": ident, "identity_complete": True, "identity_sha256": "id-" + json.dumps(wl, sort_keys=True)[:40]},
          "inputs": {"declared_env": {sel: case}, "processes": [], "exe_sha256": exe_sha},
          "roi": {"runs_s": runs if status == "ok" else [], "wall_s": statistics.median(runs) if status == "ok" else None},
-         "measurement": {"protocol": {"warmup_runs": 0, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+         "measurement": {"protocol": {"warmup_runs": warm, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
          "device": None, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": commit}, "caveats": []}
     os.makedirs(f"{root}/level2/{app}/{case}", exist_ok=True)
     json.dump(r, open(f"{root}/level2/{app}/{case}/{run_id}.json", "w"))
@@ -1287,6 +1287,8 @@ rec("run02", cur["workload"], ["-o", "2"] + base, [1.40, 1.41, 1.42], invalid=Tr
 rec("run03", cur["workload"], base + ["-o", "3"], [2.72, 2.40, 2.38])                               # current, 3 runs
 rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                                     # adaptive +2, same config
 rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
+rec("run07", cur["workload"], base + ["-o", "3"], [9.5, 9.6, 9.7], exe_sha="bb", warm=1)            # another protocol: a new chain
+rec("run08", cur["workload"], base + ["-o", "3"], [9.6, 9.7, 9.8], exe_sha="bb", warm=1)            # same protocol as run07
 json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
            "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
           open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
@@ -1301,8 +1303,8 @@ rows = {i["input_id"]: i for a in c["levels"]["2"] for i in a["inputs"]}
 nreg = sum(1 for x in RV.registered_inputs(R) if x["level"] == 2)
 if len(rows) != nreg: bad.append(f"15c: {len(rows)} Level 2 inputs listed, registry has {nreg}")
 h = rows["periodic-hexagon-p0"]; m = h["cells"].get(PLAT)
-if not m or m["set"]["run_ids"] != ["run05"]:
-    bad.append(f"15d: current should be the newest configuration run05 (another binary is a separate measurement): {m and m['set']['run_ids']}")
+if not m or m["set"]["run_ids"] != ["run08"]:
+    bad.append(f"15d: current should be the newest configuration run08 (another binary / protocol is a separate measurement): {m and m['set']['run_ids']}")
 sets = {tuple(s["run_ids"]): s for s in h["sets"]}
 p = sets.get(("run03", "run04"))
 if not p or p["n"] != 5 or abs(p["median"] - 2.39) > 1e-9: bad.append(f"15e: adaptive 3+2 not pooled into 5 samples: {p}")
@@ -1310,6 +1312,10 @@ if sets.get(("run01",), {}).get("verdict") != "SUPERSEDED" or sets[("run01",)]["
 if sets[("run01",)].get("vs_previous") is not None or p.get("vs_previous") is not None:
     bad.append("15f: vs previous computed across workload definitions")
 if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.append("15f: vs previous missing between same-workload measurements")
+if sets.get(("run07",), {}).get("vs_previous") is not None: bad.append("15k: vs previous computed across protocols (warm-up 0 -> 1)")
+if not sets.get(("run08",)) or sets[("run08",)]["vs_previous"] is None: bad.append("15k: vs previous missing between two measurements of the same protocol")
+if "warm-up 1" not in sets.get(("run07",), {}).get("protocol_key", ""): bad.append(f"15k: protocol key not shown: {sets.get(('run07',), {}).get('protocol_key')}")
+if m and m["set"]["run_ids"] != ["run08"]: bad.append(f"15d/15k: current should now be run08: {m['set']['run_ids']}")
 if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
     bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
 f = rows["darcy-hex"]

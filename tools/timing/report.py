@@ -29,7 +29,7 @@ Two kinds of results are rendered, both from the same records:
   definition count; INVALIDATED records (the run got another workload) and SUPERSEDED records (an
   older definition of the input) are history; an adaptive extension (+2 clean runs) is pooled with
   its 3 runs into one 5-sample result only through an explicit measurement group (measurement_groups.json); "vs previous" is only computed
-  between measurements of the same workload. Scientific correctness and blocker notes come from
+  between measurements of the same workload under the same protocol (warm-up runs), binding policy and GPU. Scientific correctness and blocker notes come from
   annotations.json next to the records (evidence from outside the timing runs), never from a ROI run.
 * Case-table results (measure_level<N>.sh without --registry): the cases of tools/timing/cases/ against
   the platforms, the latest run of each (case, platform) -- the original view.
@@ -256,10 +256,24 @@ def build_data(recs):
 
 # ----------------------------------------------------------------- registered inputs (registry_view)
 
+def _protocol_key(m):
+    """What two measurements of one workload must share for a "vs previous" to mean anything: the warm-up
+    count of the protocol, the CPU-binding policy and the physical GPU(s) (from the newest record of the set).
+    A change of any of them (2026-09-30: the final Level 2 protocol on another physical GPU) starts a new
+    comparison chain instead of a percentage against an earlier, different setup."""
+    r = m["records"][-1]
+    proto = (r.get("measurement") or {}).get("protocol") or {}
+    plc = r.get("placement") or {}
+    return (proto.get("warmup_runs"), (plc.get("policy") or {}).get("kind") or "not recorded",
+            tuple((plc.get("summary") or {}).get("gpus") or ()))
+
+
 def _set_summary(m, input_key):
+    pk = _protocol_key(m)
     return {"run_ids": m["run_ids"], "verdict": m["verdict"], "n": len(m["samples"]), "median": m["median"],
             "spread": m["spread"], "stable": m["stable"], "git_commit": (m["git_commit"] or "")[:10],
-            "utc_last": m["utc_last"], "platform": m["platform"], "current_definition": m["workload_key"] == input_key}
+            "utc_last": m["utc_last"], "platform": m["platform"], "current_definition": m["workload_key"] == input_key,
+            "protocol_key": f"warm-up {pk[0]}, binding {pk[1]}, GPU {','.join(pk[2]) or '?'}"}
 
 
 def _measurement(m):
@@ -292,9 +306,10 @@ def build_registry(roots):
             hist, last = [], {}
             for m in sets:
                 h = _set_summary(m, row["workload_key"])
-                prev = last.get((m["platform"], m["workload_key"]))
+                ck = (m["platform"], m["workload_key"], _protocol_key(m))     # same workload AND same protocol / binding / GPU
+                prev = last.get(ck)
                 h["vs_previous"] = None if prev is None else (m["median"] - prev) / prev
-                last[(m["platform"], m["workload_key"])] = m["median"]
+                last[ck] = m["median"]
                 hist.append(h)
             cells = {}
             for p in plats:

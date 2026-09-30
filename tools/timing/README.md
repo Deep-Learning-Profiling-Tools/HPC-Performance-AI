@@ -195,7 +195,8 @@ the top) whose numbers are never mixed with, or compared against, the current on
    failed input, the input (registry parameters / arguments / variables and the command as run), the
    code and binary identity, the caveats, and the history: every measurement of the input (pooled per
    configuration, marked current or earlier definition, "vs previous" only between measurements of the
-   same workload) and every attempt with its verdict (PASS, SUPERSEDED, INVALIDATED, NOT_RUN, ...).
+   same workload under the same protocol -- warm-up runs, binding policy and GPU -- so a protocol change
+   starts a new chain) and every attempt with its verdict (PASS, SUPERSEDED, INVALIDATED, NOT_RUN, ...).
 
 What is current and how records pool is decided by `registry_view.py` (the same module gives the counts
 and `registry_current.csv`): only a record the run verifier accepts for the input's CURRENT definition
