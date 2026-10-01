@@ -498,8 +498,9 @@ def render_md_registry(c):
             out.append(f"- {camp[key]}")
     out += ["- Spread = (max - min) / median of all clean-run samples; CV = sample stddev / median. Stable: spread <= 10 % "
             "for fewer than 10 samples; IQR / median <= 5 % for 10 samples or more (the range grows with the sample count, "
-            "the IQR does not). 'two levels': the samples fall into two groups (a gap > 5 % of the median, >= 20 % on each side). An adaptive extension (+2 runs) is pooled with its 3 runs only through "
-            "an explicit measurement group; runs of the same configuration without one stay separate measurements.",
+            "the IQR does not). 'two levels': the samples fall into two groups (a gap > 5 % of the median, >= 20 % on each side). An adaptive extension (+2 runs, history campaigns only -- the final "
+            "Level 2 protocol has none) is pooled with its 3 runs only through an explicit measurement group; runs of the same "
+            "configuration without one stay separate measurements.",
             "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification "
             "(did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness "
             "(evidence from outside the timing runs; its basis is given per input in index.html).", ""]

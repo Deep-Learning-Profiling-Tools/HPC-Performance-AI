@@ -18,8 +18,8 @@ timing:
   select: only
 baseline:
   method: Branson prints per-step conservation diagnostics and the photons-per-second FOM; validate.sh runs upstream's
-    unit tests and a small deck comparison. The registry records the transported photon count (required, no tolerance
-    basis yet) and the FOM (diagnostic).
+    unit tests and a small deck comparison. The registry records the transported photon count (required; verified by
+    the check against the deck''s frozen CPU-only reference) and the FOM (diagnostic).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: photons_transported
@@ -151,35 +151,26 @@ inputs:
   files:
   - inputs/3D_lb_hohlraum.xml
   input_form: file
-  check:
-    # The benchmark check with a 24-rank CPU reference (the 4-rank run did not finish step 1 in 11 h): the single-threaded reference of this 250 M-photon deck did not
-    # finish its first step in 12 h (2026-09-29). Same deck, seed and global photon count; Branson's CPU build is
-    # MPI-parallel and the criteria are statistical (5 % / 0.02), so the rank count is reference provenance only
-    # (printed with the result; HPCPERF_BRANSON_CPU_REF_LOG reuses a finished reference log, hashed in check.log).
-    kind: post_run
-    command: [bash, '{bench_dir}/check_reference.sh', '{log}', '{bench_dir}/{param:deck}', --cpu-ref-ranks, '24']
-    pass_regex: '^PASS: branson reference check'
-    fail_regex: '^FAIL: branson reference check'
-    basis: 'GPU vs CPU-only Branson (same sources, deck, seed and global photon count; CPU reference with 24 MPI ranks,
-      2026-09-30): final Post-mat / Absorption / Exit E within 5 % relative, transported photons within 5 % relative
-      (no per-cell T_e table in this deck) -- validate.sh check C (check_log.py cmp); the 5 % margins are validate.sh''s,
-      stated as > 6 sigma of the seed-to-seed scatter'
-    covers: [photons_transported]
-    timeout: 43200
 check:
-  # validate.sh check C generalised to the registered deck (check_reference.sh): the GPU run of the deck is compared
-  # with a CPU-only Branson built from the same sources, same deck and seed, one rank -- final Post-mat / Absorption /
-  # Exit energies within 5 %, T_e of every cell within 0.02, transported photon count within 5 % (check_log.py cmp;
-  # validate.sh: > 6 sigma of the seed-to-seed scatter, catches a broken transport kernel). The per-step conservation
-  # check (check_log.py gpu) is not repeated here: it is a consistency check, not a comparison with an independent
-  # result. The CPU reference run is single-threaded: seconds for the marshak deck, minutes for the single-node
-  # hohlraum, hours for the two 250 M-photon decks (cost not established; timeout 12 h).
+  # Candidate validation against the FROZEN CPU-only reference of the deck (reference/<id>.json, written once at
+  # construction time by generate_reference.sh from a finished CPU-only run -- README "Correctness reference"):
+  # check_reference.py reads the GPU run's log and compares its final completed step with the reference -- final-step
+  # Post-mat / Absorption / Exit E within 5 % relative, the final step's "Total Photons transported" (the last such
+  # line of the log, never the first) within 5 % relative, every cell's final T_e within 0.02 absolute where the deck
+  # prints the table (only marshak does), the same number of steps, a finished run. The margins are validate.sh check
+  # C's (> 6 sigma of the seed-to-seed scatter, far below any transport error), fixed before any candidate existed;
+  # the reference's rank count (1; lb-hohlraum 24) is provenance only. The check never builds or runs the CPU
+  # reference: a missing, corrupted or deck-mismatching reference is an explicit FAIL/ERROR. The per-step conservation
+  # check (check_log.py gpu) is not repeated here: it is a consistency check, not a comparison with an independent result.
   kind: post_run
-  command: [bash, '{bench_dir}/check_reference.sh', '{log}', '{bench_dir}/{param:deck}']
+  command: [python3, '{bench_dir}/check_reference.py', '{log}', --deck, '{bench_dir}/{param:deck}']
   pass_regex: '^PASS: branson reference check'
   fail_regex: '^FAIL: branson reference check'
-  basis: 'GPU vs CPU-only Branson (same sources, deck, seed, one rank): final Post-mat / Absorption / Exit E within 5 %
-    relative, T_e within 0.02 absolute in every cell, Total Photons transported within 5 % relative -- validate.sh check C
-    (check_log.py cmp); the 5 % / 0.02 margins are validate.sh''s, stated as > 6 sigma of the seed-to-seed scatter'
+  basis: 'GPU run vs the frozen CPU-only Branson reference of the deck (reference/<id>.json: the same sources built with
+    USE_GPU=OFF, same deck, seed and global photon count; 1 MPI rank, lb-hohlraum 24; frozen 2026-10-01 from the runs that
+    produced the PASS verdicts of 2026-09-29 / 2026-10-01): final-step Post-mat / Absorption / Exit E within 5 % relative,
+    final-step transported photons within 5 % relative, final T_e within 0.02 absolute per cell where printed --
+    validate.sh check C margins, stated as > 6 sigma of the seed-to-seed scatter; the check reads the frozen file and
+    never reruns the CPU reference'
   covers: [photons_transported]
-  timeout: 43200
+  timeout: 1800

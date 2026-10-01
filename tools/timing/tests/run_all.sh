@@ -1952,6 +1952,20 @@ else
     bad "23e: the synthetic Level 2 raw run was not created"
 fi
 
+
+# ---- 24. campaign notes carried by several results roots are shown once (annotations.json) --------------------
+N24="$(mktemp -d)"; mkdir -p "$N24/r1" "$N24/r2"
+printf '{"schema":"hpcperf-timing-annotations-1","campaign":{"a":"x"},"notes":["shared note","only in r1"],"inputs":[]}\n' > "$N24/r1/annotations.json"
+printf '{"schema":"hpcperf-timing-annotations-1","campaign":{"b":"y"},"notes":["shared note","only in r2"],"inputs":[]}\n' > "$N24/r2/annotations.json"
+if python3 - "$HERE/.." "$N24" <<'PY'
+import sys; sys.path.insert(0, sys.argv[1]); import registry_view as RV
+ann, meta = RV.load_annotations([sys.argv[2] + "/r1", sys.argv[2] + "/r2"])
+assert meta["notes"] == ["shared note", "only in r1", "only in r2"], meta["notes"]
+assert meta["campaign"] == {"a": "x", "b": "y"}
+PY
+then ok "24: a note present in two roots' annotations.json is listed once, root-specific notes kept in root order"; else bad "24: duplicate campaign notes"; fi
+rm -rf "$N24"
+
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"
 [ "$failn" -eq 0 ]

@@ -237,7 +237,7 @@ def registered_inputs(repo=REPO):
 
 def load_annotations(roots):
     """{(level, benchmark, input_id): {"correctness": .., "correctness_basis": .., "blocker": ..}} merged over the
-    roots, plus campaign notes. Kept next to the records because correctness evidence and blocker
+    roots, plus campaign notes (identical notes from several roots are kept once). Kept next to the records because correctness evidence and blocker
     diagnoses come from outside the timing runs."""
     ann, meta = {}, {"notes": [], "campaign": {}}
     for root in roots:
@@ -247,7 +247,9 @@ def load_annotations(roots):
         d = json.load(open(p))
         for a in d.get("inputs") or []:
             ann.setdefault((a["level"], a["benchmark"], a["input_id"]), {}).update({k: v for k, v in a.items() if k not in ("level", "benchmark", "input_id")})
-        meta["notes"] += d.get("notes") or []
+        for note in d.get("notes") or []:          # a note carried by several campaign roots is shown once
+            if note not in meta["notes"]:
+                meta["notes"].append(note)
         meta["campaign"].update(d.get("campaign") or {})
     return ann, meta
 

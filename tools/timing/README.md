@@ -28,7 +28,6 @@ campaign (section [Registered inputs](#registered-inputs---registry) below):
 python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
 tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
 tools/timing/measure_level2.sh --registry --collector nvidia_nsys all                             # 1 discarded warm-up + 3 clean + 1 nsys profiled (the defaults), explicit CPU binding
-tools/timing/measure_level2.sh --registry --collector nvidia_nsys --clean-runs 2 <app>/<input> ... # adaptive +2 (see below)
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
 python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
@@ -190,8 +189,8 @@ the top) whose numbers are never mixed with, or compared against, the current on
    case-table view (figures, process breakdown bar, ROI and device-activity panels, runtime API and
    checks, input and measurement, caveats, runs) plus a registered-input panel: ROI median of all clean-run
    samples, spread (max - min) / median, CV (stddev / median), stable / UNSTABLE, ROI share of the
-   process, FOM, every sample per record with its protocol (an adaptive 3 + 2 is pooled and shown as
-   such), timing status, run verification, scientific correctness with its basis, the blocker of a
+   process, FOM, every sample per record with its protocol (a history campaign's adaptive 3 + 2 is pooled and shown as
+   such; the final protocol has no adaptive extension), timing status, run verification, scientific correctness with its basis, the blocker of a
    failed input, the input (registry parameters / arguments / variables and the command as run), the
    code and binary identity, the caveats, and the history: every measurement of the input (pooled per
    configuration, marked current or earlier definition, "vs previous" only between measurements of the
@@ -346,14 +345,16 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   whole-process warm-up, 3 clean runs + 1 nsys-profiled run. The ROI time comes from the clean runs, the
   device activity from the profiled run of the same measurement. An earlier no-profile pass (2026-09-23/24)
   is kept as history: a different protocol, so a separate measurement of each input. **Adaptive
-  extension**: a Level 2 input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more
+  extension (history only -- not part of the final protocol)**: in campaign B a Level 2 input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more
   clean runs of the same configuration -- including the profiled run, so both records are one measurement
   configuration -- run as a separate invocation (`measure_level2.sh --registry --collector nvidia_nsys
   --clean-runs 2 <app>/<input>`); the front-ends do not do this by themselves -- the campaign script
   selects the inputs after the first pass and records each extension as a measurement group with its
   evidence (the campaign's decision line and both invocations' run ids and protocols). The report pools
   a grouped base + extension into one 5-sample result; all samples are kept, and an input still above
-  10 % is UNSTABLE. Without a group the extension record stays a separate 2-run measurement.
+  10 % is UNSTABLE. Without a group the extension record stays a separate 2-run measurement. The final
+  protocol (above) has no such step: an input is measured once, with its three clean runs, and an input above
+  10 % is simply UNSTABLE; `--clean-runs N` remains a diagnostic option of the front-end, not a protocol step.
 * **Stability depends on the sample size.** With fewer than 10 clean-run samples an input is stable when
   (max - min) / median <= 10 %; with 10 or more (e.g. a 20-run re-measurement of an UNSTABLE input) when
   the interquartile range / median <= 5 % -- the range grows with every added sample, the IQR does not;

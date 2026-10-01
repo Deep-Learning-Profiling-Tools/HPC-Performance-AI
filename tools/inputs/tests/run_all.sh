@@ -1062,7 +1062,7 @@ printf 'Step: 1 of 1\nEmission E: 1.0\nSource E: 0.0\nPre census E: 0.5\nPre mat
 bransonlog "$P2/b_gpu.log" 100000 2.10; bransonlog "$P2/b_cpu.log" 101000 2.12; bransonlog "$P2/b_cpu_far.log" 120000 2.12
 python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu.log" > "$P2/b1.out" 2>&1; rc1=$?
 python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu_far.log" > "$P2/b2.out" 2>&1; rc2=$?
-[ $rc1 -eq 0 ] && grep -q "^PASS: branson log check (cmp)" "$P2/b1.out" && grep -q "total photons transported: GPU 100000  CPU 101000" "$P2/b1.out" \
+[ $rc1 -eq 0 ] && grep -q "^PASS: branson log check (cmp)" "$P2/b1.out" && grep -q "final-step photons transported: GPU 100000  CPU 101000" "$P2/b1.out" \
     && [ $rc2 -eq 1 ] && grep -q "transported photon count differs" "$P2/b2.out" \
     && ok "branson check_log.py cmp: energies / T_e / transported photons within the margins pass; a 20 % photon-count difference fails" \
     || bad "branson cmp rc1=$rc1 rc2=$rc2 $(tail -2 "$P2/b1.out" "$P2/b2.out" | tr '\n' '|')"
@@ -1075,11 +1075,12 @@ python3 "$R/level2/branson/check_log.py" cmp "$P2/b_gpu.log" "$P2/b_cpu_note.log
 [ $rc3 -eq 0 ] && grep -q "no per-cell temperature table" "$P2/b3.out" && [ $rc4 -eq 1 ] && grep -q "T_e cell count differs" "$P2/b4.out" \
     && ok "branson check_log.py cmp: no T_e table in either log -> criterion not applicable, PASS on energies and photons; a table on one side only -> FAIL" \
     || bad "branson cmp without T_e rc3=$rc3 rc4=$rc4 $(tail -2 "$P2/b3.out" "$P2/b4.out" | tr '\n' '|')"
-bash -n "$R/level2/branson/check_reference.sh" && ok "branson check_reference.sh: valid shell" || bad "branson check_reference.sh syntax"
+bash -n "$R/level2/branson/generate_reference.sh" && python3 -m py_compile "$R/level2/branson/check_reference.py" && ok "branson generate_reference.sh / check_reference.py: valid" || bad "branson reference scripts syntax"
 python3 "$TOOL" check "$R/level2/branson" hohlraum-multi-node --out "$P2/b_dry" --dry-run 2>/dev/null | python3 -c "
 import json, sys; d = json.load(sys.stdin)
-assert d['command'][:2] == ['bash', '$R/level2/branson/check_reference.sh'] and d['command'][3].endswith('/level2/branson/inputs/3D_hohlraum_multi_node.xml') and d['command'][2].endswith('/run/stdout.log'), d
-" && ok "branson check: the reference checker gets the run's log and the registered deck (dry run)" || bad "branson check dry-run"
+assert d['command'][:2] == ['python3', '$R/level2/branson/check_reference.py'] and d['command'][2].endswith('/run/stdout.log') and d['command'][3] == '--deck' and d['command'][4].endswith('/level2/branson/inputs/3D_hohlraum_multi_node.xml'), d
+assert not any('generate_reference' in str(x) or 'cpu-ref' in str(x) for x in d['command']), d
+" && ok "branson check: the frozen-reference checker gets the run's log and the registered deck; no reference generation in the command (dry run)" || bad "branson check dry-run"
 # exampm: the final-state line -> rules (count exact, bounds, volume within 1 %); dumps checker refuses an empty directory
 printf 'Time 0.000000 / 0.250000\nExaMPM final state: step 250 time 0.25 particles 15400000 initial 15400000 pos_min 0.0012 pos_max 0.9876 volume_ratio 1.0004 v_mean 0.1 -0.2 -0.3 x_mean 0.5 0.5 0.31\n' > "$P2/ex_ok.log"
 sed 's/particles 15400000 initial/particles 15399999 initial/' "$P2/ex_ok.log" > "$P2/ex_lost.log"
@@ -1236,6 +1237,129 @@ assert roles == {'final_step': 'required', 'temperature_final': 'diagnostic', 'p
 assert 'acceptance criterion' in d['baseline']['method'] and 'DIAGNOSTIC' in d['baseline']['method']
 " && ok "examinimd: final temperature / potential energy are diagnostics, the step count required; the method states the adopted criterion" \
    || bad "examinimd roles"
+
+
+# ---- 17. Branson frozen references (2026-10-01): candidate validation reads reference/<id>.json, never reruns the CPU reference ----
+P4="$TMP/bfrozen"; mkdir -p "$P4/cwd" "$P4/empty" "$P4/refs"
+BR="$R/level2/branson"; BGPU="$FX/branson_lb_hohlraum_gpu.log"; BCPU="$FX/branson_lb_hohlraum_cpu_np24.log"; BDECK="$BR/inputs/3D_lb_hohlraum.xml"
+# 17.1 the checker has no build / run path at all, and the replay of the saved lb-hohlraum GPU log passes in an empty cwd
+! grep -q -E 'mpirun|cmake|subprocess' "$BR/check_reference.py" && ok "branson check_reference.py: no mpirun / cmake / subprocess -- the candidate check cannot start a CPU reference" || bad "branson check_reference.py contains a build or run path"
+(cd "$P4/cwd" && python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" > "$P4/replay.out" 2>&1); rc=$?
+[ $rc -eq 0 ] && grep -q "^PASS: branson reference check (3D_lb_hohlraum.xml): GPU run vs the frozen CPU-only reference lb-hohlraum.json (24 rank(s)" "$P4/replay.out" \
+    && grep -q "final-step photons transported: GPU 251243835  ref 251242903  rel diff 3.710e-06" "$P4/replay.out" \
+    && grep -q "final Post mat E  : GPU 1.773700e-02  ref 1.773700e-02" "$P4/replay.out" \
+    && grep -q "final completed step: 5 of 5" "$P4/replay.out" && [ -z "$(ls -A "$P4/cwd")" ] \
+    && ok "branson frozen check: lb-hohlraum's saved GPU log vs reference/lb-hohlraum.json -> PASS on the final step (photons 251243835 vs 251242903), nothing written to the cwd" \
+    || bad "branson frozen replay rc=$rc: $(tail -2 "$P4/replay.out" | tr '\n' '|')"
+# 17.2 provenance is in the artifact and printed by the check
+python3 - "$BR/reference/lb-hohlraum.json" "$BCPU" "$BDECK" <<'PY' && ok "branson reference/lb-hohlraum.json: schema, deck sha256 (= the committed deck), seed, upstream commit, CPU binary sha256, 24 ranks, launch, allocation, start/finish, CPU log sha256 (= the fixture log), final-step quantities, rule + basis, generation date" || bad "branson reference provenance"
+import hashlib, json, re, sys
+d = json.load(open(sys.argv[1])); sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
+assert d["schema"] == "hpcperf-branson-reference-1" and d["benchmark"] == "branson" and d["input_id"] == "lb-hohlraum"
+assert d["deck"] == "inputs/3D_lb_hohlraum.xml" and d["deck_sha256"] == sha(sys.argv[3]) and d["seed"] == 14706
+assert re.fullmatch(r"[0-9a-f]{40}", d["upstream"]["commit"]) and d["upstream"]["repo"] == "lanl/branson"
+r = d["reference_run"]; assert re.fullmatch(r"[0-9a-f]{64}", r["binary_sha256"]) and r["mpi_ranks"] == 24 and "USE_GPU=OFF" in r["build_options"]
+assert r["launch"].startswith("taskset") and "mpirun -np 24" in r["launch"] and "1397595" in r["allocation"]
+assert r["started_utc"] == "2026-09-30T21:59:11Z" and r["finished_utc"] == "2026-10-01T00:54:59Z" and r["log_sha256"] == sha(sys.argv[2]) and "results directory" in r["log_kept_at"]
+f = d["final_step"]; assert f["photons_transported"] == 251242903 and abs(f["post_mat_e"] - 1.7737e-02) < 1e-12 and f["t_e"] is None and d["steps"] == 5
+assert d["per_step_photons_transported"][0] == 250694250 and d["per_step_photons_transported"][-1] == 251242903
+assert d["tolerances"] == {"energy_rel": 0.05, "photons_rel": 0.05, "t_e_abs": 0.02} and "6 sigma" in d["tolerance_basis"] and d["rule"]["photons_transported"].startswith("rel <= 0.05 (final step")
+assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", d["generated_utc"]) and "generate_reference.sh" in d["generated_by"]
+PY
+grep -q "== frozen reference reference/lb-hohlraum.json: CPU-only Branson (USE_GPU=OFF), 24 MPI rank(s), binary sha256 392c0d0c32a0..., CPU log sha256 95b075a1f431... (run finished 2026-10-01T00:54:59Z)" "$P4/replay.out" \
+    && ok "branson frozen check prints the reference provenance (ranks, binary and log sha256, finish time, deck sha256 verified)" || bad "branson provenance line missing: $(head -1 "$P4/replay.out")"
+# 17.3 every registered deck has a frozen reference whose deck sha256 is the committed deck's; freeze is reproducible from the fixture log
+python3 - "$R" "$BCPU" "$P4" <<'PY' && ok "branson: all four registered inputs have reference/<id>.json bound to the committed deck by sha256; freeze of the fixture CPU log reproduces lb-hohlraum.json's values" || bad "branson references incomplete or freeze not reproducible"
+import hashlib, json, os, subprocess, sys, yaml
+R, cpu, tmp = sys.argv[1:4]; br = f"{R}/level2/branson"
+ids = [i["id"] for i in yaml.safe_load(open(f"{br}/inputs.yaml"))["inputs"]]
+assert sorted(ids) == sorted(os.path.splitext(f)[0] for f in os.listdir(f"{br}/reference") if f.endswith(".json")), ids
+for i in yaml.safe_load(open(f"{br}/inputs.yaml"))["inputs"]:
+    d = json.load(open(f"{br}/reference/{i['id']}.json")); deck = i["params"]["deck"]
+    assert d["deck"] == deck and d["deck_sha256"] == hashlib.sha256(open(f"{br}/{deck}", "rb").read()).hexdigest(), i["id"]
+    assert d["reference_run"]["mpi_ranks"] == (24 if i["id"] == "lb-hohlraum" else 1)
+out = f"{tmp}/refreeze.json"
+subprocess.run(["python3", f"{br}/check_log.py", "freeze", "--input-id", "lb-hohlraum", "--deck", f"{br}/inputs/3D_lb_hohlraum.xml", "--cpu-log", cpu, "--ranks", "24", "--out", out, "--generated-utc", "2026-10-01T00:00:00Z"], check=True, capture_output=True)
+a, b = json.load(open(out)), json.load(open(f"{br}/reference/lb-hohlraum.json"))
+for k in ("final_step", "per_step_photons_transported", "steps", "deck_sha256", "seed", "tolerances", "rule"):
+    assert a[k] == b[k], k
+assert a["reference_run"]["log_sha256"] == b["reference_run"]["log_sha256"]
+PY
+# 17.4 negative: a missing reference is an explicit error and nothing is generated
+(cd "$P4/cwd" && python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/empty" > "$P4/missing.out" 2>&1); rc=$?
+[ $rc -eq 2 ] && grep -q "^FAIL: branson reference check -- ERROR: no frozen reference for deck 3D_lb_hohlraum.xml" "$P4/missing.out" && grep -q "never done by this check" "$P4/missing.out" \
+    && [ -z "$(ls -A "$P4/empty")" ] && [ -z "$(ls -A "$P4/cwd")" ] \
+    && ok "neg: missing frozen reference -> exit 2 + explicit FAIL/ERROR line, no reference generated, nothing written" || bad "neg: missing reference rc=$rc $(tail -1 "$P4/missing.out")"
+# 17.5 negative: a deck whose content differs from the reference's sha256 is refused
+cp "$BDECK" "$P4/3D_lb_hohlraum.xml"; printf '<!-- edited -->\n' >> "$P4/3D_lb_hohlraum.xml"
+python3 "$BR/check_reference.py" "$BGPU" --deck "$P4/3D_lb_hohlraum.xml" > "$P4/deck.out" 2>&1; rc=$?
+[ $rc -eq 2 ] && grep -q "deck sha256 mismatch" "$P4/deck.out" && grep -q "^FAIL: branson reference check -- ERROR" "$P4/deck.out" \
+    && ok "neg: deck content differs from the reference's deck sha256 -> refused (exit 2)" || bad "neg: deck mismatch rc=$rc $(tail -1 "$P4/deck.out")"
+# 17.6 negative: corrupted references are refused (truncated JSON, a missing final_step field, altered tolerances, another schema)
+cp "$BR/reference/lb-hohlraum.json" "$P4/refs/lb-hohlraum.json"; head -c 200 "$BR/reference/lb-hohlraum.json" > "$P4/refs_trunc.json"; mkdir -p "$P4/trunc"; mv "$P4/refs_trunc.json" "$P4/trunc/lb-hohlraum.json"
+python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/trunc" > "$P4/c1.out" 2>&1; rc1=$?
+python3 - "$P4" <<'PY'
+import json, os, sys
+d = json.load(open(f"{sys.argv[1]}/refs/lb-hohlraum.json"))
+for name, mut in (("nofield", lambda x: x["final_step"].pop("photons_transported")), ("tol", lambda x: x["tolerances"].update(energy_rel=0.5)),
+                  ("schema", lambda x: x.update(schema="hpcperf-branson-reference-9")), ("nolog", lambda x: x["reference_run"].pop("log_sha256"))):
+    x = json.loads(json.dumps(d)); mut(x); os.makedirs(f"{sys.argv[1]}/{name}", exist_ok=True)
+    json.dump(x, open(f"{sys.argv[1]}/{name}/lb-hohlraum.json", "w"))
+PY
+python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/nofield" > "$P4/c2.out" 2>&1; rc2=$?
+python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/tol" > "$P4/c3.out" 2>&1; rc3=$?
+python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/schema" > "$P4/c4.out" 2>&1; rc4=$?
+python3 "$BR/check_reference.py" "$BGPU" --deck "$BDECK" --reference-dir "$P4/nolog" > "$P4/c5.out" 2>&1; rc5=$?
+[ $rc1 -eq 2 ] && grep -q "unreadable reference file" "$P4/c1.out" && [ $rc2 -eq 2 ] && grep -q "final_step.photons_transported missing" "$P4/c2.out" \
+    && [ $rc3 -eq 2 ] && grep -q "differ from the checker's rule" "$P4/c3.out" && [ $rc4 -eq 2 ] && grep -q "schema" "$P4/c4.out" \
+    && [ $rc5 -eq 2 ] && grep -q "reference_run.log_sha256 missing" "$P4/c5.out" \
+    && ok "neg: truncated JSON, a missing final quantity, altered tolerances, another schema, missing log provenance -> each refused (exit 2), never repaired" \
+    || bad "neg: corrupted references rc=$rc1/$rc2/$rc3/$rc4/$rc5: $(tail -1 "$P4/c1.out" "$P4/c2.out" "$P4/c3.out" "$P4/c4.out" "$P4/c5.out" | tr '\n' '|')"
+# 17.7 negative: the FINAL step's photon count / energy is what is compared -- breaking the last line fails even with the first intact
+python3 - "$BGPU" "$P4" <<'PY'
+import re, sys
+t = open(sys.argv[1]).read(); d = sys.argv[2]
+lines = t.splitlines(True)
+idx = [i for i, l in enumerate(lines) if "Total Photons transported:" in l]; assert len(idx) == 5
+last = lines[idx[-1]]; n = int(re.search(r"(\d+)", last).group(1))
+bad_last = lines[:]; bad_last[idx[-1]] = last.replace(str(n), str(int(n * 1.1))); open(f"{d}/gpu_bad_last_photons.log", "w").write("".join(bad_last))
+first = lines[idx[0]]; n0 = int(re.search(r"(\d+)", first).group(1))
+bad_first = lines[:]; bad_first[idx[0]] = first.replace(str(n0), str(int(n0 * 1.1))); open(f"{d}/gpu_bad_first_photons.log", "w").write("".join(bad_first))
+pm = [i for i, l in enumerate(lines) if "Post mat E:" in l]; assert len(pm) == 5
+lp = lines[pm[-1]]; v = re.search(r"Post mat E: ([0-9.eE+-]+)", lp).group(1)
+bad_e = lines[:]; bad_e[pm[-1]] = lp.replace(v, f"{float(v) * 1.1:.6e}"); open(f"{d}/gpu_bad_final_energy.log", "w").write("".join(bad_e))
+PY
+python3 "$BR/check_reference.py" "$P4/gpu_bad_last_photons.log" --deck "$BDECK" > "$P4/n1.out" 2>&1; rc1=$?
+python3 "$BR/check_reference.py" "$P4/gpu_bad_first_photons.log" --deck "$BDECK" > "$P4/n2.out" 2>&1; rc2=$?
+python3 "$BR/check_reference.py" "$P4/gpu_bad_final_energy.log" --deck "$BDECK" > "$P4/n3.out" 2>&1; rc3=$?
+[ $rc1 -eq 1 ] && grep -q "final-step transported photon count differs by 1.000e-01" "$P4/n1.out" && grep -q "^FAIL: branson reference check (3D_lb_hohlraum.xml)" "$P4/n1.out" \
+    && [ $rc2 -eq 0 ] && grep -q "^PASS: branson reference check" "$P4/n2.out" \
+    && [ $rc3 -eq 1 ] && grep -q "Post mat E differs by 1.000e-01" "$P4/n3.out" \
+    && ok "neg: final-step photon count +10 % -> FAIL (first step intact); only the first step's count altered -> still PASS (the final step is the compared value); final Post mat E +10 % -> FAIL" \
+    || bad "neg: final-step rules rc=$rc1/$rc2/$rc3: $(tail -1 "$P4/n1.out" "$P4/n2.out" "$P4/n3.out" | tr '\n' '|')"
+# 17.8 check_log.py cmp on the two saved logs uses the final step too: the last CPU count broken -> FAIL even though the first is identical
+python3 "$BR/check_log.py" cmp "$BGPU" "$BCPU" > "$P4/cmp1.out" 2>&1; rc1=$?
+python3 - "$BCPU" "$P4" <<'PY'
+import re, sys
+lines = open(sys.argv[1]).read().splitlines(True); idx = [i for i, l in enumerate(lines) if "Total Photons transported:" in l]
+n = int(re.search(r"(\d+)", lines[idx[-1]]).group(1)); lines[idx[-1]] = lines[idx[-1]].replace(str(n), str(int(n * 0.9)))
+open(f"{sys.argv[2]}/cpu_bad_last.log", "w").write("".join(lines))
+PY
+python3 "$BR/check_log.py" cmp "$BGPU" "$P4/cpu_bad_last.log" > "$P4/cmp2.out" 2>&1; rc2=$?
+[ $rc1 -eq 0 ] && grep -q "final-step photons transported: GPU 251243835  CPU 251242903" "$P4/cmp1.out" \
+    && [ $rc2 -eq 1 ] && grep -q "final-step transported photon count differs by 1.111e-01" "$P4/cmp2.out" \
+    && ok "branson check_log.py cmp (saved lb-hohlraum logs): compares the final step's photon count (251243835 vs 251242903); the last CPU count -10 % -> FAIL although the first count is identical" \
+    || bad "branson cmp first-vs-last rc=$rc1/$rc2: $(tail -1 "$P4/cmp1.out" "$P4/cmp2.out" | tr '\n' '|')"
+# 17.9 freeze refuses a GPU log and an unfinished run; generate_reference.sh refuses an unregistered input and an existing reference
+python3 "$BR/check_log.py" freeze --input-id x --deck "$BDECK" --cpu-log "$BGPU" --ranks 1 --out "$P4/x.json" > "$P4/f1.out" 2>&1; rc1=$?
+head -60 "$BCPU" > "$P4/cpu_unfinished.log"
+python3 "$BR/check_log.py" freeze --input-id x --deck "$BDECK" --cpu-log "$P4/cpu_unfinished.log" --ranks 1 --out "$P4/x.json" > "$P4/f2.out" 2>&1; rc2=$?
+bash "$BR/generate_reference.sh" no-such-input --from-cpu-log "$BCPU" --ranks 1 --binary-sha256 0 > "$P4/g1.out" 2>&1; rc3=$?
+bash "$BR/generate_reference.sh" lb-hohlraum --from-cpu-log "$BCPU" --ranks 24 --binary-sha256 0 > "$P4/g2.out" 2>&1; rc4=$?
+[ $rc1 -ne 0 ] && grep -q "a reference must come from the CPU-only build" "$P4/f1.out" && [ $rc2 -ne 0 ] && grep -q "did not finish" "$P4/f2.out" && [ ! -f "$P4/x.json" ] \
+    && [ $rc3 -eq 2 ] && grep -q "not registered" "$P4/g1.out" && [ $rc4 -eq 2 ] && grep -q "exists" "$P4/g2.out" \
+    && ok "neg: freeze refuses a GPU log and an unfinished CPU run; generate_reference.sh refuses an unregistered input and never overwrites a frozen reference without --force" \
+    || bad "neg: freeze / generate guards rc=$rc1/$rc2/$rc3/$rc4"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

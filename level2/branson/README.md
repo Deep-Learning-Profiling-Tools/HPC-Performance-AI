@@ -207,21 +207,59 @@ Three checks; all must pass.
 
 Result on this machine (fresh shell, cwd `/tmp`):
 `PASS: branson CUDA (ctest 11/11 excl. test_input_1pe; Marshak 5 steps: rad/mat conservation <= 1e-9 rel; GPU vs CPU final Post-mat/Absorption/Exit E within 5%, T_e within 0.02)`
--- 42 s including the one-time CPU reference build.
+-- 42 s including the one-time CPU reference build. Check C is validate.sh's build-time cross-check on the
+marshak deck; the registered inputs are checked against frozen references (next section).
 
-## Correctness check of `lb-hohlraum` (2026-09-30)
+## Correctness reference (frozen) and candidate validation
 
-The single-threaded CPU reference of the 250 M-photon `3D_lb_hohlraum.xml` deck did not finish its
-first time step in 12 h (2026-09-29). The registered input therefore declares its reference as a
-**24-rank CPU run** (`check_reference.sh --cpu-ref-ranks 24`; the 4-rank run had not finished its first of
-5 steps after 11 h and an 8-rank run needed 7 h 25 min for step 1, so the reference was taken with the rank
-count that finished first: same deck, seed and global photon count;
-Branson's CPU build is MPI-parallel, `mpirun --map-by ppr:24:node:OVERSUBSCRIBE` within the one Slurm
-task slot). The comparison criteria are unchanged and statistical (final energies and transported
-photons within 5 %; the deck prints no per-cell T_e table), so the rank count does not enter them:
-it is reference provenance, printed with the result. A finished reference log is reused through
-`HPCPERF_BRANSON_CPU_REF_LOG` (hashed in `check.log`; `HPCPERF_BRANSON_CPU_REF_NOTE` adds the
-provenance line).
+Two different things, kept apart.
+
+**A. Reference generation (construction time, once per input).** The correctness oracle of every registered
+deck is a run of a **CPU-only Branson built from the same sources** (`-DUSE_GPU=OFF`: Branson's CPU transport,
+an implementation independent of the GPU transport kernel) on the same deck, seed and global photon count.
+Its result is frozen in `reference/<input-id>.json`: the final completed step's Post mat / Absorption / Exit
+energies, transported photon count and T_e table (where the deck prints one), the per-step photon counts, the
+deck's sha256 and seed, the upstream commit, the CPU binary's sha256 and build options, the rank count, launch
+line, allocation, start / finish, the CPU log's sha256 and where it is kept (the results directory, outside the
+repository -- the raw logs are not committed), the comparison rule with its basis and the generation date.
+`generate_reference.sh <input-id> [--ranks N]` builds and runs the CPU-only Branson and freezes the result;
+`--from-cpu-log` freezes an already finished run. Neither is ever run by a correctness check.
+
+| input | reference run | CPU log sha256 | final step: Post mat E / Absorption E / Exit E / photons transported |
+|---|---|---|---|
+| hohlraum-single-node | 1 rank, 17 027 s, 2026-09-29 (Slurm job 1324397) | 172ccab5... | 1.30705e-02 / 4.17457e-05 / 2.61773e-06 / 10 748 998 (5 steps) |
+| marshak-wave-replicated | 1 rank, 7 s, 2026-09-29 (job 1324397) | 04de6b59... | 6.86634e-05 / 4.955529e-05 / 5.916541e-05 / 50 015 (1 step; 25-cell T_e table) |
+| hohlraum-multi-node | 1 rank, 2 655 s, 2026-09-29 (job 1324397) | 2d821e2b... | 1.77404e-02 / 4.53535e-04 / 2.31897e-07 / 252 973 234 (20 steps) |
+| lb-hohlraum | 24 ranks, 2 h 56 min, 2026-09-30/10-01 (job 1397595) | 95b075a1... | 1.77370e-02 / 1.08273e-03 / 1.58954e-06 / 251 242 903 (5 steps) |
+
+All four were frozen on 2026-10-01 from the logs that produced the PASS verdicts of 2026-09-29 (three decks)
+and 2026-10-01 (lb-hohlraum), without a rerun; one CPU-only binary (sha256 392c0d0c...) produced all four.
+lb-hohlraum's reference uses 24 MPI ranks because its single-threaded run did not finish the first of 5
+steps in 12 h (the 4-rank run not in 11 h; the 8-rank run needed 7 h 25 min for step 1 and was stopped when
+the 24-rank run finished -- none of those is evidence). The rank count is provenance: the criteria are
+statistical, and the global photon count and seed are the deck's.
+
+**B. Candidate validation (every correctness check, every optimized candidate).** The registry's `check:`
+runs `check_reference.py <gpu.log> --deck <deck>`: it reads the frozen JSON, verifies that the deck's sha256
+is the reference's, and compares the candidate run's **final completed step** -- Post mat / Absorption / Exit E
+within 5 % relative, the final step's `Total Photons transported` (the last such line of the log, never the
+first) within 5 % relative, every cell's T_e within 0.02 absolute where printed, the same number of steps, a
+finished run. It builds and runs nothing: a missing, corrupted or deck-mismatching reference, or one whose
+tolerances differ from the checker's constants, is an explicit error (exit 2), never a trigger to regenerate.
+Future GPT / Claude / Qwen candidates do B only; A is not repeated. Tests in `tools/inputs/tests/run_all.sh`:
+the replay of lb-hohlraum's saved GPU log passes; a wrong final photon count or final energy fails even when
+the first step is intact; a missing, truncated, field-less, tolerance-altered or deck-mismatching reference is
+refused; the check creates no CPU reference.
+
+**What the CPU reference is not.** It is the correctness oracle only, never a performance baseline. The
+performance baseline is the original, unoptimized GPU implementation's timing record:
+speedup = T_original_GPU / T_candidate_GPU; correctness = candidate output vs the frozen reference.
+
+**Parser fix (2026-10-01).** `check_log.py cmp` used to take the first `Total Photons transported` line of a
+log (`re.search`) instead of the final step's. The parser now assigns every quantity to its step block, and
+"final" means the final completed step for the energies, the T_e table and the photon count alike. Replayed
+on the saved lb-hohlraum logs: final-step photons GPU 251 243 835 vs CPU 251 242 903 (rel 3.7e-6); the
+verdicts of the four decks are unchanged (their per-step counts agree to <= 1.6e-5).
 
 ## Warnings
 

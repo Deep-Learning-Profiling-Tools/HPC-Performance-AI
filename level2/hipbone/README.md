@@ -209,20 +209,21 @@ no backtrace): `libs/mesh/meshGeometricFactors.cpp:35`
 Timer: hipBone's own `elapsed` (100 CG iterations after the 1000 warm-up
 iterations; setup, JIT and MPI start-up excluded). Baseline: `cg_iterations` and
 `dofs` exact, `r_norm_initial` within 1 % (the validate.sh rule), `r_norm_final`
-recorded -- the CORAL-2 "generally < 1e-8" guidance holds for the validate.sh
-problem and for `sweep-nx9-p14` (7.7e-9) but not at the larger sizes (see the
-note below), so no absolute threshold is applied there; a relative tolerance
-for an optimized build is still to be fixed (NEEDS_VALIDATION). The residual
+verified against the input's CPU reference (section "Correctness check of the
+registered inputs" below) -- the CORAL-2 "generally < 1e-8" guidance holds for the
+validate.sh problem and for `sweep-nx9-p14` (7.7e-9) but not at the larger sizes (see
+the note below), so it is informational, not a threshold; the applied rule is the
+benchmark-wide |log10(r_norm_final / reference)| <= 0.1, fixed before any candidate
+existed (2026-09-30). The residual
 history was identical to all printed digits (`%12.12le`) over the 3 runs at every
 registered size. The 1 % rule on `r_norm_initial` comes from validate.sh check 4,
 which compares the CUDA backend with OCCA's Serial backend (two libm realisations
 of the pseudo-random right-hand side); between two CUDA runs on the same GPU it is
 only a loose guard, not a tolerance that a 1 % change would satisfy.
-Acceptance status (round 3): `cg_iterations` and `dofs` are required configuration
-checks, `r_norm_initial` is a diagnostic (with the 1 % guard), `r_norm_final` is the
-required science result and still `record` -- so `compare` returns exit 3 / verdict
-INCOMPLETE for every hipBone input until a tolerance with a basis is fixed; the passing
-configuration checks never turn that into a PASS.
+Acceptance status: `cg_iterations` and `dofs` are required configuration checks
+(exact), `r_norm_initial` must be within 1 % of the reference, and `r_norm_final` is the
+required science result, verified by `check_reference.py` against `reference/<id>.json`.
+The round-3 state (`r_norm_final` only recorded, verdict INCOMPLETE) is history.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians; the
 warm-up absorbs the OCCA JIT compile of a new problem size, ~9 s here):

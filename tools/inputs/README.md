@@ -319,3 +319,13 @@ deterministic comparison > same-input unoptimized baseline; a tolerance needs an
 numerical basis and is never fitted to a candidate; runtime, FOM, iteration counts, sizes, exit
 0 and "no NaN" are diagnostics, never correctness; a required `record` is never downgraded to
 a diagnostic; correctness instrumentation stays outside the ROI.
+
+**Reference generation vs candidate validation.** Where a check compares with a CPU / independent-implementation
+reference (hipBone `reference/<id>.json`, miniWeather `reference/<key>.json`, Branson `reference/<id>.json`), the
+reference is generated ONCE at construction time by an explicit command (`check_reference.py --make-reference`,
+`generate_reference.sh`) and frozen with its provenance (the input's identity and hashes, the binary, rank count,
+log sha256, date, the rule and its basis); every check -- and every optimized candidate's evaluation -- only reads
+the frozen file and errors out when it is missing, corrupted or belongs to another input. A check never
+regenerates a reference. The reference is the correctness oracle, not the performance baseline: speedups are
+taken against the original (unoptimized) GPU implementation's timing records, correctness against the frozen
+reference.
