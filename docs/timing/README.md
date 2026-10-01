@@ -17,7 +17,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-30T16:04:36Z (579 records). 134 + 89 re
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
-| 2 | 88 | 1 | 0 | 0 |
+| 2 | 89 | 0 | 0 | 0 |
 | 3 | 18 | 18 | 0 | 7 |
 
 - Six Level 2 inputs (exampm dambreak-0.005 / dambreak-0.05-upstream; remhos cube-remap-rs1, periodic-hexagon-p0, periodic-square-p5, periodic-cube-p0) ran the run.sh default workload before 3c9aec2: their earlier records are INVALIDATED (kept as history), the corrected inputs were measured again.
@@ -188,7 +188,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-09-30T16:04:36Z (579 records). 134 + 89 re
 | branson | hohlraum-single-node | SUCCESS | nvidia-b200.cuda13.2 | 11.6 s | 3 | 16.9% | 8.5% | UNSTABLE | 36% | 85,448 | 0.96 | PASS | PASS | dd4040b831 |
 | branson | marshak-wave-replicated | SUCCESS | nvidia-b200.cuda13.2 | 282 ms | 3 | 2.3% | 1.3% | yes | 3% | 1,315 | 1.86 | PASS | PASS | dd4040b831 |
 | branson | hohlraum-multi-node | SUCCESS | nvidia-b200.cuda13.2 | 389.3 s | 3 | 0.1% | 0.0% | yes | 60% | 40 | 1.00 | PASS | PASS | dd4040b831 |
-| branson | lb-hohlraum | SUCCESS | nvidia-b200.cuda13.2 | 100.1 s | 3 | 0.2% | 0.1% | yes | 60% | 35,087 | 1.01 | PASS | INCOMPLETE | dd4040b831 |
+| branson | lb-hohlraum | SUCCESS | nvidia-b200.cuda13.2 | 100.1 s | 3 | 0.2% | 0.1% | yes | 60% | 35,087 | 1.01 | PASS | PASS | dd4040b831 |
 | cabanapic | weibel-ny512-nppc2000 | SUCCESS | nvidia-b200.cuda13.2 | 61.8 s | 3 | 0.4% | 0.2% | yes | 92% | 2,016,000 | 0.99 | PASS | PASS | dd4040b831 |
 | cabanapic | weibel-ny32-nppc100 | SUCCESS | nvidia-b200.cuda13.2 | 821 ms | 3 | 18.8% | 10.7% | UNSTABLE | 53% | 126,000 | 1.42 | PASS | PASS | dd4040b831 |
 | cabanapic | weibel-ny128-nppc500 | SUCCESS | nvidia-b200.cuda13.2 | 4.56 s | 3 | 0.2% | 0.1% | yes | 72% | 504,000 | 1.11 | PASS | PASS | dd4040b831 |
