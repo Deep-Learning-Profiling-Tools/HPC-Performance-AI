@@ -152,15 +152,15 @@ inputs:
   - inputs/3D_lb_hohlraum.xml
   input_form: file
   check:
-    # The benchmark check with a 4-rank CPU reference: the single-threaded reference of this 250 M-photon deck did not
+    # The benchmark check with a 24-rank CPU reference (the 4-rank run did not finish step 1 in 11 h): the single-threaded reference of this 250 M-photon deck did not
     # finish its first step in 12 h (2026-09-29). Same deck, seed and global photon count; Branson's CPU build is
     # MPI-parallel and the criteria are statistical (5 % / 0.02), so the rank count is reference provenance only
     # (printed with the result; HPCPERF_BRANSON_CPU_REF_LOG reuses a finished reference log, hashed in check.log).
     kind: post_run
-    command: [bash, '{bench_dir}/check_reference.sh', '{log}', '{bench_dir}/{param:deck}', --cpu-ref-ranks, '4']
+    command: [bash, '{bench_dir}/check_reference.sh', '{log}', '{bench_dir}/{param:deck}', --cpu-ref-ranks, '24']
     pass_regex: '^PASS: branson reference check'
     fail_regex: '^FAIL: branson reference check'
-    basis: 'GPU vs CPU-only Branson (same sources, deck, seed and global photon count; CPU reference with 4 MPI ranks,
+    basis: 'GPU vs CPU-only Branson (same sources, deck, seed and global photon count; CPU reference with 24 MPI ranks,
       2026-09-30): final Post-mat / Absorption / Exit E within 5 % relative, transported photons within 5 % relative
       (no per-cell T_e table in this deck) -- validate.sh check C (check_log.py cmp); the 5 % margins are validate.sh''s,
       stated as > 6 sigma of the seed-to-seed scatter'

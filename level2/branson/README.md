@@ -213,8 +213,10 @@ Result on this machine (fresh shell, cwd `/tmp`):
 
 The single-threaded CPU reference of the 250 M-photon `3D_lb_hohlraum.xml` deck did not finish its
 first time step in 12 h (2026-09-29). The registered input therefore declares its reference as a
-**4-rank CPU run** (`check_reference.sh --cpu-ref-ranks 4`: same deck, seed and global photon count;
-Branson's CPU build is MPI-parallel, `mpirun --map-by ppr:4:node:OVERSUBSCRIBE` within the one Slurm
+**24-rank CPU run** (`check_reference.sh --cpu-ref-ranks 24`; the 4-rank run had not finished its first of
+5 steps after 11 h and an 8-rank run needed 7 h 25 min for step 1, so the reference was taken with the rank
+count that finished first: same deck, seed and global photon count;
+Branson's CPU build is MPI-parallel, `mpirun --map-by ppr:24:node:OVERSUBSCRIBE` within the one Slurm
 task slot). The comparison criteria are unchanged and statistical (final energies and transported
 photons within 5 %; the deck prints no per-cell T_e table), so the rank count does not enter them:
 it is reference provenance, printed with the result. A finished reference log is reused through
