@@ -495,7 +495,7 @@ def render_md_registry(c):
     k = c["counts"]
     out = [f"## {camp.get('title') or 'Registered inputs'}", "",
            f"Measured {c['measured_from'] or '-'} .. {c['generated_from'] or '-'} ({c['records']} records). " + md_status_line(c), ""]
-    for lvl in ("1", "2"):
+    for lvl in ("1", "2", "3"):
         if camp.get("protocol", {}).get(f"level{lvl}"):
             out.append(f"- Level {lvl} protocol: {camp['protocol'][f'level{lvl}']}")
     for key in ("platform_note", "not_collected", "level3"):

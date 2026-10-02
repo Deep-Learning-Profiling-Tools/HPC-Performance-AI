@@ -582,7 +582,8 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
     matched += apply_templates(c, rule, params, runs, 3)
     # the application's own timer must report the registered number of steps
     expr = rule.get("timer_steps")
-    if expr:
+    if expr and rec.get("status") == "ok":                 # a record without a timer has no step count to compare
+
         try:
             want = eval(expr, {"__builtins__": {}, "round": round, "int": int, "str": str}, dict(vals))
         except Exception:

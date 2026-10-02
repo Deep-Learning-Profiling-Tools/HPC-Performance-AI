@@ -28,6 +28,7 @@ campaign (section [Registered inputs](#registered-inputs---registry) below):
 python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
 tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
 tools/timing/measure_level2.sh --registry --collector nvidia_nsys all                             # 1 discarded warm-up + 3 clean + 1 nsys profiled (the defaults), explicit CPU binding
+tools/timing/measure_level3.sh --registry --collector nvidia_nsys all                             # Level 3: 1 clean + 1 nsys profiled (the Level 3 protocol), the application's own timer, HPCPERF_GPUS from the registry
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
 python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
@@ -135,7 +136,10 @@ nsys and the device picture would still be whole-process context, not the DMC lo
 `measure_level3.sh --profile-all` profiles it anyway; `--no-profile` skips every profiled run.
 
 A clean run whose output does not contain the timer is `app_timer_missing` (FAIL); a
-Level 3 run never falls back to the process wall clock. Each run writes its run
+Level 3 run never falls back to the process wall clock. Three registered inputs have no timed region by
+construction -- CP2K's two regtest inputs (geometry optimisation / single point: no MD loop) and DFT-FE's
+LLZO ground state (no MD step) -- and their registry entries say so (`timing.status: NO_TIMED_REGION`); they
+are run, verified and checked for correctness like the others, with no timing result. Each run writes its run
 directory under `build/level3/<app>/<profile>/run.timing-<run id>-<c0|prof>/`
 (`HPCPERF_L3_RUN_SUBDIR`), so no validated or historical run directory is touched, and
 the files the timer is read from are copied into the raw evidence.
@@ -292,9 +296,23 @@ tools/timing/measure_level1.sh --registry --no-profile all                 # eve
 tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64-g64-q128
 ```
 
-* **The registry defines the inputs.** `cases/level1_registry.tsv` and `cases/level2_registry.tsv`
-  are generated from it by `gen_registry_cases.py` (one case per input, case = input id) and never
-  edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
+* **The registry defines the inputs.** `cases/level1_registry.tsv`, `cases/level2_registry.tsv` and
+  `cases/level3_registry.tsv` are generated from it by `gen_registry_cases.py` (one case per input, case = input
+  id) and never edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
+* **Level 3** cases (since 2026-10-02) run the application's `run.sh` with the registry selector set to the
+  input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 43 registered
+  inputs declare 1 GPU / 1 rank); the region is the application's own timer (section "Level 3" above), the
+  FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`. The engine stores the
+  input's workload identity next to the raw runs as for Level 1/2, and `verify_registry_runs.py` judges the
+  run from the run manifest every Level 3 `run.sh` writes (ranks, binary and its sha256, deck / input and
+  their sha256, profile, case, mode, steps, sizes), the launcher lines of `run.log` and the placement
+  records (`cases/registry_evidence.yaml`, section `level3`): PASS / FAIL / INSUFFICIENT / NOT_RUN as for
+  Level 2; a record whose timer was not found (`app_timer_missing`) is still judged on its workload
+  evidence -- timing SUCCESS and workload verification are separate results. No engine CPU-binding policy
+  applies to Level 3: each `run.sh` keeps its own (CP2K and QMCPACK bind their OpenMP threads through
+  `--cpus-per-rank`, DFT-FE four cores per rank, LAMMPS one Kokkos host thread, the others one host
+  thread); the record says `placement.policy = application` and its placement block shows what the process
+  was actually allowed.
 * **Level 1** cases run the registry's own executable: a materialized compile-time input (an NPB
   class, `tools/inputs/npb_materialize_class.sh`) runs its own binary, never the default one;
   repository-relative argument paths are resolved to absolute ones, generated datasets are the
@@ -625,7 +643,12 @@ Findings that need a decision rather than a fix:
 `device_overlap_s` is non-zero only for quicksilver (0.22-0.35 s: unified-memory
 migrations overlap its kernel); everything else is single-stream.
 
-## First Level 3 sweep (2026-09-29)
+## First Level 3 sweep (2026-09-29) -- hand-written cases, HISTORY
+
+An earlier campaign of the ten hand-written 2-GPU cases of `cases/level3_cases.tsv`, measured in another
+checkout and carried into the page as an earlier campaign (`report.py --page-level ...:3:history`). The
+current Level 3 results are the registered-input campaign of 2026-10-02 (`measure_level3.sh --registry`, one
+GPU, all 43 inputs); the two are never compared.
 
 dgx003, **2 x NVIDIA B200** (one MPI rank per GPU, `--mca pml ob1 --mca btl self,sm,smcuda`),
 CUDA 13.2.78, Nsight Systems 2025.6.3, uv toolchain (GCC 13.3.0 / system GCC 14.2.1 for CP2K and

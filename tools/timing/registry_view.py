@@ -250,7 +250,11 @@ def load_annotations(roots):
         for note in d.get("notes") or []:          # a note carried by several campaign roots is shown once
             if note not in meta["notes"]:
                 meta["notes"].append(note)
-        meta["campaign"].update(d.get("campaign") or {})
+        for k, v in (d.get("campaign") or {}).items():     # one level deep: a later root adds protocol.level3, keeps level1/2
+            if isinstance(v, dict) and isinstance(meta["campaign"].get(k), dict):
+                meta["campaign"][k].update(v)
+            else:
+                meta["campaign"][k] = v
     return ann, meta
 
 
