@@ -1449,6 +1449,22 @@ EOF
 python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/diag.json" --check "$TMP/rj/check.json" > "$TMP/rj/chk.out" 2>/dev/null; rc=$?
 [ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['compare_verdict']=='NONE' and 'covers every pending' in d['reason'], d" "$TMP/rj/chk.out" \
     && ok "re-judge: with a passing check covering all, the input is PASS on the check (the vacuous comparison counts for nothing)" || bad "re-judge chk: rc=$rc $(cat "$TMP/rj/chk.out")"
+# an older measurement file (schema measurement-1: run_ok, no comparison_rules / baseline_verdict) is re-summarised and its
+# comparison re-derived from the stored runs against the working baseline under the current registry (the audit did this
+# already; `verdict` must agree with it)
+python3 - "$TMP/rj/old.json" "$TMP/diag_baseline.json" <<'PY'
+import json, sys
+json.dump({"schema": "hpcperf-measurement-1", "benchmark": "fakediag", "level": 1, "input_id": "a", "measured_runs": 2,
+           "summary": {"run_ok": True, "timing_ok": True, "baseline_file": sys.argv[2]},
+           "runs": [{"label": "rep1", "measured": True, "exit_code": 0, "e2e_s": 1.5, "main_compute_s": 1.5, "timing": {"value": 1.5},
+                     "baseline_quantities": {"energy": {"value": 42.000000}, "pass_marker": {"present": True, "count": 1}, "iterations": {"value": 17}}},
+                    {"label": "rep2", "measured": True, "exit_code": 0, "e2e_s": 1.4, "main_compute_s": 1.4, "timing": {"value": 1.4},
+                     "baseline_quantities": {"energy": {"value": 42.000010}, "pass_marker": {"present": True, "count": 1}, "iterations": {"value": 19}}}]},
+          open(sys.argv[1], "w"))
+PY
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/old.json" > "$TMP/rj/old.out" 2>"$TMP/rj/old.err"; rc=$?
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['compare_verdict']=='PASS' and 're-derived' in d.get('compare_rejudged',''), d" "$TMP/rj/old.out" \
+    && ok "re-judge: an older measurement file without a stored verdict is re-derived against its baseline under the current registry (PASS, noted)" || bad "re-judge old: rc=$rc $(cat "$TMP/rj/old.out" "$TMP/rj/old.err" | head -c 600)"
 
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

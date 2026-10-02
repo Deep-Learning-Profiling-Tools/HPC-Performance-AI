@@ -1380,6 +1380,40 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
     return finish("PASS")
 
 
+def measurement_summary(d: dict, doc, inp) -> dict:
+    """The summary of a measurement.json in the current vocabulary. Files written by an earlier schema
+    (measurement-1: run_ok, no comparison_rules / baseline_verdict) are re-summarised from their raw run
+    records with summarize(), and their baseline comparison is re-derived with compare() over the INDEPENDENT
+    runs (the baseline run is never compared with itself) against the working baseline (the workload-migrated
+    one when it exists) -- i.e. under the CURRENT registry; baseline_checks / needs_validation are refreshed
+    from that comparison. A current-schema summary is returned as stored (rejudge_measurement reads it)."""
+    s = dict(d.get("summary") or {})
+    runs = d.get("runs") or []
+    reps = d.get("measured_runs", len([r for r in runs if r.get("measured")]))
+    if "run_completed" not in s or "comparison_rules" not in s:
+        try:
+            s2, _ = summarize(doc, inp, runs, reps)
+            s2.update({k: v for k, v in s.items() if k.startswith("baseline_")}); s = s2
+        except Exception:
+            return s
+    if "baseline_verdict" not in s:
+        bf = s.get("baseline_file")
+        if bf and os.path.exists(os.path.join(os.path.dirname(bf), "baseline.workload-migrated.json")):
+            bf = os.path.join(os.path.dirname(bf), "baseline.workload-migrated.json")
+        if bf and os.path.exists(bf):
+            try:
+                b = json.load(open(bf)); base = b.get("from_run")
+                others = [r for r in runs if r.get("measured") and r.get("exit_code") == 0 and r.get("baseline_quantities") and r.get("label") != base]
+                cmps = [compare(doc, b["quantities"], r["baseline_quantities"], inp) for r in others]
+                s["baseline_verdict"] = "NONE" if not cmps else "FAIL" if not all(c["ok"] for c in cmps) else ("PASS" if all(c["verified"] for c in cmps) else "INCOMPLETE")
+                s["baseline_checks"] = cmps
+                s["needs_validation"] = sorted({q for c in cmps for q in (c.get("required_pending") or [])})
+                s["baseline_rederived"] = "comparison re-derived from the stored runs against the working baseline under the current registry"
+            except Exception:
+                s["baseline_verdict"] = None
+    return s
+
+
 def rejudge_measurement(doc, inp, summary: dict):
     """A stored measurement's baseline verdict read under the CURRENT registry roles and rules.
 
@@ -1652,8 +1686,10 @@ def main(argv=None):
                 m = json.loads(Path(a.measurement).read_text())
                 if m.get("input_id") != inp["id"] or m.get("benchmark") != doc["benchmark"]:
                     raise InputError(f"{a.measurement} belongs to {m.get('benchmark')}/{m.get('input_id')}, not {doc['benchmark']}/{inp['id']}")
-                s = m.get("summary") or {}
+                s = measurement_summary(m, doc, inp)
                 cmp_v, pending, rejudged = rejudge_measurement(doc, inp, s)
+                if s.get("baseline_rederived"):
+                    rejudged = (rejudged + "; " if rejudged else "") + s["baseline_rederived"]
             chk = None
             if a.check:
                 chk = json.loads(Path(a.check).read_text())

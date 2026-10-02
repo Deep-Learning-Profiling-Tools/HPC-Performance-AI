@@ -19,34 +19,14 @@ import hpcperf_inputs as hi   # noqa: E402  (same directory; re-derives the stat
 
 
 def _summary(d, bench_dir):
-    """The summary of a measurement.json in the current vocabulary: files written by an earlier
-    schema (measurement-1: run_ok, no comparison_rules) are re-summarised from their raw run records
-    with the tool's own summarize(), and the baseline verdict is re-derived over the INDEPENDENT runs
-    (the baseline run is never compared with itself), as make_table.py of the pilot does."""
+    """The summary of a measurement.json in the current vocabulary (hpcperf_inputs.measurement_summary: older
+    schema files are re-summarised and their comparison re-derived under the current registry)."""
     s = dict(d.get("summary", {}))
-    reps = d.get("measured_runs", len([r for r in d["runs"] if r.get("measured")]))
     try:
         doc = hi.load(bench_dir); inp = hi.get_input(doc, d["input_id"])
     except Exception:
         return s
-    if "run_completed" not in s or "comparison_rules" not in s:
-        try:
-            s2, _ = hi.summarize(doc, inp, d["runs"], reps); s2.update({k: v for k, v in s.items() if k.startswith("baseline_")}); s = s2
-        except Exception:
-            return s
-    if "baseline_verdict" not in s:
-        bf = s.get("baseline_file")
-        if bf and os.path.exists(os.path.join(os.path.dirname(bf), "baseline.workload-migrated.json")):
-            bf = os.path.join(os.path.dirname(bf), "baseline.workload-migrated.json")
-        if bf and os.path.exists(bf):
-            try:
-                b = json.load(open(bf)); base = b.get("from_run")
-                others = [r for r in d["runs"] if r.get("measured") and r.get("exit_code") == 0 and r.get("baseline_quantities") and r.get("label") != base]
-                cmps = [hi.compare(doc, b["quantities"], r["baseline_quantities"], inp) for r in others]
-                s["baseline_verdict"] = "NONE" if not cmps else "FAIL" if not all(c["ok"] for c in cmps) else ("PASS" if all(c["verified"] for c in cmps) else "INCOMPLETE")
-            except Exception:
-                s["baseline_verdict"] = None
-    return s
+    return hi.measurement_summary(d, doc, inp)
 
 
 def load_check(cdir, bench, iid):
