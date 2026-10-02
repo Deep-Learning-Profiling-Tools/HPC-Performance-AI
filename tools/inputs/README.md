@@ -317,6 +317,15 @@ nothing failed and a check PASSED whose `covers` holds every still-pending requi
 INCOMPLETE otherwise (an ERRORed, stale or non-covering check counts as no check). A required
 `record` quantity is never downgraded by a check that does not cover it.
 
+A stored measurement's comparison verdict is re-judged under the **current** registry before it is
+used (`rejudge_measurement`, 2026-10-02): the measurement recorded which quantities its comparison
+checked and under which rule (`baseline_checks[*].checks`); a quantity that is `diagnostic` now, or
+whose rule changed, verifies nothing today even if it was `required` when the measurement was made,
+and a quantity required now but not verified then is pending. The result carries the note in
+`compare_rejudged` (and in `reason`); a stored verdict whose substance is unchanged is kept as it was.
+The case that motivated it: nekRS's `ci_failed` rule (`absent`) could never fire in a plain run and was
+made diagnostic with that basis -- the two PASS verdicts that rested on it are INCOMPLETE now.
+
 Two smaller extensions serve the checks: a quantity may be read from a file instead of stdout
 (`source: {file: <path or glob relative to the run directory>, select_file: only|newest}`; a
 missing file is an error that satisfies nothing, not even `absent`), and the rule `near`

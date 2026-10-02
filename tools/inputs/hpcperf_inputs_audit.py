@@ -75,7 +75,15 @@ def load_measurement(mdir, level, bench, iid, bench_dir=None):
                 "dir": os.path.dirname(f)}
     d = json.load(open(f))
     s = _summary(d, bench_dir) if bench_dir else d.get("summary", {})
-    return {"run_completed": bool(s.get("run_completed")), "timing_status": s.get("timing_status") or ("NATIVE" if s.get("timing_ok") else "FAILED"),
+    rejudged = None
+    if bench_dir:           # the stored comparison verdict read under the CURRENT registry roles/rules (hpcperf_inputs.rejudge_measurement)
+        try:
+            doc = hi.load(bench_dir); inp = hi.get_input(doc, iid)
+            bv, nv, rejudged = hi.rejudge_measurement(doc, inp, s)
+            s = dict(s, baseline_verdict=bv, needs_validation=nv)
+        except Exception:
+            pass
+    return {"run_completed": bool(s.get("run_completed")), "compare_rejudged": rejudged, "timing_status": s.get("timing_status") or ("NATIVE" if s.get("timing_ok") else "FAILED"),
             "timing_ok": bool(s.get("timing_ok")), "comparison_rules": s.get("comparison_rules"), "baseline_verdict": s.get("baseline_verdict"),
             "native_check": s.get("native_check"), "needs_validation": s.get("needs_validation") or [], "measured_runs": d.get("measured_runs"),
             "main_compute_median_s": (s.get("main_compute_s") or {}).get("median"), "e2e_median_s": (s.get("e2e_s") or {}).get("median"),

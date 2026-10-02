@@ -1361,5 +1361,94 @@ bash "$BR/generate_reference.sh" lb-hohlraum --from-cpu-log "$BCPU" --ranks 24 -
     && ok "neg: freeze refuses a GPU log and an unfinished CPU run; generate_reference.sh refuses an unregistered input and never overwrites a frozen reference without --force" \
     || bad "neg: freeze / generate guards rc=$rc1/$rc2/$rc3/$rc4"
 
+
+# ---- 18. Level 3 timing metadata (2026-10-02): kind app_timer and status NO_TIMED_REGION, reconciled with tools/timing/apptimers.py ----
+for d in level3/cp2k level3/dftfe level3/exaca level3/lammps level3/nekrs level3/nyx level3/qmcpack level3/sparta level3/specfem3d level3/warpx; do
+    python3 "$TOOL" validate "$R/$d" >/dev/null 2>&1 || bad "validate $d: $(python3 "$TOOL" validate "$R/$d" 2>&1 | noise | head -2)"
+done; ok "every Level 3 registry validates with the reconciled timing blocks"
+python3 - "$R" "$TMP" <<'PY' && ok "schema: kind app_timer needs app_timer {source: tools/timing/apptimers.py:<app>, region}; kind none accepts NEEDS_TIMING_SUPPORT | NO_TIMED_REGION with a reason, nothing else" || bad "schema: Level 3 timing kinds"
+import copy, os, sys, yaml
+sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
+base = yaml.safe_load(open(sys.argv[1] + "/level3/exaca/inputs.yaml"))
+def errs(timing, inp_timing=None):
+    d = copy.deepcopy(base); d["timing"] = timing
+    if inp_timing is not None:
+        d["inputs"][0]["timing"] = inp_timing
+    p = os.path.join(sys.argv[2], "l3t"); os.makedirs(p, exist_ok=True)
+    yaml.safe_dump(d, open(os.path.join(p, "inputs.yaml"), "w"))
+    return hi.validate(hi.load(p))
+assert errs({"kind": "app_timer", "unit": "s", "scope": "x", "app_timer": {"source": "tools/timing/apptimers.py:exaca", "region": "r"}}) == []
+assert any("kind app_timer requires app_timer" in e for e in errs({"kind": "app_timer", "unit": "s", "scope": "x"}))
+assert any("app_timer must be" in e for e in errs({"kind": "app_timer", "unit": "s", "scope": "x", "app_timer": {"source": "elsewhere.py:exaca", "region": "r"}}))
+assert any("unit must be" in e for e in errs({"kind": "app_timer", "unit": "parsec", "scope": "x", "app_timer": {"source": "tools/timing/apptimers.py:exaca", "region": "r"}}))
+assert errs({"kind": "none", "status": "NO_TIMED_REGION", "reason": "no loop"}) == []
+assert errs({"kind": "none", "status": "NEEDS_TIMING_SUPPORT", "reason": "no timer"}) == []
+assert any("NEEDS_TIMING_SUPPORT | NO_TIMED_REGION" in e for e in errs({"kind": "none", "status": "BOGUS", "reason": "x"}))
+assert any("NEEDS_TIMING_SUPPORT | NO_TIMED_REGION" in e for e in errs({"kind": "none", "status": "NO_TIMED_REGION"}))
+assert errs(base["timing"], {"kind": "none", "status": "NO_TIMED_REGION", "reason": "this input has no loop"}) == []
+assert any("app_timer must be" in e for e in errs(dict(base["timing"], app_timer={"source": "tools/timing/apptimers.py:exaca"})))
+PY
+out="$(python3 "$TOOL" parse-timing "$R/level3/cp2k" /dev/null 2>&1 | noise)"
+case "$out" in *"APP_TIMER: the headline timer of this input is read by tools/timing"*apptimers.py:cp2k*) ok "parse-timing cp2k: APP_TIMER (read by tools/timing/apptimers.py, not a stdout line)" ;;
+               *) bad "parse-timing cp2k: $out" ;; esac
+out="$(python3 "$TOOL" parse-timing "$R/level3/cp2k" /dev/null --input regtest-gpw-h2o-geoopt 2>&1 | noise)"
+case "$out" in *"NO_TIMED_REGION:"*"geometry optimisation"*) ok "parse-timing cp2k regtest: NO_TIMED_REGION (no MD loop in this input)" ;;
+               *) bad "parse-timing cp2k regtest: $out" ;; esac
+out="$(python3 "$TOOL" parse-timing "$R/level3/dftfe" /dev/null --input llzo-192atoms 2>&1 | noise)"
+case "$out" in *"NO_TIMED_REGION:"*"ground-state"*) ok "parse-timing dftfe llzo: NO_TIMED_REGION (ground state, no MD steps)" ;;
+               *) bad "parse-timing dftfe llzo: $out" ;; esac
+python3 - "$R" <<'PY' && ok "every Level 3 registry documents the headline timer (app_timer.source = tools/timing/apptimers.py:<app>) and names the timer definition of that application" || bad "Level 3 app_timer documentation"
+import glob, os, sys, yaml
+sys.path.insert(0, sys.argv[1] + "/tools/timing"); import apptimers
+for f in sorted(glob.glob(sys.argv[1] + "/level3/*/inputs.yaml")):
+    d = yaml.safe_load(open(f)); app = d["benchmark"]
+    assert d["timing"].get("app_timer", {}).get("source") == f"tools/timing/apptimers.py:{app}", f
+    assert app in apptimers.TIMERS and d["timing"]["app_timer"].get("region"), f
+    assert d["timing"]["kind"] != "none", f                      # no Level 3 registry is NEEDS_TIMING_SUPPORT any more
+PY
+
+# ---- 19. a stored measurement's comparison verdict is re-judged under the CURRENT registry roles/rules (2026-10-02) ----
+# fakediag (group 10.3): energy (required, rel) + pass_marker (required, present) + iterations (diagnostic, record)
+mkmeas() {   # mkmeas <out.json> <stored verdict> <checks json array>
+    python3 - "$1" "$2" "$3" <<'PY'
+import json, sys
+json.dump({"schema": "hpcperf-measurement-1", "benchmark": "fakediag", "level": 1, "input_id": "a",
+           "summary": {"baseline_verdict": sys.argv[2], "needs_validation": [], "baseline_checks": [{"verdict": sys.argv[2], "checks": json.loads(sys.argv[3])}]}},
+          open(sys.argv[1], "w"))
+PY
+}
+mkdir -p "$TMP/rj"
+mkmeas "$TMP/rj/same.json" PASS '[{"name":"energy","rule":"rel","role":"required","ok":true},{"name":"pass_marker","rule":"present","role":"required","ok":true},{"name":"iterations","rule":"record","role":"diagnostic","ok":true}]'
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/same.json" > "$TMP/rj/same.out" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['compare_verdict']=='PASS' and 'compare_rejudged' not in d, d" "$TMP/rj/same.out" \
+    && ok "re-judge: a stored PASS whose checks are the registry's current required rules stands (PASS, no note)" || bad "re-judge same: rc=$rc $(cat "$TMP/rj/same.out")"
+# the stored PASS rested on a quantity that is diagnostic now (the nekRS ci_failed case): it verifies nothing -> INCOMPLETE, never PASS
+mkmeas "$TMP/rj/diag.json" PASS '[{"name":"iterations","rule":"record","role":"required","ok":true},{"name":"gone_marker","rule":"absent","role":"required","present":false,"ok":true}]'
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/diag.json" > "$TMP/rj/diag.out" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='INCOMPLETE' and d['compare_verdict']=='NONE' and 'no currently required quantity was verified' in d['compare_rejudged'] and d['required_pending']==['energy','pass_marker'], d" "$TMP/rj/diag.out" \
+    && ok "re-judge: a stored PASS resting on quantities that are diagnostic / absent from the registry now -> compare NONE, verdict INCOMPLETE with the note and the pending required quantities" || bad "re-judge diag: rc=$rc $(cat "$TMP/rj/diag.out")"
+# a required quantity verified then under ANOTHER rule than today's is pending now
+mkmeas "$TMP/rj/rule.json" PASS '[{"name":"energy","rule":"abs","role":"required","ok":true},{"name":"pass_marker","rule":"present","role":"required","ok":true}]'
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/rule.json" > "$TMP/rj/rule.out" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='INCOMPLETE' and d['compare_verdict']=='INCOMPLETE' and d['required_pending']==['energy'] and 'pending now: energy' in d['compare_rejudged'], d" "$TMP/rj/rule.out" \
+    && ok "re-judge: a quantity verified under a rule the registry no longer uses is pending (INCOMPLETE, pending now: energy)" || bad "re-judge rule: rc=$rc $(cat "$TMP/rj/rule.out")"
+# a currently required quantity that FAILED then -> FAIL even if the stored verdict was INCOMPLETE
+mkmeas "$TMP/rj/fail.json" INCOMPLETE '[{"name":"energy","rule":"rel","role":"required","ok":false}]'
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/fail.json" > "$TMP/rj/fail.out" 2>/dev/null; rc=$?
+[ $rc -eq 1 ] && grep -q '"verdict": "FAIL"' "$TMP/rj/fail.out" && ok "re-judge: a currently required quantity that failed then -> FAIL (nothing outweighs a failure)" || bad "re-judge fail: rc=$rc $(cat "$TMP/rj/fail.out")"
+# a stored INCOMPLETE that verified nothing stays as stored (no note): only a change of substance is reported
+mkmeas "$TMP/rj/inc.json" INCOMPLETE '[{"name":"iterations","rule":"record","role":"diagnostic","ok":true}]'
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/inc.json" > "$TMP/rj/inc.out" 2>/dev/null; rc=$?
+[ $rc -eq 3 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='INCOMPLETE' and d['compare_verdict']=='INCOMPLETE' and 'compare_rejudged' not in d, d" "$TMP/rj/inc.out" \
+    && ok "re-judge: a stored INCOMPLETE that verified nothing is kept as stored (no note)" || bad "re-judge inc: rc=$rc $(cat "$TMP/rj/inc.out")"
+# a stored PASS with a passing check that covers everything: the check carries the verdict (PASS), the comparison note stays
+cat > "$TMP/rj/check.json" <<EOF
+{"schema": "$(python3 -c "import sys; sys.path.insert(0,'$R/tools/inputs'); import hpcperf_inputs as h; print(h.CHECK_SCHEMA)")", "benchmark": "fakediag", "input_id": "a", "verdict": "PASS", "covers": "all",
+ "workload": $(python3 "$TOOL" identity "$FR/level1/fakediag" a 2>/dev/null | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['workload']))")}
+EOF
+python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/diag.json" --check "$TMP/rj/check.json" > "$TMP/rj/chk.out" 2>/dev/null; rc=$?
+[ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['compare_verdict']=='NONE' and 'covers every pending' in d['reason'], d" "$TMP/rj/chk.out" \
+    && ok "re-judge: with a passing check covering all, the input is PASS on the check (the vacuous comparison counts for nothing)" || bad "re-judge chk: rc=$rc $(cat "$TMP/rj/chk.out")"
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

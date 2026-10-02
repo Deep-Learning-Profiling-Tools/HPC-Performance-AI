@@ -1380,6 +1380,42 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
     return finish("PASS")
 
 
+def rejudge_measurement(doc, inp, summary: dict):
+    """A stored measurement's baseline verdict read under the CURRENT registry roles and rules.
+
+    The measurement recorded, per compared run, which quantities its comparison checked (`baseline_checks[*].checks`:
+    name, rule, role, ok). The registry may have changed since: a quantity that is `diagnostic` now verifies nothing
+    even if it was `required` when the measurement was made (nekRS `ci_failed`, 2026-10-02: a rule that could never
+    fire), a quantity required now but not verified then is pending, a quantity whose rule changed is pending.
+    Returns (compare_verdict, required_pending, note); note is None when the stored verdict stands unchanged.
+      FAIL        a currently required quantity failed its check then
+      NONE        no currently required quantity was verified (the comparison establishes nothing)
+      INCOMPLETE  some verified, some pending
+      PASS        every currently required quantity was verified under its current rule"""
+    stored = summary.get("baseline_verdict") or "NONE"
+    pending = list(summary.get("needs_validation") or [])
+    runs = summary.get("baseline_checks") or []
+    if stored not in ("PASS", "INCOMPLETE") or not runs:
+        return stored, pending, None
+    req_now = {q["name"]: q for q in quantities(doc, inp) if role_of(q) == "required"}
+    verified, failed = set(), set()
+    for run in runs:
+        for c in run.get("checks") or []:
+            name, rule = c.get("name"), c.get("rule")
+            if rule == "record" or name not in req_now or rule != (req_now[name].get("compare") or {}).get("rule"):
+                continue                                   # record-only, no longer required, or judged under another rule: verifies nothing now
+            (verified if c.get("ok") else failed).add(name)
+    if failed:
+        return "FAIL", pending, "re-judged under the current registry: " + ", ".join(sorted(failed)) + " failed"
+    pend_now = sorted(n for n in req_now if n not in verified)
+    verdict = "PASS" if req_now and not pend_now else ("NONE" if not verified else "INCOMPLETE")
+    if verdict == stored or (stored == "INCOMPLETE" and verdict == "NONE"):      # nothing of substance changed
+        return stored, pending, None
+    what = ("no currently required quantity was verified by it" if verdict == "NONE" else
+            "pending now: " + ", ".join(pend_now) if pend_now else "every currently required quantity was verified")
+    return verdict, pend_now, f"stored comparison verdict {stored} re-judged under the current registry roles/rules: {what}"
+
+
 def correctness_verdict(doc, inp, compare_verdict, required_pending=None, check=None) -> dict:
     """The correctness verdict of an input from its baseline comparison and its correctness check.
 
@@ -1617,13 +1653,16 @@ def main(argv=None):
                 if m.get("input_id") != inp["id"] or m.get("benchmark") != doc["benchmark"]:
                     raise InputError(f"{a.measurement} belongs to {m.get('benchmark')}/{m.get('input_id')}, not {doc['benchmark']}/{inp['id']}")
                 s = m.get("summary") or {}
-                cmp_v = s.get("baseline_verdict") or "NONE"; pending = s.get("needs_validation")
+                cmp_v, pending, rejudged = rejudge_measurement(doc, inp, s)
             chk = None
             if a.check:
                 chk = json.loads(Path(a.check).read_text())
                 if chk.get("schema") != CHECK_SCHEMA or chk.get("input_id") != inp["id"] or chk.get("benchmark") != doc["benchmark"]:
                     raise InputError(f"{a.check} is not a check record of {doc['benchmark']}/{inp['id']}")
             res = correctness_verdict(doc, inp, cmp_v, pending, chk)
+            if a.measurement and rejudged:
+                res["compare_rejudged"] = rejudged
+                res["reason"] += " (" + rejudged + ")"
             print(json.dumps(res, indent=2))
             return {"PASS": 0, "FAIL": 1}.get(res["verdict"], 3)
     except InputError as ex:
