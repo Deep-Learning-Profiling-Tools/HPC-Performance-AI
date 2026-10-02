@@ -498,6 +498,12 @@ runs `mpirun --map-by ppr:<ranks>:node:PE=<cpus_per_rank> --bind-to core`, plus 
 `placement.policy` says what was applied and its `placement` block what the process was actually
 allowed; `--bind-policy runtime` reproduces the earlier campaigns' default binding. The A/B of the
 two policies (2026-09-30) is in the results directory of that round, not here.
+The policy is application-specific and explicit, not a portable GPU-topology-aware mechanism: it states
+core counts per rank, names no socket or NUMA node and resolves no GPU topology (no automatic topology
+resolver, by decision 2026-10-02). That the bound cores were GPU-local (hipBone on cores 16-19 of socket 0,
+memory on NUMA node 0) is verified on the current machine, where the allocation's cpuset begins with the
+GPU's socket and Open MPI fills the PE sets in cpuset order; on another allocation the record's `placement`
+block shows what the process was actually allowed, and nothing in the policy guarantees locality.
 
 ## Launching Level 3
 
