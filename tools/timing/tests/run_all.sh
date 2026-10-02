@@ -226,7 +226,7 @@ else
 fi
 
 echo
-pycheck "1r4: registry Level 3: one case per registered input, selector env only, GPUs from runtime_config, NVTX range / profile default from the apps table; stray, conflicting and hand-written selector refused" <<'PY'
+pycheck "1r4: registry Level 3: one case per registered input, selector env (+ the build-variant variable of a ReaxFF input), GPUs from runtime_config, NVTX range / profile default from the apps table; stray, conflicting and hand-written selector refused" <<'PY'
 import os, sys, shutil
 sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
 import cases, hpcperf_inputs as hi
@@ -240,9 +240,11 @@ rows, apps = cases.level3_registry_rows("CUDA")
 reg = cases.registry_l3()
 for r in rows:
     sel = reg[r["app"]][0]
-    if r["env"] != f"{sel}={r['input_id']}" or r["case"] != r["input_id"] or r["level"] != "3":
-        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}")
     doc = hi.load(os.path.join(R, "level3", r["app"])); inp = hi.get_input(doc, r["input_id"])
+    variant = (inp.get("params") or {}).get("variant")
+    want = f"{sel}={r['input_id']}" + (f";HPCPERF_LAMMPS_VARIANT={variant}" if variant and variant != "default" else "")
+    if r["env"] != want or r["case"] != r["input_id"] or r["level"] != "3":
+        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}, want {want!r}")
     if r["gpus"] != str((inp.get("runtime_config") or {}).get("gpus", 1)):
         bad.append(f"{r['app']}/{r['case']}: gpus {r['gpus']} != runtime_config")
     if r["nvtx_roi"] != apps[r["app"]]["nvtx_roi"] or r["profile"] != apps[r["app"]]["profile"] or r["verify_vs_roi"] != "outside":
@@ -251,6 +253,11 @@ if not any(r["app"] == "warpx" and r["nvtx_roi"] == "WarpX::Evolve()" for r in r
     bad.append("warpx rows lack the NVTX range")
 if not any(r["app"] == "qmcpack" and r["profile"].startswith("no (") for r in rows):
     bad.append("qmcpack rows lack the no-profile default")
+rx = [r for r in rows if r["app"] == "lammps" and r["case"].startswith("reaxff-")]
+if len(rx) != 2 or any("HPCPERF_LAMMPS_VARIANT=reaxff" not in r["env"] for r in rx):
+    bad.append(f"ReaxFF cases do not carry the build-variant variable: {[r['env'] for r in rx]}")
+if any("HPCPERF_LAMMPS_VARIANT" in r["env"] for r in rows if r["app"] == "lammps" and not r["case"].startswith("reaxff-")):
+    bad.append("a non-ReaxFF LAMMPS case carries a build-variant variable")
 if "HPCPERF_LAMMPS_INPUT" not in cases.allowed_env("lammps", "", level=3):
     bad.append("the Level 3 registry selector is not an allowed input variable")
 lj = [r for r in rows if r["app"] == "lammps" and r["case"] == "lj-32k"]

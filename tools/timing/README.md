@@ -301,7 +301,8 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   id) and never edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
 * **Level 3** cases (since 2026-10-02) run the application's `run.sh` with the registry selector set to the
   input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 43 registered
-  inputs declare 1 GPU / 1 rank); the region is the application's own timer (section "Level 3" above), the
+  inputs declare 1 GPU / 1 rank), plus the build-variant variable when the input's `params.variant` names one
+  (LAMMPS ReaxFF: `HPCPERF_LAMMPS_VARIANT=reaxff`, the `reaxff` build profile; run.sh refuses any other); the region is the application's own timer (section "Level 3" above), the
   FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`. The engine stores the
   input's workload identity next to the raw runs as for Level 1/2, and `verify_registry_runs.py` judges the
   run from the run manifest every Level 3 `run.sh` writes (ranks, binary and its sha256, deck / input and

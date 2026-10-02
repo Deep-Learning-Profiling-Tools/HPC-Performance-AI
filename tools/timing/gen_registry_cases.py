@@ -42,8 +42,11 @@ L1_COLS = ("app", "case", "input_id", "materialized", "exe", "args", "cwd", "env
 L2_COLS = ("app", "case", "input_id", "materialized", "selector", "registry_knobs", "gpus", "timeout_s")
 L1_MIN_TIMEOUT = 1800        # per run; the ctest default case's timeout when larger
 L2_MIN_TIMEOUT = 1800
-L3_COLS = L2_COLS
+L3_COLS = L2_COLS + ("env",)       # env: variables the input needs beyond the selector (NAME=VALUE;...), from the registry
 L3_MIN_TIMEOUT = 1800
+# An input whose params.variant names a build variant runs only on that variant's profile; run.sh reads the variant from
+# this variable and refuses any other profile (level3/lammps/run.sh: HPCPERF_LAMMPS_VARIANT). The case sets it from the registry.
+L3_BUILD_VARIANT_VAR = {"lammps": "HPCPERF_LAMMPS_VARIANT"}
 
 HEADER = """# tools/timing/cases/{name} -- GENERATED from the inputs registry by tools/timing/gen_registry_cases.py.
 # Do not edit: change level{level}/<benchmark>/inputs.yaml and regenerate; `gen_registry_cases.py --check`
@@ -140,10 +143,18 @@ def level3_rows():
             if rc.get("ranks") not in (None, gpus):
                 raise C.CaseError(f"level3/{app}/{inp['id']}: runtime_config.ranks {rc.get('ranks')} != gpus {gpus} "
                                   f"(every Level 3 run.sh runs one MPI rank per GPU)")
+            env = []
+            variant = (inp.get("params") or {}).get("variant")
+            if variant and variant != "default":
+                var = L3_BUILD_VARIANT_VAR.get(app)
+                if not var:
+                    raise C.CaseError(f"level3/{app}/{inp['id']}: params.variant={variant!r} but no build-variant variable is known "
+                                      f"for {app} (gen_registry_cases.L3_BUILD_VARIANT_VAR)")
+                env.append(f"{var}={variant}")
             rows.append({"app": app, "case": inp["id"], "input_id": inp["id"],
                          "materialized": "1" if inp.get("materialized", True) is not False else "0",
                          "selector": doc["selector"], "registry_knobs": ",".join(knobs),
-                         "gpus": str(gpus), "timeout_s": str(max(L3_MIN_TIMEOUT, a_to))})
+                         "gpus": str(gpus), "timeout_s": str(max(L3_MIN_TIMEOUT, a_to)), "env": ";".join(env)})
     return rows
 
 

@@ -177,7 +177,7 @@ L3_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_bett
                "fom_regex", "extra_env", "nvtx_roi", "profile", "notes")
 L3_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "acceptance", "notes")
 
-L3_REG_COLS = L2_REG_COLS
+L3_REG_COLS = L2_REG_COLS + ("env",)      # env: what the input needs beyond the selector (a build-variant variable), from the registry
 
 
 def registry_l3():
@@ -555,10 +555,13 @@ def level3_registry_rows(backend):
         if (r["app"], r["case"]) in seen:
             raise CaseError(f"{r['_where']}: duplicate registry case {r['app']}/{r['case']}")
         seen.add((r["app"], r["case"]))
-        env = parse_env(f"{r['selector']}={r['input_id']}", r["_where"])
+        env = parse_env(f"{r['selector']}={r['input_id']}" + (";" + r["env"] if r.get("env") else ""), r["_where"])
         allowed = allowed_env(r["app"], app["extra_env"], reg, level=3)
         if r["selector"] not in allowed:
             raise CaseError(f"{r['_where']}: selector {r['selector']} is not an input variable of {r['app']}")
+        for k, _v in env:
+            if k not in allowed:
+                raise CaseError(f"{r['_where']}: {k} is not a variable {r['app']}'s run.sh reads")
         gpus = r["gpus"] or "1"
         if not gpus.isdigit() or int(gpus) < 1:
             raise CaseError(f"{r['_where']}: gpus must be a positive integer")
