@@ -183,6 +183,7 @@ inputs:
     steps: 40
   env:
     HPCPERF_WARPX_CASE: langmuir
+    # not read for the langmuir case: run.sh runs upstream's test as shipped (64^3, 40 steps) and labels it mode=validate
     HPCPERF_SCALE_MODE: smoke
   runtime_config:
     gpus: 1

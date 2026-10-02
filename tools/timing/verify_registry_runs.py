@@ -461,7 +461,7 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
     params["input_id"] = rec["case"]
     vals = template_values(params, rule)
     bc = (entry or {}).get("build_config") or {}
-    want_variant = str((wl.get("params") or {}).get("variant") or "default")
+    declared_variant = (wl.get("params") or {}).get("variant")     # a BUILD variant the input needs (LAMMPS ReaxFF); None = the registry declares none
     exe_sha = (rec.get("inputs") or {}).get("exe_sha256")
     own = (os.path.join(repo, "build", "level3", app) + os.sep, os.path.join(repo, ".deps", "level3", app) + os.sep)
     matched = 0
@@ -502,8 +502,13 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
             c.gap(f"{r['dir']}: no install fingerprint recorded")
         if bc.get("profile") and m.get("profile") != bc["profile"]:
             c.fail(f"{r['dir']}: profile {m.get('profile')!r}, the registry's build_config requires {bc['profile']!r}")
-        if "variant" in m and m["variant"] != want_variant:
-            c.fail(f"{r['dir']}: build variant {m['variant']!r}, the registry input is variant {want_variant!r}")
+        if "variant" in m:
+            if declared_variant is not None and m["variant"] != str(declared_variant):
+                c.fail(f"{r['dir']}: build variant {m['variant']!r}, the registry input needs {str(declared_variant)!r}")
+            elif declared_variant is None:
+                # the registry's `variant` field is the input-variation kind (default / size / case / build-config), not a
+                # build variant; a build variant it does not declare (nekRS hypregpu) is recorded, the binary check covers the build
+                c.ok(f"{r['dir']}: build variant {m['variant']!r} recorded (the registry declares no build variant for this input)")
         # manifest templates: every applicable template must match the manifest value
         for key, temps in (rule.get("manifest") or {}).items():
             for tpl in (temps if isinstance(temps, list) else [temps]):

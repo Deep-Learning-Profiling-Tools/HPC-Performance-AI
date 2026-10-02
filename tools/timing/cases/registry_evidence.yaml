@@ -219,12 +219,14 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
     timer_steps: 'nstep'
   warpx:                        # run.sh: the case deck derived from upstream with the grid and step count of the mode / knobs
     covers: [HPCPERF_SCALE_MODE, HPCPERF_WARPX_CASE, HPCPERF_WARPX_LOCAL, HPCPERF_WARPX_GLOBAL, HPCPERF_WARPX_STEPS]
-    derive: {grid: "'x'.join(n_cell.split())"}
+    # run.sh runs the langmuir case as upstream's test as shipped (64^3, 40 steps) and labels it mode=validate whatever
+    # HPCPERF_SCALE_MODE says (level3/warpx/run.sh); the mode label is derived the same way here
+    derive: {grid: "'x'.join(n_cell.split())", mode: "'validate' if HPCPERF_WARPX_CASE == 'langmuir' else HPCPERF_SCALE_MODE"}
     manifest:
       case: ['^{HPCPERF_WARPX_CASE}$']
-      mode: ['^{HPCPERF_SCALE_MODE}$']
+      mode: ['^{mode}$']
       grid: ['^{grid}$']
       steps: ['^{steps}$']
     generated: {input: input_sha256}
-    output: ['^# WarpX .* case={HPCPERF_WARPX_CASE} mode={HPCPERF_SCALE_MODE} ranks=\d+ grid={grid} ']
+    output: ['^# WarpX .* case={HPCPERF_WARPX_CASE} mode={mode} ranks=\d+ grid={grid} ']
     timer_steps: 'steps'
