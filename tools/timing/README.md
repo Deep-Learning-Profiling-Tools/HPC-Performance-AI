@@ -139,7 +139,8 @@ A clean run whose output does not contain the timer is `app_timer_missing` (FAIL
 Level 3 run never falls back to the process wall clock. Three registered inputs have no timed region by
 construction -- CP2K's two regtest inputs (geometry optimisation / single point: no MD loop) and DFT-FE's
 LLZO ground state (no MD step) -- and their registry entries say so (`timing.status: NO_TIMED_REGION`); they
-are run, verified and checked for correctness like the others, with no timing result. Each run writes its run
+are run, verified and checked for correctness like the others, with no timing result; the page and
+`registry_current.csv` show them as `NO_TIMED_REGION` (neither timing SUCCESS nor a failed run). Each run writes its run
 directory under `build/level3/<app>/<profile>/run.timing-<run id>-<c0|prof>/`
 (`HPCPERF_L3_RUN_SUBDIR`), so no validated or historical run directory is touched, and
 the files the timer is read from are copied into the raw evidence.

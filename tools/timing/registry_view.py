@@ -219,6 +219,13 @@ def measurements(recs, groups=()):
     return sets, problems
 
 
+def _no_timed_region(doc, inp):
+    """True when the registry says this input has no timed region by construction (timing.kind none, status
+    NO_TIMED_REGION -- Level 3 inputs without a time-step loop): its records are expected to be app_timer_missing."""
+    t = inp.get("timing") if isinstance(inp.get("timing"), dict) else (doc.get("timing") or {})
+    return t.get("kind") == "none" and t.get("status") == "NO_TIMED_REGION"
+
+
 def registered_inputs(repo=REPO):
     import hpcperf_inputs as hi
     out = []
@@ -231,6 +238,7 @@ def registered_inputs(repo=REPO):
                             "input_form": inp.get("input_form", "runtime"), "params": inp.get("params") or {},
                             "args": [str(a) for a in inp.get("args") or []], "env": inp.get("env") or {},
                             "materialized": inp.get("materialized", True) is not False,
+                            "no_timed_region": _no_timed_region(doc, inp),
                             "workload_key": workload_key(hi.registry_identity(doc, inp)["workload"])})
     return out
 
@@ -289,6 +297,8 @@ def current_view(roots, repo=REPO):
         row["current"] = cur[-1] if cur else None
         if row["current"]:
             row["status"] = "SUCCESS"
+        elif mine and inp.get("no_timed_region") and mine[-1]["status"] == "app_timer_missing":
+            row["status"] = "NO_TIMED_REGION"        # the registry says so; the run itself is judged by run verification
         elif mine:
             row["status"] = "RUN_FAILED"
         else:
@@ -310,6 +320,7 @@ def counts(rows, recs, orphans=()):
         "roi_success": {f"level{l}": n(lambda r, l=l: r["level"] == l and r["status"] == "SUCCESS") for l in L},
         "run_failed": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "RUN_FAILED"),
         "not_measured": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "NOT_MEASURED"),
+        "no_timed_region": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "NO_TIMED_REGION"),
         "run_verification_pass": n(lambda r: r["run_verification"] == "PASS"),
         "run_verification_insufficient": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["current"] and r["run_verification"] == "INSUFFICIENT"),
         "file_identity_from_supplement": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if "supplement" in (r.get("file_identity") or [])),

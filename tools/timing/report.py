@@ -486,7 +486,8 @@ def md_status_line(c):
     reg = k["registered_inputs"]
     return (f"{reg['level1']} + {reg['level2']} + {reg['level3']} registered Level 1 / 2 / 3 inputs: timing SUCCESS for "
             f"{ok['level1']} + {ok['level2']} + {ok.get('level3', 0)} (Level 3: the application's own timer), run failed for "
-            f"{len(k['run_failed'])}, not measured {len(k['not_measured'])}; run verification PASS for "
+            f"{len(k['run_failed'])}, not measured {len(k['not_measured'])}"
+            + (f", no timed region by construction {len(k['no_timed_region'])}" if k.get("no_timed_region") else "") + "; run verification PASS for "
             f"{k['run_verification_pass']}; UNSTABLE {len(k['unstable'])}.")
 
 
@@ -506,7 +507,7 @@ def render_md_registry(c):
             "the IQR does not). 'two levels': the samples fall into two groups (a gap > 5 % of the median, >= 20 % on each side). An adaptive extension (+2 runs, history campaigns only -- the final "
             "Level 2 protocol has none) is pooled with its 3 runs only through an explicit measurement group; runs of the same "
             "configuration without one stay separate measurements.",
-            "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED), run verification "
+            "- Three separate results per input: ROI timing (SUCCESS / RUN_FAILED / NOT_MEASURED; NO_TIMED_REGION for a Level 3 input whose registry says it has no time-step loop), run verification "
             "(did the run get the registered input: tools/timing/verify_registry_runs.py), scientific correctness "
             "(evidence from outside the timing runs; its basis is given per input in index.html).", ""]
     corr = k["correctness"]

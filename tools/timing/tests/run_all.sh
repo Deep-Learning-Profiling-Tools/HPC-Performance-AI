@@ -2095,7 +2095,7 @@ print("ALLOK" if not bad else "\n".join(bad))
 PY
 
 # ---- 26. the registered Level 3 inputs on the page, in the Markdown twin and in registry_current.csv; an embedded page level as history ----
-pycheck "26: a Level 3 registry record is a SUCCESS row with run verification, the page/README show it with the application-timer columns, registry_current.csv lists it, --page-level PATH:3:history is an earlier campaign" <<'PY'
+pycheck "26: a Level 3 registry record is a SUCCESS row with run verification, the page/README show it with the application-timer columns, registry_current.csv lists it, --page-level PATH:3:history is an earlier campaign, a NO_TIMED_REGION input is neither SUCCESS nor run failed" <<'PY'
 import csv, json, os, sys
 sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
 import verify_registry_runs as V, hpcperf_inputs as hi, registry_view as RV, report, summarize
@@ -2125,16 +2125,30 @@ rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32
        "placement": {"policy": {"kind": "application"}, "summary": {"gpus": ["0000:43:00.0"]}},
        "provenance": {"raw_dir": raw, "git_commit": "c0ffee"}, "caveats": []}
 w(f"{root}/level3/lammps/lj-32k/run01.json", json.dumps(rec))
+# a Level 3 input the registry declares NO_TIMED_REGION (no time-step loop): its record is app_timer_missing by construction
+rec2 = dict(rec, app="cp2k", case="regtest-gpw-h2o-geoopt", status="app_timer_missing", run_id="run02", utc="2026-01-01T00:00:02Z",
+            registry={"input_id": "regtest-gpw-h2o-geoopt", "identity": hi.registry_identity(hi.load(os.path.join(R, "level3", "cp2k")), hi.get_input(hi.load(os.path.join(R, "level3", "cp2k")), "regtest-gpw-h2o-geoopt")), "identity_complete": True, "identity_sha256": "id-c"},
+            inputs={"declared_env": {"HPCPERF_CP2K_INPUT": "regtest-gpw-h2o-geoopt"}, "processes": [], "exe_sha256": None},
+            roi={"runs_s": [], "wall_s": None, "steps": None, "source": "app_timer"}, fom=None, provenance={"raw_dir": f"{T}/raw/cp2k/none", "git_commit": "c0ffee"},
+            caveats=["The application's timer was not found in the clean run"])
+w(f"{root}/level3/cp2k/regtest-gpw-h2o-geoopt/run02.json", json.dumps(rec2))
 bad = []
 rows, recs, meta, orph = RV.current_view([root], R)
+ntr = next((r for r in rows if r["level"] == 3 and r["benchmark"] == "cp2k" and r["input_id"] == "regtest-gpw-h2o-geoopt"), None)
+if not ntr or ntr["status"] != "NO_TIMED_REGION" or ntr["current"] is not None:
+    bad.append(f"26n: NO_TIMED_REGION input status {ntr and ntr['status']}")
 row = next((r for r in rows if r["level"] == 3 and r["benchmark"] == "lammps" and r["input_id"] == "lj-32k"), None)
 if not row or row["status"] != "SUCCESS" or row["run_verification"] != "PASS":
     bad.append(f"26a: row {row and (row['status'], row['run_verification'])}")
 k = RV.counts(rows, recs, orph)
 if k["roi_success"].get("level3") != 1 or k["registered_inputs"]["level3"] != 43 or "roi_not_supported_level3" in k:
     bad.append(f"26b: counts {k['roi_success']} {k['registered_inputs']}")
-if sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 42:
-    bad.append("26c: the other 42 Level 3 inputs are not NOT_MEASURED")
+if sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 41:
+    bad.append("26c: the other 41 Level 3 inputs are not NOT_MEASURED")
+if k.get("no_timed_region") != ["cp2k/regtest-gpw-h2o-geoopt"] or k["run_failed"] != []:
+    bad.append(f"26o: counts no_timed_region {k.get('no_timed_region')} run_failed {k['run_failed']}")
+if "no timed region by construction 1" not in report.md_status_line({"counts": k}):
+    bad.append("26p: the Markdown status line does not count the no-timed-region input")
 out = os.path.join(T, "page"); report.write([root], out)
 b = report.build_bundle([root]); c = b["campaigns"][0]
 app = next((a for a in c["levels"]["3"] if a["app"] == "lammps"), None)
@@ -2151,6 +2165,8 @@ summarize.write_registry_current(root)
 rows_csv = [r for r in csv.DictReader(open(os.path.join(root, "registry_current.csv"))) if r["level"] == "3"]
 if len(rows_csv) != 43 or not any(r["input_id"] == "lj-32k" and r["status"] == "SUCCESS" and r["run_verification"] == "PASS" for r in rows_csv):
     bad.append(f"26g: registry_current.csv level 3 rows {len(rows_csv)}")
+if not any(r["input_id"] == "regtest-gpw-h2o-geoopt" and r["status"] == "NO_TIMED_REGION" for r in rows_csv):
+    bad.append("26q: registry_current.csv does not carry NO_TIMED_REGION")
 h = report.load_page_level(os.path.join(out, "index.html") + ":3:history")
 if not h["historical"] or "earlier campaign" not in h["title"] or h["level_only"] != "3":
     bad.append(f"26h: page-level history {h.get('historical')} {h.get('title')}")

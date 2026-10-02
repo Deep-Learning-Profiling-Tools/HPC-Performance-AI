@@ -133,10 +133,11 @@
       var rows = rowsOf(a);
       var meta;
       if (isReg()) {
-        var bad = rows.filter(function (r) { return r.status !== "SUCCESS"; }).length;
+        var ntr = rows.filter(function (r) { return r.status === "NO_TIMED_REGION"; }).length;
+        var bad = rows.filter(function (r) { return r.status !== "SUCCESS" && r.status !== "NO_TIMED_REGION"; }).length;
         var uns = rows.filter(function (r) { return PLATS.some(function (p) { var m = r.cells[p.id]; return m && !m.set.stable; }); }).length;
         meta = (a.suite ? a.suite + " · " : "") + rows.length + (rows.length === 1 ? " input" : " inputs") +
-               (bad ? " · " + bad + " not measured" : " · all measured") + (uns ? " · " + uns + " UNSTABLE" : "");
+               (bad ? " · " + bad + " not measured" : " · all measured") + (ntr ? " · " + ntr + " no timed region" : "") + (uns ? " · " + uns + " UNSTABLE" : "");
       } else {
         meta = (a.suite ? a.suite + " · " : "") + rows.length + (rows.length === 1 ? " input" : " inputs") +
                " · " + measured(a) + "/" + rows.length * PLATS.length + " measured";
@@ -545,9 +546,10 @@
 
 
   // ---------------------------------------------------------------- registered inputs
-  var STATUS_TEXT = {SUCCESS: "ROI timing SUCCESS", RUN_FAILED: "run failed", NOT_MEASURED: "not measured"};
+  var STATUS_TEXT = {SUCCESS: "ROI timing SUCCESS", RUN_FAILED: "run failed", NOT_MEASURED: "not measured",
+                     NO_TIMED_REGION: "no timed region by construction (registry: timing.status NO_TIMED_REGION)"};
   function pill(text, kind) { return el("span", {cls: "pill " + kind, text: text}); }
-  function statusPill(s) { return pill(STATUS_TEXT[s] || s, s === "SUCCESS" ? "ok" : "bad"); }
+  function statusPill(s) { return pill(STATUS_TEXT[s] || s, s === "SUCCESS" ? "ok" : s === "NO_TIMED_REGION" ? "warn" : "bad"); }
   function verdictPill(v) {
     return !v ? nul("none") : pill(v, v === "PASS" ? "ok" : (v === "SUPERSEDED" || v === "INCOMPLETE") ? "warn" : v === "NOT_RUN" ? "na" : "bad");
   }
@@ -562,6 +564,7 @@
       var list = apps(), rows = [];
       list.forEach(function (a) { rows = rows.concat(a.inputs); });
       var ok = rows.filter(function (r) { return r.status === "SUCCESS"; }).length;
+      var ntr = rows.filter(function (r) { return r.status === "NO_TIMED_REGION"; }).length;
       var ver = rows.filter(function (r) { return r.run_verification === "PASS"; }).length;
       var uns = rows.filter(function (r) { return PLATS.some(function (p) { var m = r.cells[p.id]; return m && !m.set.stable; }); }).length;
       var corr = {PASS: 0, INCOMPLETE: 0, FAIL: 0, none: 0};
@@ -573,7 +576,8 @@
         el("div", {cls: "counts"}, [
           el("span", {}, [el("b", {text: String(rows.length)}), " registered inputs"]),
           el("span", {}, [el("b", {text: String(ok)}), st.level === "3" ? " timing SUCCESS (application timer)" : " ROI timing SUCCESS"]),
-          el("span", {}, [el("b", {text: String(rows.length - ok)}), " not measured successfully"]),
+          el("span", {}, [el("b", {text: String(rows.length - ok - ntr)}), " not measured successfully"]),
+          ntr ? el("span", {}, [el("b", {text: String(ntr)}), " no timed region by construction (run and verified, no timing result)"]) : null,
           el("span", {}, [el("b", {text: String(ver)}), " run verification PASS"]),
           el("span", {}, [el("b", {text: String(uns)}), " UNSTABLE"]),
           el("span", {}, ["measured ", el("b", {text: (D.measured_from || "-") + " .. " + (D.generated_from || "-")})])]),
@@ -604,7 +608,7 @@
         var m = r.cells[p.id], sel = r.input_id === st.kase && p.id === st.plat;
         var label = m ? [fmtT(m.roi.wall_s), el("small", {text: m.set.n + " runs" + (m.set.stable ? "" : " · UNSTABLE")})]
                       : [STATUS_TEXT[r.status] || r.status, el("small", {text: r.attempts.length + (r.attempts.length === 1 ? " attempt" : " attempts")})];
-        return el("td", {}, [el("button", {type: "button", cls: "cellbtn" + (m ? "" : " bad"),
+        return el("td", {}, [el("button", {type: "button", cls: "cellbtn" + (m ? "" : r.status === "NO_TIMED_REGION" ? " warn" : " bad"),
           "aria-pressed": sel ? "true" : "false", "aria-label": app.app + " " + r.input_id + " on " + p.id,
           onclick: function () { st.kase = r.input_id; st.plat = p.id; update(false);
                                  var d = document.getElementById("detail"); if (d) d.scrollIntoView({block: "start"}); }}, label)]);
