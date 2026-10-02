@@ -11,12 +11,21 @@ entry:
   path: level3/nekrs/run.sh
   backend_arg: CUDA
 timing:
-  scope: 'nekRS''s own elapsedStepSum after the last step: the sum of the time-step wall times (solver only; setup,
-    JIT compilation and the ''runtime statistics'' totalElapsed which includes them are excluded)'
+  scope: >-
+    nekRS's own elapsedStepSum after the last step (this stdout line): the sum of the time-step wall times
+    between MPI barriers; set-up, JIT compilation and the 'runtime statistics' totalElapsed (which includes
+    them) are excluded. The headline timer of tools/timing (apptimers.py: nekrs) is the 'solve' row of the
+    final runtime statistics (= elapsedStepSum, maximum over ranks) minus its 'checkpointing' row (field-file
+    output inside the loop, reported as excluded time): smaller than this line by the checkpointing time
+    when the case writes fields.
   kind: total
   unit: s
   regex: elapsedStepSum=\s*(?P<value>[0-9.eE+-]+)s
   select: last
+  app_timer:
+    source: tools/timing/apptimers.py:nekrs
+    region: "'solve' minus 'checkpointing' of the final runtime statistics (src/app/nrs/nrs.cpp, src/bin/driver.cpp, src/platform/timer.cpp)"
+    relation: 'this stdout timer includes the in-loop checkpoint writes; the headline excludes them (excluded_s)'
 baseline:
   method: upstream's --cimode CI checks ('CI test <name> passed') are run by validate.sh; a plain run prints the
     divergence error per step, recorded as a diagnostic

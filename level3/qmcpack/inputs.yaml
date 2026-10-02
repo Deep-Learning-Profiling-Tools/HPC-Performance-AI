@@ -11,12 +11,21 @@ entry:
   path: level3/qmcpack/run.sh
   backend_arg: CUDA
 timing:
-  scope: 'QMCPACK''s own ''Total Execution time'' (all QMC sections: VMC + DMC blocks; input parsing/wavefunction
-    setup included as printed by the application)'
+  scope: >-
+    QMCPACK's own 'Total Execution time' (this stdout line): all QMC sections, VMC + DMC blocks, input parsing
+    and wavefunction set-up included. The headline timer of tools/timing (apptimers.py: qmcpack) is the DMC
+    driver's 'DMCBatched::Production' timer of the stack timer profile (run.sh runs with --enable-timers=medium):
+    every DMC block and step after a barrier, including the per-block estimator reduction and output; without
+    start-up, wavefunction set-up and the VMC section before DMC (reported as a part); rank 0's clock. It is the
+    DMC loop only, so it is smaller than the total execution time.
   kind: total
   unit: s
   regex: ^\s*Total Execution time = (?P<value>[0-9.eE+-]+) secs
   select: only
+  app_timer:
+    source: tools/timing/apptimers.py:qmcpack
+    region: "'DMCBatched::Production' of the stack timer profile (src/QMCDrivers/DMC/DMCBatched.cpp, src/Utilities/TimerManager.cpp)"
+    relation: 'this stdout timer is the whole execution (set-up, VMC and DMC); the headline is the DMC production loop only'
 baseline:
   method: 'the energies go to <prefix>.s00N.scalar.dat (validate.sh: upstream check_scalars.py); stdout carries
     no scalar value -- completion is recorded only'

@@ -86,7 +86,12 @@ Quantity roles (inputs.yaml `role: required|diagnostic`, default required): only
 decide acceptance; diagnostic quantities are reported and may stay `record` without a tolerance.
 Rollout fields (optional, backward compatible): `timing.kind: none` + `status: NEEDS_TIMING_SUPPORT` +
 `reason` for a benchmark without a usable native timer (measure records E2E only, never as main
-compute); top-level `coverage: {status: MULTI_INPUT|SINGLE_INPUT|BLOCKED, reason, blocker,
+compute), or `status: NO_TIMED_REGION` for an input in which the benchmark's timed region does not exist
+(a Level 3 regtest without the MD loop the timer is defined on); `timing.kind: app_timer` + `app_timer:
+{source: tools/timing/apptimers.py:<app>, region, relation}` for a Level 3 application whose headline timer
+tools/timing reads from the run directory (CP2K's .ener file, DFT-FE's per-step lines) -- `parse-timing`
+reports APP_TIMER and `measure` records E2E only; any kind may carry `app_timer:` to document the headline
+timer when it is not the stdout line the registry reads; top-level `coverage: {status: MULTI_INPUT|SINGLE_INPUT|BLOCKED, reason, blocker,
 upstream_inputs_not_added}` for the audit; per-input `input_form: runtime|file|compile-time`.
   compute_ge_1s        median main compute >= 1 s (a reference value, not a gate)
   stable               n >= 3 and (max-min)/median <= 0.10 over the measured runs
@@ -149,13 +154,36 @@ COVERAGE_STATUS = ("MULTI_INPUT", "SINGLE_INPUT", "BLOCKED")
 INPUT_FORMS = ("runtime", "file", "compile-time")
 
 
+TIMING_NONE_STATUS = ("NEEDS_TIMING_SUPPORT", "NO_TIMED_REGION")
+
+
+def _check_app_timer(t, where, errs):
+    """`app_timer:` -- the headline timer tools/timing reads (Level 3, tools/timing/apptimers.py)."""
+    at = t.get("app_timer")
+    if at is None:
+        return
+    if not isinstance(at, dict) or not str(at.get("source", "")).startswith("tools/timing/apptimers.py:") \
+            or not at.get("region"):
+        errs.append(f"{where}.app_timer must be {{source: tools/timing/apptimers.py:<app>, region: <what the timer covers>, relation: <optional>}}")
+
+
 def _check_timer(t, where, errs, need_work=True):
     if t.get("kind") == "none":
-        # no usable native timer: the registry records why; measure() reports NEEDS_TIMING_SUPPORT
-        # and records only E2E wall as auxiliary information (never as main compute)
-        if not t.get("status") == "NEEDS_TIMING_SUPPORT" or not t.get("reason"):
-            errs.append(f"{where}.kind none requires status: NEEDS_TIMING_SUPPORT and a reason")
+        # no usable native timer (NEEDS_TIMING_SUPPORT), or the benchmark's timed region does not exist in this
+        # input (NO_TIMED_REGION): the registry records why; measure() records only E2E wall as auxiliary
+        # information (never as main compute)
+        if t.get("status") not in TIMING_NONE_STATUS or not t.get("reason"):
+            errs.append(f"{where}.kind none requires status: {' | '.join(TIMING_NONE_STATUS)} and a reason")
         return
+    if t.get("kind") == "app_timer":
+        # the headline timer is read by tools/timing/apptimers.py from the run directory, not from a stdout line
+        if "app_timer" not in t:
+            errs.append(f"{where}.kind app_timer requires app_timer: {{source, region}}")
+        _check_app_timer(t, where, errs)
+        if t.get("unit", "s") not in UNIT_TO_S:
+            errs.append(f"{where}.unit must be one of {sorted(UNIT_TO_S)}")
+        return
+    _check_app_timer(t, where, errs)
     for k in ("regex", "unit", "select"):
         if k not in t:
             errs.append(f"{where}.{k} missing")
@@ -163,8 +191,8 @@ def _check_timer(t, where, errs, need_work=True):
         errs.append(f"{where}.unit must be one of {sorted(UNIT_TO_S)}")
     if t.get("select") not in SELECT:
         errs.append(f"{where}.select must be one of {SELECT}")
-    if t.get("kind", "total") not in ("total", "per_iteration", "per_step", "none"):
-        errs.append(f"{where}.kind must be total | per_iteration | per_step | none")
+    if t.get("kind", "total") not in ("total", "per_iteration", "per_step", "none", "app_timer"):
+        errs.append(f"{where}.kind must be total | per_iteration | per_step | none | app_timer")
     if need_work and t.get("kind") in ("per_iteration", "per_step") and not t.get("work"):
         errs.append(f"{where}.work {{key, offset}} is required for per_iteration/per_step timers")
     try:
@@ -564,7 +592,10 @@ def parse_timing(doc: dict, log_path: Path, rc=0, params=None, inp=None) -> dict
         raise InputError(f"run exited {rc}; timer output of a failed run is not used")
     t = timing_of(doc, inp)
     if t.get("kind") == "none":
-        raise InputError("NEEDS_TIMING_SUPPORT: " + str(t.get("reason", "no usable native timer")))
+        raise InputError(f"{t.get('status', 'NEEDS_TIMING_SUPPORT')}: " + str(t.get("reason", "no usable native timer")))
+    if t.get("kind") == "app_timer":
+        raise InputError("APP_TIMER: the headline timer of this input is read by tools/timing from the run directory "
+                         f"({(t.get('app_timer') or {}).get('source')}); measure it with tools/timing/measure_level3.sh --registry")
     if not Path(log_path).is_file():
         raise InputError(f"log {log_path} missing")
     lines = Path(log_path).read_text(errors="replace").splitlines()
@@ -1096,7 +1127,8 @@ def summarize(doc, inp, runs, reps):
             res = r["timing"]["print_resolution_s"]; break
     s = {"run_completed": len(good) == len(measured) and len(measured) == reps,
          "timing_ok": len(mc) == len(measured) and len(measured) == reps,
-         "timing_status": ("NEEDS_TIMING_SUPPORT" if timing_of(doc, inp).get("kind") == "none"
+         "timing_status": (timing_of(doc, inp).get("status", "NEEDS_TIMING_SUPPORT") if timing_of(doc, inp).get("kind") == "none"
+                           else "APP_TIMER" if timing_of(doc, inp).get("kind") == "app_timer"
                            else ("NATIVE" if len(mc) == len(measured) and len(measured) == reps else "FAILED")),
          "main_compute_s": stats(mc, res), "e2e_s": stats(e2e)}
     sec = {}
@@ -1564,7 +1596,7 @@ def main(argv=None):
             meta = measure(doc, inp, root, bench_dir, Path(a.out), a.warmup, a.reps, a.timeout, a.gpus)
             s = meta["summary"]
             print(status_line(s))
-            return 0 if s["run_completed"] and (s["timing_ok"] or s["timing_status"] == "NEEDS_TIMING_SUPPORT") else 1
+            return 0 if s["run_completed"] and (s["timing_ok"] or s["timing_status"] in ("NEEDS_TIMING_SUPPORT", "NO_TIMED_REGION", "APP_TIMER")) else 1
         if a.cmd == "check":
             inp = get_input(doc, a.input_id)
             root = repo_root(bench_dir)

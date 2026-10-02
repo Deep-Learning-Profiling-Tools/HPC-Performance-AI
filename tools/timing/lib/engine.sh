@@ -195,6 +195,10 @@ measure_case() {
     # runtime leaves the MPI runtime's default (one core for a <= 2-rank job with Open MPI 5, as in the
     # campaigns before 2026-09-30). What was applied is written to run_meta.txt (record: placement.policy).
     local bind_meta="bind_policy=none"
+    # Level 3: no engine policy -- each run.sh applies its own application-specific CPU/thread policy (CP2K and
+    # QMCPACK --cpus-per-rank 8 with OpenMP threads, DFT-FE 4 bound cores, LAMMPS `t 1`, the others one host
+    # thread); the record says so and its placement block shows the actual placement (decision 2026-10-02)
+    [ "$level" = 3 ] && bind_meta="bind_policy=application"
     if [ "$level" = 2 ]; then
         local bind_out
         bind_out="$(python3 "$TOOLS/cases.py" binding-meta --policy "$BIND_POLICY" "$app")" \

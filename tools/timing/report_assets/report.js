@@ -215,7 +215,7 @@
   }
 
   function detail(app, kase, platId, cell, reg) {
-    if (cell.run.roi && cell.run.roi.source === "app_timer") return detailL3(app, kase, platId, cell);
+    if (cell.run.roi && cell.run.roi.source === "app_timer") return detailL3(app, kase, platId, cell, reg);
     // reg: the registered-input row when the campaign is a registry campaign (same layout, plus its panel)
     var run = cell.run, R = run.roi, dv = run.device, ctx = run.context, plat = platById(platId) || {id: platId};
     var S = run.set || null;
@@ -391,7 +391,8 @@
       [el("th", {cls: "n", text: "bytes"})] : []))]), el("tbody", {}, rows)])]);
   }
 
-  function detailL3(app, kase, platId, cell) {
+  function detailL3(app, kase, platId, cell, reg) {
+    // reg: the registered-input row when the campaign is a registry campaign (its panel and run history are added)
     var run = cell.run, R = run.roi, dv = run.device, ctx = run.context, plat = platById(platId) || {id: platId};
     var whole = ctx.whole || {};
     var box = el("section", {cls: "detail", id: "detail", "aria-label": "measurement"});
@@ -411,7 +412,7 @@
     var f = run.fom || {};
     box.appendChild(el("div", {cls: "figs"}, [
       fig(fmtT(wall), "timed region (application timer, median of " + (R.runs_s || []).length + " clean)"),
-      fig(pct(cv, 1), "clean-run spread"),
+      fig((R.runs_s || []).length > 1 ? pct(cv, 1) : "null", "clean-run spread" + ((R.runs_s || []).length > 1 ? "" : " (1 clean run: not measurable)")),
       fig(isNum(steps) && wall ? fmtT(wall / steps) : "null", "per step" + (isNum(steps) ? " (" + num(steps) + " steps)" : "")),
       fig(pct(wall && proc ? wall / proc : null, 1), "region share of the process"),
       fig(dv ? pct(dv.busy_frac_of_roi, 0, true) : pct(whole.busy_frac_of_process, 0, true),
@@ -477,7 +478,7 @@
         ["launcher GPU audit", auditCell],
         ["runtime API calls, whole process", rtAll ? num(rtAll.calls) + " calls, " + fmtT(rtAll.time_s) : "null"],
         ["profiled process wall clock", fmtT(ctx.profiled_process_wall_s)],
-        ["verification", "outside (level3/<app>/validate.sh, not run here)"],
+        ["verification", reg ? "registry: run verification and scientific correctness below" : "outside (level3/<app>/validate.sh, not run here)"],
         ["platform conformance", conf ? el("span", {cls: "pill " + (conf.status === "pass" ? "ok" : "warn"),
           text: conf.status + " " + conf.checks + " · " + conf.date}) : nul("no record")]])])]));
 
@@ -513,11 +514,12 @@
         ["device", [di.count_visible, "×", di.product, di.arch].filter(function (x) { return x !== null && x !== undefined; }).join(" ") || "null"],
         ["driver", di.driver_version || "null"],
         ["host CPU", run.host_cpu || "null"]])])]));
+    if (reg) box.appendChild(regPanel(reg));
     if (run.caveats && run.caveats.length) {
       box.appendChild(el("div", {cls: "panel"}, [el("h3", {text: "Caveats"}),
         el("ul", {cls: "caveats"}, run.caveats.map(function (c) { return el("li", {text: c}); }))]));
     }
-    box.appendChild(history(cell));
+    box.appendChild(reg ? historyReg(reg) : history(cell));
     return box;
   }
 
@@ -570,7 +572,7 @@
           el("b", {text: st.level === "1" ? "a benchmark" : "an application"}), " on the left."]),
         el("div", {cls: "counts"}, [
           el("span", {}, [el("b", {text: String(rows.length)}), " registered inputs"]),
-          el("span", {}, [el("b", {text: String(ok)}), " ROI timing SUCCESS"]),
+          el("span", {}, [el("b", {text: String(ok)}), st.level === "3" ? " timing SUCCESS (application timer)" : " ROI timing SUCCESS"]),
           el("span", {}, [el("b", {text: String(rows.length - ok)}), " not measured successfully"]),
           el("span", {}, [el("b", {text: String(ver)}), " run verification PASS"]),
           el("span", {}, [el("b", {text: String(uns)}), " UNSTABLE"]),
@@ -580,7 +582,7 @@
             ["not collected", camp.not_collected || "–"],
             ["scientific correctness", "PASS " + corr.PASS + " · INCOMPLETE " + corr.INCOMPLETE + " · FAIL " + corr.FAIL +
               " · none " + corr.none + " — evidence from outside the timing runs (basis per input); not re-verified by these ROI runs"],
-            ["Level 3", camp.level3 || (D.level3_inputs + " registered inputs without ROI support")],
+            ["Level 3", camp.level3 || (D.level3_inputs + " registered inputs (the applications' own timers)")],
             ["spread", "(max − min) / median of all clean-run samples; stable when ≤ 10 %. CV = stddev / median, shown separately."]]),
         (D.notes && D.notes.length) ? el("ul", {cls: "caveats"}, D.notes.map(function (n) { return el("li", {text: n}); })) : null]));
       return;

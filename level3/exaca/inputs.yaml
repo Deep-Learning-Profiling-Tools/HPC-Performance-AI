@@ -11,12 +11,19 @@ entry:
   path: level3/exaca/run.sh
   backend_arg: CUDA
 timing:
-  scope: ExaCA's own 'Time spent performing CA calculations' (nucleation, steering-vector creation, cell capture,
-    communication over all time steps); data initialization and output export are separate timers
+  scope: >-
+    ExaCA's own 'Time spent performing CA calculations' (nucleation, steering-vector creation, cell capture,
+    communication over all time steps); data initialization and output export are separate timers. The same
+    line is the headline timer of tools/timing (apptimers.py: exaca): rank 0's clock with the ranks aligned by
+    barriers, every timed phase ending in a Kokkos fence; the per-phase maximum-rank times are reported as parts.
   kind: total
   unit: s
   regex: ^Time spent performing CA calculations = (?P<value>[0-9.eE+-]+) s
   select: only
+  app_timer:
+    source: tools/timing/apptimers.py:exaca
+    region: "the same 'Time spent performing CA calculations' line (src/runCA.hpp, src/CAtimers.hpp)"
+    relation: identical
 baseline:
   method: 'project statistical validation protocol v2 (references/dirsolid_smoke.tolerances.json: e.g. vol_fraction_nucleated
     abs 0.01, n_nucleated rel 0.05 over 8 calibration runs) is run by validate.sh from the GrainID output; stdout

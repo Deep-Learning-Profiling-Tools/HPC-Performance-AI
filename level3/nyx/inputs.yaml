@@ -11,11 +11,20 @@ entry:
   path: level3/nyx/run.sh
   backend_arg: CUDA
 timing:
-  scope: Nyx's own 'Run time' (AMReX timer of the whole Evolve over all steps; initialization excluded)
+  scope: >-
+    Nyx's own 'Run time' (this stdout line): the AMReX timer of the whole Evolve over all steps, initialization
+    excluded, checkpoint and plotfile writes inside the loop included. The headline timer of tools/timing
+    (apptimers.py: nyx) is the sum of '[STEP n] Coarse TimeStep time' over all steps (computeNewDt + timeStep
+    + postCoarseTimeStep; maximum over ranks per step), without the checkpoint / plotfile writes (reported
+    as excluded time) and initialization: smaller than 'Run time' by the in-loop I/O.
   kind: total
   unit: s
   regex: ^Run time = (?P<value>[0-9.eE+-]+)
   select: only
+  app_timer:
+    source: tools/timing/apptimers.py:nyx
+    region: "sum of '[STEP n] Coarse TimeStep time' over all steps (AMReX_Amr.cpp, Source/Driver/nyx_main.cpp)"
+    relation: 'this stdout timer includes the in-loop checkpoint / plotfile writes; the headline excludes them (excluded_s)'
 baseline:
   method: validate.sh checks the final state/particles from the plotfiles (STATE_AND_PARTICLES_PASS; heat/cool has
     the I_R check pending). Nothing numeric is printed to stdout; the registry records completion only.

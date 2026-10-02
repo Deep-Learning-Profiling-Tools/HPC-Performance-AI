@@ -98,7 +98,7 @@ def load_records(roots):
                 r = json.load(open(p))
             except (OSError, ValueError):
                 continue
-            if r.get("schema") != SCHEMA or r.get("level") not in (1, 2):
+            if r.get("schema") != SCHEMA or r.get("level") not in (1, 2, 3):
                 continue
             key = (r["level"], r["app"], r["case"], r["run_id"])
             if key in seen:
@@ -231,7 +231,7 @@ def registered_inputs(repo=REPO):
                             "input_form": inp.get("input_form", "runtime"), "params": inp.get("params") or {},
                             "args": [str(a) for a in inp.get("args") or []], "env": inp.get("env") or {},
                             "materialized": inp.get("materialized", True) is not False,
-                            "workload_key": workload_key(hi.registry_identity(doc, inp)["workload"]) if lvl < 3 else None})
+                            "workload_key": workload_key(hi.registry_identity(doc, inp)["workload"])})
     return out
 
 
@@ -283,9 +283,7 @@ def current_view(roots, repo=REPO):
         for m in cur:                                   # sets are ordered oldest -> newest
             row["current_by_platform"][m["platform"]] = m
         row["current"] = cur[-1] if cur else None
-        if inp["level"] == 3:
-            row["status"] = "ROI_NOT_SUPPORTED"
-        elif row["current"]:
+        if row["current"]:
             row["status"] = "SUCCESS"
         elif mine:
             row["status"] = "RUN_FAILED"
@@ -305,10 +303,9 @@ def counts(rows, recs, orphans=()):
     L = (1, 2, 3)
     return {
         "registered_inputs": {f"level{l}": n(lambda r, l=l: r["level"] == l) for l in L} | {"total": len(rows)},
-        "roi_success": {f"level{l}": n(lambda r, l=l: r["level"] == l and r["status"] == "SUCCESS") for l in (1, 2)},
+        "roi_success": {f"level{l}": n(lambda r, l=l: r["level"] == l and r["status"] == "SUCCESS") for l in L},
         "run_failed": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "RUN_FAILED"),
         "not_measured": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["status"] == "NOT_MEASURED"),
-        "roi_not_supported_level3": n(lambda r: r["status"] == "ROI_NOT_SUPPORTED"),
         "run_verification_pass": n(lambda r: r["run_verification"] == "PASS"),
         "run_verification_insufficient": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if r["current"] and r["run_verification"] == "INSUFFICIENT"),
         "file_identity_from_supplement": sorted(f"{r['benchmark']}/{r['input_id']}" for r in rows if "supplement" in (r.get("file_identity") or [])),

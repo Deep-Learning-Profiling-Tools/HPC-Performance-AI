@@ -11,15 +11,20 @@ entry:
   path: level3/cp2k/run.sh
   backend_arg: CUDA
 timing:
-  kind: none
-  status: NEEDS_TIMING_SUPPORT
-  reason: >-
-    CP2K writes its report to cp2k.out in the run directory (run.sh -o cp2k.out;
-    build/level3/cp2k/<profile>/<run subdir>/<case>/cp2k.out), not to stdout. The file carries the native
-    timer: the T I M I N G table's 'CP2K' row (TOTAL TIME, e.g. 16.39 s for h2o-32) and the 'qs_mol_dyn_low' row
-    (the MD driver, 16.21 s), plus the 'ENERGY| Total FORCE_EVAL' lines. Wiring needs either run.sh to echo that
-    block to stdout or the tool to read a run-directory file; not done this round -- E2E only.
-    not to stdout (run.sh -o cp2k.out); wiring the file is pending
+  kind: app_timer
+  unit: s
+  scope: >-
+    The headline timer is read by tools/timing (apptimers.py: cp2k) from the run directory, not from stdout
+    (run.sh writes CP2K's report to cp2k.out): the per-MD-step UsedTime column of the <project>-1.ener file,
+    summed over MD steps 2..N; step 1, which carries the initial force evaluation (set-up and the SCF from
+    scratch), is reported as a part. Rank 0's clock; the GPU back-ends (DBM, PW, grid) synchronize their
+    streams before returning. Mesh / basis set-up, the initial SCF and the final output are outside. The
+    region exists only for MD inputs (the H2O-<n> benchmarks); the two regtest inputs run a geometry
+    optimisation / a single-point calculation and have no timed region (their own timing blocks say so).
+  app_timer:
+    source: tools/timing/apptimers.py:cp2k
+    region: 'sum of UsedTime over MD steps 2..N of the .ener file (src/motion/md_run.F, src/motion/md_energies.F); step 1 = initial force evaluation, reported as a part'
+    relation: 'no stdout timer line; the earlier NEEDS_TIMING_SUPPORT note (cp2k.out T I M I N G table) is superseded by this file-based timer (2026-10-02)'
 baseline:
   method: regtests carry upstream reference values (TEST_FILES.toml, used by validate.sh); H2O benchmarks have no
     reference. Nothing numeric is in stdout (cp2k.out holds ENERGY| lines).
@@ -135,6 +140,13 @@ inputs:
   backends_validated:
   - cuda
 - id: regtest-gpw-h2o-geoopt
+  timing:
+    kind: none
+    status: NO_TIMED_REGION
+    reason: >-
+      the Level 3 timed region of CP2K is the MD loop (UsedTime of steps 2..N in the .ener file,
+      tools/timing/apptimers.py); this input runs a geometry optimisation (QS/regtest-gpw-1/H2O-geoopt.inp) -- no MD steps, hence no timed region;
+      tools/timing reports app_timer_missing for it (the run and its correctness check are unaffected)
   case: regtest-gpw-1
   variant: case
   source:
@@ -156,6 +168,13 @@ inputs:
   backends_validated:
   - cuda
 - id: regtest-dm-ls-scf-h2-big-5
+  timing:
+    kind: none
+    status: NO_TIMED_REGION
+    reason: >-
+      the Level 3 timed region of CP2K is the MD loop (UsedTime of steps 2..N in the .ener file,
+      tools/timing/apptimers.py); this input runs a linear-scaling SCF single point (QS/regtest-dm-ls-scf-1/H2-big-5.inp) -- no MD steps, hence no timed region;
+      tools/timing reports app_timer_missing for it (the run and its correctness check are unaffected)
   case: regtest-dm-ls-scf-1
   variant: case
   source:

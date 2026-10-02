@@ -453,7 +453,11 @@ def harvest(app, tree, dest):
     if t is None:
         raise TimerMissing(f"no timer definition for {app!r}")
     copied = []
-    for run in sorted(glob.glob(os.path.join(tree, "*"))):
+    # a run tree is either <tree>/<run>/... (one directory per run.sh invocation: CP2K, DFT-FE, QMCPACK,
+    # ...) or the run directory itself, with run_manifest.txt directly inside it (LAMMPS, SPARTA, whose
+    # run.sh writes into $L3_BUILD/$HPCPERF_L3_RUN_SUBDIR without a sub-directory); both are harvested
+    runs = [tree] if os.path.isfile(os.path.join(tree, "run_manifest.txt")) else sorted(glob.glob(os.path.join(tree, "*")))
+    for run in runs:
         if not os.path.isdir(run):
             continue
         for pat in ["run_manifest.txt"] + t.harvest:

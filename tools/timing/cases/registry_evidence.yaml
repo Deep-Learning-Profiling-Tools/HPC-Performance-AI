@@ -103,3 +103,128 @@ level2:
   xsbench:
     last_wins: 'level2/xsbench/cuda/io.cu:346-349 (-s assigns input.HM on every occurrence)'
     output: ['^H-M Benchmark Size:\s+{size}$']
+level3:                         # Level 3 has no ROI logs: the evidence is the run manifest run.sh writes (run_manifest.txt,
+                                # harvested into clean.N/app/<run>/), the launcher's lines in run.log and the placement records.
+                                # Generic (every application, no rule needed): selector = input id, HPCPERF_GPUS and manifest
+                                # ranks = runtime_config, exit code 0, the binary is the application's own (build/ or .deps/ of
+                                # this repository) and still hashes as the manifest and the record say, build profile / variant
+                                # as the registry's build_config, launcher audit clean with the registered rank count, the
+                                # application process held exactly the registered number of GPUs.
+                                # Per-application keys:
+                                #   manifest     {manifest key: [regex templates]} -- every applicable template must match the
+                                #                manifest's value; templates are over params, the input's env knobs, input_id
+                                #                and `derive`/`defaults` (a template naming a value the input lacks is skipped)
+                                #   output       regex templates over run.log (the run.sh banner line)
+                                #   source_deck  {manifest key: level3/<app>-relative path template} -- the manifest file IS the
+                                #                frozen source deck: its recorded <key>_sha256 must equal the file's sha256 now
+                                #   source_files [level3/<app>-relative templates] -- registered source files that must exist
+                                #   generated    {manifest key: sha key} -- a file run.sh derived from the deck: must still exist
+                                #                and hash as the manifest recorded (gone -> gap, changed -> FAIL)
+                                #   timer_steps  expression over params: the step count the application's timer must report
+                                #   defaults     {name: value} implicit values (run.sh defaults an input may leave unstated)
+  cp2k:                         # run.sh: case h2o -> benchmarks/QS/H2O-<system>.inp, case regtest -> the named regtest input
+    covers: [HPCPERF_CP2K_CASE, HPCPERF_SCALE_MODE, HPCPERF_CP2K_SYSTEM, HPCPERF_CP2K_REGTEST]
+    manifest:
+      case: ['^{HPCPERF_CP2K_CASE}$']
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      input: ['/H2O-{molecules}\.inp$', '/{HPCPERF_CP2K_REGTEST}$']
+      threads_per_rank: ['^\d+$']
+    output: ['^# CP2K .* case={HPCPERF_CP2K_CASE} ']
+    timer_steps: 'md_steps - 1'                      # the .ener timer: MD steps 2..N (step 1 carries the initial force evaluation)
+  dftfe:                        # run.sh: case al_md -> Input_MD_0.prm (verbatim), llzo -> parameterFile_LLZO.prm
+    covers: [HPCPERF_DFTFE_CASE, HPCPERF_SCALE_MODE]
+    manifest:
+      case: ['^{HPCPERF_DFTFE_CASE}$']
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      upstream_prm_sha256: ['^[0-9a-f]{64}$']
+      deck_sha256: ['^[0-9a-f]{64}$']
+    output: ['^# DFT-FE .* case={HPCPERF_DFTFE_CASE} mode={HPCPERF_SCALE_MODE} ']
+    timer_steps: 'md_steps - 1'                      # MD steps 1..N-1 after the initial ground state (step 0)
+  exaca:                        # run.sh: NX/NY/NZ from HPCPERF_EXACA_N* or the mode's defaults; the deck is generated from the template
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_EXACA_NX, HPCPERF_EXACA_NY, HPCPERF_EXACA_NZ]
+    derive: {nx: "cells.split('x')[0]", ny: "cells.split('x')[1]", nz: "cells.split('x')[2]",
+             ncells: "int(cells.split('x')[0]) * int(cells.split('x')[1]) * int(cells.split('x')[2])"}
+    manifest:
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      nx: ['^{nx}$']
+      ny: ['^{ny}$']
+      nz: ['^{nz}$']
+      cells: ['^{ncells}$']
+      template_sha256: ['^[0-9a-f]{64}$']
+    generated: {input: input_sha256}
+    output: ['^# ExaCA .* box={nx}x{ny}x{nz} cells = {ncells} ']
+  lammps:                       # run.sh: the registered deck (bench/ or examples/reaxff/HNS) with its x/y/z replication and steps
+    defaults: {deck_dir: bench, variant: default}
+    manifest:
+      input_id: ['^{input_id}$']
+      deck: ['^{deck_dir}/{deck}$']
+      steps: ['^{steps}$']
+      atoms: ['^{atoms}$']
+      variant: ['^{variant}$']
+    source_files: ['src/{deck_dir}/{deck}']
+    generated: {input: input_sha256}
+    output: ['^# LAMMPS .* input={input_id} deck={deck_dir}/{deck} ranks=\d+ .* {atoms} atoms .*, {steps} steps,']
+    timer_steps: 'steps'
+  nekrs:                        # run.sh: ethier case, h-refinement and step count from the knobs / mode defaults
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_NEKRS_HREFINE]
+    defaults: {hrefine: 0}
+    manifest:
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      elements: ['^{elements}$']
+      order: ['^{order}$']
+      steps: ['^{steps}$']
+      par_sha256: ['^[0-9a-f]{64}$']
+    output: ['^# nekRS .* case=ethier hrefine={hrefine} elements={elements} .* N={order} ']
+    timer_steps: 'steps'
+  nyx:                          # run.sh: case decks derived from upstream; the heat/cool case needs the heatcool build profile
+    covers: [HPCPERF_NYX_CASE, HPCPERF_SCALE_MODE, HPCPERF_NYX_HEATCOOL]
+    derive: {n: "cells.split('^')[0]", hc_profile: "'heatcool' if HPCPERF_NYX_HEATCOOL == 'YES' else 'adiabatic'"}
+    manifest:
+      case: ['^{HPCPERF_NYX_CASE}$']
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      grid: ['^{n}x{n}x{n}$']
+      steps: ['^{steps}$']
+      profile: ['-{hc_profile}$']
+      deck_sha256: ['^[0-9a-f]{64}$']
+    generated: {input: input_sha256}
+    output: ['^# Nyx .* case={HPCPERF_NYX_CASE} mode={HPCPERF_SCALE_MODE} ranks=\d+ grid={n}x{n}x{n} ']
+    timer_steps: 'steps'
+  qmcpack:                      # run.sh: the diamondC_2x1x1 deck with walkers per GPU from the knob / mode default
+    covers: [HPCPERF_QMCPACK_CASE, HPCPERF_SCALE_MODE, HPCPERF_QMCPACK_WALKERS]
+    manifest:
+      case: ['^{HPCPERF_QMCPACK_CASE}$']
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      walkers_per_gpu: ['^{walkers}$']
+      upstream_input_sha256: ['^[0-9a-f]{64}$']
+      deck_sha256: ['^[0-9a-f]{64}$']
+      timers: ['^(medium|fine)$']
+    output: ['^# QMCPACK .* case={HPCPERF_QMCPACK_CASE} mode={HPCPERF_SCALE_MODE} ']
+  sparta:                       # run.sh: the frozen bench deck as shipped (no derivation), x/y/z as -var arguments
+    manifest:
+      input_id: ['^{input_id}$']
+      deck: ['^{deck}$']
+      cells: ['^{cells}$']
+      particles: ['^{particles}$']
+    source_deck: {input: 'src/bench/{deck}'}
+    output: ['^# SPARTA .* input={input_id} deck={deck} ranks=\d+ grid={x}x{y}x{z} = {cells} cells, {particles} particles']
+    timer_steps: 'bench_steps'
+  specfem3d:                    # run.sh: homogeneous half-space, mesh refinement and NSTEP from the knobs / mode defaults
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_SPECFEM_STRONG, HPCPERF_SPECFEM_STEPS]
+    manifest:
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      elements: ['^{elements}$']
+      nstep: ['^{nstep}$']
+      par_file_sha256: ['^[0-9a-f]{64}$']
+    output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
+    timer_steps: 'nstep'
+  warpx:                        # run.sh: the case deck derived from upstream with the grid and step count of the mode / knobs
+    covers: [HPCPERF_SCALE_MODE, HPCPERF_WARPX_CASE, HPCPERF_WARPX_LOCAL, HPCPERF_WARPX_GLOBAL, HPCPERF_WARPX_STEPS]
+    derive: {grid: "'x'.join(n_cell.split())"}
+    manifest:
+      case: ['^{HPCPERF_WARPX_CASE}$']
+      mode: ['^{HPCPERF_SCALE_MODE}$']
+      grid: ['^{grid}$']
+      steps: ['^{steps}$']
+    generated: {input: input_sha256}
+    output: ['^# WarpX .* case={HPCPERF_WARPX_CASE} mode={HPCPERF_SCALE_MODE} ranks=\d+ grid={grid} ']
+    timer_steps: 'steps'

@@ -19,11 +19,18 @@ timing:
     to its end -- pair/bond/kspace forces, neighbor list rebuilds, communication, time
     integration (fix) and thermo output inside the loop. Excludes lattice/data-file setup,
     the initial neighbor build before step 0, Kokkos/CUDA initialisation and the final
-    statistics. One `run` per deck, hence exactly one Loop time line.
+    statistics. One `run` per deck, hence exactly one Loop time line. The same line is the
+    headline timer of tools/timing (apptimers.py: lammps; average over ranks between barriers; the
+    loop ends with a blocking device sync); its Section rows (Pair/Neigh/Comm/...) are reported as
+    parts but are not device-synchronized (asynchronous kernel time lands in Comm).
   kind: total
   unit: s
   regex: '^Loop time of (?P<value>[0-9.eE+-]+) on \d+ procs for \d+ steps with \d+ atoms'
   select: only
+  app_timer:
+    source: tools/timing/apptimers.py:lammps
+    region: "'Loop time' of the last run command (src/run.cpp, src/finish.cpp, src/KOKKOS/verlet_kokkos.cpp)"
+    relation: identical
 baseline:
   method: >-
     Thermodynamic state at step 0 and at the last step (Temp, E_pair, TotEng, Press), the

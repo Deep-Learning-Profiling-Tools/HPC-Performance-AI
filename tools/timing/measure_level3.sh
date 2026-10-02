@@ -3,9 +3,14 @@
 #
 #   tools/timing/measure_level3.sh all
 #   tools/timing/measure_level3.sh lammps cp2k/h2o128
+#   tools/timing/measure_level3.sh --registry all                 # every registered input (level3/*/inputs.yaml)
+#   tools/timing/measure_level3.sh --registry lammps/lj-32k
 #   tools/timing/measure_level3.sh --dry-run all
 #
-# Selection: all | <app> | <app>/<case>. Cases: tools/timing/cases/level3_*.tsv.
+# Selection: all | <app> | <app>/<case>. Cases: tools/timing/cases/level3_*.tsv; with --registry the
+# registered inputs (cases/level3_registry.tsv, generated from level3/<app>/inputs.yaml: case == input id,
+# HPCPERF_GPUS = the input's runtime_config.gpus, one MPI rank per GPU; the engine stores the input's
+# workload identity next to the raw runs and the record carries it).
 #
 # Level 3 applications are full production codes and carry no ROI markers. The measured
 # region of each one is the timer the application prints itself, fixed once per
@@ -42,11 +47,13 @@
 #   --raw-root DIR      raw evidence root (default build/timing)
 #   --results-root DIR  records, CSVs and the web page (default results/timing)
 #   --no-summary        skip the summarize + report step after the runs
+#   --registry          measure the registered inputs (level3/<app>/inputs.yaml via the generated
+#                       cases/level3_registry.tsv; SELECT = all | <app> | <app>/<input_id>)
 #   --dry-run           print what would run
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-LEVEL=3 CLEAN_RUNS=1 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0 FORCE_PROFILE=0
+LEVEL=3 CLEAN_RUNS=1 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0 FORCE_PROFILE=0 REGISTRY=0
 COLLECTOR=auto BACKEND=CUDA BUILD_ROOT="" RAW_ROOT="$REPO/build/timing"
 ENV_SCRIPT="${HPCPERF_TIMING_ENV_SCRIPT:-hpcperf_env.sh}"
 SELECT=()
@@ -62,6 +69,7 @@ while [ $# -gt 0 ]; do
         --raw-root)    RAW_ROOT="${2:?}"; shift 2 ;;
         --results-root) RESULTS_ROOT="${2:?}"; shift 2 ;;
         --no-summary)  SUMMARIZE=0; shift ;;
+        --registry)    REGISTRY=1; shift ;;
         --dry-run)     DRY_RUN=1; shift ;;
         -h|--help)     awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*)            die "unknown option '$1' (try --help)" ;;

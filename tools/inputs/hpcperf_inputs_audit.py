@@ -90,7 +90,8 @@ def audit(root, mdir=None, blockers=None, cdir=None):
         ins = d["inputs"]; runnable = [i for i in ins if i.get("materialized", True) is not False]
         kinds = [i["source"]["kind"] for i in ins]
         forms = sorted({i.get("input_form", "runtime") for i in ins})
-        timing_status = "NEEDS_TIMING_SUPPORT" if d["timing"].get("kind") == "none" else "NATIVE"
+        timing_status = (d["timing"].get("status", "NEEDS_TIMING_SUPPORT") if d["timing"].get("kind") == "none"
+                         else "APP_TIMER" if d["timing"].get("kind") == "app_timer" else "NATIVE")
         req = [q for q in (d.get("baseline") or {}).get("quantities") or [] if q.get("role", "required") == "required"]
         rec = [q["name"] for q in req if (q.get("compare") or {}).get("rule") == "record"]
         checker = "none" if not (d.get("baseline") or {}).get("quantities") else ("record-only" if req and len(rec) == len(req) else ("rules" if req else "diagnostic-only"))
@@ -151,7 +152,7 @@ def audit(root, mdir=None, blockers=None, cdir=None):
             "n_size_variants": sum(1 for i in ins if i.get("variant") == "size"),
             "n_upstream": sum(1 for k in kinds if k in UPSTREAM), "n_derived": kinds.count("derived"), "n_custom": kinds.count("custom"),
             "input_forms": forms, "selector": d.get("selector"), "timing_status": timing_status,
-            "timing_reason": d["timing"].get("reason") if timing_status != "NATIVE" else None,
+            "timing_reason": (d["timing"].get("reason") or (d["timing"].get("app_timer") or {}).get("source")) if timing_status != "NATIVE" else None,
             "n_measured": len(completed), "n_native_measured": len(native_measured),
             "n_failed_measurements": len([k for k, m in meas.items() if not m["run_completed"] and not m.get("invalidated")]),
             "invalidated_inputs": sorted(k for k, m in meas.items() if m.get("invalidated")),

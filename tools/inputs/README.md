@@ -107,7 +107,16 @@ benchmark's timed window (HACCabanaPM's 5-step demo indat: `kind: none`). `measu
 `timing.kind: none` (with `status: NEEDS_TIMING_SUPPORT` and a `reason`) records a
 benchmark whose stdout carries no usable native timer; `parse-timing` fails with
 `NEEDS_TIMING_SUPPORT: ...`, `measure` still records the runs (exit 0 when they
-complete) with `timing_status: NEEDS_TIMING_SUPPORT` and no `main_compute_s`; the
+complete) with `timing_status: NEEDS_TIMING_SUPPORT` and no `main_compute_s`. Two Level 3
+variants (2026-10-02): `status: NO_TIMED_REGION` (per input) states that the application's
+timed region does not exist in this input (a CP2K regtest without the MD loop, DFT-FE's
+ground-state LLZO case) -- `tools/timing` reports `app_timer_missing` for it; and
+`timing.kind: app_timer` + `app_timer: {source: tools/timing/apptimers.py:<app>, region, relation}`
+states that the headline timer is read by `tools/timing/apptimers.py` from the run directory
+(CP2K's `.ener` file, DFT-FE's per-step lines), not from a stdout line -- `parse-timing` reports
+`APP_TIMER`, `measure` records E2E only, `measure_level3.sh --registry` is the measurement. Any
+`timing` block may carry `app_timer:` to document the headline region when it differs from the
+stdout line the registry reads (nekRS, Nyx, QMCPACK, SPECFEM3D, WarpX); the
 E2E wall is auxiliary only.
 
 Compile-time inputs: the NPB ports (`cg ep ft is mg`) are built for CLASS=B in the

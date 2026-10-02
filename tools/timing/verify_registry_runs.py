@@ -25,6 +25,19 @@ executable, working directory and argv -- ran that input:
             declared last-wins and the last occurrence carries the registered value, and every env knob
             the input sets evidenced by the per-application rules (argv / exe / program output / build
             configuration templates) in cases/registry_evidence.yaml.
+  Level 3   no ROI logs (no markers): the evidence is the run manifest every Level 3 run.sh writes
+            (run_manifest.txt, harvested into clean.N/app/<run>/ by apptimers.py: ranks, binary and its sha256,
+            the deck / input and its sha256, profile, case, mode, steps, sizes), the launcher's own lines in
+            run.log (ranks, GPU-binding audit) and the placement records (bind.<pid>: the binary that held the
+            GPU(s)). Checked: the registry selector set to the input id; HPCPERF_GPUS and the manifest's rank
+            count equal to the input's runtime_config; the binary is the application's own (build/ or .deps/
+            of this repository), still hashes as the manifest recorded and as the record stored; the build
+            profile / variant the registry's build_config requires; every env knob and parameter of the
+            input evidenced by the per-application manifest / output templates (cases/registry_evidence.yaml
+            `level3`); the registered source deck still hashes as the run recorded (`source_deck`), a deck
+            run.sh derived from it still exists and hashes as recorded (`generated`); the number of steps the
+            application's timer reports equals the registered one (`timer_steps`); the launcher audit clean
+            with exactly the registered number of ranks on distinct GPUs.
 
 Verdicts: PASS; FAIL (a contradiction: wrong file, wrong argument, duplicate option, changed file, ...);
 INSUFFICIENT (no contradiction, but some part of the input is not evidenced -- listed as gaps); NOT_RUN
@@ -75,7 +88,7 @@ def load_rules(path):
     import yaml
     with open(path) as f:
         doc = yaml.safe_load(f) or {}
-    return {1: doc.get("level1") or {}, 2: doc.get("level2") or {}}
+    return {1: doc.get("level1") or {}, 2: doc.get("level2") or {}, 3: doc.get("level3") or {}}
 
 
 def parse_roi_log(path):
@@ -91,13 +104,44 @@ def parse_roi_log(path):
     return p
 
 
+def parse_kv(path):
+    """key=value lines (run_manifest.txt); the first value of a repeated key wins."""
+    out = {}
+    with open(path, errors="replace") as f:
+        for line in f:
+            k, sep, v = line.rstrip("\n").partition("=")
+            if sep and k not in out:
+                out[k] = v
+    return out
+
+
+def parse_bind(path):
+    """exe / host / GPU bus ids of one placement record (tools/timing/probes/bindprobe.c)."""
+    b = {"log": path, "exe": None, "host": None, "gpus": []}
+    with open(path, errors="replace") as f:
+        for line in f:
+            k, _, v = line.rstrip("\n").partition(" ")
+            if k == "exe":
+                b["exe"] = v
+            elif k == "host":
+                b["host"] = v
+            elif k == "gpu":
+                m = re.search(r"bus (\S+)", v)
+                if m:
+                    b["gpus"].append(m.group(1))
+    return b
+
+
 def clean_runs(raw):
     runs = []
     for d in sorted(glob.glob(os.path.join(raw, "clean.*")), key=lambda x: int(x.rsplit(".", 1)[1])):
         procs = [parse_roi_log(r) for r in sorted(glob.glob(os.path.join(d, "roi.*")))]
         log = os.path.join(d, "run.log")
         out = open(log, errors="replace").read() if os.path.isfile(log) else None
-        runs.append({"dir": os.path.basename(d), "procs": procs, "output": out})
+        manifests = [parse_kv(m) for m in sorted(glob.glob(os.path.join(d, "app", "*", "run_manifest.txt")))]
+        binds = [parse_bind(b) for b in sorted(glob.glob(os.path.join(d, "bind.*")))]
+        runs.append({"dir": os.path.basename(d), "procs": procs, "output": out,
+                     "manifest": manifests[0] if manifests else None, "manifests": manifests, "bind": binds})
     return runs
 
 
@@ -109,8 +153,18 @@ def fill(template, values):
     return PLACEHOLDER.sub(lambda m: re.escape(str(values[m.group(1)])), template)
 
 
+def fill_plain(template, values):
+    """Like fill, without regex escaping (paths)."""
+    missing = [n for n in PLACEHOLDER.findall(template) if values.get(n) is None]
+    if missing:
+        return None
+    return PLACEHOLDER.sub(lambda m: str(values[m.group(1)]), template)
+
+
 def template_values(params, rule):
     vals = {k: v for k, v in (params or {}).items() if not isinstance(v, (dict, list))}
+    for name, v in (rule.get("defaults") or {}).items():       # a value an input may leave implicit (run.sh default)
+        vals.setdefault(name, v)
     for name, expr in (rule.get("derive") or {}).items():
         try:
             vals[name] = eval(expr, {"__builtins__": {}, "round": round, "int": int, "str": str}, dict(vals))
@@ -141,6 +195,8 @@ def apply_templates(c, rule, params, runs, level):
     vals = template_values(params, rule)
     matched = 0
     for kind in ("argv", "exe", "output"):
+        if level == 3 and kind != "output":       # Level 3 has no ROI logs: argv / exe come from the manifest instead
+            continue
         for t in rule.get(kind) or []:
             rx = fill(t, vals)
             if rx is None:
@@ -385,8 +441,188 @@ def verify_level2(c, repo, ident, rec, runs, rule):
             c.gap(f"knob {k}={v} is not evidenced by argv, files or output")
 
 
+def verify_level3(c, repo, ident, rec, runs, rule, entry):
+    """Level 3: the evidence is the run manifest, the launcher lines and the placement records (module docstring)."""
+    app = ident["benchmark"]
+    bdir = os.path.join(repo, "level3", app)
+    wl = ident["workload"]
+    sel = ident.get("selector")
+    denv = (rec.get("inputs") or {}).get("declared_env") or {}
+    if not sel or denv.get(sel) != rec["case"]:
+        c.fail(f"selector {sel}={denv.get(sel)!r}, not the input id {rec['case']!r}")
+    rc = (entry or {}).get("runtime_config") or {}
+    want_gpus = int(rc.get("gpus", 1))
+    want_ranks = int(rc.get("ranks", want_gpus))
+    mg = (rec.get("measurement") or {}).get("gpus")
+    if str(mg) != str(want_gpus):
+        c.fail(f"measured with HPCPERF_GPUS={mg}, the registry's runtime_config.gpus is {want_gpus}")
+    params = dict(wl.get("params") or {})
+    params.update({k: v for k, v in (wl.get("env") or {}).items()})
+    params["input_id"] = rec["case"]
+    vals = template_values(params, rule)
+    bc = (entry or {}).get("build_config") or {}
+    want_variant = str((wl.get("params") or {}).get("variant") or "default")
+    exe_sha = (rec.get("inputs") or {}).get("exe_sha256")
+    own = (os.path.join(repo, "build", "level3", app) + os.sep, os.path.join(repo, ".deps", "level3", app) + os.sep)
+    matched = 0
+    for r in runs:
+        m = r.get("manifest")
+        if not m:
+            c.gap(f"{r['dir']}: no run manifest harvested (app/<run>/run_manifest.txt): the workload evidence of this run is missing")
+            continue
+        if len(r.get("manifests") or []) > 1:
+            c.fail(f"{r['dir']}: {len(r['manifests'])} run manifests harvested for one run")
+        code = m.get("exit_code", m.get("solver_exit_code"))
+        if code != "0":
+            c.fail(f"{r['dir']}: the manifest records exit code {code!r}")
+        if m.get("ranks") != str(want_ranks):
+            c.fail(f"{r['dir']}: manifest ranks={m.get('ranks')!r}, the registry's runtime_config.ranks is {want_ranks}")
+        else:
+            c.ok(f"{r['dir']}: {want_ranks} rank(s) as registered")
+        binary = m.get("binary")
+        bsha = m.get("binary_sha256")
+        if not binary:
+            c.gap(f"{r['dir']}: the manifest names no binary")
+        else:
+            if not binary.startswith(own):
+                c.fail(f"{r['dir']}: binary {binary} is not {app}'s own binary of this repository (build/level3/{app} or .deps/level3/{app})")
+            if not bsha or bsha == "MISSING":
+                c.gap(f"{r['dir']}: the manifest records no binary sha256")
+            else:
+                if exe_sha and exe_sha != bsha:
+                    c.fail(f"{r['dir']}: the record's exe_sha256 {exe_sha[:12]} differs from the manifest's binary sha256 {bsha[:12]}")
+                if os.path.isfile(binary):
+                    if sha(binary) != bsha:
+                        c.fail(f"{r['dir']}: {binary} no longer hashes to the manifest's binary sha256 (rebuilt since the run)")
+                    else:
+                        c.ok(f"binary {os.path.relpath(binary, repo)} sha256 {bsha[:12]} (manifest, record and file agree)")
+                else:
+                    c.gap(f"{r['dir']}: binary {binary} no longer present (sha256 {bsha[:12]} recorded, not re-checkable)")
+        if m.get("fingerprint_sha256") in (None, "", "MISSING"):
+            c.gap(f"{r['dir']}: no install fingerprint recorded")
+        if bc.get("profile") and m.get("profile") != bc["profile"]:
+            c.fail(f"{r['dir']}: profile {m.get('profile')!r}, the registry's build_config requires {bc['profile']!r}")
+        if "variant" in m and m["variant"] != want_variant:
+            c.fail(f"{r['dir']}: build variant {m['variant']!r}, the registry input is variant {want_variant!r}")
+        # manifest templates: every applicable template must match the manifest value
+        for key, temps in (rule.get("manifest") or {}).items():
+            for tpl in (temps if isinstance(temps, list) else [temps]):
+                rx = fill(tpl, vals)
+                if rx is None:
+                    c.ok(f"manifest template {key} /{tpl}/ not applicable (param missing)")
+                    continue
+                v = m.get(key)
+                if v is None:
+                    c.gap(f"{r['dir']}: the manifest has no '{key}' to evidence /{rx}/")
+                elif not re.search(rx, v):
+                    c.fail(f"{r['dir']}: manifest {key}={v!r} does not match the registered /{rx}/")
+                else:
+                    matched += 1
+                    c.ok(f"manifest {key}={v!r} /{rx}/")
+        # the manifest file IS the registered source deck: its recorded sha256 must be the frozen file's
+        for key, tpl in (rule.get("source_deck") or {}).items():
+            rel = fill_plain(tpl, vals)
+            if rel is None:
+                continue
+            v = m.get(key)
+            path = os.path.join(bdir, rel)
+            if not v:
+                c.gap(f"{r['dir']}: the manifest has no '{key}' naming the source deck")
+            elif os.path.realpath(v) != os.path.realpath(path) and not v.endswith("/" + rel):
+                c.fail(f"{r['dir']}: manifest {key}={v} is not the registered deck level3/{app}/{rel}")
+            elif not os.path.isfile(path):
+                c.gap(f"{r['dir']}: registered deck level3/{app}/{rel} missing now (sha256 recorded {str(m.get(key + '_sha256'))[:12]})")
+            elif m.get(key + "_sha256") != sha(path):
+                c.fail(f"{r['dir']}: level3/{app}/{rel} does not hash to the manifest's {key}_sha256 (deck changed since the run)")
+            else:
+                matched += 1
+                c.ok(f"source deck level3/{app}/{rel} sha256 {sha(path)[:12]} as the run recorded")
+        for tpl in rule.get("source_files") or []:
+            rel = fill_plain(tpl, vals)
+            if rel is None:
+                continue
+            if os.path.isfile(os.path.join(bdir, rel)):
+                c.ok(f"registered source file level3/{app}/{rel} present")
+            else:
+                c.gap(f"registered source file level3/{app}/{rel} missing now")
+        # a file run.sh derived from the registered deck: still present and hashing as the run recorded
+        for key, shakey in (rule.get("generated") or {}).items():
+            path, want = m.get(key), m.get(shakey)
+            if not path or not want or want == "MISSING":
+                c.gap(f"{r['dir']}: the manifest records no {key} / {shakey} for the derived input")
+            elif not os.path.isfile(path):
+                c.gap(f"{r['dir']}: derived input {path} no longer present (sha256 {want[:12]} recorded, not re-checkable)")
+            elif sha(path) != want:
+                c.fail(f"{r['dir']}: derived input {path} no longer hashes to the manifest's {shakey}")
+            else:
+                c.ok(f"derived input {os.path.relpath(path, repo)} sha256 {want[:12]} as the run recorded")
+        # the launcher: ranks and GPU audit
+        out = r.get("output") or ""
+        if f"ranks={want_ranks} (one per GPU)" in out:
+            c.ok(f"launcher: ranks={want_ranks} (one per GPU)")
+        else:
+            c.gap(f"{r['dir']}: no launcher line 'ranks={want_ranks} (one per GPU)' in run.log")
+        am = re.search(r"audit summary: (\d+) verified, (\d+) mismatch, (\d+) unverified", out)
+        if not am:
+            c.gap(f"{r['dir']}: no launcher GPU audit summary in run.log")
+        elif int(am.group(2)) or int(am.group(1)) != want_ranks:
+            c.fail(f"{r['dir']}: launcher GPU audit {am.group(0)!r} (expected {want_ranks} verified, 0 mismatch)")
+        else:
+            c.ok(f"launcher GPU audit: {am.group(0)}")
+        # placement records: the application binary held exactly the registered number of GPUs
+        if binary:
+            held = [b for b in r.get("bind") or [] if b["exe"] and os.path.realpath(b["exe"]) == os.path.realpath(binary)]
+            buses = sorted({g for b in held for g in b["gpus"]})
+            if not held:
+                c.gap(f"{r['dir']}: no placement record of the application binary")
+            elif len(buses) != want_gpus:
+                c.fail(f"{r['dir']}: the application process(es) held {len(buses)} GPU(s) {buses}, registered {want_gpus}")
+            else:
+                c.ok(f"placement: {len(held)} application process(es) on GPU(s) {', '.join(buses)}")
+    matched += apply_templates(c, rule, params, runs, 3)
+    # the application's own timer must report the registered number of steps
+    expr = rule.get("timer_steps")
+    if expr:
+        try:
+            want = eval(expr, {"__builtins__": {}, "round": round, "int": int, "str": str}, dict(vals))
+        except Exception:
+            want = None
+        if want is not None:
+            got = (rec.get("roi") or {}).get("steps")
+            if got is None:
+                c.gap(f"the record has no step count from the application's timer (registered {want})")
+            elif int(got) != int(want):
+                c.fail(f"the application's timer reports {got} steps, the registered input has {want}")
+            else:
+                c.ok(f"timer steps {got} as registered")
+    # every knob the input sets must be evidenced
+    covers = set(rule.get("covers") or [])
+    for k, v in (wl.get("env") or {}).items():
+        if denv.get(k) not in (None, str(v)):
+            c.fail(f"env {k} declared as {denv.get(k)!r}, registry value {v!r}")
+        if k in covers and matched:
+            c.ok(f"knob {k} covered by the {app} evidence rules")
+        else:
+            c.gap(f"knob {k}={v} is not evidenced by the manifest or output templates")
+
+
 _current = {}
+_entries = {}
 SUPPLEMENT = "file_identity_supplement.json"
+
+
+def registry_entry(repo, level, app, iid):
+    """The input's registry entry as it is NOW (runtime_config, build_config), or None."""
+    key = (repo, level, app, iid)
+    if key not in _entries:
+        _entries[key] = None
+        bdir = os.path.join(repo, f"level{level}", app)
+        if os.path.isfile(os.path.join(bdir, "inputs.yaml")):
+            sys.path.insert(0, os.path.join(repo, "tools", "inputs"))
+            import hpcperf_inputs as hi
+            doc = hi.load(bdir)
+            _entries[key] = next((i for i in doc["inputs"] if i["id"] == iid), None)
+    return _entries[key]
 
 
 def files_added(recorded, cur):
@@ -463,13 +699,21 @@ def verify_record(path, repo, rules):
     ident = reg.get("identity") or {}
     raw = os.path.join(repo, (rec.get("provenance") or {}).get("raw_dir") or "")
     runs = clean_runs(raw) if os.path.isdir(raw) else []
-    if rec.get("status") != "ok" and not any(r["procs"] for r in runs):
-        # never reached the ROI (e.g. build_not_materialized, or run.sh stopped before the program ran)
-        out.update(verdict="NOT_RUN", problems=[f"status {rec.get('status')}, no ROI reached in any clean run"],
+    level3 = rec.get("level") == 3
+    reached = any(r["manifest"] for r in runs) if level3 else any(r["procs"] for r in runs)
+    if rec.get("status") != "ok" and not reached:
+        # never reached the ROI / never ran (e.g. build_not_materialized, or run.sh stopped before the program ran)
+        out.update(verdict="NOT_RUN", problems=[f"status {rec.get('status')}, " + ("no run manifest in any clean run" if level3 else "no ROI reached in any clean run")],
                    gaps=[], evidence=[], clean_runs=len(runs))
         return out
     if rec.get("status") != "ok":
-        c.fail(f"status {rec.get('status')}")
+        if level3 and rec.get("status") == "app_timer_missing":
+            # the run completed with its manifest but the application's timer region was not found: no timing
+            # result, yet the workload evidence can still be judged (timing SUCCESS and verification are separate)
+            c.ok("status app_timer_missing: the application's timer was not found in the output (no timing result); "
+                 "the workload evidence below is judged on its own")
+        else:
+            c.fail(f"status {rec.get('status')}")
     if not reg.get("identity_complete") or not ident.get("complete"):
         c.fail("workload identity not complete")
     if ident.get("input_id") != rec.get("case") or ident.get("benchmark") != rec.get("app"):
@@ -477,9 +721,11 @@ def verify_record(path, repo, rules):
     wi = os.path.join(raw, "workload_identity.json")
     if not os.path.isfile(wi) or json.load(open(wi)).get("workload") != ident.get("workload"):
         c.fail("raw workload_identity.json missing or differs from the record's")
-    if len(runs) != len((rec.get("roi") or {}).get("runs_s") or []):
+    if rec.get("status") == "ok" and len(runs) != len((rec.get("roi") or {}).get("runs_s") or []):
         c.fail(f"{len(runs)} clean run dirs but {len((rec.get('roi') or {}).get('runs_s') or [])} ROI samples")
     for r in runs:
+        if level3:
+            continue                                   # Level 3: the manifest is checked by verify_level3
         if not r["procs"]:
             c.fail(f"{r['dir']}: no ROI log")
         for p in r["procs"]:
@@ -508,7 +754,10 @@ def verify_record(path, repo, rules):
     if not c.problems:
         rule = rules.get(rec["level"], {}).get(rec["app"]) or {}
         try:
-            (verify_level1 if rec["level"] == 1 else verify_level2)(c, repo, used, rec, runs, rule)
+            if level3:
+                verify_level3(c, repo, used, rec, runs, rule, registry_entry(repo, 3, rec["app"], rec["case"]))
+            else:
+                (verify_level1 if rec["level"] == 1 else verify_level2)(c, repo, used, rec, runs, rule)
         except (KeyError, OSError, re.error) as exc:
             c.fail(f"verifier error: {exc!r}")
     verdict = "FAIL" if c.problems else "INSUFFICIENT" if c.gaps else "PASS"

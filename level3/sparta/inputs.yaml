@@ -19,11 +19,17 @@ timing:
     (move, collide, sort, comm, stats output) -- 100 steps for in.collide/in.free after a 30-step
     large-timestep equilibration, 1000 steps for in.sphere after 1000 equilibration steps. The
     equilibration run (first Loop time line), box/grid/particle creation, balance_grid, surface
-    read-in and the final statistics are excluded. Printed with %g (6 significant digits).
+    read-in and the final statistics are excluded. Printed with %g (6 significant digits). The same
+    (last) Loop time line is the headline timer of tools/timing (apptimers.py: sparta; average over
+    ranks between barriers).
   kind: total
   unit: s
   regex: '^Loop time of (?P<value>[0-9.eE+-]+) on \d+ procs for \d+ steps with \d+ particles'
   select: last
+  app_timer:
+    source: tools/timing/apptimers.py:sparta
+    region: "'Loop time' of the last run command of the deck (src/run.cpp, src/finish.cpp, src/KOKKOS/update_kokkos.cpp)"
+    relation: identical
 baseline:
   method: >-
     DSMC is stochastic (seed 12345, but GPU/parallel move and collision order is not

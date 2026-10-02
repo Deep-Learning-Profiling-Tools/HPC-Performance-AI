@@ -299,7 +299,7 @@ def build_registry(roots):
     plats = platform_info(recs)
     _, suites = defined_inputs()
     levels = {}
-    for lvl in (1, 2):
+    for lvl in (1, 2, 3):
         apps = {}
         for row in (r for r in rows if r["level"] == lvl):
             sets = row["history_sets"]
@@ -348,13 +348,16 @@ def load_history_page(path):
 
 
 def load_page_level(spec):
-    """One level of a published index.html, kept as a CURRENT campaign of its own: `PATH:LEVEL`.
-    Used to carry a level whose records live elsewhere (Level 3 measured in another checkout) next
-    to the levels rendered from local records; the page's own data is taken as it was published,
-    not re-summarized."""
+    """One level of a published index.html as a campaign of its own: `PATH:LEVEL` keeps it as a CURRENT
+    campaign (a level whose records live elsewhere, taken as published, not re-summarized);
+    `PATH:LEVEL:history` keeps it as an EARLIER campaign (banner, never compared with the current results),
+    e.g. the hand-written 2-GPU Level 3 sweep of 2026-09-29 next to the registered-input Level 3 campaign."""
+    historical = False
+    if spec.endswith(":history"):
+        historical, spec = True, spec[:-len(":history")]
     path, _, level = spec.rpartition(":")
     if not path or level not in ("1", "2", "3"):
-        raise SystemExit(f"report: --page-level needs PATH:LEVEL with LEVEL 1, 2 or 3, got {spec!r}")
+        raise SystemExit(f"report: --page-level needs PATH:LEVEL[:history] with LEVEL 1, 2 or 3, got {spec!r}")
     import re
     text = open(path).read()
     m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', text, re.S)
@@ -363,10 +366,12 @@ def load_page_level(spec):
         data = data["campaigns"][0]
     apps = (data.get("levels") or {}).get(level, [])
     n = sum(1 for a in apps for c in a.get("cases", []) for cell in (c.get("cells") or {}).values() if cell and cell.get("run"))
-    return {"kind": "cases", "historical": False, "source_page": os.path.basename(path), "level_only": level,
+    return {"kind": "cases", "historical": historical, "source_page": os.path.basename(path), "level_only": level,
             "generated_from": data.get("generated_from"), "platforms": data.get("platforms", []),
             "levels": {level: apps}, "records": n,
-            "title": f"Level {level} · {n} records as of {data.get('generated_from') or '-'} (from {os.path.basename(path)})"}
+            "title": (f"Level {level} · earlier campaign · {n} records as of {data.get('generated_from') or '-'} (from {os.path.basename(path)})"
+                      if historical else
+                      f"Level {level} · {n} records as of {data.get('generated_from') or '-'} (from {os.path.basename(path)})")}
 
 
 # ----------------------------------------------------------------- HTML
@@ -479,10 +484,10 @@ def md_status_line(c):
     k = c["counts"]
     ok = k["roi_success"]
     reg = k["registered_inputs"]
-    return (f"{reg['level1']} + {reg['level2']} registered Level 1 / Level 2 inputs: ROI timing SUCCESS for "
-            f"{ok['level1']} + {ok['level2']}, run failed for {len(k['run_failed'])}, not measured {len(k['not_measured'])}; "
-            f"run verification PASS for {k['run_verification_pass']}; UNSTABLE {len(k['unstable'])}. "
-            f"Level 3: {reg['level3']} registered inputs without ROI support (earlier native timing only).")
+    return (f"{reg['level1']} + {reg['level2']} + {reg['level3']} registered Level 1 / 2 / 3 inputs: timing SUCCESS for "
+            f"{ok['level1']} + {ok['level2']} + {ok.get('level3', 0)} (Level 3: the application's own timer), run failed for "
+            f"{len(k['run_failed'])}, not measured {len(k['not_measured'])}; run verification PASS for "
+            f"{k['run_verification_pass']}; UNSTABLE {len(k['unstable'])}.")
 
 
 def render_md_registry(c):
@@ -513,8 +518,11 @@ def render_md_registry(c):
     for note in c.get("notes") or []:
         out.append(f"- {md_cell(note)}")
     out.append("")
-    for lvl in ("1", "2"):
+    for lvl in ("1", "2", "3"):
         out += [f"### {LEVEL_NAMES[int(lvl)]}", ""]
+        if lvl == "3":
+            out += render_md_registry_l3(c)
+            continue
         head = ["application", "input", "status", "platform", "ROI median", "samples", "spread", "CV", "stable",
                 "device busy", "kernels in ROI", "profiler x", "run verification", "correctness", "source"]
         out.append("| " + " | ".join(head) + " |")
@@ -539,13 +547,13 @@ def render_md_registry(c):
                         str(i["run_verification"] or "-"), str(i["correctness"] or "none"),
                         st["git_commit"] if st else "-"]) + " |")
         out.append("")
-    sup = [(a["app"], i["input_id"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+    sup = [(a["app"], i["input_id"]) for lvl in ("1", "2", "3") for a in c["levels"].get(lvl, []) for i in a["inputs"]
            if "supplement" in (i.get("file_identity") or [])]
-    ins = [(a["app"], i["input_id"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+    ins = [(a["app"], i["input_id"]) for lvl in ("1", "2", "3") for a in c["levels"].get(lvl, []) for i in a["inputs"]
            if i.get("run_verification") == "INSUFFICIENT"]
-    groups = [(a["app"], i["input_id"], run["set"]["group"]) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+    groups = [(a["app"], i["input_id"], run["set"]["group"]) for lvl in ("1", "2", "3") for a in c["levels"].get(lvl, []) for i in a["inputs"]
               for run in i["cells"].values() if run and run["set"].get("group")]
-    rejected = [(a["app"], i["input_id"], p) for lvl in ("1", "2") for a in c["levels"].get(lvl, []) for i in a["inputs"]
+    rejected = [(a["app"], i["input_id"], p) for lvl in ("1", "2", "3") for a in c["levels"].get(lvl, []) for i in a["inputs"]
                 for p in i.get("link_problems") or []]
     if groups or rejected or sup or ins:
         out += ["### Pooled measurements and input-file identity", ""]
@@ -604,8 +612,54 @@ def render_md(bundle, out_dir):
                  "results and are not compared with them. Spread column here: CV = stddev / median.", ""]
                 if c.get("historical") else
                 [f"Level {c['level_only']} as published in {c['source_page']} (its records were summarized there; "
-                 "taken over as published, not re-summarized here).", ""] if c.get("source_page") else []) + render_md_cases(c)
+                 "taken over as published, not re-summarized here)" + (" -- an EARLIER campaign of hand-written cases, "
+                 "kept for history and never compared with the registered-input results." if c.get("historical") else "."), ""]
+                if c.get("source_page") else []) + render_md_cases(c)
     return "\n".join(out).rstrip("\n") + "\n"
+
+
+def render_md_registry_l3(c):
+    """The registered Level 3 inputs: the application's own timer is the region (no markers), so the columns are
+    the timer, its steps, the region's share of the process and the device picture (whole process unless the
+    application emits an NVTX range for its loop)."""
+    out = ["No markers: the timed region is the application's own timer for its time-step loop (`tools/timing/apptimers.py` "
+           "defines it per application; every record carries the definition). Device busy is for the WHOLE process unless the "
+           "application emits an NVTX range for its loop (WarpX); QMCPACK is not profiled by default. One clean run per input "
+           "is the Level 3 protocol, so the spread column is null until more clean runs are made.", ""]
+    head = ["application", "input", "status", "platform", "timed region", "runs", "spread", "steps", "per step", "process wall",
+            "region share", "device busy", "profiler x", "FOM", "GPUs", "run verification", "correctness", "source"]
+    out.append("| " + " | ".join(head) + " |")
+    out.append("|" + "|".join("---" if i < 4 else "--:" if i < 15 else "---" for i in range(len(head))) + "|")
+    for a in c["levels"].get("3", []):
+        for i in a["inputs"]:
+            cells = [(pid, run) for pid, run in sorted(i["cells"].items()) if run]
+            if not cells:
+                cells = [("-", None)]
+            for pid, run in cells:
+                st = run["set"] if run else None
+                R = run["roi"] if run else {}
+                ctx = (run.get("context") or {}) if run else {}
+                wall, proc, steps = R.get("wall_s"), ctx.get("process_wall_s"), R.get("steps")
+                dv, whole = (run.get("device") or {}) if run else {}, (ctx.get("whole_process") or {}) if run else {}
+                busy = (f"{100 * min(dv['busy_frac_of_roi'], 1):.0f}% (NVTX range)" if dv.get("busy_frac_of_roi") is not None
+                        else f"{100 * min(whole['busy_frac_of_process'], 1):.0f}% (whole process)" if whole.get("busy_frac_of_process") is not None
+                        else "null") if run else "-"
+                out.append("| " + " | ".join([
+                    md_cell(a["app"]), md_cell(i["input_id"]), i["status"], md_cell(pid),
+                    fmt_plain(wall) if run else "-", str(st["n"]) if st else "-",
+                    (md_pct(st["spread"], 1) if st["n"] > 1 else "null (1 run)") if st else "-",
+                    ("null" if steps is None else f"{steps:,}") if run else "-",
+                    (fmt_plain(wall / steps) if (wall and steps) else "null") if run else "-",
+                    fmt_plain(proc) if run else "-",
+                    md_pct(wall / proc if (wall and proc) else None, 1) if run else "-",
+                    busy,
+                    ("null" if R.get("profiler_inflation") is None else f"{R['profiler_inflation']:.2f}") if run else "-",
+                    md_cell(fom_plain(run.get("fom"))) if run else "-",
+                    str((run.get("measurement") or {}).get("gpus") or "-") if run else "-",
+                    str(i["run_verification"] or "-"), str(i["correctness"] or "none"),
+                    st["git_commit"] if st else "-"]) + " |")
+    out.append("")
+    return out
 
 
 def render_md_cases(data):
@@ -733,7 +787,7 @@ def main(argv=None):
                     help="results directory (repeatable: several directories of one campaign); default results/timing")
     ap.add_argument("--history-page", action="append", default=[],
                     help="an earlier published index.html to embed as a separate historical campaign (repeatable)")
-    ap.add_argument("--page-level", action="append", default=[], metavar="PATH:LEVEL",
+    ap.add_argument("--page-level", action="append", default=[], metavar="PATH:LEVEL[:history]",
                     help="one level of a published index.html kept as a current campaign of its own (repeatable), e.g. "
                          "the Level 3 sweep of another checkout next to the local Level 1/2 records")
     ap.add_argument("--out", default=None, help="output directory (default <first results-root>/report)")

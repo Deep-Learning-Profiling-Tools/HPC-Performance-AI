@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Generate the timing execution cases of the registered inputs from the inputs registry.
 
-    gen_registry_cases.py            write cases/level1_registry.tsv and cases/level2_registry.tsv
-    gen_registry_cases.py --check    exit 1 if either file differs from what the registry gives (drift)
+    gen_registry_cases.py            write cases/level1_registry.tsv, level2_registry.tsv and level3_registry.tsv
+    gen_registry_cases.py --check    exit 1 if any of the files differs from what the registry gives (drift)
 
 The inputs registry (`level<N>/<benchmark>/inputs.yaml`, read by tools/inputs/hpcperf_inputs.py)
-is the only definition of a benchmark's inputs; these two files are execution artifacts derived
-from it, never edited by hand. One row per registered input of a Level 1 benchmark or Level 2
-application (Level 3 has no ROI markers). The case name IS the registry's input id, and every row
+is the only definition of a benchmark's inputs; these three files are execution artifacts derived
+from it, never edited by hand. One row per registered input of a Level 1 benchmark, Level 2 or
+Level 3 application. The case name IS the registry's input id, and every row
 also carries the id in its own column, so a timing record can always be joined back to the
 registry entry (the engine additionally stores the input's full workload identity, see
 `hpcperf_inputs.py identity`, next to the raw runs).
@@ -19,6 +19,10 @@ Level 2 row: the application's run.sh with the registry selector set to the inpu
 applies the input's knobs and arguments itself (tools/inputs/hpcperf_input_selector.sh) -- plus
 the names of the knobs the selector sets, which cases.py refuses when they are set in the caller's
 shell instead of through the case.
+Level 3 row: the same as Level 2 (run.sh with the registry selector; HPCPERF_GPUS from the input's
+`runtime_config.gpus`, one MPI rank per GPU); the application has no ROI markers -- its timed region is
+its own timer (tools/timing/apptimers.py), and cases/level3_apps.tsv supplies the FOM pattern, the NVTX
+range and the profile default of every application.
 """
 
 import argparse
@@ -33,11 +37,13 @@ sys.path.insert(0, HERE)
 import cases as C            # noqa: E402
 import hpcperf_inputs as hi  # noqa: E402
 
-L1_FILE, L2_FILE = "level1_registry.tsv", "level2_registry.tsv"
+L1_FILE, L2_FILE, L3_FILE = "level1_registry.tsv", "level2_registry.tsv", "level3_registry.tsv"
 L1_COLS = ("app", "case", "input_id", "materialized", "exe", "args", "cwd", "env", "timeout_s")
 L2_COLS = ("app", "case", "input_id", "materialized", "selector", "registry_knobs", "gpus", "timeout_s")
 L1_MIN_TIMEOUT = 1800        # per run; the ctest default case's timeout when larger
 L2_MIN_TIMEOUT = 1800
+L3_COLS = L2_COLS
+L3_MIN_TIMEOUT = 1800
 
 HEADER = """# tools/timing/cases/{name} -- GENERATED from the inputs registry by tools/timing/gen_registry_cases.py.
 # Do not edit: change level{level}/<benchmark>/inputs.yaml and regenerate; `gen_registry_cases.py --check`
@@ -115,6 +121,32 @@ def level2_rows():
     return rows
 
 
+def level3_rows():
+    """Level 3: run.sh with the registry selector = input id, HPCPERF_GPUS = the input's runtime_config.gpus
+    (one MPI rank per GPU, as every Level 3 run.sh derives its rank count); the application's timer, FOM,
+    NVTX range and profile default come from cases/level3_apps.tsv when the case is resolved."""
+    apps = {r["app"]: r for r in C.read_table("level3_apps.tsv", C.L3_APP_COLS)}
+    rows = []
+    for app, doc in registry_docs(3):
+        if doc["entry"]["kind"] != "run.sh" or not doc.get("selector"):
+            raise C.CaseError(f"level3/{app}: Level 3 registry entries must be run.sh with a selector")
+        if app not in apps:
+            raise C.CaseError(f"level3/{app} has a registry but no row in cases/level3_apps.tsv")
+        a_to = int(apps[app]["timeout_s"] or 0)
+        knobs = sorted({str(k) for i in doc["inputs"] for k in (i.get("env") or {})})
+        for inp in doc["inputs"]:
+            rc = inp.get("runtime_config") or {}
+            gpus = rc.get("gpus", 1)
+            if rc.get("ranks") not in (None, gpus):
+                raise C.CaseError(f"level3/{app}/{inp['id']}: runtime_config.ranks {rc.get('ranks')} != gpus {gpus} "
+                                  f"(every Level 3 run.sh runs one MPI rank per GPU)")
+            rows.append({"app": app, "case": inp["id"], "input_id": inp["id"],
+                         "materialized": "1" if inp.get("materialized", True) is not False else "0",
+                         "selector": doc["selector"], "registry_knobs": ",".join(knobs),
+                         "gpus": str(gpus), "timeout_s": str(max(L3_MIN_TIMEOUT, a_to))})
+    return rows
+
+
 def render(name, level, cols, rows):
     out = HEADER.format(name=name, level=level, cols="\t".join(cols))
     for r in rows:
@@ -124,11 +156,12 @@ def render(name, level, cols, rows):
 
 def expected():
     return {L1_FILE: render(L1_FILE, 1, L1_COLS, level1_rows()),
-            L2_FILE: render(L2_FILE, 2, L2_COLS, level2_rows())}
+            L2_FILE: render(L2_FILE, 2, L2_COLS, level2_rows()),
+            L3_FILE: render(L3_FILE, 3, L3_COLS, level3_rows())}
 
 
 def check():
-    """Problems (empty when both generated files match the registry)."""
+    """Problems (empty when the three generated files match the registry)."""
     problems = []
     for name, text in expected().items():
         path = os.path.join(C.CASES, name)
@@ -149,7 +182,7 @@ def main(argv):
             for m in p:
                 print(f"gen_registry_cases: {m}", file=sys.stderr)
             if not p:
-                print("gen_registry_cases: level1_registry.tsv and level2_registry.tsv match the registry")
+                print("gen_registry_cases: level1_registry.tsv, level2_registry.tsv and level3_registry.tsv match the registry")
             return 1 if p else 0
         for name, text in expected().items():
             with open(os.path.join(C.CASES, name), "w") as f:

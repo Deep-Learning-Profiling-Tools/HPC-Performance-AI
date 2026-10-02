@@ -11,10 +11,22 @@ entry:
   path: level3/dftfe/run.sh
   backend_arg: CUDA
 timing:
-  kind: none
-  status: NEEDS_TIMING_SUPPORT
-  reason: DFT-FE's timing summary lines are not verified in this worktree (no run log available; the reference output
-    carries no wall-time line); to be wired after the first run
+  kind: app_timer
+  unit: s
+  scope: >-
+    The headline timer is read by tools/timing (apptimers.py: dftfe) from the run's stdout: MD steps 1..N-1 as
+    DFT-FE times them -- per step 'Time taken for updateAtomPositionsAndMoveMesh' (atom update + mesh move +
+    re-initialization) plus the step's SCF iterations ('Wall time for the above scf iteration', VERBOSITY = 1
+    set by run.sh). Not in it: the initial ground state before MD step 0 (set-up, reported as a part) and the
+    force evaluation and integrator of each step, which DFT-FE does not time while REPRODUCIBLE OUTPUT = true
+    (the upstream reference deck, kept because it also fixes numerical settings). The region is the sum of
+    DFT-FE's own step timers, not one contiguous span; no explicit device synchronization (each SCF iteration
+    ends in host-side reductions). Defined on MD runs only (al_md); the LLZO input is a ground-state
+    calculation without MD steps (its own timing block says so).
+  app_timer:
+    source: tools/timing/apptimers.py:dftfe
+    region: "MD steps: 'Time taken for updateAtomPositionsAndMoveMesh' + 'Wall time for the above scf iteration' of each step (src/md/molecularDynamicsClass.cc, src/dft/dft.cc)"
+    relation: 'no single stdout timer line covers the region; the earlier NEEDS_TIMING_SUPPORT note is superseded (2026-10-02)'
 baseline:
   method: 'upstream reference outputs (accuracyBenchmarks/output_MD_0, outputLLZO) give the total energies; validate.sh
     compares them at printed precision. Registry: the last ''Total energy'' line of stdout (dftfe.out is tee''d)
@@ -63,6 +75,13 @@ inputs:
   backends_validated:
   - cuda
 - id: llzo-192atoms
+  timing:
+    kind: none
+    status: NO_TIMED_REGION
+    reason: >-
+      the Level 3 timed region of DFT-FE is the MD loop (tools/timing/apptimers.py: updateAtomPositionsAndMoveMesh
+      + SCF iterations of each MD step); this input is a ground-state SCF of LLZO (192 atoms) with no MD STEP, hence
+      no timed region; tools/timing reports app_timer_missing for it (the run and its correctness check are unaffected)
   case: llzo-electrolyte
   variant: case
   source:

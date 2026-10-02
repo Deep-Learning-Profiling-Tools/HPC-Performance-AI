@@ -188,8 +188,10 @@ def placement_of(procs):
 def bind_policy_of(meta):
     """The CPU-binding policy the engine applied (run_meta.txt bind_*): explicit (cases/level2_binding.tsv
     through the launcher's HPCPERF_CPUS_PER_RANK interface, with the pairs it added to the run's
-    environment), runtime (the MPI runtime's default binding: the campaigns before 2026-09-30), none
-    (Level 1 / 3: no policy, the process stays unbound inside the allocation) or not recorded."""
+    environment), runtime (the MPI runtime's default binding: the campaigns before 2026-09-30), application
+    (Level 3: no engine policy -- each run.sh applies its own application-specific CPU/thread policy, and the
+    placement block shows the actual placement), none (Level 1: no policy, the process stays unbound inside
+    the allocation) or not recorded."""
     out = {"kind": meta.get("bind_policy") or "not recorded"}
     for k in ("launcher", "host_threads", "cpus_per_rank", "omp_pin"):
         v = meta.get(f"bind_{k}")
@@ -830,8 +832,6 @@ def write_registry_current(out_root):
         w = csv.writer(f)
         w.writerow(REGISTRY_CURRENT_COLS)
         for r in rows:
-            if r["level"] == 3:
-                continue
             m = r["current"] or {}
             w.writerow([r["level"], r["benchmark"], r["input_id"], r["status"], r["run_verification"] or "",
                         m.get("platform", ""), len(m.get("samples") or []), m.get("median", ""),

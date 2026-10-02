@@ -3,7 +3,7 @@
 
     cases.py resolve --level 1 --build-root build/gcc13 [SELECT ...]
     cases.py resolve --level 2 [SELECT ...]
-    cases.py resolve --level 1|2 --registry [SELECT ...]   # the registered inputs (inputs.yaml)
+    cases.py resolve --level 1|2|3 --registry [SELECT ...] # the registered inputs (inputs.yaml)
     cases.py resolve --level 3 [SELECT ...]
     cases.py check                    # validate every table; CPU only, used by the tests
     cases.py allowed-env <app>        # the input variables a Level 2 case may set
@@ -19,7 +19,7 @@ in tools/timing/cases/, tab-separated, "-" for an empty field:
   level1_apps.tsv   per-benchmark facts: suite backends roi_excludes verify_vs_roi extra_env notes
   level2_apps.tsv   per-application facts, including the application's own FOM pattern
   level2_cases.tsv  Level 2 cases: app case gpus env args timeout_s fom_regex notes
-  level1_registry.tsv, level2_registry.tsv
+  level1_registry.tsv, level2_registry.tsv, level3_registry.tsv
                     GENERATED from the inputs registry (level<N>/<app>/inputs.yaml) by
                     gen_registry_cases.py: one case per registered input, case == input_id.
                     Resolved only with --registry; `check` fails when they drift from the
@@ -177,6 +177,18 @@ L3_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_bett
                "fom_regex", "extra_env", "nvtx_roi", "profile", "notes")
 L3_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "acceptance", "notes")
 
+L3_REG_COLS = L2_REG_COLS
+
+
+def registry_l3():
+    """{app: (selector, {knob names})} from the generated Level 3 registry table (cases/level3_registry.tsv):
+    the same shape as registry_l2; every Level 3 run.sh applies its registered input through
+    hpcperf_apply_input (or its own equivalent, LAMMPS / SPARTA) when the selector is set."""
+    out = {}
+    for r in read_table("level3_registry.tsv", L3_REG_COLS):
+        out[r["app"]] = (r["selector"], set(x for x in r["registry_knobs"].split(",") if x))
+    return out
+
 
 def parse_env(text, where):
     """'A=1;B=x' -> [(A, '1'), (B, 'x')], names validated."""
@@ -214,18 +226,19 @@ def input_vars(app, registry=None, level=2):
     the text scan cannot see; Level 3: or by the common helpers for every application), not part of
     the launcher / platform interface."""
     if level == 3:
-        common, sel = L3_COMMON_INPUTS, set()
+        common = L3_COMMON_INPUTS
+        reg = registry_l3() if registry is None else registry
     else:
         common = set()
         reg = registry_l2() if registry is None else registry
-        sel = {reg[app][0]} if app in reg and reg[app][0] else set()
+    sel = {reg[app][0]} if app in reg and reg[app][0] else set()
     return {v for v in run_sh_vars(app, level) | common | sel if v not in RESERVED and v not in PLATFORM
             and not v.startswith("HPCPERF_BIND_")}
 
 
-def registry_knobs(app, registry=None):
+def registry_knobs(app, registry=None, level=2):
     """Knobs the registry selector sets inside run.sh; a case never sets them directly."""
-    reg = registry_l2() if registry is None else registry
+    reg = (registry_l3() if level == 3 else registry_l2()) if registry is None else registry
     return reg.get(app, ("", set()))[1]
 
 
@@ -488,6 +501,10 @@ def level3_rows(backend):
             raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level3_apps.tsv")
         env = parse_env(r["env"], r["_where"])
         allowed = allowed_env(r["app"], app["extra_env"], level=3)
+        sel = registry_l3().get(r["app"], ("", set()))[0]
+        if sel and any(k == sel for k, _ in env):
+            raise CaseError(f"{r['_where']}: {sel} selects a registered input -- measure it with --registry "
+                            f"(cases/level3_registry.tsv), not as a hand-written case")
         bad = sorted(k for k, _ in env if k not in allowed)
         if bad:
             raise CaseError(f"{r['_where']}: {bad} are not read by level3/{r['app']}/run.sh "
@@ -519,6 +536,48 @@ def level3_rows(backend):
     return out, apps
 
 
+def level3_registry_rows(backend):
+    """Level 3 cases of the registered inputs: run.sh with the registry selector = input id and
+    HPCPERF_GPUS = the input's runtime_config.gpus; the region is the application's own timer
+    (apptimers.py), the FOM / NVTX range / profile default come from cases/level3_apps.tsv."""
+    import apptimers
+    apps = {r["app"]: r for r in read_table("level3_apps.tsv", L3_APP_COLS)}
+    reg = registry_l3()
+    out, seen = [], set()
+    for r in read_table("level3_registry.tsv", L3_REG_COLS):
+        app = apps.get(r["app"])
+        if app is None:
+            raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level3_apps.tsv")
+        if r["app"] not in apptimers.TIMERS:
+            raise CaseError(f"{r['_where']}: {r['app']} has no timer definition in tools/timing/apptimers.py")
+        if r["case"] != r["input_id"] or not NAME_OK.match(r["case"]):
+            raise CaseError(f"{r['_where']}: case must equal the input id and match [A-Za-z0-9._-]+")
+        if (r["app"], r["case"]) in seen:
+            raise CaseError(f"{r['_where']}: duplicate registry case {r['app']}/{r['case']}")
+        seen.add((r["app"], r["case"]))
+        env = parse_env(f"{r['selector']}={r['input_id']}", r["_where"])
+        allowed = allowed_env(r["app"], app["extra_env"], reg, level=3)
+        if r["selector"] not in allowed:
+            raise CaseError(f"{r['_where']}: selector {r['selector']} is not an input variable of {r['app']}")
+        gpus = r["gpus"] or "1"
+        if not gpus.isdigit() or int(gpus) < 1:
+            raise CaseError(f"{r['_where']}: gpus must be a positive integer")
+        if backend.lower() not in app["backends"].split(","):
+            continue
+        argv = ["bash", f"level3/{r['app']}/run.sh", backend.upper()]
+        out.append({
+            "level": "3", "app": r["app"], "case": r["case"], "backend": backend.upper(), "gpus": gpus,
+            "cwd": REPO, "timeout_s": r["timeout_s"] or app["timeout_s"] or "1800",
+            "env": env_text(env), "argv": " ".join(shlex.quote(a) for a in argv),
+            "fom_name": app["fom_name"], "fom_unit": app["fom_unit"], "fom_better": app["fom_better"],
+            "fom_source": app["fom_source"], "fom_regex": app["fom_regex"],
+            "roi_excludes": "", "verify_vs_roi": "outside",
+            "notes": "; ".join(x for x in (app["notes"], "registry input" + ("" if r["materialized"] == "1" else ", NOT materialized")) if x),
+            "input_id": r["input_id"], "nvtx_roi": app["nvtx_roi"], "profile": app["profile"],
+        })
+    return out, apps
+
+
 # ----------------------------------------------------------------- selection
 
 def select(rows, specs):
@@ -541,12 +600,14 @@ def refuse_undeclared(rows, environ):
     """A variable an application reads, set in the caller's shell but not declared by the
     case, would be dropped by `env -i` -- the run would silently measure another input."""
     problems = []
-    reg = registry_l2()
+    reg2, reg3 = registry_l2(), registry_l3()
     for r in rows:
         if r["level"] not in ("2", "3"):
             continue
+        level = int(r["level"])
+        reg = reg3 if level == 3 else reg2
         declared = {kv.split("=", 1)[0] for kv in r["env"].split(";") if kv}
-        watched = input_vars(r["app"], reg, int(r["level"])) | (registry_knobs(r["app"], reg) if r["level"] != "3" else set())
+        watched = input_vars(r["app"], reg, level) | registry_knobs(r["app"], reg, level)
         stray = sorted(v for v in watched if v in environ and v not in declared)
         # the registry selector set in the shell to ANOTHER input than the case's: the case would win
         # silently and the caller would believe the other input was measured (declared case variables
@@ -624,7 +685,8 @@ def check_all(build_root=None):
                 f"bound through HPCPERF_CPUS_PER_RANK, {sum(1 for r in bind.values() if r['launcher'] == 'direct')} direct-exec unbound")
     r1, _ = level1_registry_rows("CUDA")
     r2, _ = level2_registry_rows("CUDA")
-    msgs.append(f"registry: {len(r1)} Level 1 and {len(r2)} Level 2 registered inputs (cases/level<N>_registry.tsv)")
+    r3, _ = level3_registry_rows("CUDA")
+    msgs.append(f"registry: {len(r1)} Level 1, {len(r2)} Level 2 and {len(r3)} Level 3 registered inputs (cases/level<N>_registry.tsv)")
     try:
         import gen_registry_cases
     except ImportError as exc:
@@ -677,7 +739,7 @@ def main(argv):
     try:
         if a.cmd == "resolve":
             if a.registry:
-                rows, _ = (level1_registry_rows if a.level == "1" else level2_registry_rows)(a.backend)
+                rows, _ = {"1": level1_registry_rows, "2": level2_registry_rows, "3": level3_registry_rows}[a.level](a.backend)
             elif a.level == "1":
                 if not a.build_root:
                     raise CaseError("--build-root is required for Level 1")

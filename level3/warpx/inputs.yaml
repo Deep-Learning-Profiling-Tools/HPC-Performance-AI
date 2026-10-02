@@ -11,12 +11,20 @@ entry:
   path: level3/warpx/run.sh
   backend_arg: CUDA
 timing:
-  scope: WarpX's own 'Total Time' (AMReX timer of the whole Evolve loop over all steps, printed at the end); initialization
-    is outside, TinyProfiler totals are printed separately
+  scope: >-
+    WarpX's own 'Total Time' (this stdout line): the AMReX timer printed at the end -- initialization, the Evolve
+    loop and the final diagnostics flush. The headline timer of tools/timing (apptimers.py: warpx) is the final
+    'Evolve time' line (warpx.verbose >= 1): the whole WarpX::Evolve step loop including in-loop diagnostics,
+    without InitData and the final diagnostics flush; rank 0's clock; TinyProfiler regions synchronize the
+    device. Its device activity is clipped to the NVTX range 'WarpX::Evolve()' the application emits itself.
   kind: total
   unit: s
   regex: ^Total Time\s*:\s*(?P<value>[0-9.eE+-]+)
   select: only
+  app_timer:
+    source: tools/timing/apptimers.py:warpx
+    region: "final 'Evolve time' line: the WarpX::Evolve step loop (Source/Evolve/WarpXEvolve.cpp, Source/main.cpp)"
+    relation: 'this stdout timer includes initialization and the final diagnostics flush; the headline is the Evolve loop only'
 baseline:
   method: 'uniform_plasma has no reference output (performance case); langmuir''s analytic check is run by validate.sh''s
     analysis script, not from this log. No science value is printed to stdout: the registry records the completed

@@ -11,13 +11,23 @@ entry:
   path: level3/specfem3d/run.sh
   backend_arg: CUDA
 timing:
-  scope: xspecfem3D's own 'Total elapsed time in seconds' of the time loop (OUTPUT_FILES/output_solver.txt, echoed
-    by run.sh); mesh decomposition/generation (xdecompose_mesh, xmeshfem3D, xgenerate_databases) are separate preprocessing
-    stages, recorded by run.sh as '# solver wall time' context only
+  scope: >-
+    xspecfem3D's own 'Total elapsed time in seconds' (this line, from OUTPUT_FILES/output_solver.txt, echoed by
+    run.sh): the time loop including the final seismogram write. The headline timer of tools/timing
+    (apptimers.py: specfem3d) is the 'Elapsed time in seconds' of the LAST stability report (at the final time
+    step, read from output_solver.txt in the run directory): the time loop from its start after the start-up
+    barrier, without the final seismogram write (reported as a part); rank 0's clock after an MPI max
+    reduction; every stability report synchronizes the compute stream. Mesh decomposition / generation
+    (xdecompose_mesh, xmeshfem3D, xgenerate_databases) are separate preprocessing stages, recorded by run.sh as
+    '# solver wall time' context only.
   kind: total
   unit: s
   regex: Total elapsed time in seconds =\s*(?P<value>[0-9.eE+-]+)
   select: last
+  app_timer:
+    source: tools/timing/apptimers.py:specfem3d
+    region: "'Elapsed time in seconds' of the last stability report in output_solver.txt (src/specfem3D/iterate_time.F90, check_stability.f90)"
+    relation: 'this stdout timer includes the final seismogram write; the headline stops at the last stability report'
 baseline:
   method: validate.sh compares seismograms with REF_SEIS (upstream compare_seismogram_correlations.py); no seismogram
     value is in stdout -- only the time-loop completion marker is recorded
