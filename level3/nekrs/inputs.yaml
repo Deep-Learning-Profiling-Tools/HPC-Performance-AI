@@ -1,0 +1,141 @@
+# Registered inputs of nekrs (schema hpcperf-inputs-1), selected through HPCPERF_NEKRS_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: nekrs
+level: 3
+selector: HPCPERF_NEKRS_INPUT
+default_input: ethier-n9-100
+entry:
+  kind: run.sh
+  path: level3/nekrs/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    nekRS's own elapsedStepSum after the last step (this stdout line): the sum of the time-step wall times
+    between MPI barriers; set-up, JIT compilation and the 'runtime statistics' totalElapsed (which includes
+    them) are excluded. The headline timer of tools/timing (apptimers.py: nekrs) is the 'solve' row of the
+    final runtime statistics (= elapsedStepSum, maximum over ranks) minus its 'checkpointing' row (field-file
+    output inside the loop, reported as excluded time): smaller than this line by the checkpointing time
+    when the case writes fields.
+  kind: total
+  unit: s
+  regex: elapsedStepSum=\s*(?P<value>[0-9.eE+-]+)s
+  select: last
+  app_timer:
+    source: tools/timing/apptimers.py:nekrs
+    region: "'solve' minus 'checkpointing' of the final runtime statistics (src/app/nrs/nrs.cpp, src/bin/driver.cpp, src/platform/timer.cpp)"
+    relation: 'this stdout timer includes the in-loop checkpoint writes; the headline excludes them (excluded_s)'
+baseline:
+  method: >-
+    upstream's --cimode CI checks ('CI test <name> passed': L2 errors of velocity / pressure / scalars against the exact
+    Ethier-Steinman solution, EPS 0.3, plus iteration counts) are run by validate.sh on the base ethier case; CI mode fixes the
+    solver settings, so it is a validation of the build, not of a registered plain run. A plain run prints the divergence error
+    per step (recorded as a diagnostic) and no exact-solution error: no registered nekRS input has a quantity that verifies its
+    own solution (2026-10-02). Missing criterion: the exact-solution error of a plain run (the udf computes it only under --cimode).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: div_u_err_final
+    role: diagnostic
+    regex: divUErr\s*:\s*(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+  - name: ci_failed
+    # DIAGNOSTIC since 2026-10-02: 'CI test ... failed' is printed by the ethier udf only under --cimode, which the registered
+    # plain runs do not use -- in a plain run the line is absent whatever the solution, so the rule verified nothing. The
+    # earlier PASS verdicts of ethier-n9-100 / ethier-refine4-n7 rested on this vacuous rule and are withdrawn (INCOMPLETE).
+    role: diagnostic
+    regex: CI test .* failed
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: the ethier case at three refinements is registered
+  blocker: the other upstream examples (turbPipe, tgv, channel, rbc, kershaw, lowMach, ...) are in the frozen tree
+    but run.sh hard-wires --setup ethier and copies that case directory; a case selector is a run.sh change (not
+    done this round)
+  upstream_inputs_not_added:
+  - examples/turbPipe
+  - examples/tgv
+  - examples/channel
+  - examples/rbc
+  - examples/kershaw
+  - examples/lowMach
+  - '...'
+inputs:
+- id: ethier-n9-100
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+  case: ethier
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: Nek5000/nekRS
+      version: hpcperf-l3-v1 (nekRS v26.0 frozen tree, variant hypregpu)
+      path: examples/ethier/ethier.par as shipped (32 elements, N=9, 100 steps) -- run.sh smoke
+  params:
+    case: ethier
+    elements: 32
+    order: 9
+    steps: 100
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: ethier-refine4-n7
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+  case: ethier
+  variant: size
+  source:
+    kind: derived
+    derivation: examples/ethier/ethierRefine.par with hrefine=4 (2,048 elements, N=7) -- run.sh strong mode with
+      HPCPERF_NEKRS_HREFINE=4; only hrefine/numSteps differ (class A)
+  params:
+    case: ethier
+    hrefine: 4
+    elements: 2048
+    order: 7
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_NEKRS_HREFINE: '4'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: ethier-refine10-n7
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+  case: ethier
+  variant: size
+  source:
+    kind: derived
+    derivation: ethierRefine.par with hrefine=10 (32,000 elements, N=7; run.sh strong default)
+  params:
+    case: ethier
+    hrefine: 10
+    elements: 32000
+    order: 7
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_NEKRS_HREFINE: '10'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

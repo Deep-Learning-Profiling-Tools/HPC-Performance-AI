@@ -1,0 +1,94 @@
+# Registered inputs of burgers_equation (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: burgers_equation
+level: 1
+selector: null
+default_input: x8200-y8100-t100
+entry:
+  kind: binary
+  path: build/burgers_equation/cuda/burgers_equation_cuda
+timing:
+  scope: the benchmark's own timer over all `nt` time steps of the 2D Burgers kernels (total)
+  kind: total
+  unit: s
+  regex: ^Total kernel execution time (?P<value>[0-9.eE+-]+) \(s\)
+  select: only
+baseline:
+  method: 'built-in comparison with the CPU implementation: PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus a larger grid and a longer integration
+inputs:
+- id: x8200-y8100-t100
+  case: burgers-2d
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/burger-cuda Makefile run: ./main 8200 8100 100 (= ctest)'
+  params:
+    dim_x: 8200
+    dim_y: 8100
+    steps: 100
+  args:
+  - '8200'
+  - '8100'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: x16400-y16200-t100
+  case: burgers-2d
+  variant: size
+  source:
+    kind: derived
+    derivation: grid 2x in each direction
+  params:
+    dim_x: 16400
+    dim_y: 16200
+    steps: 100
+  args:
+  - '16400'
+  - '16200'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: x8200-y8100-t1000
+  case: burgers-2d
+  variant: steps
+  source:
+    kind: derived
+    derivation: 10x the time steps on the default grid
+  params:
+    dim_x: 8200
+    dim_y: 8100
+    steps: 1000
+  args:
+  - '8200'
+  - '8100'
+  - '1000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

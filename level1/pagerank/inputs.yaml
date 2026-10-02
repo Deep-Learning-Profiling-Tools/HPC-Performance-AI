@@ -1,0 +1,91 @@
+# Registered inputs of pagerank (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: pagerank
+level: 1
+selector: null
+default_input: nodes16384
+entry:
+  kind: binary
+  path: build/pagerank/cuda/pagerank_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the port exposes no timing option (upstream's benchmark_runner -t timing mode is not wired into the CLI);
+    only the verification line is printed
+baseline:
+  method: 'built-in (upstream Verify): PageRank vector vs the CPU implementation; ''Passed.'' on success'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: Passed
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: three sizes of the upstream N.data sweep from the repository's deterministic generator
+inputs:
+- id: nodes16384
+  case: pagerank-csr
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: NUCAR-DEV/Hetero-Mark
+      version: aa685e02705f4be380cba215c6df10b42262a9cd
+      path: 'pr benchmark -i 16384.data: the largest size of the upstream N.data sweep, generated at configure time
+        by data/gen_input.py (= ctest)'
+  params:
+    nodes: 16384
+    avg_out_degree: 16
+  args:
+  - -i
+  - build/pagerank/cuda/data/16384.data
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: nodes4096
+  case: pagerank-csr
+  variant: size
+  source:
+    kind: derived
+    derivation: 4096 nodes from the same deterministic generator (a smaller point of the upstream sweep)
+  params:
+    nodes: 4096
+    avg_out_degree: 16
+  args:
+  - -i
+  - build/pagerank/cuda/data/4096.data
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: nodes1024
+  case: pagerank-csr
+  variant: size
+  source:
+    kind: derived
+    derivation: 1024 nodes
+  params:
+    nodes: 1024
+    avg_out_degree: 16
+  args:
+  - -i
+  - build/pagerank/cuda/data/1024.data
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file

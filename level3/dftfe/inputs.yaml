@@ -1,0 +1,128 @@
+# Registered inputs of dftfe (schema hpcperf-inputs-1), selected through HPCPERF_DFTFE_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: dftfe
+level: 3
+selector: HPCPERF_DFTFE_INPUT
+default_input: al-md-32atoms-4steps
+entry:
+  kind: run.sh
+  path: level3/dftfe/run.sh
+  backend_arg: CUDA
+timing:
+  kind: app_timer
+  unit: s
+  scope: >-
+    The headline timer is read by tools/timing (apptimers.py: dftfe) from the run's stdout: MD steps 1..N-1 as
+    DFT-FE times them -- per step 'Time taken for updateAtomPositionsAndMoveMesh' (atom update + mesh move +
+    re-initialization) plus the step's SCF iterations ('Wall time for the above scf iteration', VERBOSITY = 1
+    set by run.sh). Not in it: the initial ground state before MD step 0 (set-up, reported as a part) and the
+    force evaluation and integrator of each step, which DFT-FE does not time while REPRODUCIBLE OUTPUT = true
+    (the upstream reference deck, kept because it also fixes numerical settings). The region is the sum of
+    DFT-FE's own step timers, not one contiguous span; no explicit device synchronization (each SCF iteration
+    ends in host-side reductions). Defined on MD runs only (al_md); the LLZO input is a ground-state
+    calculation without MD steps (its own timing block says so).
+  app_timer:
+    source: tools/timing/apptimers.py:dftfe
+    region: "MD steps: 'Time taken for updateAtomPositionsAndMoveMesh' + 'Wall time for the above scf iteration' of each step (src/md/molecularDynamicsClass.cc, src/dft/dft.cc)"
+    relation: 'no single stdout timer line covers the region; the earlier NEEDS_TIMING_SUPPORT note is superseded (2026-10-02)'
+baseline:
+  method: 'upstream reference outputs (accuracyBenchmarks/output_MD_0, outputLLZO) give the total energies; validate.sh
+    compares them at printed precision. Registry: the last ''Total energy'' line of stdout (dftfe.out is tee''d)
+    is a required quantity, recorded until a rule with a basis is set.'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_energy_final
+    role: required
+    regex: ^\s*Total energy:\s+(?P<value>-?[0-9.]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the two run.sh cases are registered
+  blocker: the other upstream GPU .prm cases in testsGPU (Mg2x series, N2, ReS2, Pt3Ni hubbard, Be) are in the frozen
+    tree but run.sh wires only al_md and llzo; a case entry per .prm is a run.sh change (not done this round)
+  upstream_inputs_not_added:
+  - testsGPU/pseudopotential/real/parameterFileMg2x_*.prm
+  - parameterFileN2_*.prm
+  - parameterFile_ReS2.prm
+  - Pt3Ni_hubbard_spin.prm
+  - parameterFileBe.prm
+inputs:
+- id: al-md-32atoms-4steps
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^DFT-FE CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/dftfe/validate.sh on 1 GPU: the ELPA GPU probe PASS and this deck (upstream testsGPU Input_MD_0.prm verbatim) compared by dftfe_check.py --check with upstream's own GPU reference output accuracyBenchmarks/output_MD_0 at pre-fixed tolerances (ground-state energy 1e-5 Ha, MD step energies 2e-5 Ha, temperatures 0.1 K, ion forces 2e-5 Ha/Bohr; SCF converged, 4 MD steps complete, every value finite, launcher GPU audit clean).
+    covers: all
+    timeout: 2400
+  case: al-fcc-bomd
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: dftfeDevelopers/dftfe
+      version: hpcperf-l3-v1 (DFT-FE 1.2.0 frozen tree 54bea988)
+      path: testsGPU/pseudopotential/real/Input_MD_0.prm verbatim (32-atom Al, 4 BOMD steps) -- run.sh default,
+        reference output_MD_0
+  params:
+    case: al_md
+    atoms: 32
+    md_steps: 4
+  env:
+    HPCPERF_DFTFE_CASE: al_md
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: llzo-192atoms
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/dftfe_check.py', '{log}', '{bench_dir}/src/testsGPU/pseudopotential/real/accuracyBenchmarks/outputLLZO', --check, --label, llzo]
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: 'RESULT within tolerances$'
+    fail_regex: 'VALIDATION ERROR|BAD'
+    basis: >-
+      dftfe_check.py --check against upstream's own reference output accuracyBenchmarks/outputLLZO for this deck
+      (parameterFile_LLZO.prm): the ground-state total energy within 1e-5 Ha (the pre-fixed tolerance validate.sh uses for
+      the al_md ground state: SCF TOLERANCE 1e-5 on the density residual, energies quadratically converged; upstream's own check
+      is a plain diff), SCF converged, every value finite. The run's stdout (run.sh tees dftfe.out) is the checked output.
+    covers: all
+    timeout: 3600
+  timing:
+    kind: none
+    status: NO_TIMED_REGION
+    reason: >-
+      the Level 3 timed region of DFT-FE is the MD loop (tools/timing/apptimers.py: updateAtomPositionsAndMoveMesh
+      + SCF iterations of each MD step); this input is a ground-state SCF of LLZO (192 atoms) with no MD STEP, hence
+      no timed region; tools/timing reports app_timer_missing for it (the run and its correctness check are unaffected)
+  case: llzo-electrolyte
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: dftfeDevelopers/dftfe
+      version: hpcperf-l3-v1 (DFT-FE 1.2.0 frozen tree 54bea988)
+      path: testsGPU/pseudopotential/real/parameterFile_LLZO.prm (192 atoms, 720 states; reference outputLLZO)
+  params:
+    case: llzo
+    atoms: 192
+  env:
+    HPCPERF_DFTFE_CASE: llzo
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

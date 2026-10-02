@@ -1,0 +1,99 @@
+# Registered inputs of aes (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: aes
+level: 1
+selector: null
+default_input: plaintext-1mib
+entry:
+  kind: binary
+  path: build/aes/cuda/aes_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the port exposes no timing option (upstream's benchmark_runner -t timing mode is not wired into the CLI);
+    only the verification line is printed
+baseline:
+  method: 'built-in (upstream Verify): ciphertext vs the CPU AES-256 reference: ''Passed.'''
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: Passed
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail)
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: three points of the upstream size sweep from the repository's deterministic generator (the upstream data
+    server is offline)
+inputs:
+- id: plaintext-1mib
+  case: aes-256-ecb
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: NUCAR-DEV/Hetero-Mark
+      version: aa685e02705f4be380cba215c6df10b42262a9cd
+      path: aes benchmark, 1 MiB plaintext (point of the upstream 1KB..32MB sweep) generated at configure time by
+        data/gen_input.py (= ctest)
+  params:
+    plaintext_mib: 1
+    key_bytes: 32
+  args:
+  - -i
+  - build/aes/cuda/data/input_1MB.hex
+  - -k
+  - build/aes/cuda/data/key.hex
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: plaintext-4mib
+  case: aes-256-ecb
+  variant: size
+  source:
+    kind: derived
+    derivation: 4 MiB plaintext from the repository's deterministic generator (own seed); a further point of the
+      upstream sweep
+  params:
+    plaintext_mib: 4
+    key_bytes: 32
+  args:
+  - -i
+  - build/aes/cuda/data/input_4MB.hex
+  - -k
+  - build/aes/cuda/data/key.hex
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: plaintext-16mib
+  case: aes-256-ecb
+  variant: size
+  source:
+    kind: derived
+    derivation: 16 MiB plaintext, same generator
+  params:
+    plaintext_mib: 16
+    key_bytes: 32
+  args:
+  - -i
+  - build/aes/cuda/data/input_16MB.hex
+  - -k
+  - build/aes/cuda/data/key.hex
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file

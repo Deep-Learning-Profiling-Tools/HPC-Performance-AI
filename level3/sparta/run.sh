@@ -24,6 +24,8 @@
 #              default 50: 125,000 cells = 1,250,000 particles/rank); grid
 #              L*PX x L*PY x L*PZ with PXxPYxPZ from hpcperf_topology.py
 #   HPCPERF_SPARTA_GPU_AWARE  yes|no (default yes)
+#   HPCPERF_SPARTA_INPUT      a registered input id (inputs.yaml: in.collide/in.free/in.sphere at
+#                             the upstream reference sizes); mutually exclusive with strong/weak
 # The deck is upstream's bench/in.collide, unmodified; sizes enter through its
 # own -var x/y/z variables (particles = 10 * cells by construction).
 set -euo pipefail
@@ -58,24 +60,41 @@ case "$MODE" in
             read -r PX PY PZ <<< "$TOPO"
             X=$((L * PX)); Y=$((L * PY)); Z=$((L * PZ)) ;;
 esac
-CELLS=$((X * Y * Z)); PARTS=$((10 * CELLS))
+DECK=in.collide; LABEL="$MODE"
+INPUT_ID="${HPCPERF_SPARTA_INPUT:-}"
+if [ -n "$INPUT_ID" ]; then
+    # A registered input (inputs.yaml, tools/inputs/hpcperf_inputs.py) fixes the deck and its
+    # x/y/z size; it is refused together with the scale modes and their size knobs so that
+    # nothing is silently overridden. The deck must be one of the frozen bench decks.
+    if [ "$MODE" != smoke ] || [ -n "${HPCPERF_SPARTA_STRONG:-}${HPCPERF_SPARTA_LOCAL:-}" ]; then
+        echo "run.sh: HPCPERF_SPARTA_INPUT=$INPUT_ID is mutually exclusive with HPCPERF_SCALE_MODE=strong|weak and HPCPERF_SPARTA_STRONG/LOCAL" >&2
+        exit 2
+    fi
+    param() { python3 "$R/tools/inputs/hpcperf_inputs.py" param "$HERE" "$INPUT_ID" "$1"; }
+    DECK="$(param deck)" || exit 2
+    case "$DECK" in in.collide|in.free|in.sphere) ;; *) echo "run.sh: input deck '$DECK' is not a frozen bench deck" >&2; exit 2 ;; esac
+    X="$(param x)" || exit 2; Y="$(param y)" || exit 2; Z="$(param z)" || exit 2
+    LABEL="input.$INPUT_ID"
+fi
+CELLS=$((X * Y * Z)); PARTS=$((10 * CELLS))     # nominal (in.sphere starts empty and fills by inflow)
 RUN_DIR="$BUILD_DIR/$L3_RUN_SUBDIR"
 [ -n "${HPCPERF_DRY_RUN:-}" ] && RUN_DIR="$RUN_DIR/.dryrun"   # dry-run never overwrites real results
 mkdir -p "$RUN_DIR"
-LOG="$RUN_DIR/log.$MODE.np$N_RANKS.sparta"
+LOG="$RUN_DIR/log.$LABEL.np$N_RANKS.sparta"
 rm -f "$LOG"      # validate only against THIS run's output; never a stale log
-echo "# SPARTA $BACKEND profile=$PROFILE: mode=$MODE ranks=$N_RANKS grid=${X}x${Y}x${Z} = $CELLS cells, $PARTS particles ($((PARTS / N_RANKS))/rank), gpu-aware=$GAM, log=$LOG"
-cd "$SRC/bench"   # ar.species / ar.vss are referenced relative to the deck
+echo "# SPARTA $BACKEND profile=$PROFILE: mode=$MODE${INPUT_ID:+ input=$INPUT_ID deck=$DECK} ranks=$N_RANKS grid=${X}x${Y}x${Z} = $CELLS cells, $PARTS particles ($((PARTS / N_RANKS))/rank), gpu-aware=$GAM, log=$LOG"
+cd "$SRC/bench"   # ar.species / ar.vss / data.sphere are referenced relative to the deck
 RUN_ID="$(l3_run_id)"
 rc=0
 "$L3_LAUNCHER" --gpus "$N_RANKS" --bind wrapper -- \
     "$EXE" -k on g 1 -sf kk -pk kokkos gpu/aware "$GAM" \
-    -in in.collide -var x "$X" -var y "$Y" -var z "$Z" -log "$LOG" -echo none "$@" || rc=$?
+    -in "$DECK" -var x "$X" -var y "$Y" -var z "$Z" -log "$LOG" -echo none "$@" || rc=$?
 if [ -z "${HPCPERF_DRY_RUN:-}" ]; then
     l3_manifest "$RUN_DIR" "run_id=$RUN_ID" "app=sparta" "backend=$BACKEND" "profile=$PROFILE" "mode=$MODE" \
+        "input_id=${INPUT_ID:-}" "deck=$DECK" \
         "ranks=$N_RANKS" "cells=$CELLS" "particles=$PARTS" "gpu_aware=$GAM" "exit_code=$rc" \
-        "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$SRC/bench/in.collide" \
-        "input_sha256=$(l3_sha_file "$SRC/bench/in.collide")" \
+        "binary=$EXE" "binary_sha256=$(l3_sha_file "$EXE")" "input=$SRC/bench/$DECK" \
+        "input_sha256=$(l3_sha_file "$SRC/bench/$DECK")" \
         "fingerprint=$L3_INSTALL/.hpcperf-l3-fingerprint" "fingerprint_sha256=$(l3_sha_file "$L3_INSTALL/.hpcperf-l3-fingerprint")" \
         "log=$LOG" "utc=$(date -u +%FT%TZ)"
 fi

@@ -34,7 +34,8 @@ MODEL="$(echo "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 N="${HPCPERF_GPUS:-1}"
 l3_require_materialized "$HERE" || exit 3
 REF="$HERE/src/bench/log.15Jul25.lj.fixed.g++.1"     # upstream reference log, part of the frozen source bundle
-PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+VARIANT="${HPCPERF_LAMMPS_VARIANT:-}"     # validates the binary of the SAME profile build.sh/run.sh derive
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL" "$VARIANT")"
 l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2     # the run tree of the SAME profile build.sh/run.sh use
 RUN_DIR="$L3_BUILD/$L3_RUN_SUBDIR"
 TIMEOUT="${HPCPERF_VALIDATE_TIMEOUT:-900}"

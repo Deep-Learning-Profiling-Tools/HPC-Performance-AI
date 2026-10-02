@@ -1,0 +1,165 @@
+# Registered inputs of amg2023 (schema hpcperf-inputs-1), selected through HPCPERF_AMG2023_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: amg2023
+level: 2
+selector: HPCPERF_AMG2023_INPUT
+default_input: p1-256cubed
+entry:
+  kind: run.sh
+  path: level2/amg2023/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'hypre''s own timer of the AMG solve phase (the ''wall clock time'' line under ''Problem N: AMG-GMRES/PCG
+    Solve Time''); setup phase and matrix generation are separate timers (setup reported as a secondary timer)'
+  kind: total
+  unit: s
+  regex: ^\s*wall clock time = (?P<value>[0-9.eE+-]+) seconds
+  select: first
+  section_start: '^Problem \d+: AMG-(GMRES|PCG) Solve Time'
+  secondary:
+  - name: setup
+    scope: AMG setup phase (hypre timer under 'AMG Setup Time')
+    kind: total
+    unit: s
+    section_start: '^Problem \d+: AMG Setup Time'
+    regex: ^\s*wall clock time = (?P<value>[0-9.eE+-]+) seconds
+    select: first
+baseline:
+  method: AMG2023 has no built-in verification; validate.sh compares iteration counts with amg-doc's reference runs.
+    The registry keeps the solver iteration count (exact) and records the FOM values (diagnostic).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: iterations
+    role: required
+    regex: ^\s*Iterations = (?P<value>\d+)
+    select: last
+    compare:
+      rule: exact
+  - name: fom_total
+    role: diagnostic
+    regex: '^Figure of Merit \(FOM\): nnz_AP / \(Setup Phase Time \+ Solve Phase Time\) (?P<value>[0-9.eE+-]+)'
+    select: last
+    compare:
+      rule: record
+  - name: fom_solve
+    role: diagnostic
+    regex: '^FOM_Solve: nnz_AP / Solve Phase Time: (?P<value>[0-9.eE+-]+)'
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: both upstream problem types at two sizes plus a larger derived grid
+inputs:
+- id: p1-256cubed
+  case: problem1-27pt-gmres
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/AMG2023
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'amg -P 1 1 1 -n 256 256 256 -problem 1 (the run.sh default: weak mode, 256^3 local grid, 1 rank)'
+  params:
+    problem: 1
+    n: 256
+    mode: weak
+  env:
+    HPCPERF_SCALE_MODE: weak
+    HPCPERF_AMG_N: '256'
+    HPCPERF_AMG_PROBLEM: '1'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: p1-128cubed
+  case: problem1-27pt-gmres
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/AMG2023
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -problem 1 -n 128 128 128 (the run.sh smoke size)
+  params:
+    problem: 1
+    n: 128
+    mode: smoke
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_AMG_PROBLEM: '1'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: p2-256cubed
+  case: problem2-7pt-pcg
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/AMG2023
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -problem 2 (7-point Laplacian, AMG-PCG) -n 256 256 256
+  params:
+    problem: 2
+    n: 256
+    mode: weak
+  env:
+    HPCPERF_SCALE_MODE: weak
+    HPCPERF_AMG_N: '256'
+    HPCPERF_AMG_PROBLEM: '2'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: p2-128cubed
+  case: problem2-7pt-pcg
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: LLNL/AMG2023
+      version: see level2/<app>/README.md (Upstream commit)
+      path: -problem 2 -n 128 128 128
+  params:
+    problem: 2
+    n: 128
+    mode: smoke
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_AMG_PROBLEM: '2'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: p1-320cubed
+  case: problem1-27pt-gmres
+  variant: size
+  source:
+    kind: derived
+    derivation: -n 320 320 320 (the benchmark's own local-grid parameter; 32.8 M unknowns, within the 32-bit HYPRE_Int
+      limit)
+  params:
+    problem: 1
+    n: 320
+    mode: weak
+  env:
+    HPCPERF_SCALE_MODE: weak
+    HPCPERF_AMG_N: '320'
+    HPCPERF_AMG_PROBLEM: '1'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

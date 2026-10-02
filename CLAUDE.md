@@ -143,6 +143,29 @@ level3/<app>/
   for system-GCC builds), `l3_binary_backend_check` (cuobjdump archs, works for
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
+- Registered inputs (since 2026-09-21; every active benchmark since 2026-09-22 -- 50 Level 1,
+  24 Level 2, 10 Level 3; the LAMMPS ReaxFF inputs run on the separate `reaxff.cuda` profile
+  via `HPCPERF_LAMMPS_VARIANT=reaxff`): each benchmark carries `inputs.yaml` (schema
+  `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
+  content, source kind upstream-file / upstream-parameterized / derived / custom, the
+  benchmark's OWN timer scope -- or `timing.kind: none` + NEEDS_TIMING_SUPPORT when stdout has
+  no usable timer, optionally overridden per input -- baseline quantities + comparison rule,
+  and a `coverage` block: MULTI_INPUT (>= 2 runnable inputs) / SINGLE_INPUT (exactly 1, with the
+  reason) / BLOCKED (<= 1, with the concrete blocker); compile-time inputs carry
+  `input_form: compile-time` + `build_config` and are materialized as separate build
+  directories (NPB classes via `tools/inputs/npb_materialize_class.sh`, miniWeather via
+  `HPCPERF_MINIWEATHER_BUILD_TAG`). Selection only through the benchmark's selector variable
+  (`HPCPERF_<APP>_INPUT`; Quicksilver / SHAW / SW4lite: `HPCPERF_<APP>_INPUT_ID`) applied by
+  `tools/inputs/hpcperf_input_selector.sh` in every Level 2/3 run.sh; run.sh refuses an id
+  together with the knobs/args it would override and the default command stays unchanged.
+  `tools/inputs/hpcperf_inputs_audit.py` generates the per-benchmark coverage audit. `measure` = 1 warm-up + N runs
+  with the native timer (never wall time as main compute). `compare` exit 0 only for verdict
+  PASS (every REQUIRED quantity verified AND the workload identity of baseline and candidate
+  established -- measured `workload`, evidence-migrated, or an upstream reference bound to the
+  input); 3 = INCOMPLETE (a required quantity still `record`, or identity not established),
+  1 = FAIL, 2 = refused (other input/benchmark/workload or same file); diagnostic quantities
+  may stay `record`; tests in
+  `tools/inputs/tests/run_all.sh`. See `tools/inputs/README.md`.
 - Launch only through `level2/tools/hpcperf_mpi_launch.sh --gpus N
   [--cpus-per-rank C] --bind wrapper -- <exe> ...`: one MPI rank per GPU, per-rank
   `CUDA_VISIBLE_DEVICES`, nvidia-smi audit ("N verified, 0 mismatch, 0

@@ -36,6 +36,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true
+# Registered inputs (inputs.yaml): HPCPERF_HACCABANAPM_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_HACCABANAPM_INPUT || exit 2
 
 set -euo pipefail
 
@@ -103,7 +108,7 @@ printf '# pm_ic wall time: %.2f s\n' "$(echo "$t1 - $t0" | bc)"
 
 echo "# ${LAUNCH[*]} $BUILD_DIR/pm_run $IC $EVOLVED $INDAT  (PMKOKKOS_TIMING=$PMKOKKOS_TIMING)"
 t0=$(date +%s.%N)
-"${LAUNCH[@]}" "$BUILD_DIR/pm_run" "$IC" "$EVOLVED" "$INDAT" "$@"
+"${LAUNCH[@]}" "$BUILD_DIR/pm_run" "$IC" "$EVOLVED" "$INDAT" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"
 t1=$(date +%s.%N)
 printf '# pm_run wall time: %.2f s\n' "$(echo "$t1 - $t0" | bc)"
 echo "# outputs: $IC $EVOLVED"

@@ -1,0 +1,235 @@
+# Registered inputs of exampm (schema hpcperf-inputs-1), selected through HPCPERF_EXAMPM_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: exampm
+level: 2
+selector: HPCPERF_EXAMPM_INPUT
+default_input: dambreak-0.01
+entry:
+  kind: run.sh
+  path: level2/exampm/run.sh
+  backend_arg: CUDA
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: ExaMPM prints only the simulation time ('Time t / t_final'), no wall-clock timer
+baseline:
+  method: validate.sh checks its own free-fall case against the analytic solution and applies conservation criteria to
+    the dam-break dumps. Since ExaMPM_Solver.hpp printFinalState (outside the ROI) every run prints a final-state
+    summary (particle count, position bounds, volume ratio, mean velocity, centre of mass); the dam-break inputs
+    verify it through their own quantity rules (below, per input), the free-fall input through validate.sh.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: last_time_line
+    role: diagnostic
+    regex: ^Time [0-9.]+ / [0-9.]+
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: upstream's two examples; the dam break at three grid sizes
+inputs:
+- id: dambreak-0.01
+  check:
+    # validate.sh's dam-break conservation criteria on the run's own HDF5 dumps (written by the run into the shared
+    # build/level2/exampm/cuda/run directory, captured per run as `outputs`): particle count conserved, positions
+    # finite and inside [-0.02, 1.02]^3, total volume sum(J)/N_0 within 1 % of 1 on every dump. Together with the
+    # final-state rules (`baseline.quantities`) this is the correctness evidence of the dam-break inputs; no
+    # independent reference exists (see the notes).
+    kind: post_run
+    outputs: [{glob: '{repo}/build/level2/exampm/cuda/run/particles_*.h5', new: true}]
+    command: [python3, '{bench_dir}/check_dambreak.py', '{outputs}', '--min-dumps', '2']
+    pass_regex: '^PASS: exampm dam-break check'
+    fail_regex: '^FAIL: exampm dam-break check'
+    basis: 'every dump of the run (initial + evolved): particle count = initial count, positions finite and inside
+      [-0.02, 1.02]^3, sum(J)/N_0 within 1 % of 1 -- validate.sh dam-break criteria (conservation of particles and
+      volume, domain bounds); the same criteria hold for the final state through the registry rules'
+    covers: []
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
+  case: dam-break
+  variant: default
+  source:
+    kind: derived
+    derivation: 'upstream DamBreak deck refined to a 0.01 m grid, t_final 1.0 s (run.sh default: 100^3 cells, 1.92
+      M particles)'
+  params:
+    example: DamBreak
+    cell_size: 0.01
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 1.0
+    write_freq: 1000
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dambreak-0.05-upstream
+  check:
+    # validate.sh's dam-break conservation criteria on the run's own HDF5 dumps (written by the run into the shared
+    # build/level2/exampm/cuda/run directory, captured per run as `outputs`): particle count conserved, positions
+    # finite and inside [-0.02, 1.02]^3, total volume sum(J)/N_0 within 1 % of 1 on every dump. Together with the
+    # final-state rules (`baseline.quantities`) this is the correctness evidence of the dam-break inputs; no
+    # independent reference exists (see the notes).
+    kind: post_run
+    outputs: [{glob: '{repo}/build/level2/exampm/cuda/run/particles_*.h5', new: true}]
+    command: [python3, '{bench_dir}/check_dambreak.py', '{outputs}', '--min-dumps', '2']
+    pass_regex: '^PASS: exampm dam-break check'
+    fail_regex: '^FAIL: exampm dam-break check'
+    basis: 'every dump of the run (initial + evolved): particle count = initial count, positions finite and inside
+      [-0.02, 1.02]^3, sum(J)/N_0 within 1 % of 1 -- validate.sh dam-break criteria (conservation of particles and
+      volume, domain bounds); the same criteria hold for the final state through the registry rules'
+    covers: []
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
+  case: dam-break
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ECP-copa/ExaMPM
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'README/CI deck: DamBreak 0.05 2 0 0.001 0.25 100'
+  params:
+    example: DamBreak
+    cell_size: 0.05
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 0.25
+    write_freq: 100
+  args:
+  - '0.05'
+  - '2'
+  - '0'
+  - '0.001'
+  - '0.25'
+  - '100'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: dambreak-0.005
+  check:
+    kind: none
+    reason: the registered write_freq 2000 exceeds the 250 steps, so no evolved dump exists and the per-dump check
+      does not apply; the final-state summary the solver prints after the time loop (particle count, position
+      bounds, volume ratio) is verified through this input's `baseline.quantities` rules instead
+  baseline: {reference: 'the final-state summary the solver prints after the time loop (ExaMPM_Solver.hpp
+      printFinalState, outside the ROI); the working baseline of this input for the exact rules', quantities: [
+    {name: particles_final, role: required, regex: '^ExaMPM final state: .* particles (?P<value>\d+) initial', select: last,
+     compare: {rule: exact}},
+    {name: particles_initial, role: required, regex: '^ExaMPM final state: .* initial (?P<value>\d+) pos_min', select: last,
+     compare: {rule: exact}},
+    {name: pos_min, role: required, regex: '^ExaMPM final state: .* pos_min (?P<value>[-+0-9.eE]+) pos_max', select: last,
+     compare: {rule: ge, value: -0.02}},
+    {name: pos_max, role: required, regex: '^ExaMPM final state: .* pos_max (?P<value>[-+0-9.eE]+) volume_ratio', select: last,
+     compare: {rule: le, value: 1.02}},
+    {name: volume_ratio, role: required, regex: '^ExaMPM final state: .* volume_ratio (?P<value>[-+0-9.eE]+) v_mean', select: last,
+     compare: {rule: near, value: 1.0, tol: 0.01}},
+    {name: v_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* v_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+) x_mean',
+     select: last, compare: {rule: record}},
+    {name: x_mean_z, role: diagnostic, regex: '^ExaMPM final state: .* x_mean [-+0-9.eE]+ [-+0-9.eE]+ (?P<value>[-+0-9.eE]+)\s*$',
+     select: last, compare: {rule: record}},
+    {name: last_time_line, role: diagnostic, regex: '^Time [0-9.]+ / [0-9.]+', compare: {rule: present}}]}
+  case: dam-break
+  variant: size
+  source:
+    kind: derived
+    derivation: 0.005 m grid, t_final 0.25 s (15.4 M particles; run.sh header alternative)
+  params:
+    example: DamBreak
+    cell_size: 0.005
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 0.25
+    write_freq: 2000
+  args:
+  - '0.005'
+  - '2'
+  - '0'
+  - '0.001'
+  - '0.25'
+  - '2000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: freefall-0.01
+  check:
+    # validate.sh's analytic free-fall check run with this input's arguments (the six FreeFall arguments), reading the
+    # HDF5 dumps of that run (h5dump + numpy).
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env: {HPCPERF_EXAMPM_FF_ARGS: '{param:cell_size} {param:ppc} {param:halo} {param:dt} {param:t_final} {param:write_freq}'}
+    pass_regex: '^ExaMPM CUDA validation \(FreeFall .*\): PASS'
+    fail_regex: '^ExaMPM CUDA validation \(FreeFall .*\): FAIL'
+    basis: 'analytic free fall on every dump: particle count exact, |mean v_z + g t| <= 1e-9 max(1, g t), |mean v_x|,
+      |mean v_y| <= 1e-9, |z_cm - (z0 - g t^2/2)| <= g t dt_0 + 1e-12 (symplectic-Euler bound), last dump at
+      t >= 0.9 t_final (validate.sh); note: validate.sh also applies its dam-break conservation checks to whatever
+      dumps are in build/level2/exampm/cuda/run'
+    covers: all
+    timeout: 7200
+  case: free-fall
+  variant: case
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ECP-copa/ExaMPM
+      version: see level2/<app>/README.md (Upstream commit)
+      path: examples/free_fall.cpp (second upstream example) with the same seven-argument interface at the default
+        sizes
+  params:
+    example: FreeFall
+    cell_size: 0.01
+    ppc: 2
+    halo: 0
+    dt: 0.001
+    t_final: 1.0
+    write_freq: 1000
+  env:
+    HPCPERF_EXAMPM_EXAMPLE: FreeFall
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

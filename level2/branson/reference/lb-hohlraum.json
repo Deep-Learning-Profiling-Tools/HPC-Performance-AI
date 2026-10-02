@@ -1,0 +1,63 @@
+{
+ "benchmark": "branson",
+ "deck": "inputs/3D_lb_hohlraum.xml",
+ "deck_sha256": "d0c69cd7edb3fb65cb152f975e5e8d4b04b2f74d0086ebe4a62f07642345700f",
+ "final_step": {
+  "absorption_e": 0.00108273,
+  "exit_e": 1.58954e-06,
+  "photons_transported": 251242903,
+  "post_mat_e": 0.017737,
+  "t_e": null
+ },
+ "generated_by": "level2/branson/generate_reference.sh --from-cpu-log (construction-time; frozen from the finished run's log, no rerun)",
+ "generated_utc": "2026-10-01T10:57:12Z",
+ "input_id": "lb-hohlraum",
+ "note": "24-rank run: 2 h 56 min wall, Total transport 10536 s, FOM 23728 photons/s. The 1-rank run did not finish step 1 of 5 in 12 h (2026-09-29), the 4-rank run not in 11 h; the 8-rank run needed 7 h 25 min for step 1 and was stopped in step 2 when this run finished -- none of those is evidence. The 24-rank per-step time (35 min) against the 8-rank one (7 h 25 min) is a 12.7x difference for 3x the ranks; cause not established. The log produced the PASS verdict of 2026-10-01 and is unchanged since",
+ "params": {
+  "photons": "250000000",
+  "t_stop": "0.05"
+ },
+ "per_step_photons_transported": [
+  250694250,
+  251249235,
+  251245350,
+  251244309,
+  251242903
+ ],
+ "reference_run": {
+  "allocation": "dgx003, Slurm job 1397595 (24 of its 32 cores, after the Level 2 campaign)",
+  "binary_sha256": "392c0d0c32a06e5574b63f14393b9e6b537f0bc039ee600de62052c3420c7337",
+  "build_options": "cmake -DCMAKE_BUILD_TYPE=Release -DUSE_GPU=OFF -DUSE_CUDA=OFF -DUSE_HIP=OFF -DUSE_UMPIRE=OFF -DUSE_CALIPER=OFF -DBUILD_TESTING=OFF on level2/branson/src (the GPU build's sources; project toolchain hpcperf_env.sh, Open MPI 5.0.10; CPATH tools/timing/roi)",
+  "finished_utc": "2026-10-01T00:54:59Z",
+  "fom_photons_per_s": 23727.8,
+  "implementation": "CPU-only Branson built from the same sources with -DUSE_GPU=OFF: Branson's CPU transport, independent of the GPU transport kernel (the deck's use_gpu_transporter is ignored by that build)",
+  "launch": "taskset -c 16-31,96-99,108-111 mpirun -np 24 --map-by ppr:24:node:OVERSUBSCRIBE --bind-to none --mca pml ob1 --mca btl self,sm",
+  "log_bytes": 7952,
+  "log_kept_at": "results directory correctness-2026-09-30/branson/lb-hohlraum/reference-np24/cpu_ref_np24.log (outside the repository; reused by the PASS verdict of 2026-10-01, runs/branson/lb-hohlraum/check.log)",
+  "log_sha256": "95b075a1f4312e874087672ddd73812bddc37ecb3277488ffd5cc69acd696cb3",
+  "mpi_ranks": 24,
+  "started_utc": "2026-09-30T21:59:11Z",
+  "total_transport_s": 10536.2
+ },
+ "rule": {
+  "absorption_e": "rel <= 0.05 (final step)",
+  "exit_e": "rel <= 0.05 (final step)",
+  "photons_transported": "rel <= 0.05 (final step, the last \"Total Photons transported\" line)",
+  "post_mat_e": "rel <= 0.05 (final step)",
+  "steps": "the candidate run must complete the same number of steps and print the FOM line",
+  "t_e": "abs <= 0.02 per cell of the final step (when the deck prints the table)"
+ },
+ "schema": "hpcperf-branson-reference-1",
+ "seed": 14706,
+ "steps": 5,
+ "tolerance_basis": "validate.sh check C: the seed-to-seed scatter of the final energies is 0.2-0.8 % and of the front-cell T_e <= 0.006, so 5 % relative / 0.02 absolute is > 6 sigma of the Monte Carlo scatter yet far below any transport error; the transported photon count (a tally of the transport) uses the energies' margin. Fixed before any optimized candidate existed; the reference's rank count does not enter the criteria (same deck, seed and global photon count).",
+ "tolerances": {
+  "energy_rel": 0.05,
+  "photons_rel": 0.05,
+  "t_e_abs": 0.02
+ },
+ "upstream": {
+  "commit": "eed7f71699e9e2d7afc96a849c9c9b2a215cb1dd",
+  "repo": "lanl/branson"
+ }
+}

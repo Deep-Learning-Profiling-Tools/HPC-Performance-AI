@@ -34,8 +34,8 @@ export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in
-    CUDA|HIP) ;;
-    *) echo "usage: $0 [CUDA|HIP]" >&2; exit 2 ;;
+    CUDA|HIP|OPENMP) ;;
+    *) echo "usage: $0 [CUDA|HIP|OPENMP]   (OPENMP: the CPU reference build, YAKL's OpenMP backend)" >&2; exit 2 ;;
 esac
 
 # Load the project toolchain (conda GCC 13.3 + OpenMPI 5 + PnetCDF, system
@@ -51,7 +51,11 @@ fi
 
 JOBS="${MAKE_JOBS:-4}"
 SRC="$HERE/cpp"
-BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
+# HPCPERF_MINIWEATHER_BUILD_TAG=<tag> builds into a separate directory
+# (build/level2/miniweather/<backend>-<tag>) so that several compile-time
+# configurations (registered inputs, inputs.yaml) can coexist; unset = the
+# default directory as before.
+BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')${HPCPERF_MINIWEATHER_BUILD_TAG:+-$HPCPERF_MINIWEATHER_BUILD_TAG}"
 
 NX="${MINIWEATHER_NX:-2048}"
 NZ="${MINIWEATHER_NZ:-1024}"
@@ -107,6 +111,18 @@ if [ "$BACKEND" = "CUDA" ]; then
         -DYAKL_ARCH=CUDA \
         -DYAKL_CUDA_FLAGS="-DHAVE_MPI -DNO_INFORM -O3 --use_fast_math -arch sm_${SM_ARCH}${MPI_INC} -I${PNETCDF_PATH}/include" \
         -DLDFLAGS="-L${PNETCDF_PATH}/lib -lpnetcdf"
+elif [ "$BACKEND" = OPENMP ]; then
+    # CPU reference build: the same parallel_for sources through YAKL's OpenMP backend (upstream
+    # cpp/build/cmake_*_cpu.sh style: -DHAVE_MPI -DNO_INFORM -O3 -fopenmp, no fast-math). It is the
+    # per-grid reference of the registered inputs' correctness check (inputs.yaml), never measured.
+    echo "== miniWeather OPENMP (YAKL_ARCH=OPENMP): CPU reference build, compiler $(command -v mpicxx)"
+    echo "== problem: NX=$NX NZ=$NZ SIM_TIME=$SIM_TIME OUT_FREQ=$OUT_FREQ DATA_SPEC=$DATA_SPEC"
+    echo "== build dir: $BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+    cmake -S "$SRC" -B "$BUILD_DIR" "${COMMON_ARGS[@]}" \
+        -DYAKL_ARCH=OPENMP \
+        -DYAKL_OPENMP_FLAGS="-DHAVE_MPI -DNO_INFORM -O3 -fopenmp${MPI_INC} -I${PNETCDF_PATH}/include" \
+        -DLDFLAGS="-L${PNETCDF_PATH}/lib -lpnetcdf -fopenmp"
 else
     if ! command -v hipcc >/dev/null 2>&1; then
         echo "error: hipcc not found on PATH -- HIP build is not possible on this machine (no ROCm)" >&2

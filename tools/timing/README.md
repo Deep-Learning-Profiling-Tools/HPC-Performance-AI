@@ -5,22 +5,44 @@ did during it, in a form that stays comparable when applications, inputs and
 hardware platforms are added. What was changed, why, and the interfaces for adding
 an application, an input or a platform: [DESIGN.md](DESIGN.md).
 
+There are two ways to run it. Both use the same engine, markers and records; they differ in where
+the inputs come from and in the protocol defaults.
+
+**A. Case tables (the original entry, no `--registry`).** The cases of `cases/` (51 Level 1, 28 Level 2)
+with the front-ends' defaults:
+
 ```bash
-tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 50 benchmarks
-tools/timing/measure_level2.sh all                               # Level 2: 24 applications
-tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each
-python3 tools/timing/report.py --publish                         # copy the web page into docs/timing/
+tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 1 warm-up + 5 clean + 1 profiled run per case
+tools/timing/measure_level2.sh all                               # Level 2: 1 discarded warm-up + 3 clean + 1 profiled run per case, ranks bound explicitly
+tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each (own loop timers)
+python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
+# --page-level PAGE.html:3 carries one level of an already published page (e.g. the Level 3 sweep of
+# another checkout) into the page as a current campaign of its own; --history-page embeds an old page as history
 bash tools/timing/tests/run_all.sh                               # self-tests, CPU only
 ```
 
-Each measurement ends by summarizing its own run (JSON per case, CSV per level) and
-regenerating the web page `results/timing/report/index.html`; `summarize.py` does the
-same by hand for all raw data.
+**B. Registered inputs (`--registry`).** Every input in `level<N>/*/inputs.yaml`, as in the 2026-09-23/24
+campaign (section [Registered inputs](#registered-inputs---registry) below):
+
+```bash
+python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
+tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
+tools/timing/measure_level2.sh --registry --collector nvidia_nsys all                             # 1 discarded warm-up + 3 clean + 1 nsys profiled (the defaults), explicit CPU binding
+tools/timing/measure_level3.sh --registry --collector nvidia_nsys all                             # Level 3: 1 clean + 1 nsys profiled (the Level 3 protocol), the application's own timer, HPCPERF_GPUS from the registry
+python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
+python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
+python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
+```
+
+Each measurement ends by summarizing its own run (JSON per record, CSV per level; with registry
+records also `registry_current.csv`, the current result per registered input) and regenerating the web
+page `<results>/report/index.html`; `summarize.py` does the same by hand for all raw data.
 
 Requires `bash`, `python3` (standard library only) and a built tree; a profiler
 is optional (NVIDIA: `nsys`, shipped with the CUDA toolkit). Results land in
-`results/timing/` and raw evidence in `build/timing/`, both git-ignored:
-**measurement output is never committed.** Formats: [SCHEMA.md](SCHEMA.md).
+`results/timing/` and raw evidence in `build/timing/` by default (`--results-root`, `--raw-root`), both
+git-ignored: **raw evidence, JSON records and CSVs are never committed**; the one measurement output that
+may be committed is the rendered snapshot in `docs/timing/` (below). Formats: [SCHEMA.md](SCHEMA.md).
 
 ## What is measured: the region of interest
 
@@ -58,7 +80,7 @@ One set of markers serves two measurements:
 |---|---|---|---|
 | unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` | 10 cases of 10 `level3/<app>/run.sh`, 2 GPUs each |
 | region | ROI markers | ROI markers | **the application's own loop timer** (no markers, see below) |
-| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
+| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 warm-up (discarded) + 3 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
 | verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
 | FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) | LAMMPS and SPARTA print one |
 
@@ -114,7 +136,11 @@ nsys and the device picture would still be whole-process context, not the DMC lo
 `measure_level3.sh --profile-all` profiles it anyway; `--no-profile` skips every profiled run.
 
 A clean run whose output does not contain the timer is `app_timer_missing` (FAIL); a
-Level 3 run never falls back to the process wall clock. Each run writes its run
+Level 3 run never falls back to the process wall clock. Three registered inputs have no timed region by
+construction -- CP2K's two regtest inputs (geometry optimisation / single point: no MD loop) and DFT-FE's
+LLZO ground state (no MD step) -- and their registry entries say so (`timing.status: NO_TIMED_REGION`); they
+are run, verified and checked for correctness like the others, with no timing result; the page and
+`registry_current.csv` show them as `NO_TIMED_REGION` (neither timing SUCCESS nor a failed run). Each run writes its run
 directory under `build/level3/<app>/<profile>/run.timing-<run id>-<c0|prof>/`
 (`HPCPERF_L3_RUN_SUBDIR`), so no validated or historical run directory is touched, and
 the files the timer is read from are copied into the raw evidence.
@@ -145,41 +171,74 @@ and absent. Every limitation of a record is spelled out in its JSON `caveats`.
 
 ## The web page
 
-`report.py` renders `results/timing/` as one self-contained interactive page
-(`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google
-Fonts with system fallbacks, light and dark theme) plus a Markdown twin (`README.md`)
-that the repository browser displays. The page holds the Level 1, 2 and 3 timing
-results:
+`report.py` renders one or more results directories as one self-contained interactive page
+(`index.html`: the data embedded as JSON, inline CSS and script, fonts from Google Fonts with system
+fallbacks, light and dark theme) plus a Markdown twin (`README.md`) generated from the same data model.
+The page holds the Level 1, 2 and 3 timing results (a level can also be taken over from an already
+published page with `--page-level PAGE.html:N`, as a current campaign of its own, when its records
+live in another checkout). Several `--results-root` directories are
+read as ONE campaign (e.g. the phases of a campaign kept in separate directories); `--history-page`
+embeds an earlier published `index.html` verbatim as a separate, labelled campaign (a campaign tab at
+the top) whose numbers are never mixed with, or compared against, the current ones.
 
-1. **Level tab**, then **an application** from the list (each shows its number of
-   inputs and how many input x platform combinations were measured).
-2. The application's **inputs x platforms** grid: inputs are its cases from
-   `cases/` (with the variables and arguments that define them) plus anything
-   measured; platforms are every platform with a measurement or a conformance record.
-   A combination never measured shows `null`.
-3. Choosing a measured combination shows **that measurement** -- and only then: ROI
-   (median, min/max, every clean run, entries, excluded time), clean-run spread, device
-   busy and host gap inside the ROI, ROI share of the process with the process
-   breakdown bar, profiler inflation, device time / ops / bytes per category (`null`
-   where the collector cannot observe it), the top operations, runtime API calls, the
-   FOM, the application's own timer against the ROI, the launcher audit, the platform's
-   conformance, the input and command as run, the caveats, and every run of the
-   combination with its change against the previous one (the view shows the latest
-   successful run; a later failed run is flagged).
+**Registered inputs** (records made with `--registry`) -- the current view:
 
-The selection is kept in the URL hash (`index.html#L2/quicksilver/p200000/nvidia-b200.cuda13.2`),
-so a view can be linked. The Markdown twin lists the latest successful run of every
-measured combination, one table per level. Absolute paths of the checkout
-are written as `{REPO}`; host names, the environment and GPU UUIDs are not in the page.
-The output depends only on the records and the case tables, so the same data gives
-the same bytes.
+1. **Level tab**, then **an application** (each shows its registered inputs, how many are not measured
+   successfully and how many are UNSTABLE). With nothing chosen: the counts of the level (registered,
+   ROI SUCCESS, not measured, run verification PASS, UNSTABLE), the protocol, what was not collected,
+   the correctness totals with their scope, Level 3, and the campaign notes.
+2. The application's **registered inputs x platforms**: the inputs come from the registry, not from
+   the records, so a failed or unmeasured input is listed (its cell shows the failure). Every row
+   shows its parameters, run-verification verdict and scientific-correctness verdict.
+3. Choosing an input and a platform shows its **current measurement**, in the same layout as the
+   case-table view (figures, process breakdown bar, ROI and device-activity panels, runtime API and
+   checks, input and measurement, caveats, runs) plus a registered-input panel: ROI median of all clean-run
+   samples, spread (max - min) / median, CV (stddev / median), stable / UNSTABLE, ROI share of the
+   process, FOM, every sample per record with its protocol (a history campaign's adaptive 3 + 2 is pooled and shown as
+   such; the final protocol has no adaptive extension), timing status, run verification, scientific correctness with its basis, the blocker of a
+   failed input, the input (registry parameters / arguments / variables and the command as run), the
+   code and binary identity, the caveats, and the history: every measurement of the input (pooled per
+   configuration, marked current or earlier definition, "vs previous" only between measurements of the
+   same workload under the same protocol -- warm-up runs, binding policy and GPU -- so a protocol change
+   starts a new chain) and every attempt with its verdict (PASS, SUPERSEDED, INVALIDATED, NOT_RUN, ...).
 
-* **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every
-  `summarize.py` rewrite `results/timing/report/` (git-ignored).
-* **In the repository**: `python3 tools/timing/report.py --publish` writes the same page
-  to `docs/timing/`; committing it is the deliberate step that shows it. That snapshot is
-  the only measurement output that enters git -- raw evidence, JSON and CSV never do.
-  GitHub shows `docs/timing/README.md`; `index.html` needs a browser or GitHub Pages.
+What is current and how records pool is decided by `registry_view.py` (the same module gives the counts
+and `registry_current.csv`): only a record the run verifier accepts for the input's CURRENT definition
+(PASS, or INSUFFICIENT: timing valid, evidence incomplete -- shown as such) can be a result. Records of one
+input pool into one measurement **only through an explicit measurement group**: `measurement_groups.json`
+in the results directory (schema `hpcperf-timing-measurement-groups-1`: base run id, extension run ids,
+reason, evidence), written by whoever ran the extension. A group is used only when all its records are in
+that same results directory and are the same configuration (platform, workload identity, executable
+sha256, source commit, protocol apart from the clean-run count); otherwise it is rejected and shown.
+Equal configuration alone never pools: two independent runs -- in one campaign or in two -- stay two
+measurements, and a record provided twice counts once. The newest measurement is current. Scientific correctness and
+blocker notes come from `annotations.json` next to the records (schema `hpcperf-timing-annotations-1`,
+written by the campaign from evidence outside the timing runs); without it the page says "none".
+
+**Case tables** (records without `--registry`, and every earlier snapshot): the original view -- the
+cases of `cases/` x platforms, `null` for a combination never measured, the latest successful run with
+its device activity per category, top operations, runtime API calls, application timer, launcher audit,
+conformance, input as run, caveats and the run history.
+
+**No profiler, no device numbers.** A run without a collector (`--no-profile`, as in the first,
+no-profile pass of campaign B on 2026-09-23/24, kept as history) has
+device busy, host gap, time / ops / bytes per category, kernel and operation counts, runtime-API calls
+and profiler inflation `null` ("not collected"), never 0 and never copied from another run.
+
+The selection is kept in the URL hash (`index.html#L2/remhos/periodic-hexagon-p0/nvidia-b200.cuda13.2`,
+an earlier campaign `#c1/L2/...`), so a view can be linked. Absolute paths of the checkout are written
+as `{REPO}`, the results directories as `{RESULTS}`, host names as `{HOST}`; the environment and GPU
+UUIDs are not in the page. The output depends only on the records, the registry, the annotations and
+the embedded history (no wall-clock time; the date shown is the latest measurement), so the same data
+gives the same bytes.
+
+* **Automatic**: every `measure_level*.sh` run (unless `--no-summary`) and every `summarize.py`
+  rewrite `<results>/report/` (git-ignored) -- for that one results directory.
+* **In the repository**: `report.py ... --publish` writes `docs/timing/index.html` and
+  `docs/timing/README.md`; committing them is the deliberate step that shows the results. Publish from
+  the directories that hold the verified results of the campaign (all of its phases), not from a
+  default `results/timing/` that may hold older data. GitHub shows `docs/timing/README.md`;
+  `index.html` needs a browser (or GitHub Pages serving `docs/`).
 * **GitHub Pages**: `docs/` is ready to be served as it is -- `docs/.nojekyll` (no Jekyll
   processing) and `docs/index.html` (the site root redirects to `timing/`). A repository
   admin enables it once: Settings -> Pages -> Source "Deploy from a branch", branch `main`,
@@ -227,6 +286,128 @@ first, then `$HPCPERF_CTEST`, then a `PATH` ctest only if `ctest --version` work
 are wrapped by a repo-authored `verify.py`; their inner argv is obtained by
 importing the wrapper with `subprocess.run` intercepted, so the binary is measured
 directly and no wrapper is modified.
+
+### Registered inputs (`--registry`)
+
+The benchmarks' registered inputs (`level<N>/<app>/inputs.yaml`, the inputs registry of
+`tools/inputs/`) are measured through the same engine with `--registry`:
+
+```
+tools/timing/measure_level1.sh --registry --no-profile all                 # every registered Level 1 input
+tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64-g64-q128
+```
+
+* **The registry defines the inputs.** `cases/level1_registry.tsv`, `cases/level2_registry.tsv` and
+  `cases/level3_registry.tsv` are generated from it by `gen_registry_cases.py` (one case per input, case = input
+  id) and never edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
+* **Level 3** cases (since 2026-10-02) run the application's `run.sh` with the registry selector set to the
+  input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 43 registered
+  inputs declare 1 GPU / 1 rank), plus the build-variant variable when the input's `params.variant` names one
+  (LAMMPS ReaxFF: `HPCPERF_LAMMPS_VARIANT=reaxff`, the `reaxff` build profile; run.sh refuses any other); the region is the application's own timer (section "Level 3" above), the
+  FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`. The engine stores the
+  input's workload identity next to the raw runs as for Level 1/2, and `verify_registry_runs.py` judges the
+  run from the run manifest every Level 3 `run.sh` writes (ranks, binary and its sha256, deck / input and
+  their sha256, profile, case, mode, steps, sizes), the launcher lines of `run.log` and the placement
+  records (`cases/registry_evidence.yaml`, section `level3`): PASS / FAIL / INSUFFICIENT / NOT_RUN as for
+  Level 2; a record whose timer was not found (`app_timer_missing`) is still judged on its workload
+  evidence -- timing SUCCESS and workload verification are separate results. No engine CPU-binding policy
+  applies to Level 3: each `run.sh` keeps its own (CP2K and QMCPACK bind their OpenMP threads through
+  `--cpus-per-rank`, DFT-FE four cores per rank, LAMMPS one Kokkos host thread, the others one host
+  thread); the record says `placement.policy = application` and its placement block shows what the process
+  was actually allowed.
+* **Level 1** cases run the registry's own executable: a materialized compile-time input (an NPB
+  class, `tools/inputs/npb_materialize_class.sh`) runs its own binary, never the default one;
+  repository-relative argument paths are resolved to absolute ones, generated datasets are the
+  input's own files.
+* **Level 2** cases run `run.sh` with the registry selector (`HPCPERF_<APP>_INPUT=<id>`); run.sh
+  applies the input's knobs and arguments itself. The selector is an allowed input variable of the
+  application (it is read indirectly, so the text scan of run.sh cannot see it); a hand-written case
+  may not set it, and the selector or a registry knob set in the caller's shell is refused.
+* **Identity.** Before running a registry case the engine stores the input's workload identity
+  (`tools/inputs/hpcperf_inputs.py identity`: params, args, env, input-file / argument-file / class
+  header sha256, build configuration, selector, registry sha256 and git blob) as
+  `workload_identity.json` next to the raw runs; the JSON record carries it under `registry`, the CSV
+  in `input_id`. A case whose identity cannot be established (`identity_*`) or whose executable does
+  not exist (`build_not_materialized`) is not run and is never a result.
+* Correctness stays with the registry (`tools/inputs`); a timing run records rc and ROI only.
+* **Did the run get the input?** `verify_registry_runs.py <results dir>` (read-only) checks every clean
+  run's ROI log -- executable, working directory, argv -- against the record's workload identity:
+  Level 1 exact exe/cwd/argv (path arguments by real path and sha256); Level 2 the app's own binary,
+  the selector, the registry arguments as one contiguous run of the argv with file arguments resolved
+  the way run.sh resolves them and compared by real path AND content hash (a same-named file elsewhere
+  never matches; a copy counts only under a declared copy rule with the same sha256), every registered
+  file reached, a registered option given twice only when the program's parser is declared last-wins
+  and the last occurrence is the registry's, and every env knob of the input evidenced by argv / exe /
+  program output / build configuration. What each run.sh does with an input -- search dirs, copies,
+  generated decks, last-wins parsers, the output lines that echo the parameters -- is declared per
+  application in `cases/registry_evidence.yaml`. Verdicts:
+
+  | verdict | meaning | can it be a current result? |
+  |---|---|---|
+  | PASS | the run got the input as the registry defines it now | yes |
+  | FAIL | a contradiction: wrong file, wrong or dropped argument, duplicate option, changed file, foreign binary | no |
+  | INSUFFICIENT | no contradiction, but part of the input is not evidenced (listed as gaps) | no |
+  | NOT_RUN | the program never reached the ROI (build missing, abort before the ROI) -- a failed attempt | no |
+  | SUPERSEDED | the run got the workload its identity records, but the registry has since redefined the input | no: history of the old definition |
+
+  **INVALIDATED vs SUPERSEDED.** An *invalidated* record ran another workload than the input it is filed
+  under (e.g. the registry arguments never reached the program): its raw run carries `INVALIDATED.json`,
+  it is evidence of a bug and never a result of anything. A *superseded* record is a correct measurement
+  of an earlier definition of the input (e.g. remhos `periodic-hexagon-p0` before order 3 was made
+  explicit): valid history of that workload, but not of the current one, and never compared with it.
+* **Final Level 2 protocol (2026-09-30).** `measure_level2.sh` defaults: 1 whole-process warm-up run,
+  discarded from every statistic (its ROI time is kept in the record as `roi.warmup_runs_s`, a diagnostic
+  of the first-run effect), then 3 measured clean runs (headline = their median) and 1 nsys-profiled run;
+  every rank bound explicitly (`--bind-policy explicit`, above); one GPU, strictly serial. The warm-up is
+  defined before the runs, never removed afterwards. The campaigns before it (below) are kept as history.
+* **Protocol of campaign B.** The results of phase 5 (2026-09-26/27) follow the PR #14 structure:
+  Level 1: 1 warm-up + 5 clean runs + 1 nsys-profiled run (`HPCPERF_SKIP_VERIFY=1`, as in A); Level 2: no
+  whole-process warm-up, 3 clean runs + 1 nsys-profiled run. The ROI time comes from the clean runs, the
+  device activity from the profiled run of the same measurement. An earlier no-profile pass (2026-09-23/24)
+  is kept as history: a different protocol, so a separate measurement of each input. **Adaptive
+  extension (history only -- not part of the final protocol)**: in campaign B a Level 2 input whose 3 clean runs spread more than 10 % ((max - min) / median) gets 2 more
+  clean runs of the same configuration -- including the profiled run, so both records are one measurement
+  configuration -- run as a separate invocation (`measure_level2.sh --registry --collector nvidia_nsys
+  --clean-runs 2 <app>/<input>`); the front-ends do not do this by themselves -- the campaign script
+  selects the inputs after the first pass and records each extension as a measurement group with its
+  evidence (the campaign's decision line and both invocations' run ids and protocols). The report pools
+  a grouped base + extension into one 5-sample result; all samples are kept, and an input still above
+  10 % is UNSTABLE. Without a group the extension record stays a separate 2-run measurement. The final
+  protocol (above) has no such step: an input is measured once, with its three clean runs, and an input above
+  10 % is simply UNSTABLE; `--clean-runs N` remains a diagnostic option of the front-end, not a protocol step.
+* **Stability depends on the sample size.** With fewer than 10 clean-run samples an input is stable when
+  (max - min) / median <= 10 %; with 10 or more (e.g. a 20-run re-measurement of an UNSTABLE input) when
+  the interquartile range / median <= 5 % -- the range grows with every added sample, the IQR does not;
+  5 % is about as strict as the range rule at 5 samples. Samples that fall into two groups (a gap > 5 % of
+  the median with >= 20 % of the samples on each side) are flagged "two levels" as a description; more
+  runs do not remove such a pattern. The rule lives in `registry_view.stability()`.
+* **Input files read from copies or named only in the program's log.** `copy_dirs` in
+  `cases/registry_evidence.yaml` declares that a registered file is read from a copy of the same name
+  elsewhere (MiniEM reads `src/decks/*` from the build's `decks/`); the copy counts only with the
+  registered sha256. `logged_reads` names the output line through which the program reports a file it
+  read from its working directory (MiniEM: `Loading solver config from <file>`).
+* **Files registered after a run was measured.** When the registry names input files the record's
+  stored identity did not capture (everything else unchanged), the stored identity is not rewritten and
+  today's hash is not taken as the hash at measurement time: the record verifies INSUFFICIENT (file
+  identity) unless a `file_identity_supplement.json` next to the records (schema
+  `hpcperf-file-identity-supplement-1`) establishes the content the run read. An entry is accepted only
+  with the record's identity, the file hashes (equal to the registry's), a non-empty `basis`, a non-empty
+  `evidence` list of the sources it rests on, and a binding to exactly that record (`record_sha256` of the
+  record file, `raw_dir`). Such a supplement is conditional evidence gathered after the measurement -- for
+  MiniEM: the run's own argv / log name the files, the run read the declared run-directory copies, their
+  content hashes to the registry value, and their status-change time (ctime) precedes the run, on the
+  premise that ctime was not reset; not a proof from ctime alone. The page shows which inputs rest on a
+  supplement rather than on the identity recorded at measurement time.
+* **Measurement groups are checked, not repaired.** A group with a missing or empty base id, a missing,
+  empty or non-list extension list, an extension id listed twice, or the base id among the extensions
+  is rejected as a whole (shown on the page); its records stay separate measurements.
+* **Level 3** has no ROI markers: its registered inputs (43) keep their earlier native timing only and
+  are not measured by these front-ends.
+* **Dry run** (`--dry-run`) is a static plan: the engine starts nothing -- not run.sh, not a benchmark,
+  not even the device probe -- because not every run.sh honours `HPCPERF_DRY_RUN` (tests 14a/14b).
+* **Invalidated runs.** A raw run shown to have measured another workload keeps its evidence and gets an
+  `INVALIDATED.json` (see `tools/inputs/README.md`); `summarize.py` builds no record from it and does
+  not load an existing record of it, so it reaches no CSV, report or baseline selection.
 
 ## Hardware neutrality
 
@@ -280,6 +461,20 @@ summarizer reads only the variable NAMES the profiler recorded and caveats any
 that match the deny rule; values are never read. The tests plant credentials and
 assert both rules.
 
+**Where the process ran (placement).** Every run also carries `probes/bindprobe.c`
+through `LD_PRELOAD` (`--no-bind-probe` turns it off). It reads, at process start
+and at exit -- never inside the ROI, without threads or signals -- the CPU set and
+NUMA memory set the process was allowed (`Cpus_allowed_list`, `Mems_allowed_list`),
+the CPU each thread last ran on, the `/dev/nvidia<N>` devices it held open (mapped to
+PCI bus ids) and the placement environment (`CUDA_VISIBLE_DEVICES`, `OMP_*`, MPI and
+Slurm rank variables). Only processes that used a GPU or wrote an ROI log leave a
+`bind.<pid>` file; the record's `placement` block summarizes them and says whether
+the placement was the same in every clean run. It is context for reading a number
+(was this the same GPU, the same cores?), never a metric. The GPU the profiled run's
+kernels executed on is taken from the trace as well (`profiler.gpus_used`), and the
+device descriptor names the GPU that CUDA device 0 resolves to when
+`CUDA_VISIBLE_DEVICES` is set (`vendor_extras.selected_by`).
+
 ## Profiler cost (why the headline comes from clean runs)
 
 Measured with the previous whole-process protocol (2026-09-22, nsys 2025.6.3):
@@ -308,6 +503,27 @@ audit stays clean (`1 verified, 0 mismatch, 0 unverified`), the process tree is
 followed, and `HPCPERF_ROI_LOG` reaches the ranks through the environment
 (verified at one rank with quicksilver: `bash` -> `mpirun` -> `mpi_gpu_bind.sh` -> exe
 wrote its ROI log, audit clean).
+
+**CPU binding (explicit since 2026-09-30).** A Slurm allocation's CPU count is capacity, not rank
+binding: with the launcher's runtime default, Open MPI 5.0.10 binds a <= 2-rank job to ONE core, so
+the 17 mpirun-launched applications ran their main thread, the CUDA runtime's helper threads and --
+for hipBone -- four OpenMP threads on the first core of the cpuset (binding audit 2026-09-28; hipBone
+showed 4261 nonvoluntary context switches per run there). `cases/level2_binding.tsv` therefore states
+a policy per application -- `cpus_per_rank` = the application's host threads (1 for the single-host-
+thread applications, 4 for hipBone), `omp_pin` for the applications with several -- and
+`measure_level2.sh` (default `--bind-policy explicit`) sets `HPCPERF_CPUS_PER_RANK` so the launcher
+runs `mpirun --map-by ppr:<ranks>:node:PE=<cpus_per_rank> --bind-to core`, plus `OMP_NUM_THREADS`
+`OMP_PLACES=cores OMP_PROC_BIND=close` where `omp_pin` is yes. The seven direct-exec applications
+(no launcher) get nothing and stay unbound inside the cpuset, as before. The record's
+`placement.policy` says what was applied and its `placement` block what the process was actually
+allowed; `--bind-policy runtime` reproduces the earlier campaigns' default binding. The A/B of the
+two policies (2026-09-30) is in the results directory of that round, not here.
+The policy is application-specific and explicit, not a portable GPU-topology-aware mechanism: it states
+core counts per rank, names no socket or NUMA node and resolves no GPU topology (no automatic topology
+resolver, by decision 2026-10-02). That the bound cores were GPU-local (hipBone on cores 16-19 of socket 0,
+memory on NUMA node 0) is verified on the current machine, where the allocation's cpuset begins with the
+GPU's socket and Open MPI fills the PE sets in cpuset order; on another allocation the record's `placement`
+block shows what the process was actually allowed, and nothing in the policy guarantees locality.
 
 ## Launching Level 3
 
@@ -343,10 +559,21 @@ interfaces refuse instead of guessing, `gen_cases.py`, FOM extraction, and the w
 page (byte-identical for the same records, inputs x platforms with `null` for
 unmeasured combinations, latest-run selection and history, inert embedding of kernel
 names, no absolute paths, the Markdown twin, the application timer, `--run-id`, no
-summary on a dry run), and Level 3 (case resolution and refusal, every application's
+summary on a dry run), the registry cases and their drift check, the run verifier with its negative
+cases (same-named file, relative / absolute path, copies, dropped and duplicated options, superseded
+definition, abort before the ROI), invalidated runs, the static dry run, the registered-input report
+(INVALIDATED / SUPERSEDED never current, failed inputs listed, no-profile fields null, determinism;
+`tests/page_smoke.js` drives the page's own script with a minimal DOM when `node` is available), pooling
+only through explicit measurement groups (linked 3 + 2, unlinked or cross-campaign runs of one
+configuration kept apart, inconsistent or malformed groups refused, duplicate records counted once) and
+input-file identity through declared copies and logged reads (changed deck or solver configuration
+refused; a supplementary identity only when complete -- basis, evidence sources, bound to its record --
+and matching),
+
+Level 3 (case resolution and refusal, every application's
 timer extracted from synthetic evidence, a missing or incomplete timer failing loudly,
 every cited source line existing, the dry run, the record, CSV and page, QMCPACK's
-profile default and its override) -- 54 checks.
+profile default and its override), and the Level 2 CPU-binding policy (the table, its checks, the front-end defaults and the record) -- 82 checks.
 
 ## Scope and what is UNVERIFIED
 
@@ -362,6 +589,10 @@ profile default and its override) -- 54 checks.
   except for WarpX.
 
 ## First ROI sweep (2026-09-22)
+
+(PR #14: case tables, with the profiler. Its published page is kept verbatim as the "Earlier snapshot"
+campaign of `docs/timing/index.html` and in git history, `6f6dff2:docs/timing/`; the registered-input
+campaign of 2026-09-23/24 is a separate measurement and is not compared with it.)
 
 dgx003, 1x NVIDIA B200 (sm_100, driver 595.58.03), CUDA 13.2.78, Nsight Systems
 2025.6.3, GCC 13.3 (uv toolchain), Level 1 `build/gcc13`, Level 2 at
@@ -414,7 +645,12 @@ Findings that need a decision rather than a fix:
 `device_overlap_s` is non-zero only for quicksilver (0.22-0.35 s: unified-memory
 migrations overlap its kernel); everything else is single-stream.
 
-## First Level 3 sweep (2026-09-29)
+## First Level 3 sweep (2026-09-29) -- hand-written cases, HISTORY
+
+An earlier campaign of the ten hand-written 2-GPU cases of `cases/level3_cases.tsv`, measured in another
+checkout and carried into the page as an earlier campaign (`report.py --page-level ...:3:history`). The
+current Level 3 results are the registered-input campaign of 2026-10-02 (`measure_level3.sh --registry`, one
+GPU, all 43 inputs); the two are never compared.
 
 dgx003, **2 x NVIDIA B200** (one MPI rank per GPU, `--mca pml ob1 --mca btl self,sm,smcuda`),
 CUDA 13.2.78, Nsight Systems 2025.6.3, uv toolchain (GCC 13.3.0 / system GCC 14.2.1 for CP2K and

@@ -36,6 +36,9 @@ set +u; # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null || true; set -u
 # shellcheck disable=SC1091
 source "$R/level3/tools/l3_common.sh"
+# Registered inputs (inputs.yaml): HPCPERF_CP2K_INPUT=<id> supplies this script's case/size knobs (tools/inputs/README.md);
+# refused together with a conflicting pre-set knob or an unknown id. The frozen source tree is never touched.
+hpcperf_apply_input "$HERE" HPCPERF_CP2K_INPUT || exit 2
 BACKEND="$(echo "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"; [ $# -gt 0 ] && shift
 [ "$BACKEND" = CUDA ] || { echo "run.sh: only CUDA is built for CP2K here" >&2; exit 2; }
 GCC_MM="$(l3_version_mm "$(/usr/bin/gcc -dumpfullversion)")"; OMPI_V="$(mpirun --version | head -1 | /usr/bin/grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"

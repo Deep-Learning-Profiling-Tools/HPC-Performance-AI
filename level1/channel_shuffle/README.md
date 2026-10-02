@@ -58,6 +58,19 @@ ctest --test-dir build/channel_shuffle/cuda --output-on-failure
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: each region the benchmark's own timer measures around its kernel launches (2 marked regions; their times add up). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 
+## Warnings
+
+* **Feature maps of 256x256 and larger cannot be swept.** Upstream's `main.cu` computes the element count as
+  `const int numel = N * C * W * H` ("assume no integer overflow", `cuda/main.cu:149`) and sweeps N in
+  {1, 4, 16, 64} x C in {32, 128, 512}; at (N=16, C=512) a 512x512 map overflows, `cudaMalloc` fails, the
+  program prints `Device memory allocation failed. Exit` and **exits 0** after 8 of the 12 configurations.
+  The derived input `g2-w512-h512` ran that truncated sweep in every measurement and was deregistered on
+  2026-09-28 (its records are INVALIDATED in the results directory); `g2-w255-h255` -- the largest square
+  map for which the sweep completes (64 * 512 * 255 * 255 < 2^31) -- replaces it. HeCBench master still has
+  the `int numel` (checked 2026-09-28); the kernels take `int numel` and index in `int`, so a `size_t`
+  change would touch the kernels and was not applied. The correctness check (`check:` in `inputs.yaml`)
+  treats the abort line as a failure.
+
 ## LOC
 
 CUDA: 208 (2 source files, cloc, cuda/ + common/)

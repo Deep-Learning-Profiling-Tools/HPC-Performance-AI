@@ -1,0 +1,24 @@
+{
+ "schema": "hpcperf-miniweather-reference-1",
+ "key": "collision-2048x1024-1000s",
+ "nx": 2048,
+ "nz": 1024,
+ "sim_time": 1000,
+ "data_spec": "DATA_SPEC_COLLISION",
+ "note": "CPU reference 2026-09-30 on dgx003 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; 4304 s",
+ "d_mass": 2.365396e-13,
+ "d_te": 0.0008383598,
+ "d_te_spread_abs": 0.0,
+ "runs": [
+  {
+   "log": "collision-2048x1024-1000s.openmp.1.log",
+   "sha256": "0a1a49cbb3c2d30ff09ebe3177e83ceb77d6414fac9a65618f3319edce9291f3",
+   "d_mass": 2.365396e-13,
+   "d_te": 0.0008383598
+  }
+ ],
+ "rule": {
+  "d_mass": "abs <= 1e-09",
+  "d_te": "abs diff to reference <= 1e-07"
+ }
+}

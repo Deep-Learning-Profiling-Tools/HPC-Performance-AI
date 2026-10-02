@@ -1,0 +1,91 @@
+# Registered inputs of bitonic_sort (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: bitonic_sort
+level: 1
+selector: null
+default_input: exp25
+entry:
+  kind: binary
+  path: build/bitonic_sort/cuda/bitonic_sort_cuda
+timing:
+  scope: the benchmark's own timer over all bitonic stages of the sort (total)
+  kind: total
+  unit: ms
+  regex: '^Total kernel execution time: (?P<value>[0-9.eE+-]+) \(ms\)'
+  select: only
+baseline:
+  method: 'built-in sortedness/reference check: PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two other array sizes via the exponent parameter
+inputs:
+- id: exp25
+  case: bitonic-sort
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/bitonic-sort-cuda Makefile run: ./main 25 2 (= ctest)'
+  params:
+    exponent: 25
+    elements: 33554432
+    k: 2
+  args:
+  - '25'
+  - '2'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: exp22
+  case: bitonic-sort
+  variant: size
+  source:
+    kind: derived
+    derivation: exponent 22 (4 M elements)
+  params:
+    exponent: 22
+    elements: 4194304
+    k: 2
+  args:
+  - '22'
+  - '2'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: exp27
+  case: bitonic-sort
+  variant: size
+  source:
+    kind: derived
+    derivation: exponent 27 (134 M elements)
+  params:
+    exponent: 27
+    elements: 134217728
+    k: 2
+  args:
+  - '27'
+  - '2'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

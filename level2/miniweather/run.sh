@@ -26,14 +26,6 @@ case "$(printf '%s' "${1:-}" | tr '[:lower:]' '[:upper:]')" in
     CUDA) BACKEND="CUDA"; shift ;;
     HIP)  BACKEND="HIP";  shift ;;
 esac
-BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
-EXE="$BUILD_DIR/parallelfor"
-
-if [ ! -x "$EXE" ]; then
-    echo "error: $EXE not found -- run $HERE/build.sh $BACKEND first" >&2
-    exit 1
-fi
-
 if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; then
     # conda's activate.d scripts are not `set -u`/`set -e` safe; relax while sourcing.
     set +eu
@@ -41,6 +33,21 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     source "$R/hpcperf_env.sh" 2>/dev/null
     set -eu
 fi
+# Registered inputs (inputs.yaml): HPCPERF_MINIWEATHER_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_MINIWEATHER_INPUT || exit 2
+# The build directory follows HPCPERF_MINIWEATHER_BUILD_TAG (build.sh: one directory per
+# compile-time configuration; a registered input sets the tag), default as before.
+BUILD_DIR="$R/build/level2/miniweather/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')${HPCPERF_MINIWEATHER_BUILD_TAG:+-$HPCPERF_MINIWEATHER_BUILD_TAG}"
+EXE="$BUILD_DIR/parallelfor"
+
+if [ ! -x "$EXE" ]; then
+    echo "error: $EXE not found -- run $HERE/build.sh $BACKEND first (with HPCPERF_MINIWEATHER_BUILD_TAG=${HPCPERF_MINIWEATHER_BUILD_TAG:-<unset>} and the MINIWEATHER_* values of the input)" >&2
+    exit 1
+fi
+
 
 # shellcheck disable=SC1091
 source "$R/level2/tools/hpcperf_launch_common.sh"

@@ -1,0 +1,84 @@
+# Registered inputs of backprop (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: backprop
+level: 1
+selector: null
+default_input: n65536
+entry:
+  kind: binary
+  path: build/backprop/cuda/backprop_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the CUDA port prints no timer (only the error lines and PASS)
+baseline:
+  method: 'added check: identical network trained with the upstream CPU bpnn_train, weights/errors compared (rel
+    1e-3): PASS/FAIL'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus two larger input layers
+inputs:
+- id: n65536
+  case: backprop-train
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/backprop run: ./backprop 65536 (= ctest)'
+  params:
+    input_layer_size: 65536
+  args:
+  - '65536'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n262144
+  case: backprop-train
+  variant: size
+  source:
+    kind: derived
+    derivation: input layer x4 (positional parameter)
+  params:
+    input_layer_size: 262144
+  args:
+  - '262144'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: n524288
+  case: backprop-train
+  variant: size
+  source:
+    kind: derived
+    derivation: >-
+      input layer x8 (the port's hidden-layer kernel launches dim3 grid(1, in/16), so the input layer is
+      limited to 16 x 65535 = 1,048,560 units: 1,048,576 fails with 'bpnn kernel error: invalid argument',
+      recorded in the rollout measurements as an attempted size that is NOT registered)
+  params:
+    input_layer_size: 524288
+  args:
+  - '524288'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

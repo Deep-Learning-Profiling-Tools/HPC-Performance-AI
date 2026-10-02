@@ -1,0 +1,24 @@
+{
+ "schema": "hpcperf-miniweather-reference-1",
+ "key": "thermal-1024x512-1000s",
+ "nx": 1024,
+ "nz": 512,
+ "sim_time": 1000,
+ "data_spec": "DATA_SPEC_THERMAL",
+ "note": "CPU reference 2026-09-30 on dgx003 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111",
+ "d_mass": 1.478617e-13,
+ "d_te": 0.0001239597,
+ "d_te_spread_abs": 0.0,
+ "runs": [
+  {
+   "log": "thermal-1024x512-1000s.openmp.1.log",
+   "sha256": "06f28f0d88397b94058de81bc6b88f91cc2674568b97827fec9a96d1d53116fd",
+   "d_mass": 1.478617e-13,
+   "d_te": 0.0001239597
+  }
+ ],
+ "rule": {
+  "d_mass": "abs <= 1e-09",
+  "d_te": "abs diff to reference <= 1e-07"
+ }
+}

@@ -61,6 +61,7 @@
 
 #include <string>
 #include <iostream>
+#include <iomanip>
 
 
 template <class Scalar>
@@ -761,6 +762,19 @@ int main_(Teuchos::CommandLineProcessor &clp, int argc,char * argv[])
           }
         }
         HPCPERF_ROI_END_SYNC();
+    }
+
+    // hpcperf: one deterministic functional of the final state for every deck, evaluated after the
+    // synchronized end of the ROI (outside the measured region): the 2-norm of the solution vector,
+    // printed with full precision. Decks without a Responses block (darcyHex.xml) print nothing
+    // numeric otherwise; the registered inputs' correctness check compares this value.
+    {
+      const Scalar solution_norm = Thyra::norm_2(*solution_vec);
+      if (comm->getRank() == 0) {
+        std::stringstream strStream;
+        strStream << "hpcperf: final solution 2-norm = " << std::scientific << std::setprecision(15) << solution_norm << std::endl;
+        (*out) << strStream.str();
+      }
     }
 
     // Collect FOM data before everything goes out of scope
