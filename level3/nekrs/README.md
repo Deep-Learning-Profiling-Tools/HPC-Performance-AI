@@ -156,6 +156,17 @@ Observed on dgx003 (2026-09-05), `hypregpu` variant:
 Earlier CI L2 errors (cimode 2): velocity 2.78e-10, pressure 6.98e-10, scalars
 6.67e-12 / 7.49e-12 (CI references 2.77e-10 / 7.14e-10 / 7.49e-12 / 7.22e-12).
 
+### Correctness of the registered timing inputs (2026-10-02)
+
+The three registered inputs (`inputs.yaml`: ethier-n9-100, ethier-refine4-n7, ethier-refine10-n7) are
+plain `ethier` runs, not `--cimode` runs: the solver settings are the deck's, and a plain run prints no
+exact-solution error (the udf computes the Ethier-Steinman error only in CI mode). Their scientific
+correctness is therefore **INCOMPLETE**: `validate.sh` (cimode 2/3 above) verifies the CI configuration,
+not these workloads, and no reference for them exists. The registry's earlier `ci_failed` rule ("no
+`CI test ... failed` line") was vacuous for a plain run -- the line can never appear -- and is kept as a
+diagnostic only; it was never a correctness verdict. The baseline comparison of the registry (solve time
+and step count of the first measured run, self baseline) is a completeness check, not a numerical one.
+
 ## Results on dgx003 (4x B200, CUDA 13.2.78, Slurm job 9552083)
 
 | Run | Ranks x GPUs | rank->GPU | CPU binding | Topology | Problem | Time | Validation |

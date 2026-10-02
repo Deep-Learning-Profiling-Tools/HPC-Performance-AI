@@ -47,6 +47,18 @@ coverage:
   - tests/performance/C-molecule
 inputs:
 - id: diamond2-256w
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_QMCPACK_SKIP_CTEST: '1'
+    pass_regex: '^QMCPACK CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/qmcpack/validate.sh [2] on 1 GPU: this deck (diamondC_2x1x1_pp, upstream qmc_short_vmcbatch_dmcbatch.in.xml verbatim, 256 walkers) -- completeness, GPU evidence from QMCPACK's own banner (offload + CUDA enabled, OMP_TARGET_OFFLOAD=MANDATORY), 25 DMC blocks finite, and upstream's own statistical check check_scalars.py --ns 3 --series 1 -e 2 --le '-21.844975 0.02' (DIAMOND2_DMC_SCALARS, the test upstream runs on this deck). The upstream ctest suites ([1]) are skipped here: build validation, not this input.
+    covers: all
+    timeout: 3600
   case: diamondC-2x1x1-pp
   variant: default
   source:
@@ -68,6 +80,23 @@ inputs:
   backends_validated:
   - cuda
 - id: diamond2-128w
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/qmc_check.py', '{repo}/build/level3/qmcpack/clang231-cuda132-offload/run.check.diamond2-128w/diamond2.w128.strong.np1.t8',
+              qmc_short_vmcbatch_dmcbatch, '-21.844975 0.02', '3', '2', '{bench_dir}/src/tests/scripts/check_scalars.py']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.diamond2-128w}
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: '^check_scalars: status of this test\s*:\s*pass$'
+    fail_regex: 'VALIDATION ERROR|status of this test\s*:\s*fail'
+    basis: >-
+      qmc_check.py on this input's own run directory (run.sh writes it under the HPCPERF_L3_RUN_SUBDIR the check sets): completeness,
+      GPU evidence from QMCPACK's banner, 25 DMC blocks finite, and upstream's statistical check check_scalars.py --ns 3 --series 1 -e 2
+      --le '-21.844975 0.02' -- the DMC total energy of the same deck with 128 walkers against the upstream reference window
+      (DIAMOND2_DMC_SCALARS; upstream applies this window to 1- and 4-rank populations of the deck, i.e. to different total walker
+      counts, so applying it to this population is upstream's own expectation; the error bar grows with fewer walkers and enters
+      check_scalars' sigma test).
+    covers: all
+    timeout: 3600
   case: diamondC-2x1x1-pp
   variant: size
   source:
@@ -88,6 +117,23 @@ inputs:
   backends_validated:
   - cuda
 - id: diamond2-64w
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/qmc_check.py', '{repo}/build/level3/qmcpack/clang231-cuda132-offload/run.check.diamond2-64w/diamond2.w64.strong.np1.t8',
+              qmc_short_vmcbatch_dmcbatch, '-21.844975 0.02', '3', '2', '{bench_dir}/src/tests/scripts/check_scalars.py']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.diamond2-64w}
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: '^check_scalars: status of this test\s*:\s*pass$'
+    fail_regex: 'VALIDATION ERROR|status of this test\s*:\s*fail'
+    basis: >-
+      qmc_check.py on this input's own run directory (run.sh writes it under the HPCPERF_L3_RUN_SUBDIR the check sets): completeness,
+      GPU evidence from QMCPACK's banner, 25 DMC blocks finite, and upstream's statistical check check_scalars.py --ns 3 --series 1 -e 2
+      --le '-21.844975 0.02' -- the DMC total energy of the same deck with 64 walkers against the upstream reference window
+      (DIAMOND2_DMC_SCALARS; upstream applies this window to 1- and 4-rank populations of the deck, i.e. to different total walker
+      counts, so applying it to this population is upstream's own expectation; the error bar grows with fewer walkers and enters
+      check_scalars' sigma test).
+    covers: all
+    timeout: 3600
   case: diamondC-2x1x1-pp
   variant: size
   source:

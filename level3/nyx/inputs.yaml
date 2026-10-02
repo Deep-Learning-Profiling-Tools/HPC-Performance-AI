@@ -47,6 +47,18 @@ coverage:
   - Exec/HydroTests
 inputs:
 - id: minisb-32cubed-10
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_NYX_CASES: 'minisb'
+    pass_regex: '^Nyx CUDA validation .*: PASS$'
+    fail_regex: 'FAIL|UNSUPPORTED_LAYOUT|I_R_CHECK_PENDING'
+    basis: >-
+      level3/nyx/validate.sh on 1 GPU, case minisb (this deck, 10 steps): completeness (plt00000 and plt00010, runlog reaches max_step, every plotfile variable finite, DM particle count equal to the IC count), baryon mass conservation, and AMReX fcompare at the official GPU nightly tolerances (nyx_fcompare_check.py, strict: structure, finiteness, one parsed row per variable) plus nyx_particle_compare.py against an independent same-configuration rerun and against the CPU reference build of the same sources and deck.
+    covers: all
+    timeout: 7200
   case: santa-barbara-minisb
   variant: default
   source:
@@ -69,6 +81,18 @@ inputs:
   backends_validated:
   - cuda
 - id: lya-adiabatic-32cubed-10
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_NYX_CASES: 'lya_adiabatic'
+    pass_regex: '^Nyx CUDA validation .*: PASS$'
+    fail_regex: 'FAIL|UNSUPPORTED_LAYOUT|I_R_CHECK_PENDING'
+    basis: >-
+      level3/nyx/validate.sh on 1 GPU, case lya_adiabatic (this deck, 10 steps): completeness (plt00000 and plt00010, runlog reaches max_step, every plotfile variable finite, DM particle count equal to the IC count), baryon mass conservation, and AMReX fcompare at the official GPU nightly tolerances (nyx_fcompare_check.py, strict: structure, finiteness, one parsed row per variable) plus nyx_particle_compare.py against an independent same-configuration rerun and against the CPU reference build of the same sources and deck.
+    covers: all
+    timeout: 7200
   case: lyman-alpha-adiabatic
   variant: case
   source:
@@ -91,6 +115,10 @@ inputs:
   backends_validated:
   - cuda
 - id: lya-adiabatic-64cubed
+  check:
+    kind: none
+    reason: >-
+      validate.sh compares the 32^3 decks (minisb, lya_adiabatic, 10 steps) with a same-configuration rerun and the CPU reference build; the same comparison at 64^3 needs a CPU reference run of this size, not run this round. Missing criterion: the fcompare / particle comparison vs an independent run of this size (INCOMPLETE)
   case: lyman-alpha-adiabatic
   variant: size
   source:
@@ -115,6 +143,10 @@ inputs:
   notes: >-
     run.sh's max_step default applies (HPCPERF_NYX_STEPS=10, upstream's MiniSB test length): 10 steps of the 64^3 deck, measured 1.5 s Run time
 - id: lya-heatcool-32cubed
+  check:
+    kind: none
+    reason: >-
+      validate.sh's heat/cool acceptance is incomplete by design: the state and particle checks pass (STATE_AND_PARTICLES_PASS) but the heating / cooling rate field I_R has no accepted tolerance -- validate.sh exits PENDING (3), never PASS. Missing criterion: an accepted I_R tolerance (INCOMPLETE; see level3/nyx/README.md)
   case: lyman-alpha-heat-cool
   variant: case
   source:

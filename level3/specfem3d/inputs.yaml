@@ -53,6 +53,17 @@ coverage:
   - tomographic_model
 inputs:
 - id: homogeneous-halfspace-mesh-default-5000
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^SPECFEM3D CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/specfem3d/validate.sh on 1 GPU: this example (homogeneous_halfspace as shipped, 20,736 elements, NSTEP 5000, GPU_MODE, NPROC 1) vs upstream's own reference seismograms (REF_SEIS) with upstream's compare_seismogram_correlations.py: every reference trace compared, finite, correlation >= 0.8, L2 misfit <= 1 %, time shift <= 0.01 s -- upstream's thresholds unchanged.
+    covers: all
+    timeout: 2400
   case: homogeneous-halfspace
   variant: default
   source:
@@ -76,6 +87,10 @@ inputs:
   backends_validated:
   - cuda
 - id: homogeneous-halfspace-refine2-1000
+  check:
+    kind: none
+    reason: >-
+      upstream's reference seismograms (REF_SEIS) exist for the default mesh only; the 2x-refined mesh (xmeshfem3D) changes the discretisation, so they are not its reference. Missing criterion: reference seismograms or an independent solution for the refined mesh (INCOMPLETE)
   case: homogeneous-halfspace
   variant: size
   source:
@@ -98,6 +113,10 @@ inputs:
   backends_validated:
   - cuda
 - id: homogeneous-halfspace-refine2-5000
+  check:
+    kind: none
+    reason: >-
+      upstream's reference seismograms (REF_SEIS) exist for the default mesh only; the 2x-refined mesh (xmeshfem3D) changes the discretisation, so they are not its reference. Missing criterion: reference seismograms or an independent solution for the refined mesh (INCOMPLETE)
   case: homogeneous-halfspace
   variant: steps
   source:

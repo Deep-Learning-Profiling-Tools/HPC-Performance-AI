@@ -60,6 +60,17 @@ coverage:
   - Inp_Finch.json
 inputs:
 - id: dirsolid-128cubed
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^ExaCA CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/exaca/validate.sh on 1 GPU: this deck (dirsolid 128^3 smoke) -- completeness (every cell solidified, one global decomposition), self-consistency (VolFractionNucleated recomputed from the field, 1e-3) and the statistical invariants of the final microstructure vs the frozen reference statistics of the validated 1-GPU baseline (references/dirsolid_smoke.reference.json; tolerances derived from the measured spread, project protocol v2); the registry baseline rules (nucleated fraction abs 0.01, nucleation events rel 0.05) hold as well.
+    covers: all
+    timeout: 1800
   case: directional-solidification
   variant: default
   source:
@@ -79,6 +90,10 @@ inputs:
   backends_validated:
   - cuda
 - id: dirsolid-200cubed-upstream
+  check:
+    kind: none
+    reason: >-
+      verified by the registry's baseline comparison (statistical invariants of the final microstructure -- nucleated volume fraction abs 0.01, nucleation events rel 0.05 -- vs the first run of this size under the project's protocol v2 tolerances); validate.sh's frozen reference statistics exist for the 128^3 smoke case only
   case: directional-solidification
   variant: size
   source:
@@ -104,6 +119,10 @@ inputs:
   backends_validated:
   - cuda
 - id: dirsolid-512x256x512
+  check:
+    kind: none
+    reason: >-
+      verified by the registry's baseline comparison (statistical invariants of the final microstructure -- nucleated volume fraction abs 0.01, nucleation events rel 0.05 -- vs the first run of this size under the project's protocol v2 tolerances); validate.sh's frozen reference statistics exist for the 128^3 smoke case only
   case: directional-solidification
   variant: size
   source:
@@ -122,6 +141,10 @@ inputs:
   backends_validated:
   - cuda
 - id: dirsolid-64cubed
+  check:
+    kind: none
+    reason: >-
+      verified by the registry's baseline comparison (statistical invariants of the final microstructure -- nucleated volume fraction abs 0.01, nucleation events rel 0.05 -- vs the first run of this size under the project's protocol v2 tolerances); validate.sh's frozen reference statistics exist for the 128^3 smoke case only
   case: directional-solidification
   variant: size
   source:

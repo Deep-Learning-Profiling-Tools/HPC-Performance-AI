@@ -82,6 +82,17 @@ coverage:
     upstream bench decks (LJ at three sizes, EAM, rhodopsin) plus the ReaxFF HNS deck at two sizes on the reaxff.cuda profile
 inputs:
   - id: lj-32k
+    check:
+      kind: standalone
+      command: [bash, '{bench_dir}/validate.sh', CUDA]
+      env:
+        HPCPERF_GPUS: '1'
+      pass_regex: '^LAMMPS CUDA validation .*: PASS$'
+      fail_regex: 'FAIL'
+      basis: >-
+        level3/lammps/validate.sh on 1 GPU: this deck (bench/in.lj, 32,000 atoms, 100 steps) vs the reference log LAMMPS ships (bench/log.15Jul25.lj.fixed.g++.1): Temp / E_pair / TotEng / Press at step 0 (rel 1e-8) and step 100 (rel 1e-5), upstream's regression mechanism; the registry baseline rules compare the same quantities.
+      covers: all
+      timeout: 900
     case: lj-melt
     variant: default
     source:
@@ -93,6 +104,10 @@ inputs:
     backends_validated: [cuda]
     notes: identical to the run.sh smoke default (validated 1/2/4 GPUs against the upstream reference log).
   - id: lj-2m
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against self baseline (no upstream log for this replication), the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: lj-melt
     variant: size
     source:
@@ -104,6 +119,10 @@ inputs:
     backends_validated: [cuda]
     notes: 80^3 fcc cells = 2,048,000 atoms (the bench README's scaled-size series 32K -> 256K -> 2M -> 16M).
   - id: lj-16m
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against self baseline (no upstream log for this replication), the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: lj-melt
     variant: size
     source:
@@ -115,6 +134,10 @@ inputs:
     backends_validated: [cuda]
     notes: 160^3 fcc cells = 16,384,000 atoms; the same box as run.sh's strong-mode default (S=8) on one GPU.
   - id: eam-32k
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against upstream reference log bench/log.15Jul25.eam.fixed.g++.1, the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: eam-cu
     variant: case
     source:
@@ -126,6 +149,10 @@ inputs:
     backends_validated: [cuda]
     notes: metallic Cu with the EAM potential (pair eam/kk, fix nve/kk); the potential file path is made absolute in the derived deck.
   - id: rhodo-32k
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against upstream reference log bench/log.15Jul25.rhodo.fixed.g++.1, the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: rhodopsin
     variant: case
     source:
@@ -174,6 +201,10 @@ inputs:
           select: last
           compare: {rule: rel, tol: 1.0e-5}
   - id: reaxff-hns-2k
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against self baseline (no upstream log; ReaxFF build variant), the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: reaxff-hns-crystal
     variant: build-config
     source:
@@ -251,6 +282,10 @@ inputs:
       ecoul vol with thermo_modify norm yes (per-atom values); fix qeq/reax 1e-6 tolerance. The
       derived deck differs from upstream only in run ${steps} and absolute read_data / ffield paths.
   - id: reaxff-hns-16k
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison: the thermodynamic state at step 0 (rel 1e-8) and at the last step (rel 1e-5: Temp, E_pair, TotEng, Press) against self baseline (no upstream log; ReaxFF build variant), the tolerances of upstream's regression tests; validate.sh covers bench/in.lj at 32k atoms only
     case: reaxff-hns-crystal
     variant: size
     source:

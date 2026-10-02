@@ -52,6 +52,17 @@ coverage:
   - parameterFileBe.prm
 inputs:
 - id: al-md-32atoms-4steps
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^DFT-FE CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/dftfe/validate.sh on 1 GPU: the ELPA GPU probe PASS and this deck (upstream testsGPU Input_MD_0.prm verbatim) compared by dftfe_check.py --check with upstream's own GPU reference output accuracyBenchmarks/output_MD_0 at pre-fixed tolerances (ground-state energy 1e-5 Ha, MD step energies 2e-5 Ha, temperatures 0.1 K, ion forces 2e-5 Ha/Bohr; SCF converged, 4 MD steps complete, every value finite, launcher GPU audit clean).
+    covers: all
+    timeout: 2400
   case: al-fcc-bomd
   variant: default
   source:
@@ -75,6 +86,19 @@ inputs:
   backends_validated:
   - cuda
 - id: llzo-192atoms
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/dftfe_check.py', '{log}', '{bench_dir}/src/testsGPU/pseudopotential/real/accuracyBenchmarks/outputLLZO', --check, --label, llzo]
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: 'RESULT within tolerances$'
+    fail_regex: 'VALIDATION ERROR|BAD'
+    basis: >-
+      dftfe_check.py --check against upstream's own reference output accuracyBenchmarks/outputLLZO for this deck
+      (parameterFile_LLZO.prm): the ground-state total energy within 1e-5 Ha (the pre-fixed tolerance validate.sh uses for
+      the al_md ground state: SCF TOLERANCE 1e-5 on the density residual, energies quadratically converged; upstream's own check
+      is a plain diff), SCF converged, every value finite. The run's stdout (run.sh tees dftfe.out) is the checked output.
+    covers: all
+    timeout: 3600
   timing:
     kind: none
     status: NO_TIMED_REGION

@@ -27,8 +27,12 @@ timing:
     region: "'solve' minus 'checkpointing' of the final runtime statistics (src/app/nrs/nrs.cpp, src/bin/driver.cpp, src/platform/timer.cpp)"
     relation: 'this stdout timer includes the in-loop checkpoint writes; the headline excludes them (excluded_s)'
 baseline:
-  method: upstream's --cimode CI checks ('CI test <name> passed') are run by validate.sh; a plain run prints the
-    divergence error per step, recorded as a diagnostic
+  method: >-
+    upstream's --cimode CI checks ('CI test <name> passed': L2 errors of velocity / pressure / scalars against the exact
+    Ethier-Steinman solution, EPS 0.3, plus iteration counts) are run by validate.sh on the base ethier case; CI mode fixes the
+    solver settings, so it is a validation of the build, not of a registered plain run. A plain run prints the divergence error
+    per step (recorded as a diagnostic) and no exact-solution error: no registered nekRS input has a quantity that verifies its
+    own solution (2026-10-02). Missing criterion: the exact-solution error of a plain run (the udf computes it only under --cimode).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: div_u_err_final
@@ -38,7 +42,10 @@ baseline:
     compare:
       rule: record
   - name: ci_failed
-    role: required
+    # DIAGNOSTIC since 2026-10-02: 'CI test ... failed' is printed by the ethier udf only under --cimode, which the registered
+    # plain runs do not use -- in a plain run the line is absent whatever the solution, so the rule verified nothing. The
+    # earlier PASS verdicts of ethier-n9-100 / ethier-refine4-n7 rested on this vacuous rule and are withdrawn (INCOMPLETE).
+    role: diagnostic
     regex: CI test .* failed
     compare:
       rule: absent
@@ -58,6 +65,10 @@ coverage:
   - '...'
 inputs:
 - id: ethier-n9-100
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
   case: ethier
   variant: default
   source:
@@ -80,6 +91,10 @@ inputs:
   backends_validated:
   - cuda
 - id: ethier-refine4-n7
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
   case: ethier
   variant: size
   source:
@@ -101,6 +116,10 @@ inputs:
   backends_validated:
   - cuda
 - id: ethier-refine10-n7
+  check:
+    kind: none
+    reason: >-
+      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
   case: ethier
   variant: size
   source:

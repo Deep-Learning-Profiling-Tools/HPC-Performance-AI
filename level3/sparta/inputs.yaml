@@ -78,6 +78,17 @@ coverage:
     upstream collide deck at four sizes, the free deck and the sphere deck (sphere-1m frozen INCOMPLETE)
 inputs:
   - id: collide-10k
+    check:
+      kind: standalone
+      command: [bash, '{bench_dir}/validate.sh', CUDA]
+      env:
+        HPCPERF_GPUS: '1'
+      pass_regex: '^SPARTA CUDA validation .*: PASS$'
+      fail_regex: 'FAIL'
+      basis: >-
+        level3/sparta/validate.sh on 1 GPU: this deck (bench/in.collide 10x10x10, 10,000 particles) vs the reference log SPARTA ships (bench/log.7Jul14.collide.icc.10K.1): complete stats block (step 30..130), Np == 10,000 at every row, mean temperature within 2 %, mean collision attempts within 15 % -- upstream's tolerance-based regression practice; the registry baseline rules compare the same quantities.
+      covers: all
+      timeout: 900
     case: collide-box
     variant: default
     source:
@@ -89,6 +100,10 @@ inputs:
     backends_validated: [cuda]
     notes: the run.sh smoke problem and the validate.sh problem.
   - id: collide-100k
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison against the upstream reference log bench/log.7Jul14.collide.icc.100K.1: benchmark step count and final step exact, particle count exact (closed box), final temperature rel 0.02, collision attempts rel 0.15 -- validate.sh's in.collide rules; validate.sh itself runs the 10k deck only
     case: collide-box
     variant: size
     source:
@@ -99,6 +114,10 @@ inputs:
     build_config: null
     backends_validated: [cuda]
   - id: collide-1m
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison against the upstream reference log bench/log.7Jul14.collide.icc.1M.1: benchmark step count and final step exact, particle count exact (closed box), final temperature rel 0.02, collision attempts rel 0.15 -- validate.sh's in.collide rules; validate.sh itself runs the 10k deck only
     case: collide-box
     variant: size
     source:
@@ -109,6 +128,10 @@ inputs:
     build_config: null
     backends_validated: [cuda]
   - id: collide-10m
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison against the upstream reference log bench/log.7Jul14.collide.icc.10M.1: benchmark step count and final step exact, particle count exact (closed box), final temperature rel 0.02, collision attempts rel 0.15 -- validate.sh's in.collide rules; validate.sh itself runs the 10k deck only
     case: collide-box
     variant: size
     source:
@@ -120,6 +143,10 @@ inputs:
     backends_validated: [cuda]
     notes: the same grid as run.sh's strong-scaling default (HPCPERF_SPARTA_STRONG=100), here as a fixed single-rank input.
   - id: free-1m
+    check:
+      kind: none
+      reason: >-
+        verified by the registry's baseline comparison against the upstream reference log bench/log.7Jul14.free.icc.1M.1: benchmark step count and final step exact, particle count exact (closed box), final temperature rel 0.02, collision attempts rel 0.15 -- validate.sh's in.collide rules; validate.sh itself runs the 10k deck only
     case: free-molecular-box
     variant: case
     source:
@@ -131,6 +158,10 @@ inputs:
     backends_validated: [cuda]
     notes: no collide command -- pure advection with wall reflection; the Natt/Ncoll columns are 0 by construction (natt_final compares 0 with 0).
   - id: sphere-1m
+    check:
+      kind: none
+      reason: >-
+        open boundaries with inflow (fix emit/face) and diffuse surface collisions: the particle count fluctuates around the inflow steady state and the collide rules (exact Np, 15 % natt) have no basis for this deck; vs the 2014 reference log the count after equilibration is 1.0 % lower here with no validated statistical model (cause not determined). np_final and natt_final stay recorded. Missing criterion: a statistical model / tolerance for the inflow steady state (INCOMPLETE)
     case: flow-around-sphere
     variant: case
     source:

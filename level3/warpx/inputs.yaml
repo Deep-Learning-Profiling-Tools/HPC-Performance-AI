@@ -50,6 +50,17 @@ coverage:
   - '...'
 inputs:
 - id: uniform-plasma-64x32x32-10
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^WarpX CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/warpx/validate.sh [2] on 1 GPU: this case (uniform_plasma smoke, 64x32x32, 10 steps) -- the macroparticle count constant and finite at every step (reduced diagnostics NP.txt) and the run reaching the final step; the only criterion upstream has for its performance case (no reference solution; the energy series is recorded for information only). [1] (langmuir) runs as an extra.
+    covers: all
+    timeout: 1800
   case: uniform-plasma-3d
   variant: default
   source:
@@ -73,6 +84,10 @@ inputs:
   backends_validated:
   - cuda
 - id: uniform-plasma-128cubed-20
+  check:
+    kind: none
+    reason: >-
+      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
   case: uniform-plasma-3d
   variant: size
   source:
@@ -94,6 +109,10 @@ inputs:
   backends_validated:
   - cuda
 - id: uniform-plasma-256cubed-20
+  check:
+    kind: none
+    reason: >-
+      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
   case: uniform-plasma-3d
   variant: size
   source:
@@ -114,6 +133,10 @@ inputs:
   backends_validated:
   - cuda
 - id: uniform-plasma-64x32x32-100
+  check:
+    kind: none
+    reason: >-
+      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
   case: uniform-plasma-3d
   variant: steps
   source:
@@ -134,6 +157,17 @@ inputs:
   backends_validated:
   - cuda
 - id: langmuir-multi-64cubed-40
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^WarpX CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/warpx/validate.sh [1] on 1 GPU: this case (test_3d_langmuir_multi, 64^3, 40 steps) against the analytic Langmuir-wave solution -- max|E_sim-E_th|/max|E_th| < 5e-2 per component and charge conservation max|divE-rho/eps0|/max|rho/eps0| < 1e-11 (upstream analysis_3d.py criteria, CODATA-2022 constants), hardened reader (full plotfile, finite values); [2] (uniform_plasma smoke) runs as an extra.
+    covers: all
+    timeout: 1800
   case: langmuir-multi-3d
   variant: case
   source:

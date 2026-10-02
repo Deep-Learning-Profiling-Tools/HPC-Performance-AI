@@ -48,6 +48,18 @@ coverage:
   - benchmarks/QMMM_*
 inputs:
 - id: h2o-64
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_CP2K_REGTESTS: 'QS/regtest-gpw-1/H2O-geoopt.inp'
+    pass_regex: '^CP2K CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/cp2k/validate.sh on 1 GPU: upstream regtest QS/regtest-gpw-1/H2O-geoopt.inp (a cheap extra) (the quantity TEST_FILES.toml names, within the upstream tolerance; the GPU CI runs the same test) and benchmarks/QS/H2O-64.inp MD by cp2k_md_summary.py --check -- run complete (10 MD steps), every MD-step SCF converged, finite energies, GPU evidence from CP2K's own output; at 1 GPU no cross-layout energy comparison is made (upstream's check-release-comparison.py compares MPI x OMP layouts at 1e-10, a second layout was not run). H2O-64 is exactly this input (the registered benchmark deck, run.sh case h2o system 64).
+    covers: all
+    timeout: 2400
   case: qs-gpw-water-md
   variant: default
   source:
@@ -71,6 +83,10 @@ inputs:
   backends_validated:
   - cuda
 - id: h2o-32
+  check:
+    kind: none
+    reason: >-
+      no reference energies exist for benchmarks/QS/H2O-32.inp (upstream ships inputs only; its check-release-comparison.py compares MPI x OMP layouts of the same binary at 1e-10, a relative consistency check, and validate.sh applies that only to H2O-64 across rank counts); cp2k_md_summary.py --check (completeness, SCF convergence, finiteness, GPU evidence) would apply but is completion, not correctness. Missing criterion: an independent reference energy or a second-layout 1e-10 consistency run for this size -- not available / not run this round (INCOMPLETE)
   case: qs-gpw-water-md
   variant: size
   source:
@@ -94,6 +110,10 @@ inputs:
   backends_validated:
   - cuda
 - id: h2o-128
+  check:
+    kind: none
+    reason: >-
+      no reference energies exist for benchmarks/QS/H2O-128.inp (upstream ships inputs only; its check-release-comparison.py compares MPI x OMP layouts of the same binary at 1e-10, a relative consistency check, and validate.sh applies that only to H2O-64 across rank counts); cp2k_md_summary.py --check (completeness, SCF convergence, finiteness, GPU evidence) would apply but is completion, not correctness. Missing criterion: an independent reference energy or a second-layout 1e-10 consistency run for this size -- not available / not run this round (INCOMPLETE)
   case: qs-gpw-water-md
   variant: size
   source:
@@ -117,6 +137,10 @@ inputs:
   backends_validated:
   - cuda
 - id: h2o-256
+  check:
+    kind: none
+    reason: >-
+      no reference energies exist for benchmarks/QS/H2O-256.inp (upstream ships inputs only; its check-release-comparison.py compares MPI x OMP layouts of the same binary at 1e-10, a relative consistency check, and validate.sh applies that only to H2O-64 across rank counts); cp2k_md_summary.py --check (completeness, SCF convergence, finiteness, GPU evidence) would apply but is completion, not correctness. Missing criterion: an independent reference energy or a second-layout 1e-10 consistency run for this size -- not available / not run this round (INCOMPLETE)
   case: qs-gpw-water-md
   variant: size
   source:
@@ -140,6 +164,18 @@ inputs:
   backends_validated:
   - cuda
 - id: regtest-gpw-h2o-geoopt
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_CP2K_REGTESTS: 'QS/regtest-gpw-1/H2O-geoopt.inp'
+    pass_regex: '^CP2K CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/cp2k/validate.sh on 1 GPU: upstream regtest QS/regtest-gpw-1/H2O-geoopt.inp = this input (the quantity TEST_FILES.toml names, within the upstream tolerance; the GPU CI runs the same test) and benchmarks/QS/H2O-64.inp MD by cp2k_md_summary.py --check -- run complete (10 MD steps), every MD-step SCF converged, finite energies, GPU evidence from CP2K's own output; at 1 GPU no cross-layout energy comparison is made (upstream's check-release-comparison.py compares MPI x OMP layouts at 1e-10, a second layout was not run). the H2O-64 MD part is an extra.
+    covers: all
+    timeout: 2400
   timing:
     kind: none
     status: NO_TIMED_REGION
@@ -168,6 +204,18 @@ inputs:
   backends_validated:
   - cuda
 - id: regtest-dm-ls-scf-h2-big-5
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_CP2K_REGTESTS: 'QS/regtest-dm-ls-scf-1/H2-big-5.inp'
+    pass_regex: '^CP2K CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/cp2k/validate.sh on 1 GPU: upstream regtest QS/regtest-dm-ls-scf-1/H2-big-5.inp = this input (the quantity TEST_FILES.toml names, within the upstream tolerance; the GPU CI runs the same test) and benchmarks/QS/H2O-64.inp MD by cp2k_md_summary.py --check -- run complete (10 MD steps), every MD-step SCF converged, finite energies, GPU evidence from CP2K's own output; at 1 GPU no cross-layout energy comparison is made (upstream's check-release-comparison.py compares MPI x OMP layouts at 1e-10, a second layout was not run). the H2O-64 MD part is an extra.
+    covers: all
+    timeout: 2400
   timing:
     kind: none
     status: NO_TIMED_REGION
