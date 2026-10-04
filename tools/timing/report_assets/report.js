@@ -413,7 +413,8 @@
     var f = run.fom || {};
     box.appendChild(el("div", {cls: "figs"}, [
       fig(fmtT(wall), "timed region (application timer, median of " + (R.runs_s || []).length + " clean)"),
-      fig((R.runs_s || []).length > 1 ? pct(cv, 1) : "null", "clean-run spread" + ((R.runs_s || []).length > 1 ? "" : " (1 clean run: not measurable)")),
+      fig((R.runs_s || []).length > 1 ? pct(cv, 1) : "null", "clean-run CV = stddev / median" + ((R.runs_s || []).length > 1 ? "" : " (1 clean run: not measurable)")),
+      fig((R.runs_s || []).length > 1 && run.set ? pct(run.set.spread, 1) : "null", "spread = (max − min) / median" + ((R.runs_s || []).length > 1 && run.set ? (run.set.stable ? " · stable (≤ 10 %)" : " · UNSTABLE (> 10 %)") : " (1 clean run: not measurable)")),
       fig(isNum(steps) && wall ? fmtT(wall / steps) : "null", "per step" + (isNum(steps) ? " (" + num(steps) + " steps)" : "")),
       fig(pct(wall && proc ? wall / proc : null, 1), "region share of the process"),
       fig(dv ? pct(dv.busy_frac_of_roi, 0, true) : pct(whole.busy_frac_of_process, 0, true),
@@ -575,7 +576,7 @@
           el("b", {text: st.level === "1" ? "a benchmark" : "an application"}), " on the left."]),
         el("div", {cls: "counts"}, [
           el("span", {}, [el("b", {text: String(rows.length)}), " registered inputs"]),
-          el("span", {}, [el("b", {text: String(ok)}), st.level === "3" ? " timing SUCCESS (application timer)" : " ROI timing SUCCESS"]),
+          el("span", {}, [el("b", {text: String(ok)}), st.level === "3" ? " timing SUCCESS (application timer; 3 clean runs, headline = median)" : " ROI timing SUCCESS"]),
           el("span", {}, [el("b", {text: String(rows.length - ok - ntr)}), " not measured successfully"]),
           ntr ? el("span", {}, [el("b", {text: String(ntr)}), " no timed region by construction (run and verified, no timing result)"]) : null,
           el("span", {}, [el("b", {text: String(ver)}), " run verification PASS"]),

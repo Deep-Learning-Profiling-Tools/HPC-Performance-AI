@@ -28,7 +28,7 @@ campaign (section [Registered inputs](#registered-inputs---registry) below):
 python3 tools/timing/gen_registry_cases.py --check                # generated cases match the registry
 tools/timing/measure_level1.sh --registry --collector nvidia_nsys --warmup 1 --clean-runs 5 all   # 1 warm-up + 5 clean + 1 nsys profiled
 tools/timing/measure_level2.sh --registry --collector nvidia_nsys all                             # 1 discarded warm-up + 3 clean + 1 nsys profiled (the defaults), explicit CPU binding
-tools/timing/measure_level3.sh --registry --collector nvidia_nsys all                             # Level 3: 1 clean + 1 nsys profiled (the Level 3 protocol), the application's own timer, HPCPERF_GPUS from the registry
+tools/timing/measure_level3.sh --registry --collector nvidia_nsys all                             # Level 3: 0 warm-up + 3 clean + 1 nsys profiled (the final Level 3 protocol; QMCPACK unprofiled), the application's own timer, HPCPERF_GPUS from the registry
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
 python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
@@ -80,7 +80,7 @@ One set of markers serves two measurements:
 |---|---|---|---|
 | unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` | 10 cases of 10 `level3/<app>/run.sh`, 2 GPUs each |
 | region | ROI markers | ROI markers | **the application's own loop timer** (no markers, see below) |
-| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 warm-up (discarded) + 3 clean + 1 profiled | 1 clean + 1 profiled (QMCPACK: 1 clean, see below) |
+| runs per case | 1 warm-up + 5 clean + 1 profiled | 1 warm-up (discarded) + 3 clean + 1 profiled | 0 whole-process warm-up + 3 fixed clean + 1 separate profiled (QMCPACK: 3 clean, no profiled run by default); headline = median of the 3, spread (max - min) / median <= 10 % or UNSTABLE, no adaptive extension (final, 2026-10-03; the campaigns before it had 1 clean run) |
 | verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
 | FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) | LAMMPS and SPARTA print one |
 
@@ -304,7 +304,10 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 43 registered
   inputs declare 1 GPU / 1 rank), plus the build-variant variable when the input's `params.variant` names one
   (LAMMPS ReaxFF: `HPCPERF_LAMMPS_VARIANT=reaxff`, the `reaxff` build profile; run.sh refuses any other); the region is the application's own timer (section "Level 3" above), the
-  FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`. The engine stores the
+  FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`; the protocol is the final
+  Level 3 one (0 whole-process warm-up, 3 fixed clean runs, headline = median, 1 separate profiled run, QMCPACK
+  unprofiled, no adaptive extension -- no warm-up because the application-owned timer already excludes start-up,
+  set-up and the application's own warm-up step). The engine stores the
   input's workload identity next to the raw runs as for Level 1/2, and `verify_registry_runs.py` judges the
   run from the run manifest every Level 3 `run.sh` writes (ranks, binary and its sha256, deck / input and
   their sha256, profile, case, mode, steps, sizes), the launcher lines of `run.log` and the placement
@@ -696,4 +699,4 @@ What the numbers say, and what they do not:
   sweep took 100 min, 4.4x. Per case the profiled run plus export costs 1.1x (SPARTA, SPECFEM3D)
   to 3.6x (Nyx) a clean run, QMCPACK 9.1x; nekRS's profiled run was shorter than its clean run
   (234 vs 331 s) because the clean run, first at this polynomial order, paid the JIT compilation.
-* One clean run per case: the spread column is null until `--clean-runs 3` is used.
+* One clean run per case in that sweep: the spread column is null there. The final Level 3 protocol (2026-10-03) uses 3 clean runs.

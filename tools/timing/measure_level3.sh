@@ -18,11 +18,15 @@
 # without start-up, set-up, the application's own warm-up step and final output). The
 # record has the same schema as Level 1/2 (hpcperf-timing-2, roi.source = "app_timer").
 #
-# Protocol per case: 1 clean run of level3/<app>/run.sh (the timer, FOM and launcher
-# audit are read from it, no profiler) + 1 profiled run -- except for applications whose
+# Protocol per case (FINAL, 2026-10-03): 0 whole-process warm-up + 3 fixed clean runs of
+# level3/<app>/run.sh (the timer, FOM and launcher audit are read from them, no profiler;
+# headline = median of the 3, spread = (max - min) / median, UNSTABLE above 10 %, no adaptive
+# extension, every sample kept) + 1 separate profiled run -- except for applications whose
 # row in cases/level3_apps.tsv says `profile = no (<reason>)`: QMCPACK is not profiled by
 # default (its profiled run writes a 24 GB trace and cost ~55 of the 100 minutes of the
 # first sweep for a 5-minute application; the reason is in the table and in its record).
+# No whole-process warm-up: the application-owned timer already leaves start-up, set-up and
+# the application's own warm-up step outside the region (per timer definition in apptimers.py).
 # Without markers the profiled run gives the device activity of the WHOLE process (context:
 # it includes set-up), except for applications that emit an NVTX range for their loop
 # themselves (cases/level3_apps.tsv nvtx_roi), where it is clipped to that range. nsys wraps run.sh from the OUTSIDE, as for
@@ -39,7 +43,7 @@
 # Options
 #   --env-script F      environment loader, relative to the repo (default hpcperf_env.sh,
 #                       or $HPCPERF_TIMING_ENV_SCRIPT)
-#   --clean-runs N      clean runs per case (default 1)
+#   --clean-runs N      clean runs per case (default 3, the final Level 3 protocol)
 #   --no-profile        no profiled run for any case (the application's timer and FOM only)
 #   --profile-all       also profile the applications the table does not profile by default
 #   --collector NAME    auto (default) | nvidia_nsys | none
@@ -53,7 +57,7 @@
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-LEVEL=3 CLEAN_RUNS=1 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0 FORCE_PROFILE=0 REGISTRY=0
+LEVEL=3 CLEAN_RUNS=3 WARMUP_RUNS=0 PROFILED_RUNS=1 SKIP_VERIFY=0 DRY_RUN=0 FORCE_PROFILE=0 REGISTRY=0
 COLLECTOR=auto BACKEND=CUDA BUILD_ROOT="" RAW_ROOT="$REPO/build/timing"
 ENV_SCRIPT="${HPCPERF_TIMING_ENV_SCRIPT:-hpcperf_env.sh}"
 SELECT=()

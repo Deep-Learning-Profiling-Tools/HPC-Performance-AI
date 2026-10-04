@@ -1351,6 +1351,8 @@ rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                 
 rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
 rec("run07", cur["workload"], base + ["-o", "3"], [9.5, 9.6, 9.7], exe_sha="bb", warm=1)            # another protocol: a new chain
 rec("run08", cur["workload"], base + ["-o", "3"], [9.6, 9.7, 9.8], exe_sha="bb", warm=1)            # same protocol as run07
+rec("run09", cur["workload"], base + ["-o", "3"], [9.9], exe_sha="bb", warm=1)                      # ONE clean run: never a baseline
+rec("run10", cur["workload"], base + ["-o", "3"], [9.7, 9.8, 9.9], exe_sha="bb", warm=1)            # compares with run08, not run09
 json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
            "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
           open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
@@ -1365,8 +1367,8 @@ rows = {i["input_id"]: i for a in c["levels"]["2"] for i in a["inputs"]}
 nreg = sum(1 for x in RV.registered_inputs(R) if x["level"] == 2)
 if len(rows) != nreg: bad.append(f"15c: {len(rows)} Level 2 inputs listed, registry has {nreg}")
 h = rows["periodic-hexagon-p0"]; m = h["cells"].get(PLAT)
-if not m or m["set"]["run_ids"] != ["run08"]:
-    bad.append(f"15d: current should be the newest configuration run08 (another binary / protocol is a separate measurement): {m and m['set']['run_ids']}")
+if not m or m["set"]["run_ids"] != ["run10"]:
+    bad.append(f"15d: current should be the newest configuration run10 (another binary / protocol is a separate measurement): {m and m['set']['run_ids']}")
 sets = {tuple(s["run_ids"]): s for s in h["sets"]}
 p = sets.get(("run03", "run04"))
 if not p or p["n"] != 5 or abs(p["median"] - 2.39) > 1e-9: bad.append(f"15e: adaptive 3+2 not pooled into 5 samples: {p}")
@@ -1377,7 +1379,11 @@ if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.appe
 if sets.get(("run07",), {}).get("vs_previous") is not None: bad.append("15k: vs previous computed across protocols (warm-up 0 -> 1)")
 if not sets.get(("run08",)) or sets[("run08",)]["vs_previous"] is None: bad.append("15k: vs previous missing between two measurements of the same protocol")
 if "warm-up 1" not in sets.get(("run07",), {}).get("protocol_key", ""): bad.append(f"15k: protocol key not shown: {sets.get(('run07',), {}).get('protocol_key')}")
-if m and m["set"]["run_ids"] != ["run08"]: bad.append(f"15d/15k: current should now be run08: {m['set']['run_ids']}")
+if m and m["set"]["run_ids"] != ["run10"]: bad.append(f"15d/15k: current should now be run10: {m['set']['run_ids']}")
+if sets.get(("run09",), {}).get("vs_previous") is not None: bad.append("15l: a single-sample measurement got a vs previous")
+r10 = sets.get(("run10",), {})
+if r10.get("vs_previous") is None or abs(r10["vs_previous"] - (9.8 - 9.7) / 9.7) > 1e-9:
+    bad.append(f"15l: vs previous of run10 should skip the single-sample run09 and use run08: {r10.get('vs_previous')}")
 if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
     bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
 f = rows["darcy-hex"]
@@ -1875,13 +1881,15 @@ print("ALLOK" if not bad else "\n".join(bad))
 PY
 out="$(bash "$TOOLS/measure_level3.sh" --dry-run --collector none lammps 2>&1 | noise)"
 if echo "$out" | /usr/bin/grep -q 'HPCPERF_L3_RUN_SUBDIR=run.timing-' && ! echo "$out" | /usr/bin/grep -q 'HPCPERF_ROI_LOG' \
-   && echo "$out" | /usr/bin/grep -q "application's own timer" && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=2'; then
-    ok "13g: a Level 3 dry run uses its own run-directory tree, no ROI log, 2 GPUs"
+   && echo "$out" | /usr/bin/grep -q "application's own timer" && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=2' \
+   && echo "$out" | /usr/bin/grep -q 'protocol=warmup:0,clean:3,profiled:1'; then
+    ok "13g: a Level 3 dry run uses its own run-directory tree, no ROI log, 2 GPUs, the final protocol 0 warm-up + 3 clean + 1 profiled"
 else bad "13g: level 3 dry run: $out"; fi
 out="$(bash "$TOOLS/measure_level3.sh" --registry --dry-run --collector none lammps/lj-32k 2>&1 | noise)"
 if echo "$out" | /usr/bin/grep -q 'HPCPERF_LAMMPS_INPUT=lj-32k' && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=1' \
-   && echo "$out" | /usr/bin/grep -q 'registry level3/lammps/inputs.yaml; workload identity: ok' && echo "$out" | /usr/bin/grep -q 'apptimers.py: lammps'; then
-    ok "13k: a Level 3 registry dry run sets the selector and the input's GPU count and captures the workload identity"
+   && echo "$out" | /usr/bin/grep -q 'registry level3/lammps/inputs.yaml; workload identity: ok' && echo "$out" | /usr/bin/grep -q 'apptimers.py: lammps' \
+   && echo "$out" | /usr/bin/grep -q 'runs     warmup=0 clean=3 profiled=1'; then
+    ok "13k: a Level 3 registry dry run sets the selector and the input's GPU count, captures the workload identity, 3 clean runs by default"
 else bad "13k: level 3 registry dry run: $(echo "$out" | head -8 | tr '\n' ' ' | cut -c1-300)"; fi
 
 # summarize: a synthetic Level 3 raw run -> an app_timer record; a run without its timer -> app_timer_missing
@@ -1937,9 +1945,9 @@ PY
 # an application the table does not profile by default: skipped with its reason, --profile-all overrides
 out="$(bash "$TOOLS/measure_level3.sh" --dry-run qmcpack 2>&1 | noise)"
 out2="$(bash "$TOOLS/measure_level3.sh" --dry-run --profile-all qmcpack 2>&1 | noise)"
-if echo "$out" | /usr/bin/grep -q 'profiled=0 collector=none' && echo "$out" | /usr/bin/grep -q 'skipped by default' \
+if echo "$out" | /usr/bin/grep -q 'warmup=0 clean=3 profiled=0 collector=none' && echo "$out" | /usr/bin/grep -q 'skipped by default' \
    && echo "$out2" | /usr/bin/grep -q 'profiled=1' && ! echo "$out2" | /usr/bin/grep -q 'skipped by default'; then
-    ok "13i: QMCPACK is not profiled by default (reason shown), --profile-all profiles it"
+    ok "13i: QMCPACK runs 3 clean runs and is not profiled by default (reason shown), --profile-all profiles it"
 else bad "13i: profile default: $out // $out2"; fi
 d="$TMP/raw3/level3/lammps/strong.s8/20260929T000002Z-3"
 mkdir -p "$d"; cp -r "$TMP/raw3/level3/lammps/strong.s8/20260929T000000Z-1/clean.0" "$d/"
@@ -2107,15 +2115,19 @@ if not os.path.isfile(exe) or not os.path.isfile(os.path.join(R, "level3", "lamm
 exe_sha = V.sha(exe); PLAT = "test-platform"
 def w(p, s):
     os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
-raw = f"{T}/raw/lammps/lj-32k/run01"; run = f"{raw}/clean.0"; derived = f"{raw}/in.lj.input.lj-32k"; w(derived, "run ${steps}\n")
-m = {"run_id": "r", "app": "lammps", "backend": "CUDA", "profile": "cuda", "variant": "default", "mode": "smoke", "input_id": "lj-32k", "deck": "bench/in.lj",
-     "ranks": "1", "atoms": "32000", "steps": "100", "gpu_aware": "on", "exit_code": "0", "binary": exe, "binary_sha256": exe_sha,
-     "input": derived, "input_sha256": V.sha(derived), "fingerprint_sha256": "f" * 64, "log": "x", "utc": "t"}
-w(f"{run}/app/run.timing-r-c0/run_manifest.txt", "".join(f"{k}={v}\n" for k, v in m.items()))
-w(f"{run}/run.log", "# LAMMPS CUDA profile=cuda: mode=smoke input=lj-32k deck=bench/in.lj ranks=1 box=20x20x20 fcc cells = 32000 atoms (32000/rank), 100 steps, gpu-aware=on, log=x\n"
-  "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\nhpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks)\n")
-w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + exe + "\nhost h\ngpu minor 1 bus 0000:43:00.0\n")
-w(f"{raw}/workload_identity.json", json.dumps(ident))
+def evidence(raw, nclean):   # the raw evidence of one Level 3 registry run with nclean clean runs (manifest, launcher lines, placement)
+    derived = f"{raw}/in.lj.input.lj-32k"; w(derived, "run ${steps}\n")
+    m = {"run_id": "r", "app": "lammps", "backend": "CUDA", "profile": "cuda", "variant": "default", "mode": "smoke", "input_id": "lj-32k", "deck": "bench/in.lj",
+         "ranks": "1", "atoms": "32000", "steps": "100", "gpu_aware": "on", "exit_code": "0", "binary": exe, "binary_sha256": exe_sha,
+         "input": derived, "input_sha256": V.sha(derived), "fingerprint_sha256": "f" * 64, "log": "x", "utc": "t"}
+    for i in range(nclean):
+        run = f"{raw}/clean.{i}"
+        w(f"{run}/app/run.timing-r-c{i}/run_manifest.txt", "".join(f"{k}={v}\n" for k, v in m.items()))
+        w(f"{run}/run.log", "# LAMMPS CUDA profile=cuda: mode=smoke input=lj-32k deck=bench/in.lj ranks=1 box=20x20x20 fcc cells = 32000 atoms (32000/rank), 100 steps, gpu-aware=on, log=x\n"
+          "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\nhpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks)\n")
+        w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + exe + "\nhost h\ngpu minor 1 bus 0000:43:00.0\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+raw = f"{T}/raw/lammps/lj-32k/run01"; evidence(raw, 1)
 rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32k", "status": "ok", "run_id": "run01", "utc": "2026-01-01T00:00:01Z",
        "platform": PLAT, "registry": {"input_id": "lj-32k", "identity": ident, "identity_complete": True, "identity_sha256": "id-l3"},
        "inputs": {"declared_env": {"HPCPERF_LAMMPS_INPUT": "lj-32k"}, "processes": [], "exe_sha256": exe_sha},
@@ -2125,6 +2137,13 @@ rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32
        "placement": {"policy": {"kind": "application"}, "summary": {"gpus": ["0000:43:00.0"]}},
        "provenance": {"raw_dir": raw, "git_commit": "c0ffee"}, "caveats": []}
 w(f"{root}/level3/lammps/lj-32k/run01.json", json.dumps(rec))
+# the final protocol: 3 clean runs of the same input (each with its own evidence); run02 stable (spread 14.3 %), run03 the newest
+# and UNSTABLE (spread 25 %) -> current; run02 stable (spread 7.1 %); the 1-clean run01 is history and never a baseline
+for rid, samples, utc in (("run02", [0.029, 0.027, 0.028], "2026-01-01T00:00:02Z"), ("run03", [0.200, 0.160, 0.210], "2026-01-01T00:00:03Z")):
+    raw_n = f"{T}/raw/lammps/lj-32k/{rid}"; evidence(raw_n, 3)
+    rec_n = dict(rec, run_id=rid, utc=utc, roi=dict(rec["roi"], runs_s=samples, wall_s=sorted(samples)[1]), provenance={"raw_dir": raw_n, "git_commit": "c0ffee"},
+                 measurement=dict(rec["measurement"], protocol={"warmup_runs": 0, "clean_runs": 3, "profiled_runs": 1}))
+    w(f"{root}/level3/lammps/lj-32k/{rid}.json", json.dumps(rec_n))
 # a Level 3 input the registry declares NO_TIMED_REGION (no time-step loop): its record is app_timer_missing by construction
 rec2 = dict(rec, app="cp2k", case="regtest-gpw-h2o-geoopt", status="app_timer_missing", run_id="run02", utc="2026-01-01T00:00:02Z",
             registry={"input_id": "regtest-gpw-h2o-geoopt", "identity": hi.registry_identity(hi.load(os.path.join(R, "level3", "cp2k")), hi.get_input(hi.load(os.path.join(R, "level3", "cp2k")), "regtest-gpw-h2o-geoopt")), "identity_complete": True, "identity_sha256": "id-c"},
@@ -2140,11 +2159,18 @@ if not ntr or ntr["status"] != "NO_TIMED_REGION" or ntr["current"] is not None:
 row = next((r for r in rows if r["level"] == 3 and r["benchmark"] == "lammps" and r["input_id"] == "lj-32k"), None)
 if not row or row["status"] != "SUCCESS" or row["run_verification"] != "PASS":
     bad.append(f"26a: row {row and (row['status'], row['run_verification'])}")
+cur3 = row and row["current"]
+if not cur3 or cur3["run_ids"] != ["run03"] or len(cur3["samples"]) != 3 or abs(cur3["median"] - 0.200) > 1e-12 \
+   or abs(cur3["min"] - 0.160) > 1e-12 or abs(cur3["max"] - 0.210) > 1e-12 or abs(cur3["spread"] - 0.25) > 1e-9 or cur3["stable"]:
+    bad.append(f"26r: the newest 3-clean set is not the current measurement with median / min / max / spread, UNSTABLE at 25 %: {cur3 and (cur3['run_ids'], cur3['median'], cur3['spread'], cur3['stable'])}")
+h2 = next((s for s in row["history_sets"] if s["run_ids"] == ["run02"]), None) if row else None
+if not h2 or len(h2["samples"]) != 3 or abs(h2["median"] - 0.028) > 1e-12 or abs(h2["spread"] - (0.029 - 0.027) / 0.028) > 1e-9 or not h2["stable"]:
+    bad.append(f"26s: the stable 3-clean set (spread 7.1 %) is not in the history with its statistics: {h2 and (h2['median'], h2['spread'], h2['stable'])}")
 k = RV.counts(rows, recs, orph)
 if k["roi_success"].get("level3") != 1 or k["registered_inputs"]["level3"] != 43 or "roi_not_supported_level3" in k:
     bad.append(f"26b: counts {k['roi_success']} {k['registered_inputs']}")
-if sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 41:
-    bad.append("26c: the other 41 Level 3 inputs are not NOT_MEASURED")
+if k["unstable"] != ["L3 lammps/lj-32k"] or sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 41:
+    bad.append(f"26c: unstable {k['unstable']} / the other 41 Level 3 inputs are not NOT_MEASURED")
 if k.get("no_timed_region") != ["cp2k/regtest-gpw-h2o-geoopt"] or k["run_failed"] != []:
     bad.append(f"26o: counts no_timed_region {k.get('no_timed_region')} run_failed {k['run_failed']}")
 if "no timed region by construction 1" not in report.md_status_line({"counts": k}):
@@ -2155,10 +2181,23 @@ app = next((a for a in c["levels"]["3"] if a["app"] == "lammps"), None)
 cell = next((i for i in app["inputs"] if i["input_id"] == "lj-32k"), {}).get("cells", {}).get(PLAT) if app else None
 if not cell or cell["roi"].get("source") != "app_timer" or cell["roi"].get("steps") != 100 or cell["measurement"].get("gpus") != "1":
     bad.append(f"26d: page cell {cell and (cell['roi'].get('source'), cell['roi'].get('steps'))}")
+if cell and (cell["set"]["n"] != 3 or cell["set"]["run_ids"] != ["run03"] or abs(cell["set"]["min"] - 0.160) > 1e-12 or abs(cell["set"]["max"] - 0.210) > 1e-12
+             or cell["roi"]["runs_s"] != [0.200, 0.160, 0.210] or abs(cell["roi"]["wall_s"] - 0.200) > 1e-12 or cell["set"]["stable"]):
+    bad.append(f"26t: the page cell is not the 3-run set with its samples / min / max / UNSTABLE: {cell and cell['set']}")
+sets3 = {tuple(s["run_ids"]): s for s in (next(i for i in app["inputs"] if i["input_id"] == "lj-32k")["sets"] if app else [])}
+if ("run01",) not in sets3 or sets3[("run01",)].get("vs_previous") is not None or sets3.get(("run02",), {}).get("vs_previous") is not None:
+    bad.append(f"26u: the 1-clean run must be listed as history and never be a baseline (run02 gets no vs previous from it): {sets3}")
+if sets3.get(("run03",), {}).get("vs_previous") is None or abs(sets3[("run03",)]["vs_previous"] - (0.200 - 0.028) / 0.028) > 1e-9:
+    bad.append(f"26u: run03's vs previous must be against the 3-clean run02: {sets3.get(('run03',), {}).get('vs_previous')}")
 md = open(os.path.join(out, "README.md")).read(); html = open(os.path.join(out, "index.html")).read()
 l3 = md[md.index("### Level 3"):]
-if "| lammps | lj-32k | SUCCESS |" not in l3 or "timed region" not in l3 or "24 ms" not in l3 or "| PASS |" not in l3:
+if "| lammps | lj-32k | SUCCESS |" not in l3 or "timed region (median)" not in l3 or "200 ms" not in l3 or "| PASS |" not in l3:
     bad.append("26e: the Markdown Level 3 table lacks the row / timer columns")
+l3row = next((ln for ln in l3.split("\n") if ln.startswith("| lammps | lj-32k |")), "")
+if "| 3 |" not in l3row or "| 160 ms |" not in l3row or "| 210 ms |" not in l3row or "| 25.0% |" not in l3row or "| UNSTABLE |" not in l3row:
+    bad.append(f"26v: the Markdown row lacks runs / min / max / spread / UNSTABLE: {l3row[:200]}")
+if "3 fixed clean runs" not in l3 or "1 clean run: not measurable" in l3:
+    bad.append("26x: the Level 3 protocol text")
 if "registered Level 1 / 2 / 3 inputs" not in md or 'data-level="3"' not in html:
     bad.append("26f: status line / page level 3 tab")
 summarize.write_registry_current(root)

@@ -246,7 +246,8 @@ Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
   (`cases/level3_apps.tsv` profile = no: 24 GB trace, ~55 of the sweep's 100 min for a
   5-min run; `--profile-all` overrides). Runs write under
   `build/level3/<app>/<profile>/run.timing-<run id>-*`.
-- Protocol: Level 1 1 warm-up + 5 clean + 1 profiled; Level 2 and 3 1 clean + 1 profiled.
+- Protocol: Level 1 1 warm-up + 5 clean + 1 profiled; Level 2 1 warm-up (discarded) + 3 clean + 1 profiled;
+  Level 3 0 warm-up + 3 clean + 1 profiled (QMCPACK unprofiled), headline = median, no adaptive extension.
   The headline `roi_wall_s` comes from the CLEAN runs (the markers' own log, no
   profiler); the profiled run only gives device activity clipped to the same
   markers. FOMs (16 of 24 Level 2 apps; the other 8 BLANK) are read from the clean run.

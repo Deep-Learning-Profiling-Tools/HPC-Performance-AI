@@ -283,7 +283,8 @@ def _measurement(m):
     s = m["samples"]
     run["roi"].update({"wall_s": m["median"], "runs_s": s, "wall_s_min": m["min"], "wall_s_max": m["max"],
                        "wall_s_stddev": m["cv"] * m["median"] if m["cv"] is not None else None})
-    run["set"] = scrub({"run_ids": m["run_ids"], "n": len(s), "spread": m["spread"], "cv": m["cv"], "stable": m["stable"],
+    run["set"] = scrub({"run_ids": m["run_ids"], "n": len(s), "median": m["median"], "min": m["min"], "max": m["max"],
+                        "spread": m["spread"], "cv": m["cv"], "stable": m["stable"],
                         "iqr": m.get("iqr"), "stability_rule": m.get("stability_rule"), "two_levels": m.get("two_levels"),
                         "adaptive": m["adaptive"], "group": m.get("group"), "utc_first": m["utc_first"], "utc_last": m["utc_last"],
                         "git_commit": (m["git_commit"] or "")[:10], "exe_sha256": (m["exe_sha256"] or "")[:16],
@@ -308,8 +309,11 @@ def build_registry(roots):
                 h = _set_summary(m, row["workload_key"])
                 ck = (m["platform"], m["workload_key"], _protocol_key(m))     # same workload AND same protocol / binding / GPU
                 prev = last.get(ck)
-                h["vs_previous"] = None if prev is None else (m["median"] - prev) / prev
-                last[ck] = m["median"]
+                # a single clean run is never a baseline and gets no percentage: "vs previous" needs a spread on
+                # both sides (the 1-clean Level 3 campaign of 2026-10-02 vs the 3-clean final protocol)
+                h["vs_previous"] = None if prev is None or len(m["samples"]) < 2 else (m["median"] - prev) / prev
+                if len(m["samples"]) >= 2:
+                    last[ck] = m["median"]
                 hist.append(h)
             cells = {}
             for p in plats:
@@ -625,12 +629,16 @@ def render_md_registry_l3(c):
     application emits an NVTX range for its loop)."""
     out = ["No markers: the timed region is the application's own timer for its time-step loop (`tools/timing/apptimers.py` "
            "defines it per application; every record carries the definition). Device busy is for the WHOLE process unless the "
-           "application emits an NVTX range for its loop (WarpX); QMCPACK is not profiled by default. One clean run per input "
-           "is the Level 3 protocol, so the spread column is null until more clean runs are made.", ""]
-    head = ["application", "input", "status", "platform", "timed region", "runs", "spread", "steps", "per step", "process wall",
-            "region share", "device busy", "profiler x", "FOM", "GPUs", "run verification", "correctness", "source"]
+           "application emits an NVTX range for its loop (WarpX); QMCPACK is not profiled by default. Final protocol "
+           "(2026-10-03): 0 whole-process warm-up, 3 fixed clean runs -- headline = median, min / max / spread = "
+           "(max - min) / median (stable when <= 10 %, UNSTABLE above, no adaptive extension, every sample kept), CV = "
+           "stddev / median -- and 1 separate profiled run. A set with one clean run (the 2026-10-02 campaign, history) "
+           "has no spread.", ""]
+    head = ["application", "input", "status", "platform", "timed region (median)", "runs", "min", "max", "spread", "CV", "stable",
+            "steps", "per step", "process wall", "region share", "device busy", "profiler x", "FOM", "GPUs", "run verification",
+            "correctness", "source"]
     out.append("| " + " | ".join(head) + " |")
-    out.append("|" + "|".join("---" if i < 4 else "--:" if i < 15 else "---" for i in range(len(head))) + "|")
+    out.append("|" + "|".join("---" if i < 4 else "--:" if i in (4, 5, 6, 7, 8, 9) else "---" if i == 10 else "--:" if i < 19 else "---" for i in range(len(head))) + "|")
     for a in c["levels"].get("3", []):
         for i in a["inputs"]:
             cells = [(pid, run) for pid, run in sorted(i["cells"].items()) if run]
@@ -648,7 +656,11 @@ def render_md_registry_l3(c):
                 out.append("| " + " | ".join([
                     md_cell(a["app"]), md_cell(i["input_id"]), i["status"], md_cell(pid),
                     fmt_plain(wall) if run else "-", str(st["n"]) if st else "-",
+                    (fmt_plain(st["min"]) if st["n"] > 1 else "null (1 run)") if st else "-",
+                    (fmt_plain(st["max"]) if st["n"] > 1 else "null (1 run)") if st else "-",
                     (md_pct(st["spread"], 1) if st["n"] > 1 else "null (1 run)") if st else "-",
+                    (md_pct(st["cv"], 1) if (st["n"] > 1 and st.get("cv") is not None) else "null (1 run)") if st else "-",
+                    (("yes" if st["stable"] else "UNSTABLE") if st["n"] > 1 else "null (1 run)") if st else "-",
                     ("null" if steps is None else f"{steps:,}") if run else "-",
                     (fmt_plain(wall / steps) if (wall and steps) else "null") if run else "-",
                     fmt_plain(proc) if run else "-",

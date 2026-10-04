@@ -140,8 +140,9 @@ their schema (`hpcperf-timing-1`).
   registered inputs of `level3/<app>/inputs.yaml` are the measured Level 3 workloads:
   `gen_registry_cases.py` writes `cases/level3_registry.tsv` (one case per input, the
   application's selector variable = input id, `gpus` = the input's `runtime_config.gpus`),
-  `measure_level3.sh --registry` runs them through the same engine (1 clean + 1 profiled run,
-  the application's own timer, no markers), and `verify_registry_runs.py` judges every record
+  `measure_level3.sh --registry` runs them through the same engine (final protocol since
+  2026-10-03: 0 warm-up + 3 fixed clean runs, headline = median, + 1 separate profiled run,
+  QMCPACK unprofiled, no adaptive extension; the application's own timer, no markers), and `verify_registry_runs.py` judges every record
   from the run manifest, the launcher's audit lines and the placement records under the rules of
   `cases/registry_evidence.yaml` (section `level3`). The hand-written cases stay for the
   2-GPU sweep (history on the page).
@@ -280,7 +281,8 @@ hardware; the page then shows the platform as a column and its device values as 
   exposes one GPU, so Level 2 ran at one rank); hardware counters (`ncu`) are not
   collected. Level 3 is measured with the applications' own timers (the 43 registered inputs at
   1 GPU, 2026-10-02; the earlier hand-written 2-GPU sweep is history); its device picture is
-  whole-process except for WarpX, one clean run per input (no spread), and the scientific
+  whole-process except for WarpX, three clean runs per input since 2026-10-03 (spread <= 10 % or
+  UNSTABLE, no adaptive extension; the 2026-10-02 campaign had one), and the scientific
   correctness of each input is the registry's own check (PASS / INCOMPLETE / none per input, no
   invented tolerance -- see the page).
 * **Decisions for the maintainers**:
