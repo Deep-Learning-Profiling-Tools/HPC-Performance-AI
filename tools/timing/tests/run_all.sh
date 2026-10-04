@@ -2043,7 +2043,7 @@ rm -rf "$N24"
 
 
 # ---- 25. Level 3 run verification: manifest, launcher and placement evidence (registered lammps/lj-32k, synthetic raw) ----
-pycheck "25: Level 3 verification PASSes on consistent evidence and FAILs on a wrong selector / rank count / GPU count / foreign or changed binary / deck / steps / audit; a missing manifest is INSUFFICIENT; app_timer_missing is judged on its evidence" <<'PY'
+pycheck "25: Level 3 verification PASSes on consistent evidence (an unverified launcher audit with the placement record holding the GPU included) and FAILs on a wrong selector / rank count / GPU count / foreign or changed binary / deck / steps / audit mismatch; a missing manifest is INSUFFICIENT; app_timer_missing is judged on its evidence" <<'PY'
 import json, os, sys
 sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
 import verify_registry_runs as V, hpcperf_inputs as hi
@@ -2057,7 +2057,7 @@ n = [0]
 def w(p, s):
     os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
 def record(manifest=None, status="ok", sel_val="lj-32k", gpus="1", steps=100, exe_rec=None, audit="1 verified, 0 mismatch, 0 unverified",
-           buses=("0000:43:00.0",), with_manifest=True, binary=None):
+           buses=("0000:43:00.0",), with_manifest=True, binary=None, with_bind=True):
     n[0] += 1; raw = f"{T}/raw/{n[0]}"; run = f"{raw}/clean.0"; binary = binary or exe
     derived = f"{raw}/in.lj.input.lj-32k"; w(derived, "run ${steps}\n")
     m = {"run_id": "r", "app": "lammps", "backend": "CUDA", "profile": "cuda", "variant": "default", "mode": "smoke", "input_id": "lj-32k",
@@ -2071,7 +2071,8 @@ def record(manifest=None, status="ok", sel_val="lj-32k", gpus="1", steps=100, ex
            "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\n"
            f"hpcperf-launch: audit summary: {audit} (of 1 ranks)\n")
     w(f"{run}/run.log", log)
-    w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + binary + "\nhost h\n" + "".join(f"gpu minor 1 bus {b}\n" for b in buses))
+    if with_bind:
+        w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + binary + "\nhost h\n" + "".join(f"gpu minor 1 bus {b}\n" for b in buses))
     w(f"{raw}/workload_identity.json", json.dumps(ident))
     rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32k", "status": status, "run_id": f"r{n[0]}",
            "registry": {"input_id": "lj-32k", "identity": ident, "identity_complete": True},
@@ -2095,6 +2096,8 @@ expect("25g wrong deck in the manifest", record({"deck": "bench/in.eam"}), "FAIL
 expect("25h wrong step count in the manifest", record({"steps": "50"}), "FAIL", "steps=")
 expect("25i timer reports other steps", record(steps=50), "FAIL", "timer reports")
 expect("25j audit mismatch", record(audit="0 verified, 1 mismatch, 0 unverified"), "FAIL", "audit")
+expect("25p audit unverified (sampling missed a short run) but the placement record holds the GPU", record(audit="0 verified, 0 mismatch, 1 unverified"), "PASS")
+expect("25q audit unverified and no placement record", record(audit="0 verified, 0 mismatch, 1 unverified", with_bind=False), "INSUFFICIENT", "not evidenced")
 expect("25k two GPUs held", record(buses=("0000:43:00.0", "0000:52:00.0")), "FAIL", "held 2")
 expect("25l no manifest harvested", record(with_manifest=False), "INSUFFICIENT", "no run manifest")
 expect("25m app_timer_missing judged on its evidence", record(status="app_timer_missing", steps=None), "PASS")

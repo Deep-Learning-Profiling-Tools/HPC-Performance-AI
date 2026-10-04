@@ -36,7 +36,8 @@ executable, working directory and argv -- ran that input:
             input evidenced by the per-application manifest / output templates (cases/registry_evidence.yaml
             `level3`); the registered source deck still hashes as the run recorded (`source_deck`), a deck
             run.sh derived from it still exists and hashes as recorded (`generated`); the number of steps the
-            application's timer reports equals the registered one (`timer_steps`); the launcher audit clean
+            application's timer reports equals the registered one (`timer_steps`); the launcher audit clean (or, when its sampled
+            observation missed a short process -- `unverified` -- the placement record of the binary holding its GPU)
             with exactly the registered number of ranks on distinct GPUs.
 
 Verdicts: PASS; FAIL (a contradiction: wrong file, wrong argument, duplicate option, changed file, ...);
@@ -567,14 +568,9 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
             c.ok(f"launcher: ranks={want_ranks} (one per GPU)")
         else:
             c.gap(f"{r['dir']}: no launcher line 'ranks={want_ranks} (one per GPU)' in run.log")
-        am = re.search(r"audit summary: (\d+) verified, (\d+) mismatch, (\d+) unverified", out)
-        if not am:
-            c.gap(f"{r['dir']}: no launcher GPU audit summary in run.log")
-        elif int(am.group(2)) or int(am.group(1)) != want_ranks:
-            c.fail(f"{r['dir']}: launcher GPU audit {am.group(0)!r} (expected {want_ranks} verified, 0 mismatch)")
-        else:
-            c.ok(f"launcher GPU audit: {am.group(0)}")
-        # placement records: the application binary held exactly the registered number of GPUs
+        # placement records: the application binary held exactly the registered number of GPUs (read at process exit
+        # by the probe -- direct evidence, unlike the launcher's sampled observation below)
+        held_ok = False
         if binary:
             held = [b for b in r.get("bind") or [] if b["exe"] and os.path.realpath(b["exe"]) == os.path.realpath(binary)]
             buses = sorted({g for b in held for g in b["gpus"]})
@@ -583,7 +579,21 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
             elif len(buses) != want_gpus:
                 c.fail(f"{r['dir']}: the application process(es) held {len(buses)} GPU(s) {buses}, registered {want_gpus}")
             else:
+                held_ok = True
                 c.ok(f"placement: {len(held)} application process(es) on GPU(s) {', '.join(buses)}")
+        am = re.search(r"audit summary: (\d+) verified, (\d+) mismatch, (\d+) unverified", out)
+        if not am:
+            c.gap(f"{r['dir']}: no launcher GPU audit summary in run.log")
+        elif int(am.group(2)):
+            c.fail(f"{r['dir']}: launcher GPU audit {am.group(0)!r}: a rank was observed on another GPU than expected")
+        elif int(am.group(1)) == want_ranks:
+            c.ok(f"launcher GPU audit: {am.group(0)}")
+        elif held_ok:
+            # `unverified` = the launcher's nvidia-smi sampling never saw the process (short runs: tens of ms to a
+            # second); the placement record above shows the binary held its GPU -- evidenced, not contradicted
+            c.ok(f"launcher GPU audit {am.group(0)!r}: the sampled observation missed the process; the placement record shows the binary held its GPU")
+        else:
+            c.gap(f"{r['dir']}: launcher GPU audit {am.group(0)!r} and no placement record of the binary holding a GPU -- GPU use not evidenced")
     matched += apply_templates(c, rule, params, runs, 3)
     # the application's own timer must report the registered number of steps
     expr = rule.get("timer_steps")
