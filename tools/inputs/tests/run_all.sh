@@ -1466,5 +1466,66 @@ python3 "$TOOL" verdict "$FR/level1/fakediag" a --measurement "$TMP/rj/old.json"
 [ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['verdict']=='PASS' and d['compare_verdict']=='PASS' and 're-derived' in d.get('compare_rejudged',''), d" "$TMP/rj/old.out" \
     && ok "re-judge: an older measurement file without a stored verdict is re-derived against its baseline under the current registry (PASS, noted)" || bad "re-judge old: rc=$rc $(cat "$TMP/rj/old.out" "$TMP/rj/old.err" | head -c 600)"
 
+# ---- 20. Level 3 checkers added 2026-10-06 (synthetic evidence; no GPU) ----
+mkdir -p "$TMP/wx"
+python3 - "$TMP/wx" <<'PY'
+import sys
+d = sys.argv[1]
+def w(name, rows): open(f"{d}/{name}", "w").write("# step time ...\n" + "".join(" ".join(str(x) for x in r) + "\n" for r in rows))
+w("NP.txt", [[s, s * 1e-15, 131072, 131072, 6.4e11] for s in range(0, 21)])
+w("EP.txt", [[s, 0, 1.0] for s in range(0, 21)]); w("EF.txt", [[s, 0, 0.5] for s in range(0, 21)])
+PY
+out="$(python3 "$R/level3/warpx/check_particle_conservation.py" "$TMP/wx" 20 2>&1)"; rc=$?
+[ $rc -eq 0 ] && echo "$out" | grep -q '^PASS: WarpX uniform_plasma particle conservation' && ok "warpx checker: constant count and weight to the registered final step -> PASS" || bad "warpx checker pass: $out"
+out="$(python3 "$R/level3/warpx/check_particle_conservation.py" "$TMP/wx" 100 2>&1)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'registered final step 100' && ok "warpx checker: a run that stops before the registered final step -> FAIL" || bad "warpx checker steps: $out"
+sed -i '12s/131072 131072/131071 131072/' "$TMP/wx/NP.txt"
+out="$(python3 "$R/level3/warpx/check_particle_conservation.py" "$TMP/wx" 20 2>&1)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'not conserved' && ok "warpx checker: one lost macroparticle -> FAIL" || bad "warpx checker loss: $out"
+mkdir -p "$TMP/sf/ref" "$TMP/sf/run"
+python3 - "$TMP/sf" <<'PY'
+import math, sys
+d = sys.argv[1]
+f = lambda t: math.exp(-((t - 5.0) / 2.0) ** 2) * math.sin(2 * t)
+for st in ("X1", "X2"):
+    open(f"{d}/ref/DB.{st}.BXZ.semd", "w").writelines(f"{-10 + 0.05 * i:.6f} {f(-10 + 0.05 * i):.9e}\n" for i in range(800))
+    open(f"{d}/run/DB.{st}.BXZ.semd", "w").writelines(f"{-10 + 0.025 * i:.6f} {f(-10 + 0.025 * i):.9e}\n" for i in range(1000))
+open(f"{d}/cmp.py", "w").write(
+"import sys, glob, os\n"
+"syn, ref = sys.argv[1], sys.argv[2]\n"
+"fs = sorted(glob.glob(ref + '*.semd'))\n"
+"bad = 0\n"
+"for r in fs:\n"
+"    a = [float(l.split()[1]) for l in open(r)]; b = [float(l.split()[1]) for l in open(syn + os.path.basename(r))]\n"
+"    if len(a) != len(b) or max(abs(x - y) for x, y in zip(a, b)) > 1e-6: bad += 1\n"
+"print(f'{len(fs)} seismograms compared')\n"
+"print('no poor correlations found' if not bad else 'poor correlation')\n"
+"print('no poor matches found' if not bad else 'poor match')\n"
+"print('no significant time shifts found')\n")
+PY
+out="$(python3 "$R/level3/specfem3d/check_refined_vs_ref_seis.py" "$TMP/sf/run" "$TMP/sf/ref" "$TMP/sf/cmp.py" "$TMP/sf/w1" 2>&1)"; rc=$?
+[ $rc -eq 0 ] && echo "$out" | grep -q 'window -10..14.95 s' && ok "specfem3d checker: a DT/2 run is decimated onto the reference grid and compared over the common window -> PASS" || bad "specfem3d checker pass: $out"
+python3 - "$TMP/sf" <<'PY'
+import sys
+d = sys.argv[1]
+L = open(f"{d}/run/DB.X1.BXZ.semd").read().split("\n")
+open(f"{d}/run/DB.X1.BXZ.semd", "w").write("\n".join(f"{float(x.split()[0]) + 0.0125:.6f} {x.split()[1]}" if x.strip() else x for x in L))
+PY
+out="$(python3 "$R/level3/specfem3d/check_refined_vs_ref_seis.py" "$TMP/sf/run" "$TMP/sf/ref" "$TMP/sf/cmp.py" "$TMP/sf/w2" 2>&1)"; rc=$?
+[ $rc -ne 0 ] && echo "$out" | grep -q 'VALIDATION ERROR' && ok "specfem3d checker: a trace off the reference time grid -> FAIL (never compared by index)" || bad "specfem3d checker grid: $out"
+python3 - "$R" <<'PY' && ok "Level 3 registries: the six checks of 2026-10-06 are executable (post_run / standalone), nekRS records the exact-solution L2 errors as diagnostics" || bad "Level 3 2026-10-06 check blocks"
+import sys, yaml
+R = sys.argv[1]
+want = {("warpx", "uniform-plasma-128cubed-20"): "post_run", ("warpx", "uniform-plasma-256cubed-20"): "post_run", ("warpx", "uniform-plasma-64x32x32-100"): "post_run",
+        ("specfem3d", "homogeneous-halfspace-refine2-1000"): "post_run", ("specfem3d", "homogeneous-halfspace-refine2-5000"): "post_run", ("nyx", "lya-adiabatic-64cubed"): "standalone"}
+for (a, i), k in want.items():
+    d = yaml.safe_load(open(f"{R}/level3/{a}/inputs.yaml"))
+    assert next(x for x in d["inputs"] if x["id"] == i)["check"]["kind"] == k, (a, i)
+d = yaml.safe_load(open(f"{R}/level3/nekrs/inputs.yaml"))
+q = {x["name"]: x for x in d["baseline"]["quantities"]}
+assert all(q[f"l2err_{n}_final"]["role"] == "diagnostic" for n in ("u", "p", "s00", "s01"))
+assert all("DOES print the exact-solution error" in x["check"]["reason"] for x in d["inputs"])
+PY
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]
