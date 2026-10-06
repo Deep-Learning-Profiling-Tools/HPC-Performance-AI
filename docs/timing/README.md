@@ -19,7 +19,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-10-04T04:09:18Z (667 records). 134 + 89 + 
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
 | 2 | 89 | 0 | 0 | 0 |
-| 3 | 29 | 12 | 0 | 2 |
+| 3 | 35 | 6 | 0 | 2 |
 
 - Six Level 2 inputs (exampm dambreak-0.005 / dambreak-0.05-upstream; remhos cube-remap-rs1, periodic-hexagon-p0, periodic-square-p5, periodic-cube-p0) ran the run.sh default workload before 3c9aec2: their earlier records are INVALIDATED (kept as history), the corrected inputs were measured again.
 - remhos periodic-hexagon-p0 / periodic-square-p5 were redefined at order 3 (695c6a9): their order-2 records are SUPERSEDED (valid history of the old definition, never compared with the order-3 result).
@@ -35,6 +35,7 @@ Measured 2026-09-23T18:04:11Z .. 2026-10-04T04:09:18Z (667 records). 134 + 89 + 
 - Level 3 scientific correctness is the registry's own check per input (14 executable checks: 12 standalone validate.sh configurations and 2 post-run checkers; the other 29 inputs state explicitly why no check exists -- no tolerance was invented to close them); PASS / INCOMPLETE / none per input in index.html, with the basis. nekRS's former 'ci_failed' rule was vacuous for plain ethier runs and is a diagnostic since 2026-10-02 (level3/nekrs/README.md).
 - Level 3 final protocol (2026-10-03, l3-final-2026-10-03): every registered Level 3 input measured once more with 0 warm-up + 3 fixed clean runs + 1 profiled run (QMCPACK unprofiled), headline = median, spread &lt;= 10 % or UNSTABLE, no adaptive extension. These are the current Level 3 results. The 1-clean campaign of 2026-10-02 (l3-registry-2026-10-02) is kept as history in each input's run list and is never a baseline (a single clean run gets no 'vs previous'); the hand-written 2-GPU sweep of 2026-09-29 stays an earlier campaign. The three are never mixed into one current result.
 - Level 3 run verification (final campaign): every clean run's manifest, the launcher's GPU-audit line and the placement records are judged by cases/registry_evidence.yaml (level3); PASS is not 'exit 0'. Scientific correctness: the evidence of 2026-10-02 (16 executable checks, all PASSED, + the registry comparisons re-judged under the current registry) is reused -- binaries, decks and registry definitions are unchanged (same sha256 in the manifests); no reference was regenerated.
+- Level 3 correctness closure (2026-10-06, correctness-l3-2026-10-06): six inputs gained executable checks and PASSED -- WarpX uniform-plasma 128cubed-20 / 256cubed-20 / 64x32x32-100 (validate.sh's exact particle-count invariant at the registered final step), SPECFEM3D homogeneous-halfspace refine2-1000 / refine2-5000 (upstream REF_SEIS and thresholds, decimated onto the reference grid, compared over each run's own record), Nyx lya-adiabatic-64cubed (validate.sh's pre-fixed adiabatic criteria and a one-time CPU reference). Still open, with the missing criterion stated per input: CP2K h2o-32 / 128 / 256, nekRS ethier x3 (the plain run prints the exact-solution error, but no tolerance exists for its configuration), Nyx lya-heatcool-32cubed (I_R), SPARTA sphere-1m.
 
 ### Level 1
 
@@ -299,7 +300,7 @@ No markers: the timed region is the application's own timer for its time-step lo
 | nekrs | ethier-refine10-n7 | SUCCESS | nvidia-b200.cuda13.2 | 180.3 s | 3 | 178.5 s | 186.9 s | 4.7% | 2.5% | yes | 100 | 1.8 s | 412.5 s | 43.7% | null | 0.99 | none printed | 1 | PASS | none | 04f66c6f5e |
 | nyx | minisb-32cubed-10 | SUCCESS | nvidia-b200.cuda13.2 | 287 ms | 3 | 286 ms | 288 ms | 0.6% | 0.3% | yes | 10 | 28.7 ms | 8.96 s | 3.2% | null | 1.44 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-adiabatic-32cubed-10 | SUCCESS | nvidia-b200.cuda13.2 | 219 ms | 3 | 219 ms | 258 ms | 17.7% | 10.2% | UNSTABLE | 10 | 21.9 ms | 9.13 s | 2.4% | null | 1.83 | none printed | 1 | PASS | PASS | 04f66c6f5e |
-| nyx | lya-adiabatic-64cubed | SUCCESS | nvidia-b200.cuda13.2 | 881 ms | 3 | 874 ms | 995 ms | 13.7% | 7.7% | UNSTABLE | 10 | 88.1 ms | 10.6 s | 8.3% | null | 1.38 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
+| nyx | lya-adiabatic-64cubed | SUCCESS | nvidia-b200.cuda13.2 | 881 ms | 3 | 874 ms | 995 ms | 13.7% | 7.7% | UNSTABLE | 10 | 88.1 ms | 10.6 s | 8.3% | null | 1.38 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-heatcool-32cubed | SUCCESS | nvidia-b200.cuda13.2 | 307 ms | 3 | 254 ms | 360 ms | 34.5% | 17.2% | UNSTABLE | 10 | 30.7 ms | 8.89 s | 3.4% | null | 1.13 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
 | qmcpack | diamond2-256w | SUCCESS | nvidia-b200.cuda13.2 | 553.9 s | 3 | 509.5 s | 559.8 s | 9.1% | 5.0% | yes | 2,500 | 222 ms | 586.0 s | 94.5% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | qmcpack | diamond2-128w | SUCCESS | nvidia-b200.cuda13.2 | 263.0 s | 3 | 240.2 s | 276.6 s | 13.8% | 7.0% | UNSTABLE | 2,500 | 105 ms | 282.5 s | 93.1% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
@@ -311,12 +312,12 @@ No markers: the timed region is the application's own timer for its time-step lo
 | sparta | free-1m | SUCCESS | nvidia-b200.cuda13.2 | 87.8 ms | 3 | 86.1 ms | 88 ms | 2.2% | 1.2% | yes | 100 | 878 us | 9.06 s | 1.0% | null | 1.03 | 483.2 Mparticle-step/s | 1 | PASS | PASS | 04f66c6f5e |
 | sparta | sphere-1m | SUCCESS | nvidia-b200.cuda13.2 | 1.59 s | 3 | 1.59 s | 1.99 s | 25.1% | 14.5% | UNSTABLE | 1,000 | 1.59 ms | 11.9 s | 13.4% | null | 1.28 | 621.6 Mparticle-step/s | 1 | PASS | INCOMPLETE | 04f66c6f5e |
 | specfem3d | homogeneous-halfspace-mesh-default-5000 | SUCCESS | nvidia-b200.cuda13.2 | 711 ms | 3 | 710 ms | 722 ms | 1.8% | 1.0% | yes | 5,000 | 142 us | 27.2 s | 2.6% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
-| specfem3d | homogeneous-halfspace-refine2-1000 | SUCCESS | nvidia-b200.cuda13.2 | 885 ms | 3 | 885 ms | 887 ms | 0.2% | 0.1% | yes | 1,000 | 885 us | 257.8 s | 0.3% | null | 1.00 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
-| specfem3d | homogeneous-halfspace-refine2-5000 | SUCCESS | nvidia-b200.cuda13.2 | 4.44 s | 3 | 4.44 s | 4.45 s | 0.4% | 0.2% | yes | 5,000 | 888 us | 261.7 s | 1.7% | null | 1.01 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
+| specfem3d | homogeneous-halfspace-refine2-1000 | SUCCESS | nvidia-b200.cuda13.2 | 885 ms | 3 | 885 ms | 887 ms | 0.2% | 0.1% | yes | 1,000 | 885 us | 257.8 s | 0.3% | null | 1.00 | none printed | 1 | PASS | PASS | 04f66c6f5e |
+| specfem3d | homogeneous-halfspace-refine2-5000 | SUCCESS | nvidia-b200.cuda13.2 | 4.44 s | 3 | 4.44 s | 4.45 s | 0.4% | 0.2% | yes | 5,000 | 888 us | 261.7 s | 1.7% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | uniform-plasma-64x32x32-10 | SUCCESS | nvidia-b200.cuda13.2 | 110 ms | 3 | 79 ms | 237 ms | 144.0% | 76.4% | UNSTABLE | 10 | 11 ms | 7.7 s | 1.4% | 3% (NVTX range) | 0.72 | none printed | 1 | PASS | PASS | 04f66c6f5e |
-| warpx | uniform-plasma-128cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 181 ms | 3 | 175 ms | 195 ms | 11.1% | 5.7% | UNSTABLE | 20 | 9.03 ms | 7.8 s | 2.3% | 33% (NVTX range) | 1.06 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
-| warpx | uniform-plasma-256cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 579 ms | 3 | 572 ms | 601 ms | 5.0% | 2.6% | yes | 20 | 29 ms | 8.66 s | 6.7% | 72% (NVTX range) | 1.07 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
-| warpx | uniform-plasma-64x32x32-100 | SUCCESS | nvidia-b200.cuda13.2 | 624 ms | 3 | 620 ms | 636 ms | 2.7% | 1.4% | yes | 100 | 6.24 ms | 9.34 s | 6.7% | 5% (NVTX range) | 1.20 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
+| warpx | uniform-plasma-128cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 181 ms | 3 | 175 ms | 195 ms | 11.1% | 5.7% | UNSTABLE | 20 | 9.03 ms | 7.8 s | 2.3% | 33% (NVTX range) | 1.06 | none printed | 1 | PASS | PASS | 04f66c6f5e |
+| warpx | uniform-plasma-256cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 579 ms | 3 | 572 ms | 601 ms | 5.0% | 2.6% | yes | 20 | 29 ms | 8.66 s | 6.7% | 72% (NVTX range) | 1.07 | none printed | 1 | PASS | PASS | 04f66c6f5e |
+| warpx | uniform-plasma-64x32x32-100 | SUCCESS | nvidia-b200.cuda13.2 | 624 ms | 3 | 620 ms | 636 ms | 2.7% | 1.4% | yes | 100 | 6.24 ms | 9.34 s | 6.7% | 5% (NVTX range) | 1.20 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | langmuir-multi-64cubed-40 | SUCCESS | nvidia-b200.cuda13.2 | 210 ms | 3 | 201 ms | 223 ms | 10.5% | 5.3% | UNSTABLE | 40 | 5.24 ms | 8.72 s | 2.4% | 6% (NVTX range) | 1.04 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 
 ### History kept, never current
