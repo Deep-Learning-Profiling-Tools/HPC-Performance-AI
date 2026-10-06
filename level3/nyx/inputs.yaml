@@ -116,9 +116,22 @@ inputs:
   - cuda
 - id: lya-adiabatic-64cubed
   check:
-    kind: none
-    reason: >-
-      validate.sh compares the 32^3 decks (minisb, lya_adiabatic, 10 steps) with a same-configuration rerun and the CPU reference build; the same comparison at 64^3 needs a CPU reference run of this size, not run this round. Missing criterion: the fcompare / particle comparison vs an independent run of this size (INCOMPLETE)
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env: {HPCPERF_GPUS: '1', HPCPERF_NYX_CASES: lya_adiabatic, HPCPERF_NYX_VALIDATE_MODE: strong}
+    pass_regex: '^Nyx CUDA validation .*: PASS$'
+    fail_regex: 'FAIL|UNSUPPORTED_LAYOUT|I_R_CHECK_PENDING'
+    basis: >-
+      level3/nyx/validate.sh on 1 GPU in strong mode (HPCPERF_NYX_VALIDATE_MODE=strong, 2026-10-06): this deck (the 64^3 adiabatic
+      derivative of Exec/LyA/inputs, IC 64sssss_20mpc.nyx, 10 steps) with the validator's adiabatic criteria UNCHANGED --
+      completeness (plt00000 / plt00010, runlog reaches max_step, every plotfile variable finite, DM particle count equal to the
+      IC's 262,144), baryon mass conservation |dM/M| <= 1e-9 (periodic, no mass source), AMReX fcompare + particle comparison
+      against a same-configuration GPU rerun at rel_tol 2e-10 and against the CPU-profile build of the same sources and deck at
+      rel_tol 1e-8 (PROJECT tolerances fixed for the adiabatic decks before their first run; extended to this third adiabatic deck
+      before any 64^3 comparison, not derived from its results). The CPU reference run (1 rank, ~30 s) is made once by the
+      validator and reused while its deck sha256 and step count match.
+    covers: all
+    timeout: 3600
   case: lyman-alpha-adiabatic
   variant: size
   source:

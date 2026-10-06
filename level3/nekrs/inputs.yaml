@@ -29,15 +29,47 @@ timing:
 baseline:
   method: >-
     upstream's --cimode CI checks ('CI test <name> passed': L2 errors of velocity / pressure / scalars against the exact
-    Ethier-Steinman solution, EPS 0.3, plus iteration counts) are run by validate.sh on the base ethier case; CI mode fixes the
-    solver settings, so it is a validation of the build, not of a registered plain run. A plain run prints the divergence error
-    per step (recorded as a diagnostic) and no exact-solution error: no registered nekRS input has a quantity that verifies its
-    own solution (2026-10-02). Missing criterion: the exact-solution error of a plain run (the udf computes it only under --cimode).
+    Ethier-Steinman solution, EPS 0.3 around per-mode references, plus iteration counts) are run by validate.sh on the base
+    ethier case; CI mode overrides the deck's settings, so it validates the build, not a registered plain run. A plain run
+    prints the same exact-solution L2 errors every step (ethier.usr userchk, 'L2 err' lines) and the divergence error; both
+    are recorded as diagnostics. No upstream tolerance exists for the plain configuration (2026-10-06).
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: div_u_err_final
     role: diagnostic
     regex: divUErr\s*:\s*(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+  - name: l2err_u_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 1 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+\S+\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_p_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 2 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_s00_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 3 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_s01_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 4 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+L2 err'
     select: last
     compare:
       rule: record
@@ -68,7 +100,7 @@ inputs:
   check:
     kind: none
     reason: >-
-      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
   case: ethier
   variant: default
   source:
@@ -94,7 +126,7 @@ inputs:
   check:
     kind: none
     reason: >-
-      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
   case: ethier
   variant: size
   source:
@@ -119,7 +151,7 @@ inputs:
   check:
     kind: none
     reason: >-
-      a plain ethier run prints no exact-solution error (the udf computes the Ethier-Steinman L2 errors only under --cimode, which fixes the solver settings: validate.sh's CI run validates the build, not this run); the 'CI test failed' absence rule was vacuous and is a diagnostic since 2026-10-02. Missing criterion: an exact-solution error printed by the plain run
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
   case: ethier
   variant: size
   source:

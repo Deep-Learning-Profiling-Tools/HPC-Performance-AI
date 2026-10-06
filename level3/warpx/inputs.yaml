@@ -85,9 +85,20 @@ inputs:
   - cuda
 - id: uniform-plasma-128cubed-20
   check:
-    kind: none
-    reason: >-
-      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
+    kind: post_run
+    command: [python3, '{bench_dir}/check_particle_conservation.py', '{repo}/build/level3/warpx/cuda/run.check.uniform-plasma-128cubed-20/uniform_plasma.weak.np1/diags/reducedfiles', '{param:steps}']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.uniform-plasma-128cubed-20}
+    pass_regex: '^PASS: WarpX uniform_plasma particle conservation'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      validate.sh [2]'s criterion, unchanged except that the final step is this input's (20) instead of the smoke case's 10
+      (check_particle_conservation.py on this input's own run directory): the reduced diagnostics NP.txt reach the registered
+      final step, and the total macroparticle count and the total particle weight are finite and take a single value at every
+      step. The deck is periodic in every direction with one species and no injection, ionization or resampling, so both are
+      conserved exactly at any n_cell / step count -- an exact invariant, no tolerance. Energy is printed for the record only
+      (the 2-particles-per-cell thermal plasma is not an energy-conservation test; no energy tolerance exists). Added 2026-10-06.
+    covers: all
+    timeout: 1800
   case: uniform-plasma-3d
   variant: size
   source:
@@ -110,9 +121,20 @@ inputs:
   - cuda
 - id: uniform-plasma-256cubed-20
   check:
-    kind: none
-    reason: >-
-      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
+    kind: post_run
+    command: [python3, '{bench_dir}/check_particle_conservation.py', '{repo}/build/level3/warpx/cuda/run.check.uniform-plasma-256cubed-20/uniform_plasma.strong.np1/diags/reducedfiles', '{param:steps}']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.uniform-plasma-256cubed-20}
+    pass_regex: '^PASS: WarpX uniform_plasma particle conservation'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      validate.sh [2]'s criterion, unchanged except that the final step is this input's (20) instead of the smoke case's 10
+      (check_particle_conservation.py on this input's own run directory): the reduced diagnostics NP.txt reach the registered
+      final step, and the total macroparticle count and the total particle weight are finite and take a single value at every
+      step. The deck is periodic in every direction with one species and no injection, ionization or resampling, so both are
+      conserved exactly at any n_cell / step count -- an exact invariant, no tolerance. Energy is printed for the record only
+      (the 2-particles-per-cell thermal plasma is not an energy-conservation test; no energy tolerance exists). Added 2026-10-06.
+    covers: all
+    timeout: 1800
   case: uniform-plasma-3d
   variant: size
   source:
@@ -134,9 +156,20 @@ inputs:
   - cuda
 - id: uniform-plasma-64x32x32-100
   check:
-    kind: none
-    reason: >-
-      uniform_plasma has no reference solution (upstream performance case); validate.sh's particle-count conservation invariant is implemented for the smoke case (64x32x32, 10 steps) only and was not applied to this size / step count this round. Missing criterion: the same invariant (or an energy criterion) applied to this run's reduced diagnostics (INCOMPLETE)
+    kind: post_run
+    command: [python3, '{bench_dir}/check_particle_conservation.py', '{repo}/build/level3/warpx/cuda/run.check.uniform-plasma-64x32x32-100/uniform_plasma.smoke.np1/diags/reducedfiles', '{param:steps}']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.uniform-plasma-64x32x32-100}
+    pass_regex: '^PASS: WarpX uniform_plasma particle conservation'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      validate.sh [2]'s criterion, unchanged except that the final step is this input's (100) instead of the smoke case's 10
+      (check_particle_conservation.py on this input's own run directory): the reduced diagnostics NP.txt reach the registered
+      final step, and the total macroparticle count and the total particle weight are finite and take a single value at every
+      step. The deck is periodic in every direction with one species and no injection, ionization or resampling, so both are
+      conserved exactly at any n_cell / step count -- an exact invariant, no tolerance. Energy is printed for the record only
+      (the 2-particles-per-cell thermal plasma is not an energy-conservation test; no energy tolerance exists). Added 2026-10-06.
+    covers: all
+    timeout: 1800
   case: uniform-plasma-3d
   variant: steps
   source:

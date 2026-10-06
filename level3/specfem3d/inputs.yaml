@@ -88,9 +88,20 @@ inputs:
   - cuda
 - id: homogeneous-halfspace-refine2-1000
   check:
-    kind: none
-    reason: >-
-      upstream's reference seismograms (REF_SEIS) exist for the default mesh only; the 2x-refined mesh (xmeshfem3D) changes the discretisation, so they are not its reference. Missing criterion: reference seismograms or an independent solution for the refined mesh (INCOMPLETE)
+    kind: post_run
+    command: [python3, '{bench_dir}/check_refined_vs_ref_seis.py', '{repo}/build/level3/specfem3d/cuda/run.check.homogeneous-halfspace-refine2-1000/strong.np1/OUTPUT_FILES', '{bench_dir}/src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS', '{bench_dir}/src/utils/scripts/compare_seismogram_correlations.py', '{run_dir}/compare']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.homogeneous-halfspace-refine2-1000}
+    pass_regex: '^PASS: SPECFEM3D refined mesh vs REF_SEIS'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      upstream's reference seismograms REF_SEIS with upstream's compare_seismogram_correlations.py and its thresholds UNCHANGED
+      (correlation >= 0.8, L2 misfit <= 0.01, time shift <= 0.01 s, all 12 reference traces). The 2x-refined mesh solves the same
+      physical problem as the shipped example (same domain, medium, CMTSOLUTION, STATIONS, Stacey boundaries, t0; same internal
+      mesher that produced REF_SEIS, whose default mesh already resolves periods below the 5 s source half duration), so a
+      converged solution must match the reference. check_refined_vs_ref_seis.py decimates the run's traces by DT_ref / DT_run = 2
+      after checking that its samples fall exactly on the reference grid, and compares over the run's whole 25 s record (t = -10 .. 14.95 s on the reference grid: the early arrivals only -- 0.1 % to 39 % of each reference trace's L2 norm lies in this window). Added 2026-10-06.
+    covers: all
+    timeout: 1800
   case: homogeneous-halfspace
   variant: size
   source:
@@ -114,9 +125,20 @@ inputs:
   - cuda
 - id: homogeneous-halfspace-refine2-5000
   check:
-    kind: none
-    reason: >-
-      upstream's reference seismograms (REF_SEIS) exist for the default mesh only; the 2x-refined mesh (xmeshfem3D) changes the discretisation, so they are not its reference. Missing criterion: reference seismograms or an independent solution for the refined mesh (INCOMPLETE)
+    kind: post_run
+    command: [python3, '{bench_dir}/check_refined_vs_ref_seis.py', '{repo}/build/level3/specfem3d/cuda/run.check.homogeneous-halfspace-refine2-5000/strong.np1/OUTPUT_FILES', '{bench_dir}/src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS', '{bench_dir}/src/utils/scripts/compare_seismogram_correlations.py', '{run_dir}/compare']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.homogeneous-halfspace-refine2-5000}
+    pass_regex: '^PASS: SPECFEM3D refined mesh vs REF_SEIS'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      upstream's reference seismograms REF_SEIS with upstream's compare_seismogram_correlations.py and its thresholds UNCHANGED
+      (correlation >= 0.8, L2 misfit <= 0.01, time shift <= 0.01 s, all 12 reference traces). The 2x-refined mesh solves the same
+      physical problem as the shipped example (same domain, medium, CMTSOLUTION, STATIONS, Stacey boundaries, t0; same internal
+      mesher that produced REF_SEIS, whose default mesh already resolves periods below the 5 s source half duration), so a
+      converged solution must match the reference. check_refined_vs_ref_seis.py decimates the run's traces by DT_ref / DT_run = 2
+      after checking that its samples fall exactly on the reference grid, and compares over the run's whole 125 s record (t = -10 .. 114.95 s of REF_SEIS's 250 s). Added 2026-10-06.
+    covers: all
+    timeout: 1800
   case: homogeneous-halfspace
   variant: steps
   source:

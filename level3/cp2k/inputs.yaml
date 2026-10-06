@@ -140,7 +140,7 @@ inputs:
   check:
     kind: none
     reason: >-
-      no reference energies exist for benchmarks/QS/H2O-256.inp (upstream ships inputs only; its check-release-comparison.py compares MPI x OMP layouts of the same binary at 1e-10, a relative consistency check, and validate.sh applies that only to H2O-64 across rank counts); cp2k_md_summary.py --check (completeness, SCF convergence, finiteness, GPU evidence) would apply but is completion, not correctness. Missing criterion: an independent reference energy or a second-layout 1e-10 consistency run for this size -- not available / not run this round (INCOMPLETE)
+      no reference energies exist for benchmarks/QS/H2O-256.inp (upstream ships inputs only; its check-release-comparison.py compares MPI x OMP layouts of the same binary at 1e-10, a relative consistency check, and validate.sh applies that only to H2O-64 across rank counts); cp2k_md_summary.py --check (completeness, SCF convergence, finiteness, GPU evidence) would apply but is completion, not correctness. Missing criterion: an independent reference energy or a second-layout 1e-10 consistency run for this size -- not available / not run this round (INCOMPLETE) Same-binary, same-layout runs of H2O-256 on this GPU build already differ by up to 5e-5 Ha in the final FORCE_EVAL energy (GPU nondeterminism, 2026-10-02/04 runs), so even upstream's 1e-10 layout check could not pass for this size.
   case: qs-gpw-water-md
   variant: size
   source:

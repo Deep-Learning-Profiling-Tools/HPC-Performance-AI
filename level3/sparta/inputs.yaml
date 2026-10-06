@@ -161,7 +161,7 @@ inputs:
     check:
       kind: none
       reason: >-
-        open boundaries with inflow (fix emit/face) and diffuse surface collisions: the particle count fluctuates around the inflow steady state and the collide rules (exact Np, 15 % natt) have no basis for this deck; vs the 2014 reference log the count after equilibration is 1.0 % lower here with no validated statistical model (cause not determined). np_final and natt_final stay recorded. Missing criterion: a statistical model / tolerance for the inflow steady state (INCOMPLETE)
+        open boundaries with inflow (fix emit/face) and diffuse surface collisions: Np is not conserved, so the collide rules (exact Np, 15 % natt) have no basis here. The 2014 reference logs (bench/log.7Jul14.sphere.icc.1M.{1,8}) were made with older commands (fix inflow, read_surf data.sphere) and upstream documents that KOKKOS and non-KOKKOS runs draw the emit/face random numbers differently ('statistically similar', doc/fix_emit_face.txt) without a statistical bound; this build's count is ~1 % below the reference while upstream's 1- and 8-process logs agree to 0.005 % at step 2000 -- a systematic offset, cause not determined. np_final and natt_final stay recorded. Missing criterion: a reference for the current deck or a statistical model of the inflow steady state (INCOMPLETE)
     case: flow-around-sphere
     variant: case
     source:
