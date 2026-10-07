@@ -424,6 +424,10 @@ def render_html(bundle):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HPC-Performance-AI Timing</title>
 <meta name="description" content="Region-of-interest timing of the HPC-Performance-AI Level 1, 2 and 3 suites">
+<script id="theme-init">
+/* theme before first paint: a stored choice (light / dark) wins over the system setting; "auto" stores nothing */
+try {{ var t = localStorage.getItem("hpcperf-timing-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); }} catch (e) {{}}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -433,6 +437,11 @@ def render_html(bundle):
 <body>
 <div class="wrap">
 <header class="top">
+  <div class="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-theme-choice="auto" aria-pressed="true" title="Follow the system setting">Auto</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+    <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+  </div>
   <div class="eyebrow">tools/timing &middot; latest measurement {as_of}</div>
   <h1>Timing results</h1>
   <p class="sub">Region-of-interest (ROI) timing of the Level&nbsp;1 benchmarks and the Level&nbsp;2 mini-applications:

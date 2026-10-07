@@ -19,6 +19,7 @@ class Node_ {
   get textContent() { return this._text !== null && !this.children.length ? this._text
                              : (this._text || "") + this.children.map(c => c.textContent).join(" "); }
   setAttribute(k, v) { this.attrs[k] = String(v); if (k === "class") this.className = String(v); }
+  removeAttribute(k) { delete this.attrs[k]; }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   addEventListener(t, f) { (this.listeners[t] = this.listeners[t] || []).push(f); }
   click() { (this.listeners.click || []).forEach(f => f({})); }
@@ -59,6 +60,10 @@ function makeDocument(html) {
     const nav = mk("nav", null, "tabs campaigns"); doc.appendChild(nav);
     ctabs.forEach(m => { const b = mk("button"); b.attrs["data-campaign"] = m[1]; nav.appendChild(b); });
   }
+  // the colour-theme switch and <html> (data-theme), as report.py writes them
+  doc.documentElement = mk("html");
+  const tnav = mk("div", null, "theme"); doc.appendChild(tnav);
+  ["auto", "light", "dark"].forEach(t => { const b = mk("button"); b.attrs["data-theme-choice"] = t; tnav.appendChild(b); });
   const lnav = mk("nav", null, "tabs levels"); doc.appendChild(lnav);
   ["1", "2", "3"].forEach(l => { const b = mk("button"); b.attrs["data-level"] = l; b.appendChild(mk("span")); lnav.appendChild(b); });
   ["app-filter", "app-list", "main"].forEach(id => doc.appendChild(mk(id === "app-filter" ? "input" : id === "app-list" ? "ul" : "main", id)));
@@ -78,6 +83,13 @@ function run(html, checks) {
     new Function("document", "location", "window", js)(ctx.document, ctx.location, ctx.window);
     const label = JSON.stringify(c);
     try {
+      if (c.theme) {            // click a theme button; data-theme on <html> and aria-pressed must follow
+        doc.querySelectorAll(".theme button").find(b => b.attrs["data-theme-choice"] === c.theme).click();
+        const got = doc.documentElement.getAttribute("data-theme") || "auto";
+        if (got !== c.theme) throw new Error("data-theme " + got + " != " + c.theme);
+        const pressed = doc.querySelectorAll(".theme button").filter(b => b.attrs["aria-pressed"] === "true").map(b => b.attrs["data-theme-choice"]);
+        if (pressed.join() !== c.theme) throw new Error("aria-pressed on " + pressed.join() + ", expected " + c.theme);
+      }
       if (c.campaign) doc.querySelectorAll(".tabs.campaigns button").find(b => b.attrs["data-campaign"] === String(c.campaign)).click();
       if (c.level && c.level !== "1") doc.querySelectorAll(".tabs.levels button").find(b => b.attrs["data-level"] === c.level).click();
       if (c.app) {

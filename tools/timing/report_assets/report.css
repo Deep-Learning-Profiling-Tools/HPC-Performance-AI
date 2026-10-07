@@ -50,7 +50,15 @@ button{font:inherit;color:inherit}
 code{font-family:var(--mono);font-size:.86em;background:var(--rule-2);padding:.1em .34em;border-radius:3px;
   overflow-wrap:anywhere}
 
-header.top{padding-block:36px 4px}
+header.top{padding-block:36px 4px;position:relative}
+.theme{position:absolute;top:30px;right:0;display:inline-flex;border:1px solid var(--rule);border-radius:999px;
+  background:var(--surface);padding:2px}
+.theme button{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;color:var(--ink-3);background:none;border:0;
+  border-radius:999px;padding:4px 10px;cursor:pointer}
+.theme button:hover{color:var(--ink)}
+.theme button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.theme button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:640px){.theme{position:static;margin-bottom:14px}}
 .eyebrow{font-family:var(--mono);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
   color:var(--accent);margin-bottom:12px}
 .sub{font-size:1.05rem;color:var(--ink-2);margin-top:12px;max-width:72ch}

@@ -1395,10 +1395,16 @@ md = open(os.path.join(T, "page", "README.md")).read()
 if "darcy-hex**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
+grep -q '<script id="theme-init">' "$TMP/rv/page/index.html" && grep -q 'data-theme-choice="dark"' "$TMP/rv/page/index.html" \
+    && grep -q ':root\[data-theme="dark"\]' "$TMP/rv/page/index.html" \
+    && ok "15j: the page has the colour-theme switch (Auto / Light / Dark) and applies a stored choice before first paint" || bad "15j: theme switch markup"
 if command -v node >/dev/null 2>&1; then
     printf '%s\n' '[{"name":"15i overview","level":"2","expect":["1 ROI timing SUCCESS"]},
  {"name":"15i hexagon","level":"2","app":"remhos","input":"periodic-hexagon-p0","platform":"test-platform","expect":["run05","SUPERSEDED","INVALIDATED","earlier definition","Where the process spends its time","Device activity inside the ROI","no collector observed this run","Runs of this input"]},
- {"name":"15i failed","level":"2","app":"miniem","input":"darcy-hex","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
+ {"name":"15i failed","level":"2","app":"miniem","input":"darcy-hex","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]},
+ {"name":"15j theme dark","level":"1","theme":"dark"},
+ {"name":"15j theme light","level":"1","theme":"light"},
+ {"name":"15j theme auto","level":"1","theme":"auto"}]' > "$TMP/rv/checks.json"
     out="$(node "$HERE/page_smoke.js" "$TMP/rv/page/index.html" "$TMP/rv/checks.json" 2>&1)"
     [ $? -eq 0 ] && ok "15i: the page's own script renders the synthetic campaign (DOM shim, $(echo "$out" | grep -c '^ok') checks)" \
                  || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"
