@@ -293,10 +293,25 @@ def _measurement(m):
     return run
 
 
-def build_registry(roots):
-    """The registered-input campaign: every registry input of Level 1/2, its current measurement per platform,
-    its status, verification, correctness evidence and history (tools/timing/registry_view.py)."""
+def build_registry(roots, latest_only=False):
+    """The registered-input campaign: every registry input of Level 1/2/3, its current measurement per platform,
+    its status, verification, correctness evidence and history (tools/timing/registry_view.py).
+
+    latest_only: the page shows the latest results only -- per input the current measurement(s) and, for an input
+    without one (a failed run, NO_TIMED_REGION), its newest attempt; older records, superseded / invalidated sets and
+    their "vs previous" are left out (they stay in the results directories). Selection and counting rules unchanged."""
     rows, recs, meta, orphans = RV.current_view(roots, REPO)
+    if latest_only:
+        keep = set()
+        for row in rows:
+            cur = list(row["current_by_platform"].values())
+            row["history_sets"] = [m for m in row["history_sets"] if any(m is c for c in cur)]
+            ids = {rid for m in cur for rid in m["run_ids"]}
+            if not ids and row["attempts"]:
+                ids = {row["attempts"][-1]["run_id"]}
+            row["attempts"] = [a for a in row["attempts"] if a["run_id"] in ids]
+            keep |= ids
+        recs = [r for r in recs if r["run_id"] in keep]
     plats = platform_info(recs)
     _, suites = defined_inputs()
     levels = {}
@@ -761,7 +776,7 @@ def render_md_l3(data):
 
 # ----------------------------------------------------------------- entry points
 
-def build_bundle(results_roots, history_pages=(), page_levels=()):
+def build_bundle(results_roots, history_pages=(), page_levels=(), latest_only=False):
     roots = [os.path.realpath(r) for r in (results_roots if isinstance(results_roots, (list, tuple)) else [results_roots])]
     SCRUB_ROOTS[:] = sorted({os.path.dirname(r) for r in roots} | set(roots), key=len, reverse=True)
     recs = load(roots)
@@ -775,15 +790,15 @@ def build_bundle(results_roots, history_pages=(), page_levels=()):
             hosts |= {h, h.split(".")[0]}
     SCRUB_HOSTS[:] = sorted((h for h in hosts if len(h) >= 4), key=len, reverse=True)
     registry = any(((r.get("registry") or {}).get("input_id")) for r in recs)
-    campaigns = [build_registry(roots) if registry else build_data(recs)]
+    campaigns = [build_registry(roots, latest_only) if registry else build_data(recs)]
     campaigns += [load_page_level(x) for x in page_levels]
     campaigns += [load_history_page(p) for p in history_pages]
     return {"campaigns": campaigns}
 
 
-def write(results_root, out_dir, history_pages=(), page_levels=()):
+def write(results_root, out_dir, history_pages=(), page_levels=(), latest_only=False):
     """Render the results root(s) into out_dir/index.html and out_dir/README.md; returns the two paths."""
-    bundle = build_bundle(results_root, history_pages, page_levels)
+    bundle = build_bundle(results_root, history_pages, page_levels, latest_only)
     os.makedirs(out_dir, exist_ok=True)
     page = os.path.join(out_dir, "index.html")
     md = os.path.join(out_dir, "README.md")
@@ -803,6 +818,9 @@ def main(argv=None):
     ap.add_argument("--page-level", action="append", default=[], metavar="PATH:LEVEL[:history]",
                     help="one level of a published index.html kept as a current campaign of its own (repeatable), e.g. "
                          "the Level 3 sweep of another checkout next to the local Level 1/2 records")
+    ap.add_argument("--latest-only", action="store_true",
+                    help="registry campaign: show only the latest result of every input (its current measurement, or the newest "
+                         "attempt when it has none); older records stay in the results directories, not on the page")
     ap.add_argument("--out", default=None, help="output directory (default <first results-root>/report)")
     ap.add_argument("--publish", action="store_true", help=f"write to {os.path.relpath(PUBLISH_DIR, REPO)}/")
     a = ap.parse_args(argv)
@@ -814,7 +832,7 @@ def main(argv=None):
         if not os.path.isdir(r):
             print(f"report: no results directory {r} (run summarize.py first)", file=sys.stderr)
             return 1
-    for p in write(roots, out, a.history_page, a.page_level):
+    for p in write(roots, out, a.history_page, a.page_level, a.latest_only):
         print(f"report: {os.path.relpath(p, REPO)}")
     return 0
 
