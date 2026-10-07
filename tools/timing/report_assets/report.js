@@ -6,6 +6,25 @@
 // chosen by tools/timing/registry_view.py) and "cases" (case tables; also every earlier snapshot).
 (function () {
   "use strict";
+  // colour theme: Auto (the system setting, prefers-color-scheme) / Light / Dark. The choice is kept in this
+  // browser only (localStorage, guarded: private windows may refuse it); every colour is a CSS variable, so
+  // switching data-theme on <html> restyles the page at once.
+  (function initTheme() {
+    var KEY = "hpcperf-timing-theme", root = document.documentElement;
+    if (!root) return;
+    var btns = Array.prototype.slice.call(document.querySelectorAll(".theme button")).filter(function (b) { return b.getAttribute("data-theme-choice"); });
+    function current() { var t = root.getAttribute("data-theme"); return t === "light" || t === "dark" ? t : "auto"; }
+    function mark() { var c = current(); btns.forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-theme-choice") === c ? "true" : "false"); }); }
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var c = b.getAttribute("data-theme-choice");
+        if (c === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", c);   // auto: CSS follows prefers-color-scheme
+        try { if (c === "auto") localStorage.removeItem(KEY); else localStorage.setItem(KEY, c); } catch (e) {}
+        mark();
+      });
+    });
+    mark();
+  })();
   var BUNDLE = JSON.parse(document.getElementById("timing-data").textContent);
   var CAMPS = BUNDLE.campaigns || [BUNDLE];
   var D = CAMPS[0];
