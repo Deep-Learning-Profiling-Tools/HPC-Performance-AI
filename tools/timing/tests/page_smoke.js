@@ -60,7 +60,7 @@ function makeDocument(html) {
     ctabs.forEach(m => { const b = mk("button"); b.attrs["data-campaign"] = m[1]; nav.appendChild(b); });
   }
   const lnav = mk("nav", null, "tabs levels"); doc.appendChild(lnav);
-  ["1", "2"].forEach(l => { const b = mk("button"); b.attrs["data-level"] = l; b.appendChild(mk("span")); lnav.appendChild(b); });
+  ["1", "2", "3"].forEach(l => { const b = mk("button"); b.attrs["data-level"] = l; b.appendChild(mk("span")); lnav.appendChild(b); });
   ["app-filter", "app-list", "main"].forEach(id => doc.appendChild(mk(id === "app-filter" ? "input" : id === "app-list" ? "ul" : "main", id)));
   doc.getElementById = id => byId[id] || doc.all().find(n => n.attrs.id === id) || null;
   doc.createElement = tag => new Node_(tag);
