@@ -144,8 +144,8 @@ their schema (`hpcperf-timing-1`).
   2026-10-03: 0 warm-up + 3 fixed clean runs, headline = median, + 1 separate profiled run,
   QMCPACK unprofiled, no adaptive extension; the application's own timer, no markers), and `verify_registry_runs.py` judges every record
   from the run manifest, the launcher's audit lines and the placement records under the rules of
-  `cases/registry_evidence.yaml` (section `level3`). The hand-written cases stay for the
-  2-GPU sweep (history on the page).
+  `cases/registry_evidence.yaml` (section `level3`). The hand-written cases remain the definition of the
+  superseded 2-GPU sweep (not on the published page, which shows the latest results only).
 
 ### 4.5 Elsewhere
 

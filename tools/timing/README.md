@@ -31,7 +31,7 @@ tools/timing/measure_level2.sh --registry --collector nvidia_nsys all           
 tools/timing/measure_level3.sh --registry --collector nvidia_nsys all                             # Level 3: 0 warm-up + 3 clean + 1 nsys profiled (the final Level 3 protocol; QMCPACK unprofiled), the application's own timer, HPCPERF_GPUS from the registry
 python3 tools/timing/verify_registry_runs.py <results dir>        # did every run get its input?
 python3 tools/timing/registry_view.py <results dir> [...]         # current result per input (counts)
-python3 tools/timing/report.py --results-root <dir> [--results-root <dir> ...] [--history-page OLD.html] --publish
+python3 tools/timing/report.py --latest-only --results-root <dir> [--results-root <dir> ...] --publish   # the published page: latest results only
 ```
 
 Each measurement ends by summarizing its own run (JSON per record, CSV per level; with registry
@@ -179,7 +179,11 @@ published page with `--page-level PAGE.html:N`, as a current campaign of its own
 live in another checkout). Several `--results-root` directories are
 read as ONE campaign (e.g. the phases of a campaign kept in separate directories); `--history-page`
 embeds an earlier published `index.html` verbatim as a separate, labelled campaign (a campaign tab at
-the top) whose numbers are never mixed with, or compared against, the current ones.
+the top) whose numbers are never mixed with, or compared against, the current ones. `--latest-only` shows the latest
+result of every registered input only (its current measurement, or its newest attempt when it has none): older records,
+superseded / invalidated sets and "vs previous" stay in the results directories. **The published page (`docs/timing`)
+is generated with `--latest-only` from the result directories that hold current measurements, with no `--page-level`
+or `--history-page` (decision 2026-10-06: the page shows the latest results only).**
 
 **Registered inputs** (records made with `--registry`) -- the current view:
 
@@ -648,12 +652,11 @@ Findings that need a decision rather than a fix:
 `device_overlap_s` is non-zero only for quicksilver (0.22-0.35 s: unified-memory
 migrations overlap its kernel); everything else is single-stream.
 
-## First Level 3 sweep (2026-09-29) -- hand-written cases, HISTORY
+## First Level 3 sweep (2026-09-29) -- hand-written cases, superseded
 
-An earlier campaign of the ten hand-written 2-GPU cases of `cases/level3_cases.tsv`, measured in another
-checkout and carried into the page as an earlier campaign (`report.py --page-level ...:3:history`). The
-current Level 3 results are the registered-input campaign of 2026-10-02 (`measure_level3.sh --registry`, one
-GPU, all 43 inputs); the two are never compared.
+The ten hand-written 2-GPU cases of `cases/level3_cases.tsv`, measured in another checkout. Superseded by the
+registered-input Level 3 results (final protocol, `measure_level3.sh --registry`, one GPU, all 43 inputs); not on
+the published page. The section below is kept as the record of that sweep.
 
 dgx003, **2 x NVIDIA B200** (one MPI rank per GPU, `--mca pml ob1 --mca btl self,sm,smcuda`),
 CUDA 13.2.78, Nsight Systems 2025.6.3, uv toolchain (GCC 13.3.0 / system GCC 14.2.1 for CP2K and

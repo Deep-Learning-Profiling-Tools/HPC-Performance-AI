@@ -2226,6 +2226,18 @@ if camp.get("protocol") != {"level1": "P1", "level2": "P2", "level3": "P3"} or c
 md3 = report.render_md_registry({"campaign": camp, "counts": k, "measured_from": None, "generated_from": None, "records": 1, "notes": [], "levels": {}})
 if "- Level 3 protocol: P3" not in md3 or "- Level 1 protocol: P1" not in md3 or "- L3 text" not in md3:
     bad.append("26k: the Markdown twin does not list the Level 3 protocol line")
+# 26y: --latest-only keeps per input only the current set (the 1-clean run01 and the stable run02 leave the page), and a
+# NO_TIMED_REGION / failed input only its newest attempt; the counts are those of the full view
+bl = report.build_bundle([root], latest_only=True); cl = bl["campaigns"][0]
+lj = next(i for a in cl["levels"]["3"] if a["app"] == "lammps" for i in a["inputs"] if i["input_id"] == "lj-32k")
+if [s["run_ids"] for s in lj["sets"]] != [["run03"]] or [a["run_id"] for a in lj["attempts"]] != ["run03"]:
+    bad.append(f"26y: latest-only lj-32k sets {[s['run_ids'] for s in lj['sets']]} attempts {[a['run_id'] for a in lj['attempts']]}")
+nt = next(i for a in cl["levels"]["3"] if a["app"] == "cp2k" for i in a["inputs"] if i["input_id"] == "regtest-gpw-h2o-geoopt")
+if nt["status"] != "NO_TIMED_REGION" or [a["run_id"] for a in nt["attempts"]] != ["run02"]:
+    bad.append(f"26y: latest-only NO_TIMED_REGION input {nt['status']} {[a['run_id'] for a in nt['attempts']]}")
+full = report.build_bundle([root])["campaigns"][0]
+if cl["counts"]["roi_success"] != full["counts"]["roi_success"] or cl["counts"]["unstable"] != full["counts"]["unstable"] or cl["records"] != 2 or len(bl["campaigns"]) != 1:
+    bad.append(f"26y: latest-only counts / records / campaigns {cl['counts']['roi_success']} {cl['records']} {len(bl['campaigns'])}")
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
