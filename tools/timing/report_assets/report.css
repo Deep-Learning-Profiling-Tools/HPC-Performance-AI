@@ -8,6 +8,7 @@
   --ok:#156b4a; --ok-soft:#e3f1ea;
   --trace-bg:#e6ecf1; --trace-hi:#0f6b78; --trace-lo:#a9bcc6;
   --seg-host:#aebcc7; --seg-idle:#c58f3f; --seg-busy:#0f6b78;
+  --bar-pre:#aebcc7; --bar-roi:#0f6b78; --bar-roi-op:.45; --bar-rest:#aebcc7; --bar-post:#a9bcc6;   /* process-time bar */
   --display:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
   --body:"Source Serif 4",Georgia,"Times New Roman",serif;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -22,6 +23,7 @@
     --ok:#5fbf96; --ok-soft:#12291f;
     --trace-bg:#1c2632; --trace-hi:#3fa3b2; --trace-lo:#33434f;
     --seg-host:#485865; --seg-idle:#c08c40; --seg-busy:#3fa3b2;
+    --bar-pre:#8394a2; --bar-roi:#4fb6c5; --bar-roi-op:1; --bar-rest:#5e7180; --bar-post:#7b8c99;
   }
 }
 :root[data-theme="dark"] {
@@ -33,6 +35,7 @@
   --ok:#5fbf96; --ok-soft:#12291f;
   --trace-bg:#1c2632; --trace-hi:#3fa3b2; --trace-lo:#33434f;
   --seg-host:#485865; --seg-idle:#c08c40; --seg-busy:#3fa3b2;
+  --bar-pre:#8394a2; --bar-roi:#4fb6c5; --bar-roi-op:1; --bar-rest:#5e7180; --bar-post:#7b8c99;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -146,12 +149,12 @@ table.matrix .plat small{display:block;font-weight:400;text-transform:none;lette
 td.opname{max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .pbar{display:flex;height:14px;background:var(--trace-bg);border-radius:2px;overflow:hidden;margin-top:12px}
 .pbar i{display:block;height:100%}
-.s-pre{background:var(--seg-host)}
+.s-pre{background:var(--bar-pre)}
 .s-busy{background:var(--seg-busy)}
 .s-idle{background:var(--seg-idle)}
-.s-roi{background:var(--trace-hi);opacity:.45}
-.s-excl{background:repeating-linear-gradient(135deg,var(--seg-host) 0 3px,var(--trace-bg) 3px 6px)}
-.s-post{background:var(--trace-lo)}
+.s-roi{background:var(--bar-roi);opacity:var(--bar-roi-op)}
+.s-excl{background:repeating-linear-gradient(135deg,var(--bar-rest) 0 3px,var(--trace-bg) 3px 6px)}
+.s-post{background:var(--bar-post)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-family:var(--mono);font-size:.71rem;color:var(--ink-2)}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend b{width:11px;height:11px;border-radius:2px;display:block;flex:none}
