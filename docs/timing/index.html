@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HPC-Performance-AI Timing</title>
 <meta name="description" content="Region-of-interest timing of the HPC-Performance-AI Level 1, 2 and 3 suites">
+<script id="theme-init">
+/* theme before first paint: a stored choice (light / dark) wins over the system setting; "auto" stores nothing */
+try { var t = localStorage.getItem("hpcperf-timing-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -61,7 +65,15 @@ button{font:inherit;color:inherit}
 code{font-family:var(--mono);font-size:.86em;background:var(--rule-2);padding:.1em .34em;border-radius:3px;
   overflow-wrap:anywhere}
 
-header.top{padding-block:36px 4px}
+header.top{padding-block:36px 4px;position:relative}
+.theme{position:absolute;top:30px;right:0;display:inline-flex;border:1px solid var(--rule);border-radius:999px;
+  background:var(--surface);padding:2px}
+.theme button{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;color:var(--ink-3);background:none;border:0;
+  border-radius:999px;padding:4px 10px;cursor:pointer}
+.theme button:hover{color:var(--ink)}
+.theme button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.theme button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:640px){.theme{position:static;margin-bottom:14px}}
 .eyebrow{font-family:var(--mono);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
   color:var(--accent);margin-bottom:12px}
 .sub{font-size:1.05rem;color:var(--ink-2);margin-top:12px;max-width:72ch}
@@ -182,6 +194,11 @@ td.opname{max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowr
 <body>
 <div class="wrap">
 <header class="top">
+  <div class="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-theme-choice="auto" aria-pressed="true" title="Follow the system setting">Auto</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+    <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+  </div>
   <div class="eyebrow">tools/timing &middot; latest measurement 2026-10-04T04:09:18Z</div>
   <h1>Timing results</h1>
   <p class="sub">Region-of-interest (ROI) timing of the Level&nbsp;1 benchmarks and the Level&nbsp;2 mini-applications:
@@ -214,6 +231,25 @@ td.opname{max-width:46ch;overflow:hidden;text-overflow:ellipsis;white-space:nowr
 // chosen by tools/timing/registry_view.py) and "cases" (case tables; also every earlier snapshot).
 (function () {
   "use strict";
+  // colour theme: Auto (the system setting, prefers-color-scheme) / Light / Dark. The choice is kept in this
+  // browser only (localStorage, guarded: private windows may refuse it); every colour is a CSS variable, so
+  // switching data-theme on <html> restyles the page at once.
+  (function initTheme() {
+    var KEY = "hpcperf-timing-theme", root = document.documentElement;
+    if (!root) return;
+    var btns = Array.prototype.slice.call(document.querySelectorAll(".theme button")).filter(function (b) { return b.getAttribute("data-theme-choice"); });
+    function current() { var t = root.getAttribute("data-theme"); return t === "light" || t === "dark" ? t : "auto"; }
+    function mark() { var c = current(); btns.forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-theme-choice") === c ? "true" : "false"); }); }
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var c = b.getAttribute("data-theme-choice");
+        if (c === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", c);   // auto: CSS follows prefers-color-scheme
+        try { if (c === "auto") localStorage.removeItem(KEY); else localStorage.setItem(KEY, c); } catch (e) {}
+        mark();
+      });
+    });
+    mark();
+  })();
   var BUNDLE = JSON.parse(document.getElementById("timing-data").textContent);
   var CAMPS = BUNDLE.campaigns || [BUNDLE];
   var D = CAMPS[0];
