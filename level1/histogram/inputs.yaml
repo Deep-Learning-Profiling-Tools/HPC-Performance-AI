@@ -1,0 +1,90 @@
+# Registered inputs of histogram (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: histogram
+level: 1
+selector: null
+default_input: w1920-h1080
+entry:
+  kind: binary
+  path: build/histogram/cuda/histogram_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: two atomics variants (shared / global) each print 'Avg time'; no total
+baseline:
+  method: 'built-in: PASS per variant'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: PASS
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: FAIL
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: ctest run line plus two larger random images through the program's own --width/--height
+inputs:
+- id: w1920-h1080
+  case: histogram-256bin
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/histogram-cuda (= ctest): ./main --i=100 (random 1920x1080 image)'
+  params:
+    width: 1920
+    height: 1080
+    iterations: 100
+  args:
+  - --i=100
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: w3840-h2160
+  case: histogram-256bin
+  variant: size
+  source:
+    kind: derived
+    derivation: --width/--height 3840x2160 (4x pixels)
+  params:
+    width: 3840
+    height: 2160
+    iterations: 100
+  args:
+  - --i=100
+  - --width=3840
+  - --height=2160
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: w7680-h4320
+  case: histogram-256bin
+  variant: size
+  source:
+    kind: derived
+    derivation: --width/--height 7680x4320 (16x pixels)
+  params:
+    width: 7680
+    height: 4320
+    iterations: 100
+  args:
+  - --i=100
+  - --width=7680
+  - --height=4320
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

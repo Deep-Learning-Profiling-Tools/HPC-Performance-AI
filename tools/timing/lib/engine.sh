@@ -20,10 +20,14 @@
 #
 # Raw evidence: <RAW_ROOT>/level<L>/<app>/<case>/<run_id>/
 #   run_meta.txt              case, protocol, platform, provenance (key=value)
-#   warmup.<i>/run.log        discarded
-#   clean.<i>/{run.log,run.txt,roi.<pid>}           Level 1/2
-#   clean.<i>/{run.log,run.txt,app/,app_timer.json}  Level 3
-#   prof/{run.log,run.txt,roi.<pid>|app/,trace.*}
+#   warmup.<i>/{run.log,run.txt,roi.<pid>,bind.<pid>}   discarded from every statistic; the ROI
+#                             time is kept as `roi.warmup_runs_s` (what the first contact cost)
+#   clean.<i>/{run.log,run.txt,roi.<pid>,bind.<pid>}           Level 1/2
+#   clean.<i>/{run.log,run.txt,app/,app_timer.json,bind.<pid>}  Level 3
+#   prof/{run.log,run.txt,roi.<pid>|app/,bind.<pid>,trace.*}
+# bind.<pid> is the placement record of the measured process (probes/bindprobe.c, injected
+# through LD_PRELOAD and written at process exit): the CPU set, NUMA memory set and GPU
+# device it actually ran with. Diagnostic context, outside the ROI, never a metric.
 # After the cases, the engine runs tools/timing/summarize.py on this run (JSON per case,
 # the per-level CSVs and the web page results/timing/report/) unless SUMMARIZE=0.
 
@@ -36,7 +40,8 @@ REPO="$(cd "$TOOLS/../.." && pwd)"
 : "${LEVEL:?}" "${CLEAN_RUNS:=1}" "${WARMUP_RUNS:=0}" "${PROFILED_RUNS:=1}"
 : "${RAW_ROOT:=$REPO/build/timing}" "${COLLECTOR:=auto}" "${ENV_SCRIPT:=}" "${BUILD_ROOT:=}"
 : "${BACKEND:=CUDA}" "${SKIP_VERIFY:=0}" "${DRY_RUN:=0}" "${PROFILE_TIMEOUT_FACTOR:=3}"
-: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${FORCE_PROFILE:=0}"
+: "${SUMMARIZE:=1}" "${RESULTS_ROOT:=$REPO/results/timing}" "${REGISTRY:=0}" "${BIND_PROBE:=1}" "${FORCE_PROFILE:=0}"
+: "${BIND_POLICY:=explicit}"     # Level 2 CPU binding: explicit (cases/level2_binding.tsv) | runtime (the MPI runtime's default)
 # HPCPERF_ROI_LOG is derived from RAW_ROOT and read by processes that run in another cwd
 # (run.sh changes into its run directory): a relative root would silently lose every log.
 case "$RAW_ROOT" in /*) ;; *) RAW_ROOT="$PWD/$RAW_ROOT" ;; esac
@@ -85,6 +90,34 @@ run_clean() {
 
 now_ns() { date +%s%N; }
 
+# bind_env <run dir> -- the two variables that inject the placement probe into a run
+# (nothing when the probe is off or did not build). Word-split on purpose: the raw root
+# is refused when it contains whitespace (engine_setup).
+bind_env() { [ -n "${BINDPROBE_SO:-}" ] && echo "LD_PRELOAD=$BINDPROBE_SO HPCPERF_PLACEMENT_LOG=$1/bind"; return 0; }
+
+# bindprobe_setup: compile tools/timing/probes/bindprobe.c once per raw root (keyed by the
+# source hash) into <RAW_ROOT>/.bindprobe/. A build failure disables the probe for this
+# run and is reported; the measurement itself is unaffected.
+bindprobe_setup() {
+    BINDPROBE_SO=""; BINDPROBE_ID="none"
+    [ "$BIND_PROBE" = 1 ] || return 0
+    [ "$DRY_RUN" != 1 ] || { BINDPROBE_ID="not-built-in-dry-run"; return 0; }
+    local src="$TOOLS/probes/bindprobe.c" sha cc
+    sha=$(sha256sum "$src" | cut -c1-16)
+    cc="${HPCPERF_CC:-cc}"
+    command -v "$cc" >/dev/null 2>&1 || { echo "measure_level${LEVEL}: no C compiler ($cc): placement probe off" >&2; return 0; }
+    BINDPROBE_SO="$RAW_ROOT/.bindprobe/bindprobe-$sha.so"
+    if [ ! -f "$BINDPROBE_SO" ]; then
+        mkdir -p "$RAW_ROOT/.bindprobe"
+        if ! "$cc" -O2 -shared -fPIC -o "$BINDPROBE_SO" "$src" > "$BINDPROBE_SO.log" 2>&1; then
+            echo "measure_level${LEVEL}: placement probe did not build (see $BINDPROBE_SO.log): placement off" >&2
+            rm -f "$BINDPROBE_SO"; BINDPROBE_SO=""
+            return 0
+        fi
+    fi
+    BINDPROBE_ID="bindprobe.c@$sha"
+}
+
 # ROI seconds of one run directory: slowest process, sum(E-B) - excluded (x lines). "-" if none.
 roi_seconds() {
     local f best=""
@@ -130,13 +163,14 @@ l3_collect() {
 
 # ---------------------------------------------------------------- one case
 # fields: level app case backend gpus cwd timeout_s env argv fom_name fom_unit fom_better
-#         fom_source fom_regex roi_excludes verify_vs_roi notes [nvtx_roi] [profile]
+#         fom_source fom_regex roi_excludes verify_vs_roi notes input_id [nvtx_roi] [profile]
+# input_id: the registry input a --registry case measures ("-" for hand-written cases).
 # profile: "yes", or "no (<reason>)" -- the case table's default says not to profile this
 # application (Level 3: QMCPACK); FORCE_PROFILE=1 (--profile-all) profiles it anyway.
 measure_case() {
     local level="$1" app="$2" case="$3" backend="$4" gpus="$5" cwd="$6" tmo="$7" env="$8" argv="$9"
     local fom_name="${10}" fom_unit="${11}" fom_better="${12}" fom_source="${13}" fom_regex="${14}"
-    local roi_excl="${15}" verify="${16}" notes="${17}" nvtx_roi="${18:--}" profile="${19:-yes}"
+    local roi_excl="${15}" verify="${16}" notes="${17}" input_id="${18:--}" nvtx_roi="${19:--}" profile="${20:-yes}"
     local prof_runs="$PROFILED_RUNS" coll="$COLLECTOR" coll_ver="$COLLECTOR_VERSION" prof_skip=""
     case "$profile" in
         no*) if [ "$FORCE_PROFILE" != 1 ] && [ "$prof_runs" -gt 0 ]; then
@@ -155,12 +189,47 @@ measure_case() {
     run_env=("${case_env[@]}")
     case "$level" in 2|3) run_env+=("HPCPERF_GPUS=$gpus") ;; esac
     [ "$SKIP_VERIFY" = 1 ] && run_env+=("HPCPERF_SKIP_VERIFY=1")
+    # Level 2 CPU binding: the per-application policy of cases/level2_binding.tsv reaches the launcher
+    # through its HPCPERF_CPUS_PER_RANK interface (mpirun --map-by ppr:N:node:PE=<c> --bind-to core),
+    # with the OpenMP threads pinned one per core where the application has several; --bind-policy
+    # runtime leaves the MPI runtime's default (one core for a <= 2-rank job with Open MPI 5, as in the
+    # campaigns before 2026-09-30). What was applied is written to run_meta.txt (record: placement.policy).
+    local bind_meta="bind_policy=none"
+    # Level 3: no engine policy -- each run.sh applies its own application-specific CPU/thread policy (CP2K and
+    # QMCPACK --cpus-per-rank 8 with OpenMP threads, DFT-FE 4 bound cores, LAMMPS `t 1`, the others one host
+    # thread); the record says so and its placement block shows the actual placement (decision 2026-10-02)
+    [ "$level" = 3 ] && bind_meta="bind_policy=application"
+    if [ "$level" = 2 ]; then
+        local bind_out
+        bind_out="$(python3 "$TOOLS/cases.py" binding-meta --policy "$BIND_POLICY" "$app")" \
+            || { echo "  $app/$case: no CPU-binding policy in cases/level2_binding.tsv" >&2; return 1; }
+        bind_meta="$bind_out"
+        if [ "$BIND_POLICY" = explicit ]; then
+            local bkv
+            while IFS= read -r bkv; do [ -n "$bkv" ] && run_env+=("$bkv"); done < <(python3 "$TOOLS/cases.py" binding-env "$app")
+        fi
+    fi
 
     local out="$RAW_ROOT/level$level/$app/$case/$RUN_ID"
     local label; label=$(printf 'level%s %-34s' "$level" "$app/$case")
 
+    # A registry case measures one registered input: its workload identity (tools/inputs) is stored
+    # with the raw runs, and a case whose identity cannot be established -- or whose executable
+    # (a compile-time input's own build) does not exist -- is not run at all.
+    local ident_tmp="" ident_status="-"
+    if [ "$input_id" != "-" ]; then
+        ident_tmp="$(mktemp)"
+        python3 "$REPO/tools/inputs/hpcperf_inputs.py" identity "$REPO/level$level/$app" "$input_id" > "$ident_tmp" 2> "$ident_tmp.err"
+        case $? in
+            0) ident_status=ok ;;
+            3) ident_status=incomplete ;;
+            *) ident_status=failed ;;
+        esac
+    fi
+
     if [ "$DRY_RUN" = 1 ]; then
         echo "  $label"
+        [ "$input_id" != "-" ] && echo "    input    $input_id (registry level$level/$app/inputs.yaml; workload identity: $ident_status)"
         echo "    cwd      $cwd"
         if [ "$level" = 3 ]; then
             echo "    env      env -i $(_allowed_pairs | cut -d= -f1 | tr '\n' ' ')${run_env[*]:+${run_env[*]} }HPCPERF_L3_RUN_SUBDIR=$(l3_subdir c0)"
@@ -173,10 +242,23 @@ measure_case() {
         echo "    runs     warmup=$WARMUP_RUNS clean=$CLEAN_RUNS profiled=$prof_runs collector=$coll"
         [ -n "$prof_skip" ] && echo "    profile  skipped by default (cases table): ${prof_skip:0:120}... (--profile-all overrides)"
         echo "    command  timeout $tmo ${cmd[*]}"
+        [ -n "$ident_tmp" ] && rm -f "$ident_tmp" "$ident_tmp.err"
         return 0
     fi
 
     mkdir -p "$out" || return 1
+    local pre_status=""
+    if [ -n "$ident_tmp" ]; then
+        mv "$ident_tmp" "$out/workload_identity.json"
+        [ -s "$ident_tmp.err" ] && mv "$ident_tmp.err" "$out/workload_identity.err" || rm -f "$ident_tmp.err"
+        case "$ident_status" in
+            incomplete) pre_status="identity_incomplete" ;;
+            failed)     pre_status="identity_failed" ;;
+        esac
+        if [ -z "$pre_status" ] && [ "$level" = 1 ] && [ ! -x "${cmd[0]}" ]; then
+            pre_status="build_not_materialized"
+        fi
+    fi
     {
         echo "schema=hpcperf-timing-raw-2"
         echo "run_id=$RUN_ID"
@@ -198,6 +280,8 @@ measure_case() {
         echo "roi_excludes=$roi_excl"
         echo "verify_vs_roi=$verify"
         echo "notes=$notes"
+        echo "input_id=$input_id"
+        [ -f "$out/workload_identity.json" ] && echo "workload_identity_sha256=$(sha256sum "$out/workload_identity.json" | cut -d' ' -f1)"
         echo "nvtx_roi=$nvtx_roi"
         echo "region=$([ "$level" = 3 ] && echo app_timer || echo markers)"
         echo "roi_where=$(roi_where "$app")"
@@ -212,6 +296,8 @@ measure_case() {
         echo "env_script=${ENV_SCRIPT:--}"
         echo "env_allow=$(_env_allow | tr -s ' \n' '  ')"
         echo "env_deny_regex=$ENV_DENY"
+        echo "bind_probe=${BINDPROBE_ID:-none}"
+        echo "$bind_meta"
         echo "platform_id=$PLATFORM_ID"
         echo "device_json=$DEVICE_JSON"
         echo "git_commit=$(git -C "$REPO" rev-parse HEAD 2>/dev/null)"
@@ -220,12 +306,23 @@ measure_case() {
     } > "$out/run_meta.txt"
 
     local i t0 t1 rc d status=ok roi_s="-"
+    if [ -n "$pre_status" ]; then
+        echo "status=$pre_status" >> "$out/run_meta.txt"
+        echo "  $label FAIL ($pre_status: input $input_id not run; see ${out#$REPO/}/workload_identity.*)"
+        return 1
+    fi
+    # Warm-up runs are discarded from every statistic, but their ROI time is recorded: it shows
+    # what the first contact with the input cost (file and JIT caches, device state) next to the
+    # clean runs that follow it.
     i=0
     local -a sub_env=()
     while [ "$i" -lt "$WARMUP_RUNS" ]; do
-        mkdir -p "$out/warmup.$i"
-        sub_env=(); [ "$level" = 3 ] && sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir "w$i")")
-        run_clean "$out/warmup.$i/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- timeout "$tmo" "${cmd[@]}"
+        d="$out/warmup.$i"; mkdir -p "$d"
+        if [ "$level" = 3 ]; then sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir "w$i")"); else sub_env=("HPCPERF_ROI_LOG=$d/roi"); fi
+        t0=$(now_ns)
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
+        rc=$?; t1=$(now_ns)
+        echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         i=$((i + 1))
     done
 
@@ -234,7 +331,7 @@ measure_case() {
         d="$out/clean.$i"; mkdir -p "$d"
         if [ "$level" = 3 ]; then sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir "c$i")"); else sub_env=("HPCPERF_ROI_LOG=$d/roi"); fi
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- timeout "$tmo" "${cmd[@]}"
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" $(bind_env "$d") -- timeout "$tmo" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
         if [ "$rc" -ne 0 ]; then
@@ -263,6 +360,16 @@ measure_case() {
         [ "$i" -eq 0 ] && roi_s=$(roi_seconds "$d")
         i=$((i + 1))
     done
+    # The executable the ROI processes ran (from their own logs), hashed now, at measurement
+    # time: a Level 2 run.sh chooses its binary itself, so the front-end could not hash it
+    # up front the way Level 1 does. Written when every ROI process ran the same file.
+    if [ "$status" = ok ] && [ "$level" != 1 ]; then
+        local exes; exes=$(awk '/^exe /{print $2}' "$out"/clean.0/roi.* 2>/dev/null | sort -u)
+        if [ "$(printf '%s\n' "$exes" | /usr/bin/grep -c .)" = 1 ] && [ -f "$exes" ]; then
+            echo "exe_path=$exes" >> "$out/run_meta.txt"
+            echo "exe_sha256=$(sha256sum "$exes" | cut -d' ' -f1)" >> "$out/run_meta.txt"
+        fi
+    fi
 
     local prof_note=""
     if [ "$status" = ok ] && [ "$prof_runs" -gt 0 ] && [ "$coll" != none ]; then
@@ -270,7 +377,7 @@ measure_case() {
         collector_wrap "$coll" "$d/trace" || return 2
         if [ "$level" = 3 ]; then sub_env=("HPCPERF_L3_RUN_SUBDIR=$(l3_subdir prof)"); else sub_env=("HPCPERF_ROI_LOG=$d/roi"); fi
         t0=$(now_ns)
-        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" -- \
+        run_clean "$d/run.log" "$cwd" "${run_env[@]}" "${sub_env[@]}" $(bind_env "$d") -- \
             timeout "$((tmo * PROFILE_TIMEOUT_FACTOR))" "${COLLECTOR_ARGV[@]}" "${cmd[@]}"
         rc=$?; t1=$(now_ns)
         echo "start_ns=$t0 end_ns=$t1 rc=$rc" > "$d/run.txt"
@@ -303,11 +410,17 @@ engine_setup() {
         case "$ENV_SCRIPT" in /*) ENV_SCRIPT_ABS="$ENV_SCRIPT" ;; *) ENV_SCRIPT_ABS="$REPO/$ENV_SCRIPT" ;; esac
         [ -f "$ENV_SCRIPT_ABS" ] || engine_die "environment script not found: $ENV_SCRIPT (pass --env-script)"
     fi
-    local probe_log; probe_log="$(mktemp)"
-    run_clean "$probe_log" "$REPO" -- python3 "$TOOLS/probes/device.py"
-    DEVICE_JSON="$(tail -1 "$probe_log")"; rm -f "$probe_log"
-    PLATFORM_ID="$(printf '%s' "$DEVICE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["device"]["platform_id"])' 2>/dev/null)"
-    [ -n "$PLATFORM_ID" ] || engine_die "device probe failed: $DEVICE_JSON"
+    # A dry run starts nothing in the clean environment, not even the device probe: it is a
+    # static plan (tests/run_all.sh 14 checks this with shims for env/timeout/mpirun).
+    if [ "$DRY_RUN" = 1 ]; then
+        DEVICE_JSON="{}"; PLATFORM_ID="not-probed-in-dry-run"
+    else
+        local probe_log; probe_log="$(mktemp)"
+        run_clean "$probe_log" "$REPO" -- python3 "$TOOLS/probes/device.py"
+        DEVICE_JSON="$(tail -1 "$probe_log")"; rm -f "$probe_log"
+        PLATFORM_ID="$(printf '%s' "$DEVICE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["device"]["platform_id"])' 2>/dev/null)"
+        [ -n "$PLATFORM_ID" ] || engine_die "device probe failed: $DEVICE_JSON"
+    fi
     if [ "$COLLECTOR" = auto ]; then
         case "$PLATFORM_ID" in
             nvidia-*) if collector_available nvidia_nsys; then COLLECTOR=nvidia_nsys; else COLLECTOR=none; fi ;;
@@ -319,11 +432,14 @@ engine_setup() {
         collector_available "$COLLECTOR" || engine_die "collector $COLLECTOR is not available here"
     fi
     COLLECTOR_VERSION="$(collector_version "$COLLECTOR")"
+    case "$RAW_ROOT" in *[[:space:]]*) engine_die "raw root must not contain whitespace: $RAW_ROOT" ;; esac
+    bindprobe_setup
     RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 }
 
 engine_main() {
     local -a resolve=(python3 "$TOOLS/cases.py" resolve --level "$LEVEL" --backend "$BACKEND")
+    [ "$REGISTRY" = 1 ] && resolve+=(--registry)
     [ -n "$BUILD_ROOT" ] && resolve+=(--build-root "$BUILD_ROOT")
     local rows
     rows="$("${resolve[@]}" "$@")" || exit 2
@@ -332,7 +448,8 @@ engine_main() {
 
     local n; n=$(printf '%s\n' "$rows" | wc -l)
     echo "measure_level${LEVEL}: run_id=$RUN_ID platform=$PLATFORM_ID collector=$COLLECTOR cases=$n" \
-         "protocol=warmup:$WARMUP_RUNS,clean:$CLEAN_RUNS,profiled:$PROFILED_RUNS skip_verify=$SKIP_VERIFY"
+         "protocol=warmup:$WARMUP_RUNS,clean:$CLEAN_RUNS,profiled:$PROFILED_RUNS skip_verify=$SKIP_VERIFY" \
+         "bind_probe=$BINDPROBE_ID$([ "$LEVEL" = 2 ] && echo " bind_policy=$BIND_POLICY")"
     if [ "$COLLECTOR" = none ] && [ "$PROFILED_RUNS" -gt 0 ]; then
         echo "measure_level${LEVEL}: no profiler for $PLATFORM_ID -- ROI time and FOM only, device columns will be null"
     fi
@@ -340,7 +457,7 @@ engine_main() {
     local rc_all=0
     local -a f
     while IFS=$'\t' read -r -a f; do
-        [ "${#f[@]}" -eq 19 ] || engine_die "malformed case row (${#f[@]} fields)"
+        [ "${#f[@]}" -eq 20 ] || engine_die "malformed case row (${#f[@]} fields)"
         measure_case "${f[@]}" < /dev/null || rc_all=1
     done <<< "$rows"
     if [ "$DRY_RUN" != 1 ] && [ "$SUMMARIZE" = 1 ]; then

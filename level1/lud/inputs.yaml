@@ -1,0 +1,95 @@
+# Registered inputs of lud (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: lud
+level: 1
+selector: null
+default_input: s256
+entry:
+  kind: binary
+  path: build/lud/cuda/lud_cuda
+timing:
+  scope: the benchmark's own timer around the LU decomposition kernels (matrix generation and the -v verification
+    excluded)
+  kind: total
+  unit: ms
+  regex: '^Time consumed\(ms\): (?P<value>[0-9.eE+-]+)'
+  select: only
+baseline:
+  method: 'built-in -v: L*U recombined and compared with the original matrix; ''dismatch'' printed on failure'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: verify_marker
+    role: required
+    regex: '>>>Verify<<<<'
+    compare:
+      rule: present
+  - name: dismatch
+    role: required
+    regex: dismatch
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: three matrix sizes through upstream's built-in generator (-s)
+inputs:
+- id: s256
+  case: lud-generated
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'cuda/lud run: ./lud -s 256 -v (= ctest; upstream''s built-in matrix generator)'
+  params:
+    n: 256
+  args:
+  - -s
+  - '256'
+  - -v
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: s2048
+  case: lud-generated
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: -s 2048 (the size of upstream's 2048.dat)
+  params:
+    n: 2048
+  args:
+  - -s
+  - '2048'
+  - -v
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: s8192
+  case: lud-generated
+  variant: size
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: -s 8192
+  params:
+    n: 8192
+  args:
+  - -s
+  - '8192'
+  - -v
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

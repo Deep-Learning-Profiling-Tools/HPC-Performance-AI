@@ -71,6 +71,10 @@ class Solver : public SolverBase
             bulk_modulus, density, gamma, kappa );
 
         MPI_Comm_rank( comm, &_rank );
+
+        // tools/inputs correctness signature: the global particle count at the start (see printFinalState)
+        unsigned long long n_local = _pm->numParticle();
+        MPI_Allreduce( &n_local, &_num_particles_initial, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, comm );
     }
 
     void solve( const double t_final, const int write_freq ) override
@@ -106,6 +110,75 @@ class Solver : public SolverBase
             if ( hpcperf_output ) HPCPERF_ROI_EXCLUDE_END();
         }
         HPCPERF_ROI_END_SYNC();
+        // tools/inputs correctness signature: conserved quantities of the final state, after the ROI
+        printFinalState();
+    }
+
+    // Final-state summary for the correctness check (level2/exampm/inputs.yaml `baseline.quantities`):
+    // the global particle count (must equal the initial count), the position bounds (the fluid stays in
+    // the unit cube), the total volume sum(J)/N_0 (the deformation-gradient determinant summed over the
+    // particles, 1 for the incompressible-ish fluid) and, as diagnostics, the mean velocity and centre of
+    // mass. Computed with device reductions after the time loop -- never inside the ROI -- and printed
+    // by rank 0 with full precision. The computation of the run is not touched.
+    void printFinalState()
+    {
+        auto x_p = _pm->get( Location::Particle(), Field::Position() );
+        auto u_p = _pm->get( Location::Particle(), Field::Velocity() );
+        auto j_p = _pm->get( Location::Particle(), Field::J() );
+        const int n = _pm->numParticle();
+        Kokkos::RangePolicy<ExecutionSpace> policy( 0, n );
+        double sum_j = 0.0, pos_min = 1.0e300, pos_max = -1.0e300;
+        double sum_u[3] = { 0.0, 0.0, 0.0 }, sum_x[3] = { 0.0, 0.0, 0.0 };
+        Kokkos::parallel_reduce(
+            "hpcperf_final_sum_j", policy,
+            KOKKOS_LAMBDA( const int p, double& s ) { s += j_p( p ); }, sum_j );
+        Kokkos::parallel_reduce(
+            "hpcperf_final_pos_min", policy,
+            KOKKOS_LAMBDA( const int p, double& m ) {
+                for ( int d = 0; d < 3; ++d )
+                    m = ( x_p( p, d ) < m ) ? x_p( p, d ) : m;
+            },
+            Kokkos::Min<double>( pos_min ) );
+        Kokkos::parallel_reduce(
+            "hpcperf_final_pos_max", policy,
+            KOKKOS_LAMBDA( const int p, double& m ) {
+                for ( int d = 0; d < 3; ++d )
+                    m = ( x_p( p, d ) > m ) ? x_p( p, d ) : m;
+            },
+            Kokkos::Max<double>( pos_max ) );
+        for ( int d = 0; d < 3; ++d )
+        {
+            Kokkos::parallel_reduce(
+                "hpcperf_final_sum_u", policy,
+                KOKKOS_LAMBDA( const int p, double& s ) { s += u_p( p, d ); }, sum_u[d] );
+            Kokkos::parallel_reduce(
+                "hpcperf_final_sum_x", policy,
+                KOKKOS_LAMBDA( const int p, double& s ) { s += x_p( p, d ); }, sum_x[d] );
+        }
+        Kokkos::fence();
+        MPI_Comm comm = _mesh->localGrid()->globalGrid().comm();
+        unsigned long long n_local = n, n_global = 0;
+        double g_sum_j, g_min, g_max, g_sum_u[3], g_sum_x[3];
+        MPI_Allreduce( &n_local, &n_global, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, comm );
+        MPI_Allreduce( &sum_j, &g_sum_j, 1, MPI_DOUBLE, MPI_SUM, comm );
+        MPI_Allreduce( &pos_min, &g_min, 1, MPI_DOUBLE, MPI_MIN, comm );
+        MPI_Allreduce( &pos_max, &g_max, 1, MPI_DOUBLE, MPI_MAX, comm );
+        MPI_Allreduce( sum_u, g_sum_u, 3, MPI_DOUBLE, MPI_SUM, comm );
+        MPI_Allreduce( sum_x, g_sum_x, 3, MPI_DOUBLE, MPI_SUM, comm );
+        if ( 0 == _rank )
+        {
+            const double n0 = static_cast<double>( _num_particles_initial );
+            const double ng = static_cast<double>( n_global );
+            printf( "ExaMPM final state: step %d time %.17g particles %llu initial %llu "
+                    "pos_min %.17g pos_max %.17g volume_ratio %.17g "
+                    "v_mean %.17g %.17g %.17g x_mean %.17g %.17g %.17g\n",
+                    _step, _time, n_global, _num_particles_initial, g_min, g_max,
+                    ( n0 > 0.0 ) ? g_sum_j / n0 : 0.0,
+                    ( ng > 0.0 ) ? g_sum_u[0] / ng : 0.0, ( ng > 0.0 ) ? g_sum_u[1] / ng : 0.0,
+                    ( ng > 0.0 ) ? g_sum_u[2] / ng : 0.0, ( ng > 0.0 ) ? g_sum_x[0] / ng : 0.0,
+                    ( ng > 0.0 ) ? g_sum_x[1] / ng : 0.0, ( ng > 0.0 ) ? g_sum_x[2] / ng : 0.0 );
+            fflush( stdout );
+        }
     }
 
     void outputParticles()
@@ -145,6 +218,7 @@ class Solver : public SolverBase
     std::shared_ptr<Mesh<MemorySpace>> _mesh;
     std::shared_ptr<ProblemManager<MemorySpace>> _pm;
     int _rank;
+    unsigned long long _num_particles_initial = 0;
 };
 
 //---------------------------------------------------------------------------//

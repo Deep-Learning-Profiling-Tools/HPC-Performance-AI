@@ -1,7 +1,8 @@
 name: lammps
 level: 3
 application: LAMMPS
-description: LAMMPS KOKKOS/CUDA package, Lennard-Jones bench deck (in.lj) at 1/2/4 GPUs, one MPI rank per GPU
+description: LAMMPS KOKKOS/CUDA package, upstream bench/ decks (in.lj default; in.eam, in.rhodo and scaled in.lj sizes
+  registered in inputs.yaml, HPCPERF_LAMMPS_INPUT) at 1/2/4 GPUs, one MPI rank per GPU
 supported_backends:
 - cuda
 - hip
@@ -20,12 +21,20 @@ run_entry: ./run.sh
 validate_entry: ./validate.sh
 environment_profile: hpcperf_env.sh (conda GCC 13.3.0 host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile gmu-hopper)
 install_root: .deps/level3/lammps/cuda
-profile_scheme: '<backend> (cuda validated; hip: build path present, untested -- no ROCm on the validation node); override HPCPERF_LAMMPS_PROFILE must name the backend; generated state .deps/level3/lammps/<profile>/ and build/level3/lammps/<profile>/'
+profile_scheme: '<backend> or <variant>.<backend> (cuda validated; reaxff.cuda = HPCPERF_LAMMPS_VARIANT=reaxff adds the REAXFF package, validated 2026-09-21; hip: build path present, untested -- no ROCm on the validation node); override HPCPERF_LAMMPS_PROFILE must name the backend; generated state .deps/level3/lammps/<profile>/ and build/level3/lammps/<profile>/'
 dependency_installs: []
 inputs:
 - src/bench/in.lj
+- src/bench/in.eam
+- src/bench/Cu_u3.eam
+- src/bench/in.rhodo
+- src/bench/data.rhodo
+registered_inputs: inputs.yaml       # schema hpcperf-inputs-1; ids lj-32k lj-2m lj-16m eam-32k rhodo-32k (profile cuda), reaxff-hns-2k reaxff-hns-16k (profile reaxff.cuda, HPCPERF_LAMMPS_VARIANT=reaxff) (tools/inputs/)
 references:
+- src/examples/reaxff/HNS/log.30Nov23.reaxff.hns.g++.1
 - src/bench/log.15Jul25.lj.fixed.g++.1
+- src/bench/log.15Jul25.eam.fixed.g++.1
+- src/bench/log.15Jul25.rhodo.fixed.g++.1
 source_version: hpcperf-l3-v1
 source_tree_sha256: d7549c2f6d1b5b6c76575b7bf3b0f528cfa69b9b057aa0b3ef0f03921bdf8e48
 source_artifact:

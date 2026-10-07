@@ -67,7 +67,16 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../tools" && pwd)/hpcperf_launch_co
 if [ -n "${HIPBONE_NP:-}" ] && [ -z "${HPCPERF_GPUS:-}${HPCPERF_NP:-}" ]; then export HPCPERF_NP="$HIPBONE_NP"; fi   # legacy alias
 N_RANKS="$(hpcperf_ranks hipbone no)" || exit 2   # HPCPERF_GPUS (or legacy HPCPERF_NP/HIPBONE_NP); no scale modes yet
 
-if [ $# -gt 0 ]; then
+# Registered inputs (inputs.yaml, tools/inputs/hpcperf_inputs.py): HPCPERF_HIPBONE_INPUT=<id>
+# selects a registered problem; the id defines the whole hipBone argument list, so it is
+# mutually exclusive with extra arguments. Unset -> the default problem / extra args as before.
+INPUT_ID="${HPCPERF_HIPBONE_INPUT:-}"
+if [ -n "$INPUT_ID" ]; then
+    [ $# -eq 0 ] || { echo "run.sh: HPCPERF_HIPBONE_INPUT=$INPUT_ID and extra hipBone arguments are mutually exclusive (the input id defines the problem)" >&2; exit 2; }
+    ARGS_TXT="$(python3 "$R/tools/inputs/hpcperf_inputs.py" args "$HERE" "$INPUT_ID")" || exit 2
+    [ -n "$ARGS_TXT" ] || { echo "run.sh: input '$INPUT_ID' resolved to no arguments" >&2; exit 2; }
+    mapfile -t ARGS <<< "$ARGS_TXT"
+elif [ $# -gt 0 ]; then
     ARGS=("$@")
 else
     ARGS=(-nx 24 -ny 24 -nz 24 -p 14)
@@ -94,5 +103,5 @@ fi
 MPIRUN=("$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind app --)
 
 cd "$BUILD"
-echo "== hipBone $BACKEND: ${MPIRUN[*]} ./hipBone -m $BACKEND ${ARGS[*]}  (OMP_NUM_THREADS=$OMP_NUM_THREADS)"
+echo "== hipBone $BACKEND: ${MPIRUN[*]} ./hipBone -m $BACKEND ${ARGS[*]}  (OMP_NUM_THREADS=$OMP_NUM_THREADS${INPUT_ID:+, input=$INPUT_ID})"
 exec "${MPIRUN[@]}" ./hipBone -m "$BACKEND" "${ARGS[@]}"

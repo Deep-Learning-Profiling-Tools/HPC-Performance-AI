@@ -11,6 +11,8 @@
 #   HPCPERF_TEALEAF_DECK  input deck (absolute path, or a name relative to
 #                         level2/tealeaf, e.g. Benchmarks/tea_bm_4.in)
 #   HPCPERF_NP            number of MPI ranks (default 1)
+#   HPCPERF_TEALEAF_INPUT a registered input id (inputs.yaml); mutually exclusive
+#                         with HPCPERF_TEALEAF_DECK and extra arguments
 #
 # Other upstream decks (all validated against tea.problems by the app):
 #   Benchmarks/tea_bm_4.in      1000x1000 @ 10 steps  (~1 s on B200)
@@ -40,7 +42,21 @@ if [ ! -x "$EXE" ]; then
     exit 1
 fi
 
-DECK="${HPCPERF_TEALEAF_DECK:-Benchmarks/tea_bm_5.in}"
+INPUT_ID="${HPCPERF_TEALEAF_INPUT:-}"
+OUT_NAME="tea.out"
+if [ -n "$INPUT_ID" ]; then
+    # A registered input (inputs.yaml, tools/inputs/hpcperf_inputs.py) defines the deck; it
+    # is refused together with HPCPERF_TEALEAF_DECK or extra tealeaf arguments so that
+    # nothing is silently overridden.
+    if [ -n "${HPCPERF_TEALEAF_DECK:-}" ] || [ $# -gt 0 ]; then
+        echo "run.sh: HPCPERF_TEALEAF_INPUT=$INPUT_ID is mutually exclusive with HPCPERF_TEALEAF_DECK and extra arguments" >&2
+        exit 2
+    fi
+    DECK="$(python3 "$R/tools/inputs/hpcperf_inputs.py" param "$HERE" "$INPUT_ID" deck)" || exit 2
+    OUT_NAME="tea.input.$INPUT_ID.out"     # one log file per registered input
+else
+    DECK="${HPCPERF_TEALEAF_DECK:-Benchmarks/tea_bm_5.in}"
+fi
 case "$DECK" in /*) ;; *) DECK="$HERE/$DECK" ;; esac
 if [ ! -f "$DECK" ]; then
     echo "run.sh: deck $DECK not found" >&2
@@ -65,9 +81,9 @@ elif [ "$N_RANKS" -ne 1 ]; then
     exit 2
 fi
 
-echo "# TeaLeaf $BACKEND: ${LAUNCH[*]:-} $EXE --file $DECK"
+echo "# TeaLeaf $BACKEND: ${LAUNCH[*]:-} $EXE --file $DECK${INPUT_ID:+ input=$INPUT_ID}"
 exec "${LAUNCH[@]}" "$EXE" \
     --file "$DECK" \
     --problems "$HERE/tea.problems" \
-    --out "$OUT_DIR/tea.out" \
+    --out "$OUT_DIR/$OUT_NAME" \
     "$@"

@@ -156,6 +156,20 @@ Observed on dgx003 (2026-09-05), `hypregpu` variant:
 Earlier CI L2 errors (cimode 2): velocity 2.78e-10, pressure 6.98e-10, scalars
 6.67e-12 / 7.49e-12 (CI references 2.77e-10 / 7.14e-10 / 7.49e-12 / 7.22e-12).
 
+### Correctness of the registered timing inputs (2026-10-02)
+
+The three registered inputs (`inputs.yaml`: ethier-n9-100, ethier-refine4-n7, ethier-refine10-n7) are
+plain `ethier` runs, not `--cimode` runs: the solver settings are the deck's. **Correction (2026-10-06):** a
+plain run does print the exact-solution error -- `ethier.usr` `userchk`, called from `UDF_ExecuteStep` every
+step, writes the mass-weighted L2 errors of u_x, p and both scalars against the Ethier-Steinman solution
+(`... L2 err`; e.g. ethier-n9-100 at step 100: 3.63e-10 / 6.64e-10 / 1.08e-11 / 1.40e-11). The 2026-10-02
+note here said the error is computed only in CI mode; that was wrong. The registry records the four errors
+as diagnostics (`l2err_*_final`). Correctness stays **INCOMPLETE** because no tolerance exists for this
+configuration: `ci.inc`'s references and EPS 0.3 belong to the CI settings (t = 0.06, CI solver overrides,
+N = 9), `--cimode` would change the registered workload (and force N = 9 on the N = 7 refine inputs), and a
+band around this build's own first run or an absolute bound would be a tolerance chosen now. The `ci_failed`
+rule ("no `CI test ... failed` line") was vacuous for a plain run and stays a diagnostic.
+
 ## Results on dgx003 (4x B200, CUDA 13.2.78, Slurm job 9552083)
 
 | Run | Ranks x GPUs | rank->GPU | CPU binding | Topology | Problem | Time | Validation |

@@ -37,7 +37,8 @@ pinned commit). Not copied: the TriBITS `CMakeLists.txt` of the example (see "Ch
   `tools/timing/roi/README.md`.
 
 - No other source change (`src/UPSTREAM_SHA256SUMS` keeps upstream's checksums; `main.cpp` differs from
-  them only by the marker lines). `main.cpp`, `MiniEM_helpers.cpp`, `MiniEM_helpers.hpp` and the decks compile and run
+  them by the marker lines and, since 2026-09-30, by the final-solution 2-norm print after the ROI, see
+  "Correctness check"). `main.cpp`, `MiniEM_helpers.cpp`, `MiniEM_helpers.hpp` and the decks compile and run
   unmodified with CUDA 13.2 / GCC 13.3 / Kokkos 5.2.1 against this repo's Trilinos.
 - `src/CMakeLists.txt` is new: upstream builds the driver only through TriBITS as part of a Trilinos source
   build (`TRIBITS_ADD_EXECUTABLE(BlockPrec ...)`, not installed). Here the driver is compiled as a stand-alone
@@ -122,6 +123,23 @@ Results (2026-09-14, this node): L2 error E = **0.0566793** at 1 rank, **0.05667
 implicit steps (the driver's `--numTimeSteps` is superseded by the deck's final time). GPU binding audit: N verified,
 0 mismatch at every rank count.
 
+## Correctness check of the registered inputs (2026-09-30)
+
+* **Maxwell decks** (`maxwell-large-*`, `maxwell-smoke-15`): `em_energy_final`, the deck's
+  "Electromagnetic Energy" response after the last step, is compared with the same-deck run of the
+  unoptimized reference build (the working baseline) at `rel 1e-4` = one unit in the last of the five
+  significant digits the driver prints. The reference build reproduced the printed value exactly in
+  five repeat runs of every Maxwell input (2026-09-28); the tolerance only keeps a value at a rounding
+  boundary of two converged solves (Belos, 1e-8 relative residual) from failing on the printed digit.
+* **Every deck**: `main.cpp` now prints `hpcperf: final solution 2-norm = ...` (15 significant
+  digits) after the synchronized end of the ROI -- a deterministic functional of the final state,
+  outside the measured region, for decks without a Responses block (`darcyHex.xml`) as well. The
+  registry compares it (`solution_norm_final`, required) at `rel 1e-8`, the deck's Belos convergence
+  tolerance (`solverMueLu.xml`): two solves that satisfy the deck's own convergence criterion agree in
+  the solution to the order of that tolerance. The reference build's 7 runs per input (2026-09-30
+  campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics). The change alters the
+  binary's sha256, so the MiniEM timing inputs were re-measured with it (the 2026-09-30 Level 2 campaign).
+
 ## Warnings
 
 - **GPU-aware MPI is off for MiniEM** (`TPETRA_ASSUME_GPU_AWARE_MPI=0`, exported by `run.sh`): Tpetra asks Open MPI
@@ -137,6 +155,21 @@ implicit steps (the driver's `--numTimeSteps` is superseded by the deck's final 
 - Static Trilinos libraries (as every Level 2 dependency); the driver links ~60 of them.
 - Exodus output is off by default (`--exodus-output` writes mesh files through Ioss/netCDF); the validation
   does not exercise it.
+- **The upstream decks `maxwell-bdot-small.xml`, `maxwell-bdot-medium.xml` and `maxwell-blob-R1.xml` are not
+  registered inputs** (they were until 2026-09-26). They do not run with this driver (exit 134, before the ROI),
+  for two independent reasons found in a bounded check:
+  1. The driver reads the equation set as `sublist("Maxwell Physics").sublist("Maxwell Physics")`
+     (`src/main.cpp:246`, unchanged from upstream), but these decks leave that inner `<ParameterList>`
+     unnamed. The result is `Teuchos InvalidParameterName: "Type" does not exist`.
+  2. The decks read Exodus meshes (`BDot.small.gen`, `BDot.medium.gen`, `blob-R1.g`) that are not in the
+     pinned Trilinos source or in this repository. With the list named in a scratch copy, the run stops at
+     `Could not open database 'BDot.small.gen'`.
+
+  The decks are byte-identical to the pinned upstream. Upstream copies them but runs no test with them. They are
+  kept unmodified in `src/decks/` and listed under `upstream_inputs_not_added` in `inputs.yaml`.
+
+  The decks are byte-identical to the pinned upstream. Upstream copies them but runs no test with them. They are
+  kept unmodified, and the inputs stay registered and reported as failed, not measured.
 
 ## LOC
 

@@ -1,0 +1,173 @@
+# Registered inputs of nekrs (schema hpcperf-inputs-1), selected through HPCPERF_NEKRS_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: nekrs
+level: 3
+selector: HPCPERF_NEKRS_INPUT
+default_input: ethier-n9-100
+entry:
+  kind: run.sh
+  path: level3/nekrs/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    nekRS's own elapsedStepSum after the last step (this stdout line): the sum of the time-step wall times
+    between MPI barriers; set-up, JIT compilation and the 'runtime statistics' totalElapsed (which includes
+    them) are excluded. The headline timer of tools/timing (apptimers.py: nekrs) is the 'solve' row of the
+    final runtime statistics (= elapsedStepSum, maximum over ranks) minus its 'checkpointing' row (field-file
+    output inside the loop, reported as excluded time): smaller than this line by the checkpointing time
+    when the case writes fields.
+  kind: total
+  unit: s
+  regex: elapsedStepSum=\s*(?P<value>[0-9.eE+-]+)s
+  select: last
+  app_timer:
+    source: tools/timing/apptimers.py:nekrs
+    region: "'solve' minus 'checkpointing' of the final runtime statistics (src/app/nrs/nrs.cpp, src/bin/driver.cpp, src/platform/timer.cpp)"
+    relation: 'this stdout timer includes the in-loop checkpoint writes; the headline excludes them (excluded_s)'
+baseline:
+  method: >-
+    upstream's --cimode CI checks ('CI test <name> passed': L2 errors of velocity / pressure / scalars against the exact
+    Ethier-Steinman solution, EPS 0.3 around per-mode references, plus iteration counts) are run by validate.sh on the base
+    ethier case; CI mode overrides the deck's settings, so it validates the build, not a registered plain run. A plain run
+    prints the same exact-solution L2 errors every step (ethier.usr userchk, 'L2 err' lines) and the divergence error; both
+    are recorded as diagnostics. No upstream tolerance exists for the plain configuration (2026-10-06).
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: div_u_err_final
+    role: diagnostic
+    regex: divUErr\s*:\s*(?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+  - name: l2err_u_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 1 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+\S+\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_p_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 2 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_s00_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 3 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+\S+\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: l2err_s01_final
+    # the exact-solution L2 error printed by ethier.usr userchk at the last step (column 4 of the 'L2 err' line); no
+    # upstream bound exists for the plain configuration -> recorded only (2026-10-06)
+    role: diagnostic
+    regex: '^\s*\d+\s+\S+\s+\S+\s+\S+\s+\S+\s+(?P<value>[0-9.eE+-]+)\s+L2 err'
+    select: last
+    compare:
+      rule: record
+  - name: ci_failed
+    # DIAGNOSTIC since 2026-10-02: 'CI test ... failed' is printed by the ethier udf only under --cimode, which the registered
+    # plain runs do not use -- in a plain run the line is absent whatever the solution, so the rule verified nothing. The
+    # earlier PASS verdicts of ethier-n9-100 / ethier-refine4-n7 rested on this vacuous rule and are withdrawn (INCOMPLETE).
+    role: diagnostic
+    regex: CI test .* failed
+    compare:
+      rule: absent
+coverage:
+  status: MULTI_INPUT
+  reason: the ethier case at three refinements is registered
+  blocker: the other upstream examples (turbPipe, tgv, channel, rbc, kershaw, lowMach, ...) are in the frozen tree
+    but run.sh hard-wires --setup ethier and copies that case directory; a case selector is a run.sh change (not
+    done this round)
+  upstream_inputs_not_added:
+  - examples/turbPipe
+  - examples/tgv
+  - examples/channel
+  - examples/rbc
+  - examples/kershaw
+  - examples/lowMach
+  - '...'
+inputs:
+- id: ethier-n9-100
+  check:
+    kind: none
+    reason: >-
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
+  case: ethier
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: Nek5000/nekRS
+      version: hpcperf-l3-v1 (nekRS v26.0 frozen tree, variant hypregpu)
+      path: examples/ethier/ethier.par as shipped (32 elements, N=9, 100 steps) -- run.sh smoke
+  params:
+    case: ethier
+    elements: 32
+    order: 9
+    steps: 100
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: ethier-refine4-n7
+  check:
+    kind: none
+    reason: >-
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
+  case: ethier
+  variant: size
+  source:
+    kind: derived
+    derivation: examples/ethier/ethierRefine.par with hrefine=4 (2,048 elements, N=7) -- run.sh strong mode with
+      HPCPERF_NEKRS_HREFINE=4; only hrefine/numSteps differ (class A)
+  params:
+    case: ethier
+    hrefine: 4
+    elements: 2048
+    order: 7
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_NEKRS_HREFINE: '4'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: ethier-refine10-n7
+  check:
+    kind: none
+    reason: >-
+      the plain ethier run DOES print the exact-solution error: ethier.usr userchk writes the mass-weighted L2 errors of u_x, p, s00, s01 against the Ethier-Steinman analytic solution at every step ('... L2 err', recorded below as diagnostics l2err_*_final); the 2026-10-02 statement that only --cimode computes it was wrong (corrected 2026-10-06). What is missing is a TOLERANCE for this configuration: upstream's ci.inc references and its EPS 0.3 band belong to the CI settings (t = 0.06, CI solver overrides, N=9 ethier), and --cimode would change the registered workload (end time, solvers; it also forces N=9 on the N=7 refine inputs). A self-frozen reference band or an absolute bound would be a project tolerance chosen now -- not adopted. Missing criterion: an accepted error bound for the plain ethier configuration (INCOMPLETE)
+  case: ethier
+  variant: size
+  source:
+    kind: derived
+    derivation: ethierRefine.par with hrefine=10 (32,000 elements, N=7; run.sh strong default)
+  params:
+    case: ethier
+    hrefine: 10
+    elements: 32000
+    order: 7
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_NEKRS_HREFINE: '10'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

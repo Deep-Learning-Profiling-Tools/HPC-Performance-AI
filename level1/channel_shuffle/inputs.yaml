@@ -1,0 +1,133 @@
+# Registered inputs of channel_shuffle (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: channel_shuffle
+level: 1
+selector: null
+default_input: g2-w224-h224
+entry:
+  kind: binary
+  path: build/channel_shuffle/cuda/channel_shuffle_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: per-layout timers (NHWC, NCHW) for several kernel variants; no total
+baseline:
+  method: built-in memcmp against the CPU reference; a message is printed only on mismatch
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: fail_marker
+    role: required
+    regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
+    compare:
+      rule: absent
+  # the "Average time" line of a layout is printed only after its memcmp against the CPU reference passed
+  # (cuda/main.cu); a run under HPCPERF_SKIP_VERIFY prints neither, so their presence is the evidence that the
+  # built-in check ran (the absence of the failure marker alone is not)
+  - name: nhwc_checked
+    role: required
+    regex: '^Average time of channel shuffle \(NHWC\):'
+    compare:
+      rule: present
+  - name: nchw_checked
+    role: required
+    regex: '^Average time of channel shuffle \(NCHW\):'
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: upstream run line plus the largest map the program can sweep completely and another group count
+  # The earlier derived input g2-w512-h512 (feature map 512x512) was deregistered on 2026-09-28: upstream's
+  # main.cu computes `const int numel = N * C * W * H` ("assume no integer overflow", cuda/main.cu:149) and
+  # the sweep N in {1,4,16,64} x C in {32,128,512} overflows at (N=16, C=512, 512x512); cudaMalloc fails,
+  # the program prints "Device memory allocation failed. Exit" and exits 0 after 8 of its 12 configurations.
+  # Every measurement of that input ran the truncated sweep and is INVALIDATED (results directory
+  # inputs-roi-timing-2026-09-23/invalidations.json). HeCBench master still has the int numel (checked
+  # 2026-09-28); the kernels take `int numel` and index in int, so a size_t change is not a pure
+  # representation fix and was not applied. The sweep completes for W*H < 65536 (64 * 512 * W * H < 2^31):
+  # g2-w255-h255 is the largest square map that runs the whole intended workload.
+  upstream_inputs_not_added:
+  - 'feature maps of 256x256 and larger (the full N/C sweep overflows the int element count)'
+inputs:
+- id: g2-w224-h224
+  case: channel-shuffle
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: ORNL/HeCBench
+      version: 23714d9980070bc5543e99c11fd93ee6f79c6947
+      path: 'src/channelShuffle-cuda Makefile run: ./main 2 224 224 100 (= ctest)'
+  params:
+    group: 2
+    width: 224
+    height: 224
+    repeat: 100
+  args:
+  - '2'
+  - '224'
+  - '224'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: g2-w255-h255
+  case: channel-shuffle
+  variant: size
+  source:
+    kind: derived
+    derivation: feature map 255x255 -- the largest square map for which the program's N x C sweep completes
+      (64 * 512 * 255 * 255 = 2 130 739 200 < 2^31; replaces the deregistered 512x512 input, see coverage)
+  params:
+    group: 2
+    width: 255
+    height: 255
+    repeat: 100
+  args:
+  - '2'
+  - '255'
+  - '255'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: g4-w224-h224
+  case: channel-shuffle
+  variant: parameter
+  source:
+    kind: derived
+    derivation: group size 4 on the default map
+  params:
+    group: 4
+    width: 224
+    height: 224
+    repeat: 100
+  args:
+  - '4'
+  - '224'
+  - '224'
+  - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+check:
+  # the program's own check: one run without HPCPERF_SKIP_VERIFY (the timing runs set it), every GPU result of
+  # every (N, C) combination memcmp'ed against the upstream CPU reference for both layouts.
+  kind: post_run
+  run_env: {HPCPERF_SKIP_VERIFY: null}
+  pass_regex: '^Average time of channel shuffle \(NCHW\):'
+  # An aborted sweep is a failure too: upstream computes numel as int (cuda/main.cu:149, "assume no
+  # integer overflow"); for maps of 256x256 and larger it overflows at N=16, C=512, cudaMalloc fails and
+  # the program prints "Device memory allocation failed. Exit" and exits 0 (this is how the deregistered
+  # g2-w512-h512 was found never to complete its sweep).
+  fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
+  basis: exact (memcmp) against the upstream CPU reference inside the program (cuda/main.cu); "Failed to pass ... check" on
+    any mismatch, the "Average time" lines only after a passed comparison
+  covers: all
+  timeout: 7200

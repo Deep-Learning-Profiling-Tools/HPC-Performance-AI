@@ -1,0 +1,65 @@
+# Registered inputs of nearest_neighbor (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: nearest_neighbor
+level: 1
+selector: null
+default_input: cane4-k5
+entry:
+  kind: binary
+  path: build/nearest_neighbor/cuda/nearest_neighbor_cuda
+timing:
+  kind: none
+  status: NEEDS_TIMING_SUPPORT
+  reason: the CUDA port prints no timer (results checked by ctest verify.py)
+baseline:
+  method: no PASS line; ctest's verify.py recomputes the distances on the CPU (not wired into the registry)
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: no_error
+    role: required
+    regex: (FAIL|[Ee]rror)
+    compare:
+      rule: absent
+coverage:
+  status: BLOCKED
+  reason: only the 4-file upstream sample set is vendored
+  blocker: larger upstream record sets come from Rodinia's hurricane_gen generator (not vendored); needs a vendored
+    deterministic generator or the external-artifact mechanism
+  upstream_inputs_not_added:
+  - data/nn hurricane_gen-generated record sets (filelist with more/larger .db files)
+inputs:
+- id: cane4-k5
+  case: nearest-neighbor-hurricane
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: HPC-FAIR/rodinia_3.1
+      version: 366b283456506ef2fe2c2b7dc5e83e941ffc5524
+      path: 'data/nn: filelist_4 (cane4_0..3.db, 4 upstream files) -r 5 -lat 30 -lng 90 (= ctest)'
+  params:
+    db_files: 4
+    records: 4 x cane4_*.db
+    k: 5
+    lat: 30
+    lng: 90
+  args:
+  - build/nearest_neighbor/cuda/filelist_4
+  - -r
+  - '5'
+  - -lat
+  - '30'
+  - -lng
+  - '90'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/cane4_0.db
+  - data/cane4_1.db
+  - data/cane4_2.db
+  - data/cane4_3.db
+  input_form: file

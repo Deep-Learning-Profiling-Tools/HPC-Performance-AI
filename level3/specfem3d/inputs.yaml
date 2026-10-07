@@ -1,0 +1,161 @@
+# Registered inputs of specfem3d (schema hpcperf-inputs-1), selected through HPCPERF_SPECFEM3D_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: specfem3d
+level: 3
+selector: HPCPERF_SPECFEM3D_INPUT
+default_input: homogeneous-halfspace-mesh-default-5000
+entry:
+  kind: run.sh
+  path: level3/specfem3d/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    xspecfem3D's own 'Total elapsed time in seconds' (this line, from OUTPUT_FILES/output_solver.txt, echoed by
+    run.sh): the time loop including the final seismogram write. The headline timer of tools/timing
+    (apptimers.py: specfem3d) is the 'Elapsed time in seconds' of the LAST stability report (at the final time
+    step, read from output_solver.txt in the run directory): the time loop from its start after the start-up
+    barrier, without the final seismogram write (reported as a part); rank 0's clock after an MPI max
+    reduction; every stability report synchronizes the compute stream. Mesh decomposition / generation
+    (xdecompose_mesh, xmeshfem3D, xgenerate_databases) are separate preprocessing stages, recorded by run.sh as
+    '# solver wall time' context only.
+  kind: total
+  unit: s
+  regex: Total elapsed time in seconds =\s*(?P<value>[0-9.eE+-]+)
+  select: last
+  app_timer:
+    source: tools/timing/apptimers.py:specfem3d
+    region: "'Elapsed time in seconds' of the last stability report in output_solver.txt (src/specfem3D/iterate_time.F90, check_stability.f90)"
+    relation: 'this stdout timer includes the final seismogram write; the headline stops at the last stability report'
+baseline:
+  method: validate.sh compares seismograms with REF_SEIS (upstream compare_seismogram_correlations.py); no seismogram
+    value is in stdout -- only the time-loop completion marker is recorded
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: time_loop_finished
+    role: diagnostic
+    regex: Time loop finished
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream homogeneous_halfspace case at two mesh resolutions and two step counts is registered
+  blocker: the other upstream EXAMPLES (layered_halfspace, homogeneous_acoustic, Mount_StHelens, waterlayered_halfspace,
+    tomographic_model, CPML_examples) are in the frozen tree with their own DATA/MESH, but run.sh hard-wires the
+    homogeneous_halfspace example directory (EX=...); a per-example selection needs a run.sh change (not done this
+    round)
+  upstream_inputs_not_added:
+  - EXAMPLES/applications/layered_halfspace
+  - homogeneous_acoustic
+  - Mount_StHelens
+  - waterlayered_halfspace
+  - tomographic_model
+inputs:
+- id: homogeneous-halfspace-mesh-default-5000
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+    pass_regex: '^SPECFEM3D CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/specfem3d/validate.sh on 1 GPU: this example (homogeneous_halfspace as shipped, 20,736 elements, NSTEP 5000, GPU_MODE, NPROC 1) vs upstream's own reference seismograms (REF_SEIS) with upstream's compare_seismogram_correlations.py: every reference trace compared, finite, correlation >= 0.8, L2 misfit <= 1 %, time shift <= 0.01 s -- upstream's thresholds unchanged.
+    covers: all
+    timeout: 2400
+  case: homogeneous-halfspace
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: SPECFEM/specfem3d
+      version: hpcperf-l3-v1 (SPECFEM3D Cartesian v4.1.1 frozen tree 9bdc4eed)
+      path: EXAMPLES/applications/homogeneous_halfspace as shipped (CUBIT MESH-default 36x36x16, NSTEP 5000) --
+        run.sh smoke
+  params:
+    example: homogeneous_halfspace
+    mesh: MESH-default
+    elements: 20736
+    nstep: 5000
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: homogeneous-halfspace-refine2-1000
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/check_refined_vs_ref_seis.py', '{repo}/build/level3/specfem3d/cuda/run.check.homogeneous-halfspace-refine2-1000/strong.np1/OUTPUT_FILES', '{bench_dir}/src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS', '{bench_dir}/src/utils/scripts/compare_seismogram_correlations.py', '{run_dir}/compare']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.homogeneous-halfspace-refine2-1000}
+    pass_regex: '^PASS: SPECFEM3D refined mesh vs REF_SEIS'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      upstream's reference seismograms REF_SEIS with upstream's compare_seismogram_correlations.py and its thresholds UNCHANGED
+      (correlation >= 0.8, L2 misfit <= 0.01, time shift <= 0.01 s, all 12 reference traces). The 2x-refined mesh solves the same
+      physical problem as the shipped example (same domain, medium, CMTSOLUTION, STATIONS, Stacey boundaries, t0; same internal
+      mesher that produced REF_SEIS, whose default mesh already resolves periods below the 5 s source half duration), so a
+      converged solution must match the reference. check_refined_vs_ref_seis.py decimates the run's traces by DT_ref / DT_run = 2
+      after checking that its samples fall exactly on the reference grid, and compares over the run's whole 25 s record (t = -10 .. 14.95 s on the reference grid: the early arrivals only -- 0.1 % to 39 % of each reference trace's L2 norm lies in this window). Added 2026-10-06.
+    covers: all
+    timeout: 1800
+  case: homogeneous-halfspace
+  variant: size
+  source:
+    kind: derived
+    derivation: 'the same domain meshed by the in-house xmeshfem3D refined 2x (run.sh strong mode, HPCPERF_SPECFEM_STRONG=2),
+      NSTEP 1000 (HPCPERF_SPECFEM_STEPS) -- derived class A: Par_file/Mesh_Par_file sizes only'
+  params:
+    example: homogeneous_halfspace
+    mesh: xmeshfem3D refined 2x
+    elements: 165888
+    nstep: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_SPECFEM_STRONG: '2'
+    HPCPERF_SPECFEM_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: homogeneous-halfspace-refine2-5000
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/check_refined_vs_ref_seis.py', '{repo}/build/level3/specfem3d/cuda/run.check.homogeneous-halfspace-refine2-5000/strong.np1/OUTPUT_FILES', '{bench_dir}/src/EXAMPLES/applications/homogeneous_halfspace/REF_SEIS', '{bench_dir}/src/utils/scripts/compare_seismogram_correlations.py', '{run_dir}/compare']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.homogeneous-halfspace-refine2-5000}
+    pass_regex: '^PASS: SPECFEM3D refined mesh vs REF_SEIS'
+    fail_regex: 'VALIDATION ERROR'
+    basis: >-
+      upstream's reference seismograms REF_SEIS with upstream's compare_seismogram_correlations.py and its thresholds UNCHANGED
+      (correlation >= 0.8, L2 misfit <= 0.01, time shift <= 0.01 s, all 12 reference traces). The 2x-refined mesh solves the same
+      physical problem as the shipped example (same domain, medium, CMTSOLUTION, STATIONS, Stacey boundaries, t0; same internal
+      mesher that produced REF_SEIS, whose default mesh already resolves periods below the 5 s source half duration), so a
+      converged solution must match the reference. check_refined_vs_ref_seis.py decimates the run's traces by DT_ref / DT_run = 2
+      after checking that its samples fall exactly on the reference grid, and compares over the run's whole 125 s record (t = -10 .. 114.95 s of REF_SEIS's 250 s). Added 2026-10-06.
+    covers: all
+    timeout: 1800
+  case: homogeneous-halfspace
+  variant: steps
+  source:
+    kind: derived
+    derivation: refined 2x mesh with the upstream NSTEP 5000
+  params:
+    example: homogeneous_halfspace
+    mesh: xmeshfem3D refined 2x
+    elements: 165888
+    nstep: 5000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_SPECFEM_STRONG: '2'
+    HPCPERF_SPECFEM_STEPS: '5000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

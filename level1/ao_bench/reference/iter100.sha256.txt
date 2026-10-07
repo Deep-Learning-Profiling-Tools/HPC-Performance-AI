@@ -1,0 +1,6 @@
+reference image of level1/ao_bench iter100 (./main 100, 256x256), rendered by the unoptimized reference build
+captured 2026-09-29T00:57:53Z on dgx003.orc.gmu.edu GPU GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e
+binary: /projects/kzhou6/bcui2/research/HPC-Performance-AI-b11/build/ao_bench/cuda/ao_bench_cuda sha256 dbf4b9e9cc6719588091aae216d905082bf48d4527f53a6d505d433e1e255404
+git HEAD: 29cde72ea2164197a8b2a72f0c3666ffae98b9e2
+run log: /projects/kzhou6/bcui2/research/HPC-Performance-AI-results/repro-2026-09-28/correctness/runs/ao_bench/iter100/capture/run/stdout.log
+image sha256: 1c63ff1ecb2fcebd07f4125b9b104948e7b8ef590bf085bdf7c9d9f20435dfeb

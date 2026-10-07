@@ -91,6 +91,8 @@ COLUMNS = [
     "host_cpu_model", "host_cpus_allowed", "host_loadavg_1m",
     "exe_sha256", "git_commit", "git_dirty", "raw_dir",
     "app_timer_s", "roi_vs_app_timer",
+    "input_id",
+    "placement_cpus_allowed", "placement_mems_allowed", "placement_gpus", "placement_consistent", "placement_policy",
     "roi_source", "roi_steps", "roi_setup_s", "ops_scope",
     "whole_compute_s", "whole_copy_h2d_s", "whole_copy_d2h_s", "whole_copy_d2d_s", "whole_fill_s",
     "whole_runtime_api_calls",
@@ -132,6 +134,88 @@ def read_run_txt(d):
 
 def sec(ns):
     return None if ns is None else finite("seconds", ns / 1e9)
+
+
+def read_bind_logs(d):
+    """The placement records (bind.<pid>, probes/bindprobe.c) of one run directory."""
+    procs = []
+    for p in sorted(glob.glob(os.path.join(d, "bind.*"))):
+        rec = {"tasks": [], "gpus": [], "env": {}}
+        with open(p, errors="replace") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if not line or line.startswith("#"):
+                    continue
+                k, _, v = line.partition(" ")
+                t = v.split()
+                if k == "task" and len(t) >= 6:          # tid cpus <set> last_cpu <n> name <comm>
+                    rec["tasks"].append({"tid": t[0], "cpus": t[2], "last_cpu": int(t[4]), "name": " ".join(t[6:])})
+                elif k == "gpu" and len(t) >= 4:         # minor <n> bus <pci>
+                    rec["gpus"].append({"minor": int(t[1]), "pci_bus_id": t[3]})
+                elif k == "env":
+                    n, _, val = v.partition("=")
+                    rec["env"][n] = val
+                else:
+                    rec[k] = v
+        procs.append(rec)
+    return procs
+
+
+def placement_of(procs):
+    """Per measured process: the CPU set, NUMA memory set and GPU it ran with (diagnostic context)."""
+    def num(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+    out = []
+    for r in procs:
+        masks = {}
+        for t in r["tasks"]:
+            masks[t["cpus"]] = masks.get(t["cpus"], 0) + 1
+        out.append({"pid": num(r.get("pid")), "exe": r.get("exe"), "roi_log": r.get("roi_log") == "1",
+                    "cpus_allowed": r.get("cpus_allowed_end"), "mems_allowed": r.get("mems_allowed_end"),
+                    "cpus_allowed_at_start": r.get("cpus_allowed_start"),
+                    "threads": num(r.get("threads")), "thread_cpusets": masks,
+                    "last_cpus": sorted({t["last_cpu"] for t in r["tasks"]}),
+                    "cpu_start": num(r.get("cpu_start")), "cpu_end": num(r.get("cpu_end")),
+                    "voluntary_ctxt_switches": num(r.get("voluntary_ctxt_switches")),
+                    "nonvoluntary_ctxt_switches": num(r.get("nonvoluntary_ctxt_switches")),
+                    "gpus": [g["pci_bus_id"] for g in r["gpus"]], "env": r["env"]})
+    return out
+
+
+def bind_policy_of(meta):
+    """The CPU-binding policy the engine applied (run_meta.txt bind_*): explicit (cases/level2_binding.tsv
+    through the launcher's HPCPERF_CPUS_PER_RANK interface, with the pairs it added to the run's
+    environment), runtime (the MPI runtime's default binding: the campaigns before 2026-09-30), application
+    (Level 3: no engine policy -- each run.sh applies its own application-specific CPU/thread policy, and the
+    placement block shows the actual placement), none (Level 1: no policy, the process stays unbound inside
+    the allocation) or not recorded."""
+    out = {"kind": meta.get("bind_policy") or "not recorded"}
+    for k in ("launcher", "host_threads", "cpus_per_rank", "omp_pin"):
+        v = meta.get(f"bind_{k}")
+        if v not in (None, "", "-"):
+            out[k] = int(v) if v.isdigit() else v
+    env = meta.get("bind_env")
+    out["env"] = [e for e in env.split(";") if e] if env else []
+    return out
+
+
+def placement_block(meta, runs, prof_dir):
+    """The record's `placement`: what the probe saw in every run, and whether it was the same
+    CPU set / memory set / GPU in all of them, plus the binding policy the engine applied. Never a metric."""
+    clean = [placement_of(read_bind_logs(r["dir"])) for r in runs]
+    prof = placement_of(read_bind_logs(prof_dir)) if os.path.isdir(prof_dir) else []
+    # the measured processes are the ones that wrote an ROI log; helpers that merely opened a
+    # GPU (a launcher's nvidia-smi audit, a profiler) count only when no process wrote one
+    measured = [p for ps in clean for p in ps if p["roi_log"]] or [p for ps in clean for p in ps if p["gpus"]]
+    cpus = sorted({p["cpus_allowed"] for p in measured if p["cpus_allowed"]})
+    mems = sorted({p["mems_allowed"] for p in measured if p["mems_allowed"]})
+    gpus = sorted({g for p in measured for g in p["gpus"]})
+    return {"probe": dash(meta.get("bind_probe")) or None, "policy": bind_policy_of(meta), "clean_runs": clean, "profiled": prof,
+            "summary": {"processes_recorded": len(measured), "cpus_allowed": cpus, "mems_allowed": mems,
+                        "gpus": gpus, "consistent": bool(measured) and len(cpus) <= 1 and len(mems) <= 1 and len(gpus) <= 1}}
 
 
 def platform_conformance(platform_id):
@@ -257,8 +341,17 @@ def build_record(raw):
         good = [r for r in runs if r["run"] and r["run"].get("rc") == 0 and r["roi"] and r["roi"]["entries"] > 0]
         walls = [sec(r["roi"]["wall_ns"]) for r in good]
 
-    roi = {"wall_s": None, "runs_s": walls, "wall_s_min": None, "wall_s_max": None, "wall_s_stddev": None,
-           "entries": None, "excluded_s": None, "processes": None, "imbalance_s": None,
+    # warm-up runs: discarded from every statistic, recorded (when the engine logged their ROI)
+    # so the cost of the first contact with the input is visible next to the clean runs
+    warm = []
+    for d in sorted(glob.glob(os.path.join(raw, "warmup.*")), key=lambda p: int(p.rsplit(".", 1)[1])):
+        wl = [analysis.parse_roi_log(p) for p in sorted(glob.glob(os.path.join(d, "roi.*")))]
+        wr = analysis.clean_roi(wl) if wl else None
+        rt = read_run_txt(d)
+        warm.append(sec(wr["wall_ns"]) if wr and wr["entries"] > 0 and (rt is None or rt.get("rc") == 0) else None)
+
+    roi = {"wall_s": None, "runs_s": walls, "warmup_runs_s": warm, "wall_s_min": None, "wall_s_max": None,
+           "wall_s_stddev": None, "entries": None, "excluded_s": None, "processes": None, "imbalance_s": None,
            "profiled_wall_s": None, "profiled_marker_wall_s": None, "profiler_inflation": None,
            "source": "app_timer" if level == 3 else "markers"}
     context = {"process_wall_s": None, "pre_roi_s": None, "post_roi_s": None}
@@ -349,12 +442,34 @@ def build_record(raw):
                 h.update(chunk)
         exe_sha = h.hexdigest()
     inputs = {"declared_env": declared_env, "declared_argv": dash(meta.get("argv")),
-              "processes": procs, "exe_sha256": exe_sha}
+              "processes": procs, "exe_sha256": exe_sha,
+              "exe_sha256_when": "measurement" if meta.get("exe_sha256") else ("summarize" if exe_sha else None)}
     if manifest:
         inputs["run_manifest"] = {k: manifest[k] for k in sorted(manifest)
                                   if k in ("app", "case", "mode", "ranks", "profile", "backend", "input_sha256",
                                            "binary_sha256", "fingerprint_sha256", "source_tree_sha256",
                                            "threads", "steps")}
+    placement = placement_block(meta, runs, os.path.join(raw, "prof"))
+
+    # ---- registry input (a --registry case): the workload identity stored by the engine
+    registry = None
+    if dash(meta.get("input_id")):
+        ident, ident_path = None, os.path.join(raw, "workload_identity.json")
+        try:
+            with open(ident_path) as f:
+                ident = json.load(f)
+        except (OSError, ValueError):
+            pass
+        registry = {"input_id": meta["input_id"], "identity": ident,
+                    "identity_sha256": dash(meta.get("workload_identity_sha256")) or None,
+                    "identity_complete": bool(ident and ident.get("complete")
+                                              and ident.get("input_id") == meta["input_id"]
+                                              and ident.get("benchmark") == meta["app"])}
+        if not registry["identity_complete"]:
+            caveats.append("The registry input's workload identity could not be established: this record "
+                           "is not a result for that input.")
+            if status == "ok":
+                status = "identity_failed"
 
     # ---- FOM and launcher audit, from the first clean run
     clean0_log = os.path.join(runs[0]["dir"], "run.log") if runs else None
@@ -523,6 +638,7 @@ def build_record(raw):
             "nvtx_roi": nvtx_roi or None,
         },
         "inputs": inputs,
+        "registry": registry,
         "roi": roi,
         "device": device,
         "runtime_api": runtime,
@@ -532,6 +648,7 @@ def build_record(raw):
         "fom": fom,
         "app_timer": app_timer,
         "launcher": {"audit": audit, "audit_ok": audit_ok},
+        "placement": placement,
         "platform_info": {"device": device_info, "host": host_info, "conformance": conformance},
         "profiler": {k: v for k, v in prof_info.items() if k != "recorded_env_names"} |
                     ({"recorded_env_name_count": len(recorded)} if recorded is not None else {}),
@@ -550,6 +667,7 @@ def flatten(rec):
     rt = rec.get("runtime_api") or {}
     rt_roi = rt.get("roi") or {}
     pdev, host = rec["platform_info"]["device"], rec["platform_info"]["host"]
+    plc = (rec.get("placement") or {}).get("summary") or {}
     ops = rec.get("ops") or []
     top = ops[0] if ops else None
 
@@ -606,6 +724,13 @@ def flatten(rec):
         "git_dirty": int(rec["provenance"]["git_dirty"]), "raw_dir": rec["provenance"]["raw_dir"],
         "app_timer_s": v((rec.get("app_timer") or {}).get("value_s")),
         "roi_vs_app_timer": v((rec.get("app_timer") or {}).get("roi_diff_frac")),
+        "input_id": v((rec.get("registry") or {}).get("input_id")),
+        "placement_cpus_allowed": ";".join(plc.get("cpus_allowed", [])),
+        "placement_mems_allowed": ";".join(plc.get("mems_allowed", [])),
+        "placement_gpus": ";".join(plc.get("gpus", [])),
+        "placement_consistent": "" if not plc.get("processes_recorded") else int(plc["consistent"]),
+        "placement_policy": (lambda p: p.get("kind", "") + (f":PE={p['cpus_per_rank']}" if p.get("cpus_per_rank") else "")
+                             + (":omp_pin" if p.get("omp_pin") == "yes" else ""))((rec.get("placement") or {}).get("policy") or {}),
         "roi_source": v(roi.get("source") or "markers"), "roi_steps": v(roi.get("steps")),
         "roi_setup_s": v(roi.get("setup_s")), "ops_scope": v(rec.get("ops_scope")),
         "whole_compute_s": v(whole.get("compute_s")), "whole_copy_h2d_s": v(whole.get("copy_h2d_s")),
@@ -630,6 +755,17 @@ def op_rows(rec):
 
 # ----------------------------------------------------------------- driver
 
+# A raw run shown to have measured another workload than its case/input (see
+# tools/inputs/hpcperf_inputs.py `invalidation`) keeps its evidence on disk but carries an
+# INVALIDATED.json: no record is built from it and an existing record of it is not loaded, so it
+# reaches no CSV, summary, report or baseline selection.
+INVALIDATION_FILE = "INVALIDATED.json"
+
+
+def invalidated(raw):
+    return os.path.isfile(os.path.join(raw, INVALIDATION_FILE))
+
+
 def raw_dirs(raw_root):
     for level_dir in sorted(glob.glob(os.path.join(raw_root, "level[0-9]"))):
         for run in sorted(glob.glob(os.path.join(level_dir, "*", "*", "*"))):
@@ -641,12 +777,17 @@ def json_path(out_root, rec):
     return os.path.join(out_root, f"level{rec['level']}", rec["app"], rec["case"], f"{rec['run_id']}.json")
 
 
-def load_records(out_root):
+def load_records(out_root, invalid=None):
     records, skipped = [], 0
     for path in sorted(glob.glob(os.path.join(out_root, "level[0-9]", "*", "*", "*.json"))):
         rec = json.load(open(path))
         if rec.get("schema") != SCHEMA:
             skipped += 1
+            continue
+        raw = (rec.get("provenance") or {}).get("raw_dir")
+        if raw and invalidated(os.path.join(REPO, raw)):
+            if invalid is not None:
+                invalid.append(path)
             continue
         records.append(rec)
     records.sort(key=lambda r: (r["level"], r["app"], r["case"], r["run_id"]))
@@ -676,6 +817,30 @@ def write_csvs(out_root, records):
     return written
 
 
+REGISTRY_CURRENT_COLS = ["level", "benchmark", "input_id", "status", "run_verification", "platform", "samples", "roi_median_s",
+                         "spread", "cv", "stable", "adaptive", "run_ids", "git_commit", "correctness", "correctness_basis"]
+
+
+def write_registry_current(out_root):
+    """registry_current.csv: the current result of every registered input -- the same rules as the report
+    (tools/timing/registry_view.py). The per-record CSVs above stay a log of every record."""
+    import csv
+    import registry_view
+    rows, _recs, _meta, _orph = registry_view.current_view([out_root], REPO)
+    path = os.path.join(out_root, "registry_current.csv")
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(REGISTRY_CURRENT_COLS)
+        for r in rows:
+            m = r["current"] or {}
+            w.writerow([r["level"], r["benchmark"], r["input_id"], r["status"], r["run_verification"] or "",
+                        m.get("platform", ""), len(m.get("samples") or []), m.get("median", ""),
+                        "" if m.get("spread") is None else m["spread"], "" if m.get("cv") is None else m["cv"],
+                        m.get("stable", ""), m.get("adaptive", ""), " ".join(m.get("run_ids") or []),
+                        (m.get("git_commit") or "")[:10], r.get("correctness") or "", r.get("correctness_basis") or ""])
+    return path
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--raw-root", default=os.path.join(REPO, "build", "timing"))
@@ -685,13 +850,16 @@ def main(argv=None):
     ap.add_argument("--no-report", action="store_true", help="do not regenerate <out-root>/report/")
     a = ap.parse_args(argv)
 
-    written = failed = 0
+    written = failed = n_invalid_raw = 0
     if not a.csv_only:
         if not os.path.isdir(a.raw_root):
             print(f"summarize: no raw directory {a.raw_root}", file=sys.stderr)
             return 1
         for raw in raw_dirs(a.raw_root):
             if a.run_id and os.path.basename(raw) not in a.run_id:
+                continue
+            if invalidated(raw):
+                n_invalid_raw += 1
                 continue
             try:
                 rec = build_record(raw)
@@ -709,16 +877,20 @@ def main(argv=None):
             written += 1
 
     os.makedirs(a.out_root, exist_ok=True)
-    records, skipped = load_records(a.out_root)
+    invalid = []
+    records, skipped = load_records(a.out_root, invalid)
     outs = write_csvs(a.out_root, records)
     by = {}
     for r in records:
         by.setdefault(r["level"], []).append(r)
-    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}")
+    print(f"summarize: json_written={written} failed={failed} records={len(records)} skipped_old_schema={skipped}"
+          f" invalidated_raw={n_invalid_raw} invalidated_records={len(invalid)}")
     for level, recs in sorted(by.items()):
         ok = sum(1 for r in recs if r["status"] == "ok")
         fom = sum(1 for r in recs if r["fom"]["status"] == "ok")
         print(f"           level{level}: {len(recs)} runs, {ok} ok, {len(recs) - ok} not ok, fom_ok={fom}")
+    if any((r.get("registry") or {}).get("input_id") for r in records):
+        outs.append(write_registry_current(a.out_root))
     if not a.no_report:
         outs += report.write(a.out_root, os.path.join(a.out_root, "report"))
     for p in outs:

@@ -1,0 +1,27 @@
+{
+ "schema": "hpcperf-hipbone-reference-1",
+ "input_id": "sweep-nx32-p4",
+ "note": "CPU reference runs 2026-09-30 on dgx003 (Slurm job 1397595), the same build/level2/hipbone/cuda/hipBone binary, OCCA Serial and OpenMP (8 threads, cores 100-107) backends, exact registered arguments",
+ "dofs": 2048383,
+ "cg_iterations": 100,
+ "r_norm_initial": 1012.346403441495,
+ "r_norm_final": 9.250608364543e-06,
+ "r_norm_final_spread_log10": 0.0,
+ "runs": [
+  {
+   "log": "sweep-nx32-p4.OpenMP.1.log",
+   "sha256": "6ea3903b093f9a9fbbd449d42263444cdb8afc916d6150ad281752475a94be57",
+   "backend": "?",
+   "dofs": 2048383,
+   "cg_iterations": 100,
+   "r_norm_initial": 1012.346403441495,
+   "r_norm_final": 9.250608364543e-06
+  }
+ ],
+ "rule": {
+  "r_norm_initial": "rel 0.01",
+  "r_norm_final": "|log10 ratio| <= 0.1",
+  "dofs": "exact",
+  "cg_iterations": "exact"
+ }
+}

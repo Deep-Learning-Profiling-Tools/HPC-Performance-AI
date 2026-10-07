@@ -135,9 +135,17 @@ their schema (`hpcperf-timing-1`).
   `dftfe/run.sh` sets `VERBOSITY = $HPCPERF_DFTFE_VERBOSITY` (default 1, the decks ship 0)
   in its copy of the deck and records the change in `deck.diff` and the manifest. Both
   are output-only; `validate.sh` passes with them at 1 and 2 GPUs.
-* `cases/level3_apps.tsv`, `cases/level3_cases.tsv`: the applications and the timing
-  inputs (larger than the smoke inputs; `acceptance` says whether `validate.sh` checks
-  that input).
+* `cases/level3_apps.tsv`, `cases/level3_cases.tsv`: the applications and the hand-written timing
+  cases (2 GPUs; `acceptance` says whether `validate.sh` checks that input). Since 2026-10-02 the
+  registered inputs of `level3/<app>/inputs.yaml` are the measured Level 3 workloads:
+  `gen_registry_cases.py` writes `cases/level3_registry.tsv` (one case per input, the
+  application's selector variable = input id, `gpus` = the input's `runtime_config.gpus`),
+  `measure_level3.sh --registry` runs them through the same engine (final protocol since
+  2026-10-03: 0 warm-up + 3 fixed clean runs, headline = median, + 1 separate profiled run,
+  QMCPACK unprofiled, no adaptive extension; the application's own timer, no markers), and `verify_registry_runs.py` judges every record
+  from the run manifest, the launcher's audit lines and the placement records under the rules of
+  `cases/registry_evidence.yaml` (section `level3`). The hand-written cases remain the definition of the
+  superseded 2-GPU sweep (not on the published page, which shows the latest results only).
 
 ### 4.5 Elsewhere
 
@@ -171,7 +179,9 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
    regenerates `cases/level1.tsv`, plus a row in `cases/level1_apps.tsv`; Level 2 -- a
    row in `cases/level2_apps.tsv` (backends, timeout, FOM pattern if it prints one,
    `roi_excludes`, and `app_timer_regex` / `app_timer_unit` if it prints a timer for
-   exactly its ROI) and a `default` row in `cases/level2_cases.tsv`.
+   exactly its ROI), a `default` row in `cases/level2_cases.tsv`, and its CPU-binding
+   policy in `cases/level2_binding.tsv` (mpirun-launched: `cpus_per_rank` = its host
+   threads, `omp_pin` when it has several; direct-exec: no binding).
 5. `python3 tools/timing/cases.py check` and `bash tools/timing/tests/run_all.sh` must
    pass: the tests fail for a Level 1/2 source without BEGIN/END or a build that does
    not see the header, and for a `run.sh` without a case row.
@@ -189,11 +199,18 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
    re-run `validate.sh`.
 3. A row in `cases/level3_apps.tsv` (FOM if it prints one, `nvtx_roi` if it emits an
    NVTX range around its loop, `profile = no (<reason>)` if its profiled run is not worth
-   its cost -- QMCPACK) and a case in `cases/level3_cases.tsv` with its `acceptance`.
+   its cost -- QMCPACK) and a case in `cases/level3_cases.tsv` with its `acceptance`; the
+   registered inputs come from the application's `inputs.yaml` (whose `timing.app_timer.source`
+   names the timer) through `gen_registry_cases.py`, plus a `level3.<app>` rule block in
+   `cases/registry_evidence.yaml` for the verifier.
 4. Synthetic evidence for the extractor in `tests/run_all.sh` (13d), then
    `bash tools/timing/tests/run_all.sh` (13f checks the cited source lines exist).
 
 ### 5.3 Adding an input
+
+* A benchmark with an `inputs.yaml`: add the input there (the registry is the source of truth) and
+  run `python3 tools/timing/gen_registry_cases.py`; it is then measured with `--registry` (README,
+  "Registered inputs"). The hand-written tables below remain for cases outside the registry.
 
 * Level 2: a row in `cases/level2_cases.tsv` -- `app case gpus env args timeout_s
   fom_regex notes`; `env` may only set variables the application's `run.sh` reads
@@ -262,9 +279,12 @@ hardware; the page then shows the platform as a column and its device values as 
 * **UNVERIFIED**: HIP/ROCm builds and the AMD collector (no ROCm on the node); TPU
   (interface only, by decision); the multi-process ROI (implemented; the allocation
   exposes one GPU, so Level 2 ran at one rank); hardware counters (`ncu`) are not
-  collected. Level 3 is measured with the applications' own timers (2 GPUs); its device
-  picture is whole-process except for WarpX, and 8 of its 10 timing inputs have no
-  numerical acceptance (completeness runs, caveated).
+  collected. Level 3 is measured with the applications' own timers (the 43 registered inputs at
+  1 GPU, 2026-10-02; the earlier hand-written 2-GPU sweep is history); its device picture is
+  whole-process except for WarpX, three clean runs per input since 2026-10-03 (spread <= 10 % or
+  UNSTABLE, no adaptive extension; the 2026-10-02 campaign had one), and the scientific
+  correctness of each input is the registry's own check (PASS / INCOMPLETE / none per input, no
+  invented tolerance -- see the page).
 * **Decisions for the maintainers**:
   - Level 2 uses one clean run per case; quicksilver's ROI varies 4-7% run to run (its
     own timers agree), so `--clean-runs 3` or `5` may be worth the cost.

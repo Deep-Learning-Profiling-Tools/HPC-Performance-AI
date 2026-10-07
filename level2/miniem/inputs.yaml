@@ -1,0 +1,293 @@
+# Registered inputs of miniem (schema hpcperf-inputs-1), selected through HPCPERF_MINIEM_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: miniem
+level: 2
+selector: HPCPERF_MINIEM_INPUT
+default_input: maxwell-large-weak48
+entry:
+  kind: run.sh
+  path: level2/miniem/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'MiniEM''s own ''Time for Belos Linear Solve'' (FOM Calculation block): the linear solves of all time steps;
+    mesh generation, assembly and preconditioner setup are outside'
+  kind: total
+  unit: s
+  regex: ^\s*Time for Belos Linear Solve = (?P<value>[0-9.eE+-]+) seconds
+  select: only
+baseline:
+  method: validate.sh uses upstream's analytic-solution deck (L2 error < 0.065 asserted by the driver). The registry
+    records the FOM and the step count; no result value of the performance decks is printed.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: time_steps
+    role: diagnostic
+    regex: ^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)
+    select: last
+    compare:
+      rule: exact
+  - name: fom
+    role: diagnostic
+    regex: ^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: 'four upstream decks/sizes are registered (two maxwell-large sizes, the smoke deck, darcy). Each input
+    names the files the driver reads: its deck (--inputFile, read from the build''s decks/ copy of src/decks/) and
+    the solver configurations it loads with --solver=MueLu on CUDA (solverMueLu.xml, solverMueLuCuda.xml; the
+    driver logs "Loading solver config from <file>").'
+  upstream_inputs_not_added:
+  - 'decks/maxwell-bdot-small.xml, maxwell-bdot-medium.xml, maxwell-blob-R1.xml (registered until 2026-09-26, removed -- they do not run with this driver: the equation-set ParameterList is unnamed while main.cpp:246 reads it by name, and the Exodus meshes they read (BDot.small.gen, BDot.medium.gen, blob-R1.g) are not distributed with the pinned Trilinos; upstream runs no test with them; level2/miniem/README.md, Warnings)'
+inputs:
+- id: maxwell-large-weak48
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-08
+  case: maxwell-refmaxwell
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: packages/panzer/mini-em decks/maxwell-large.xml, 48^3 elements per rank, 3 steps (run.sh weak default)
+  params:
+    deck: maxwell-large.xml
+    elements: 48^3
+    steps: 3
+  env:
+    HPCPERF_SCALE_MODE: weak
+  files:
+  - src/decks/maxwell-large.xml
+  - src/decks/solverMueLu.xml
+  - src/decks/solverMueLuCuda.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-large-strong64
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-08
+  case: maxwell-refmaxwell
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: maxwell-large.xml with a 64^3 global grid, 3 steps (upstream performance test size)
+  params:
+    deck: maxwell-large.xml
+    elements: 64^3
+    steps: 3
+  env:
+    HPCPERF_SCALE_MODE: strong
+  files:
+  - src/decks/maxwell-large.xml
+  - src/decks/solverMueLu.xml
+  - src/decks/solverMueLuCuda.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: maxwell-smoke-15
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: '^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)'
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: '^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: record
+    # the deck's "Electromagnetic Energy" response functional, evaluated by the driver after each step (outside the
+    # ROI): the result quantity of the Maxwell decks. Compared with the same-deck run of the unoptimized reference
+    # build (the working baseline) at rel 1e-4 = one unit in the last of the 5 significant digits the driver prints:
+    # the reference build reproduced the printed value exactly in 5 repeat runs of every Maxwell input (2026-09-28),
+    # so the tolerance only keeps a value at a rounding boundary of two converged solves (Belos, 1e-8 relative
+    # residual) from failing on the printed digit; it is not a physical margin (2026-09-30).
+    - name: em_energy_final
+      role: required
+      regex: '^\s*Electromagnetic Energy = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-04
+    # the driver's final-solution 2-norm (main.cpp, printed after the synchronized ROI end with 15 significant
+    # digits, 2026-09-30). Compared with the same-deck run of the reference build at rel 1e-8 = the deck's Belos
+    # convergence tolerance (solverMueLu.xml "Convergence Tolerance" 1.0e-8): two solves that satisfy the deck's own
+    # convergence criterion agree in the solution to the order of that tolerance; the reference build's repeats
+    # (2026-09-30: 7 runs per input, campaign + measure) agree to 1-2 ulps (rel <= 3e-16, the assembly's atomics), so the
+    # rule is satisfiable by eight orders of magnitude and is the deck's numerical parameter, not a candidate's error.
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-08
+  case: maxwell-refmaxwell
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: maxwell.xml, 15^3 hex elements, 1 step (upstream Maxwell_MueLu order1 test)
+  params:
+    deck: maxwell.xml
+    elements: 15^3
+    steps: 1
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  files:
+  - src/decks/maxwell.xml
+  - src/decks/solverMueLu.xml
+  - src/decks/solverMueLuCuda.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file
+- id: darcy-hex
+  baseline:
+    quantities:
+    - name: time_steps
+      role: diagnostic
+      regex: ^\s*Number of Time Steps \(one linear solve per step\) = (?P<value>\d+)
+      select: last
+      compare:
+        rule: exact
+    - name: fom
+      role: diagnostic
+      regex: ^\s*FOM \( num_cells \* num_steps / solver_time / 1000\) = (?P<value>[0-9.eE+-]+)
+      select: last
+      compare:
+        rule: record
+    # darcyHex.xml has no Responses block; the driver now prints the 2-norm of the final solution vector after the
+    # synchronized ROI end (main.cpp, 15 significant digits, 2026-09-30) -- a deterministic functional of the result
+    # without touching the registered deck. Compared at rel 1e-8 = the deck's Belos convergence tolerance
+    # (solverMueLu.xml 1.0e-8; see the Maxwell inputs); the reference build's 7 runs agree to 2 ulps (6.804576196336858e-03
+    # .. ...860e-03, rel 3e-16, the assembly's atomics).
+    - name: solution_norm_final
+      role: required
+      regex: '^hpcperf: final solution 2-norm = (?P<value>[0-9.eE+-]+)'
+      select: last
+      compare:
+        rule: rel
+        tol: 1.0e-08
+  case: darcy-flow
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: trilinos/Trilinos
+      version: see level2/<app>/README.md (Upstream commit)
+      path: decks/darcyHex.xml (Darcy flow, a different physics driver of mini-em)
+  params:
+    deck: darcyHex.xml
+  env:
+    HPCPERF_SCALE_MODE: smoke
+    HPCPERF_MINIEM_DECK: darcyHex.xml
+  files:
+  - src/decks/darcyHex.xml
+  - src/decks/solverMueLu.xml
+  - src/decks/solverMueLuCuda.xml
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  input_form: file

@@ -1,0 +1,176 @@
+# Registered inputs of examinimd (schema hpcperf-inputs-1), selected through HPCPERF_EXAMINIMD_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: examinimd
+level: 2
+selector: HPCPERF_EXAMINIMD_INPUT
+default_input: lj-160cubed-1000
+entry:
+  kind: run.sh
+  path: level2/examinimd/run.sh
+  backend_arg: CUDA
+timing:
+  scope: 'ExaMiniMD''s own PERFORMANCE line: total time of the MD loop (force + neighbor + comm + other) over all
+    steps'
+  kind: total
+  unit: s
+  regex: '^\d+ \d+ \| (?P<value>[0-9.]+) [0-9.]+ [0-9.]+ [0-9.]+ [0-9.]+ \| '
+  select: last
+baseline:
+  method: >-
+    upstream ships no reference outputs and no acceptance criterion (its --correctness option only compares a run
+    with a binary dump of an earlier run of itself). The acceptance criterion adopted here (2026-09-30) is the one
+    validate.sh already enforces and validate_lj.py generalises to every registered lattice -- the t=0 state against
+    the analytic fcc lattice sums and the NVE energy-conservation bound over the run, cross-checked against LAMMPS'
+    published log of the identical bench/in.lj problem -- because it is the only reference-backed criterion that
+    exists for this code. The final thermo row's temperature and potential energy are DIAGNOSTIC (recorded,
+    reported, never a pass/fail): an MD trajectory is chaotic, so a candidate that merely reorders floating-point
+    work reaches a different sample of the same ensemble, and no upstream value exists to pin them to. This follows
+    the reference-backed criterion; it does not manufacture a pass (the check still fails on a wrong initial state
+    or a non-conserving integration). The step count of the last row stays required and exact.
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: final_step
+    role: required
+    regex: ^(?P<value>\d+) [0-9.eE+-]+ -?[0-9.eE+-]+ -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: exact
+  - name: temperature_final
+    role: diagnostic   # chaotic trajectory, no upstream reference: reported, not a criterion (see method)
+    regex: ^\d+ (?P<value>[0-9.eE+-]+) -?[0-9.eE+-]+ -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: record
+  - name: pote_final
+    role: diagnostic   # as temperature_final; the SNAP deck prints 0 (no SNAP energy is computed)
+    regex: ^\d+ [0-9.eE+-]+ (?P<value>-?[0-9.eE+-]+) -?[0-9.eE+-]+ [0-9.eE+-]+ [0-9.eE+-]+$
+    select: last
+    compare:
+      rule: record
+coverage:
+  status: MULTI_INPUT
+  reason: the upstream LJ deck at three sizes plus the upstream SNAP tantalum case (in.snap.W not registered)
+inputs:
+- id: lj-160cubed-1000
+  case: lj-melt
+  variant: default
+  source:
+    kind: derived
+    derivation: upstream input/in.lj (LJ melt) with the lattice box scaled to 160^3 unit cells (16.4 M atoms) and
+      1000 steps -- run.sh strong-mode default
+  params:
+    deck: input/in.lj
+    lattice: 160
+    atoms: 16384000
+    steps: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_EXAMINIMD_LATTICE: '160'
+    HPCPERF_EXAMINIMD_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: lj-40cubed-100
+  case: lj-melt
+  variant: size
+  source:
+    kind: upstream-file
+    upstream:
+      repo: ECP-copa/ExaMiniMD
+      version: see level2/<app>/README.md (Upstream commit)
+      path: 'input/in.lj as shipped: 40^3 unit cells (256,000 atoms), 100 steps (run.sh smoke)'
+  params:
+    deck: input/in.lj
+    lattice: 40
+    atoms: 256000
+    steps: 100
+  env:
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - input/in.lj
+  input_form: file
+- id: lj-80cubed-1000
+  case: lj-melt
+  variant: size
+  source:
+    kind: derived
+    derivation: 80^3 unit cells (2.05 M atoms), 1000 steps
+  params:
+    deck: input/in.lj
+    lattice: 80
+    atoms: 2048000
+    steps: 1000
+  env:
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_EXAMINIMD_LATTICE: '80'
+    HPCPERF_EXAMINIMD_STEPS: '1000'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: snap-ta06a
+  case: snap-tantalum
+  variant: case
+  source:
+    kind: upstream-file
+    upstream:
+      repo: ECP-copa/ExaMiniMD
+      version: see level2/<app>/README.md (Upstream commit)
+      path: input/snap/in.snap.Ta06A (SNAP machine-learning potential, tantalum; deck run unchanged)
+  params:
+    deck: input/snap/in.snap.Ta06A
+    potential: SNAP Ta06A
+    steps: 100
+  env:
+    HPCPERF_EXAMINIMD_DECK: input/snap/in.snap.Ta06A
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  notes: the deck references Ta06A.snapcoeff/.snapparam relative to its directory; run.sh must run it from input/snap
+    (to be confirmed by the first measurement)
+  files:
+  - input/snap/in.snap.Ta06A
+  - input/snap/Ta06A.snapcoeff
+  - input/snap/Ta06A.snapparam
+  input_form: file
+  check:
+    # validate_lj.py does not apply (no SNAP energy is computed: PE = 0 in every row, so no conservation bound, and no
+    # analytic lattice sum exists for SNAP); validate_snap.py checks what is reference-backed: T(0) = 300 K, the deck's
+    # velocity-create target (scaled exactly, 3N-3 convention), every thermo row finite, the run complete (100 steps).
+    # The final temperature is a diagnostic. No CPU reference run exists here (this repository builds ExaMiniMD for
+    # CUDA / HIP only; upstream ships no reference output for this case) -- stated, not worked around.
+    kind: post_run
+    command: [python3, '{bench_dir}/validate_snap.py', --log, '{log}', --temp, '300.0', --steps, '100']
+    pass_regex: '^ExaMiniMD SNAP check: PASS'
+    fail_regex: '^ExaMiniMD SNAP check: FAIL'
+    basis: 'validate_snap.py: T(0) = 300.0 (in.snap.Ta06A velocity create; rel 1e-5), all thermo rows finite with T > 0,
+      last row = step 100; temperature_final diagnostic (chaotic 64-atom NVE trajectory, no upstream reference), PotE
+      not computed by the SNAP kernel (no energy-conservation bound possible)'
+    covers: []
+check:
+  # the run through run.sh (the registered deck / lattice / steps), then validate_lj.py on its stdout: T(0), the
+  # analytic fcc lattice energy at t=0 and the NVE energy-conservation bound over the whole run.
+  kind: post_run
+  command: [python3, '{bench_dir}/validate_lj.py', --log, '{log}', --lattice, '{param:lattice}', --temp, '1.4']
+  pass_regex: '^ExaMiniMD LJ check: PASS'
+  fail_regex: '^ExaMiniMD LJ check: FAIL'
+  basis: 'validate_lj.py (= validate.sh deck A generalised to the registered lattice): T(0) = 1.4 (in.lj velocity create;
+    abs 1e-5), PE(0)/atom and ETot(0)/atom vs the analytic fcc lattice sum with ExaMiniMD''s cutoff shift (rel 1e-5),
+    max |ETot(t) - ETot(0)| / |ETot(0)| <= 1e-3 over all thermo rows. This IS the acceptance criterion (see
+    baseline.method): temperature_final / pote_final are diagnostics, bounded but not pinned by it'
+  covers: []

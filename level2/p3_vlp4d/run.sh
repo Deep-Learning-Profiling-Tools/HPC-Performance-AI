@@ -21,12 +21,19 @@ if [ "${HPC_PERFORMANCE_AI_ROOT:-}" != "$R" ] && [ -f "$R/hpcperf_env.sh" ]; the
     source "$R/hpcperf_env.sh" 2>/dev/null
     set -eu
 fi
+# Registered inputs (inputs.yaml): HPCPERF_P3_VLP4D_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_P3_VLP4D_INPUT || exit 2
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in
     CUDA|HIP) shift || true ;;
     *) echo "usage: $0 [CUDA|HIP] [input deck] [extra vlp4d args]" >&2; exit 2 ;;
 esac
+# a registered input's deck/extra arguments come first (they are parsed like caller arguments below)
+set -- ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"
 
 BUILD_DIR="$R/build/level2/p3_vlp4d/$(printf '%s' "$BACKEND" | tr '[:upper:]' '[:lower:]')"
 EXE="$BUILD_DIR/miniapps/vlp4d/thrust/vlp4d"

@@ -1,0 +1,139 @@
+-------- Branson, a massively parallel proxy app for Implicit Monte Carlo ------
+-------- Authors: Alex Long (along@lanl.gov), Kendra Long (keadyk@lanl.gov), Kelly Thompson (kgt@lanl.gov), and Joseph Farmer (University of Notre Dame)--------
+-------- Version: 0.83----------------------------------------------------------
+ Branson compiled on: CCS
+"use_combing" not found or recognized, defaulting to TRUE
+WARNING: Domain decomposition method not recognized or not set... setting to PARTICLE PASSING method
+WARNING: Domain decomposition method set to PARTICLE_PASS but there is only one rank, setting to REPLICATED
+WARNING: Number of OpenMP threads set but Branson was not configured with OpenMP, OpenMP threads will not be used
+dd_batch_size not found in settings, defaulting to 10000
+event_batch_size not found in settings, defaulting to 10000
+Problem Specifications:Constants -- c: 299.792 (cm/sh) , a: 0.01372
+Run Parameters-- Photons: 250000000, time finish: 0.05 (sh), time step: 0.01 (sh) ,
+ time multiplier: 1 , max dt:1 (sh), Random number seed: 14706 , output frequency: 1
+Combing census enabled (default)
+Terse printing mode (default)
+Spatial Information -- cells x,y,z: 65 65 140
+--Material Information--
+ heat capacity: 0.3 opacity constants: 0.001 + 0^0, scattering opacity: 0
+ heat capacity: 0.3 opacity constants: 0.001 + 0^0, scattering opacity: 0
+ heat capacity: 0.3 opacity constants: 10000 + 0^0, scattering opacity: 0
+--Algorithm Information--
+Particle/census storage: AOS
+Transport loop algorithm: EVENT BASED
+ Batch size for event-based transport loops is 10000
+--Parallel Information--
+DD algorithm: REPLICATED
+No parameters are needed in replicated mode
+Branson built WITHOUT OpenMP, number of OpenMP threads set in the input will have no affect
+Mesh decomposition: N/A (no decomposition in replicated mode)
+N devices: 1
+rank: 0, device: 0 bus id: 67
+Allocating and transferring 591500 cell(s) to the GPU
+********************************************************************************
+Step: 1  Start Time: 0  End Time: 0.01  dt: 0.01
+Transferring 591500 cell(s) to the GPU
+source time: 12.287
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |     250694250    250694250 |    250694250    250694250 |
+Memory (GB)      |       30.1969      30.1969 |      30.1969      30.1969 |
+---------------------------------------------------------------------------
+=== AoS CPU Event Batch Memory Estimate ===
+Batch size: 10000 particles
+Batch memory: 1200000 bytes (1.14441 MB)
+Bytes per particle: 120
+Total Photons transported: 250694250
+Emission E: 0.0010863, Source E: 0, Absorption E: 0.00108474, Exit E: 1.65607e-06
+Pre census E: 8.11538e-07 Post census E: 7.11425e-07 Post census Size: 915734
+Pre mat E: 0.017745 Post mat E: 0.0177434
+Radiation conservation: 3.86214e-15
+Material conservation: -3.38445e-14
+Transport time max/min: 6.22982/6.22982
+********************************************************************************
+Step: 2  Start Time: 0.01  End Time: 0.02  dt: 0.01
+Transferring 591500 cell(s) to the GPU
+source time: 12.0969
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |     251250016    251250016 |    251250016    251250016 |
+Memory (GB)      |       30.2636      30.2636 |      30.2636      30.2636 |
+---------------------------------------------------------------------------
+=== AoS CPU Event Batch Memory Estimate ===
+Batch size: 10000 particles
+Batch memory: 1200000 bytes (1.14441 MB)
+Bytes per particle: 120
+Total Photons transported: 251250016
+Emission E: 0.00108582, Source E: 0, Absorption E: 0.0010842, Exit E: 1.61732e-06
+Pre census E: 7.11425e-07 Post census E: 7.08899e-07 Post census Size: 910144
+Pre mat E: 0.0177434 Post mat E: 0.0177418
+Radiation conservation: 3.89988e-15
+Material conservation: -4.70804e-15
+Transport time max/min: 6.24475/6.24475
+********************************************************************************
+Step: 3  Start Time: 0.02  End Time: 0.03  dt: 0.01
+Transferring 591500 cell(s) to the GPU
+source time: 6.16429
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |     251244480    251244480 |    251244480    251244480 |
+Memory (GB)      |       30.2629      30.2629 |      30.2629      30.2629 |
+---------------------------------------------------------------------------
+=== AoS CPU Event Batch Memory Estimate ===
+Batch size: 10000 particles
+Batch memory: 1200000 bytes (1.14441 MB)
+Bytes per particle: 120
+Total Photons transported: 251244480
+Emission E: 0.00108532, Source E: 0, Absorption E: 0.00108371, Exit E: 1.61054e-06
+Pre census E: 7.08899e-07 Post census E: 7.09444e-07 Post census Size: 910774
+Pre mat E: 0.0177418 Post mat E: 0.0177402
+Radiation conservation: 3.76934e-15
+Material conservation: -3.80251e-15
+Transport time max/min: 6.24078/6.24078
+********************************************************************************
+Step: 4  Start Time: 0.03  End Time: 0.04  dt: 0.01
+Transferring 591500 cell(s) to the GPU
+source time: 6.14416
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |     251245056    251245056 |    251245056    251245056 |
+Memory (GB)      |        30.263       30.263 |       30.263       30.263 |
+---------------------------------------------------------------------------
+=== AoS CPU Event Batch Memory Estimate ===
+Batch size: 10000 particles
+Batch memory: 1200000 bytes (1.14441 MB)
+Bytes per particle: 120
+Total Photons transported: 251245056
+Emission E: 0.00108482, Source E: 0, Absorption E: 0.00108321, Exit E: 1.60307e-06
+Pre census E: 7.09444e-07 Post census E: 7.09761e-07 Post census Size: 909756
+Pre mat E: 0.0177402 Post mat E: 0.0177386
+Radiation conservation: 3.74592e-15
+Material conservation: -2.94903e-15
+Transport time max/min: 6.2356/6.2356
+********************************************************************************
+Step: 5  Start Time: 0.04  End Time: 0.05  dt: 0.01
+Transferring 591500 cell(s) to the GPU
+source time: 6.53699
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |     251243835    251243835 |    251243835    251243835 |
+Memory (GB)      |       30.2628      30.2628 |      30.2628      30.2628 |
+---------------------------------------------------------------------------
+=== AoS CPU Event Batch Memory Estimate ===
+Batch size: 10000 particles
+Batch memory: 1200000 bytes (1.14441 MB)
+Bytes per particle: 120
+Total Photons transported: 251243835
+Emission E: 0.00108432, Source E: 0, Absorption E: 0.00108274, Exit E: 1.58702e-06
+Pre census E: 7.09761e-07 Post census E: 7.07951e-07 Post census Size: 908981
+Pre mat E: 0.0177386 Post mat E: 0.017737
+Radiation conservation: 3.61039e-15
+Material conservation: -4.91968e-15
+Transport time max/min: 6.23638/6.23638
+********************************************************************************
+********************************************************************************
+replicated aos: 100.158
+mesh setup: 0.302595
+Total: 100.461
+Total transport: 31.1873
+Photons Per Second (FOM): 8.01607e+06

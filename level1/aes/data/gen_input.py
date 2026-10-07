@@ -19,4 +19,10 @@ with open(os.path.join(out_dir, "input_1MB.hex"), "w") as f:
     f.write("".join(f"{rng.randrange(256):02x}" for _ in range(n_bytes)))
 with open(os.path.join(out_dir, "key.hex"), "w") as f:
     f.write("".join(f"{rng.randrange(256):02x}" for _ in range(32)))
+# Registered-input sizes (inputs.yaml): further points of the upstream 1KB..32MB sweep, each from
+# its own fixed seed so the 1 MiB file above is byte-identical to before (the ctest default).
+for mib in (4, 16):
+    r = random.Random(20260831 + mib)
+    with open(os.path.join(out_dir, f"input_{mib}MB.hex"), "w") as f:
+        f.write("".join(f"{r.randrange(256):02x}" for _ in range(mib << 20)))
 print("aes input generated in", out_dir)

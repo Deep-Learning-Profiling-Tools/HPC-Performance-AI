@@ -1,0 +1,94 @@
+# Registered inputs of spmv (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+schema: hpcperf-inputs-1
+benchmark: spmv
+level: 1
+selector: null
+default_input: s110503
+entry:
+  kind: binary
+  path: build/spmv/cuda/spmv_cuda
+timing:
+  scope: 'the port''s aveTime(ms) column: average time of one SpMV over the timed loop (upstream perf_test metric)'
+  kind: total
+  unit: ms
+  regex: ^\s*\d+\s+\d+\s+\d+\s+[0-9.]+\s+[0-9.]+\s+[0-9.]+\s+(?P<value>[0-9.]+)\s+\d+\s*$
+  select: only
+baseline:
+  method: 'built-in gold-standard relative-error check: numErrors column and PASS'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: pass_marker
+    role: required
+    regex: ^PASS$
+    compare:
+      rule: present
+  - name: fail_marker
+    role: required
+    regex: ^FAIL$
+    compare:
+      rule: absent
+  - name: num_errors
+    role: required
+    regex: ^\s*\d+\s+\d+\s+\d+\s+[0-9.]+\s+[0-9.]+\s+[0-9.]+\s+[0-9.]+\s+(?P<value>\d+)\s*$
+    select: only
+    compare:
+      rule: le
+      value: 0
+coverage:
+  status: MULTI_INPUT
+  reason: default generated matrix plus two larger ones through -s
+inputs:
+- id: s110503
+  case: spmv-random
+  variant: default
+  source:
+    kind: upstream-parameterized
+    upstream:
+      repo: kokkos/kokkos-kernels
+      version: 23a699f3c5bd662bf2ed52116e56533ecc3ddae0
+      path: 'perf_test sparse spmv on a kk_sparseMatrix_generate matrix (seed 13721; = ctest defaults: 110503 rows,
+        1.1 M nnz)'
+  params:
+    rows: 110503
+    loop: default
+  args: []
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: s442012
+  case: spmv-random
+  variant: size
+  source:
+    kind: derived
+    derivation: -s 442012 (4x rows) with the same generator
+  params:
+    rows: 442012
+    loop: default
+  args:
+  - -s
+  - '442012'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: s1768048
+  case: spmv-random
+  variant: size
+  source:
+    kind: derived
+    derivation: -s 1768048 (16x rows)
+  params:
+    rows: 1768048
+    loop: default
+  args:
+  - -s
+  - '1768048'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

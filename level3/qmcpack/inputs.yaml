@@ -1,0 +1,154 @@
+# Registered inputs of qmcpack (schema hpcperf-inputs-1), selected through HPCPERF_QMCPACK_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every input is an upstream deck/case of the FROZEN source tree (never modified) reached
+# through run.sh's existing case/size knobs; without the variable run.sh behaves as before.
+schema: hpcperf-inputs-1
+benchmark: qmcpack
+level: 3
+selector: HPCPERF_QMCPACK_INPUT
+default_input: diamond2-256w
+entry:
+  kind: run.sh
+  path: level3/qmcpack/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    QMCPACK's own 'Total Execution time' (this stdout line): all QMC sections, VMC + DMC blocks, input parsing
+    and wavefunction set-up included. The headline timer of tools/timing (apptimers.py: qmcpack) is the DMC
+    driver's 'DMCBatched::Production' timer of the stack timer profile (run.sh runs with --enable-timers=medium):
+    every DMC block and step after a barrier, including the per-block estimator reduction and output; without
+    start-up, wavefunction set-up and the VMC section before DMC (reported as a part); rank 0's clock. It is the
+    DMC loop only, so it is smaller than the total execution time.
+  kind: total
+  unit: s
+  regex: ^\s*Total Execution time = (?P<value>[0-9.eE+-]+) secs
+  select: only
+  app_timer:
+    source: tools/timing/apptimers.py:qmcpack
+    region: "'DMCBatched::Production' of the stack timer profile (src/QMCDrivers/DMC/DMCBatched.cpp, src/Utilities/TimerManager.cpp)"
+    relation: 'this stdout timer is the whole execution (set-up, VMC and DMC); the headline is the DMC production loop only'
+baseline:
+  method: 'the energies go to <prefix>.s00N.scalar.dat (validate.sh: upstream check_scalars.py); stdout carries
+    no scalar value -- completion is recorded only'
+  reference: this build's first measured run (self baseline); see method
+  quantities:
+  - name: total_time_line
+    role: diagnostic
+    regex: '^\s*Total Execution time = '
+    compare:
+      rule: present
+coverage:
+  status: MULTI_INPUT
+  reason: the diamond2 deck at three walker counts is registered
+  blocker: tests/performance/NiO needs orbital files (h5) that are not in the frozen tree (upstream download); C-graphite/C-molecule
+    performance inputs are not wired as run.sh cases; walker counts above 300/GPU fail (cuSOLVER, 320 MB/walker)
+  upstream_inputs_not_added:
+  - tests/performance/NiO/dmc-*
+  - tests/performance/C-graphite
+  - tests/performance/C-molecule
+inputs:
+- id: diamond2-256w
+  check:
+    kind: standalone
+    command: [bash, '{bench_dir}/validate.sh', CUDA]
+    env:
+      HPCPERF_GPUS: '1'
+      HPCPERF_QMCPACK_SKIP_CTEST: '1'
+    pass_regex: '^QMCPACK CUDA validation .*: PASS$'
+    fail_regex: 'FAIL'
+    basis: >-
+      level3/qmcpack/validate.sh [2] on 1 GPU: this deck (diamondC_2x1x1_pp, upstream qmc_short_vmcbatch_dmcbatch.in.xml verbatim, 256 walkers) -- completeness, GPU evidence from QMCPACK's own banner (offload + CUDA enabled, OMP_TARGET_OFFLOAD=MANDATORY), 25 DMC blocks finite, and upstream's own statistical check check_scalars.py --ns 3 --series 1 -e 2 --le '-21.844975 0.02' (DIAMOND2_DMC_SCALARS, the test upstream runs on this deck). The upstream ctest suites ([1]) are skipped here: build validation, not this input.
+    covers: all
+    timeout: 3600
+  case: diamondC-2x1x1-pp
+  variant: default
+  source:
+    kind: upstream-file
+    upstream:
+      repo: QMCPACK/qmcpack
+      version: hpcperf-l3-v1 (QMCPACK v4.4.0 frozen tree)
+      path: tests/solids/diamondC_2x1x1_pp/qmc_short_vmcbatch_dmcbatch.in.xml verbatim (256 walkers) -- run.sh smoke
+  params:
+    case: diamond2
+    walkers: 256
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: smoke
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: diamond2-128w
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/qmc_check.py', '{repo}/build/level3/qmcpack/clang231-cuda132-offload/run.check.diamond2-128w/diamond2.w128.strong.np1.t8',
+              qmc_short_vmcbatch_dmcbatch, '-21.844975 0.02', '3', '2', '{bench_dir}/src/tests/scripts/check_scalars.py']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.diamond2-128w}
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: '^check_scalars: status of this test\s*:\s*pass$'
+    fail_regex: 'VALIDATION ERROR|status of this test\s*:\s*fail'
+    basis: >-
+      qmc_check.py on this input's own run directory (run.sh writes it under the HPCPERF_L3_RUN_SUBDIR the check sets): completeness,
+      GPU evidence from QMCPACK's banner, 25 DMC blocks finite, and upstream's statistical check check_scalars.py --ns 3 --series 1 -e 2
+      --le '-21.844975 0.02' -- the DMC total energy of the same deck with 128 walkers against the upstream reference window
+      (DIAMOND2_DMC_SCALARS; upstream applies this window to 1- and 4-rank populations of the deck, i.e. to different total walker
+      counts, so applying it to this population is upstream's own expectation; the error bar grows with fewer walkers and enters
+      check_scalars' sigma test).
+    covers: all
+    timeout: 3600
+  case: diamondC-2x1x1-pp
+  variant: size
+  source:
+    kind: derived
+    derivation: the same deck with total_walkers 128 (run.sh strong mode, HPCPERF_QMCPACK_WALKERS=128; only the
+      walker count differs)
+  params:
+    case: diamond2
+    walkers: 128
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_QMCPACK_WALKERS: '128'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: diamond2-64w
+  check:
+    kind: post_run
+    command: [python3, '{bench_dir}/qmc_check.py', '{repo}/build/level3/qmcpack/clang231-cuda132-offload/run.check.diamond2-64w/diamond2.w64.strong.np1.t8',
+              qmc_short_vmcbatch_dmcbatch, '-21.844975 0.02', '3', '2', '{bench_dir}/src/tests/scripts/check_scalars.py']
+    run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.diamond2-64w}
+    env: {L3_TOOLS: '{repo}/level3/tools'}
+    pass_regex: '^check_scalars: status of this test\s*:\s*pass$'
+    fail_regex: 'VALIDATION ERROR|status of this test\s*:\s*fail'
+    basis: >-
+      qmc_check.py on this input's own run directory (run.sh writes it under the HPCPERF_L3_RUN_SUBDIR the check sets): completeness,
+      GPU evidence from QMCPACK's banner, 25 DMC blocks finite, and upstream's statistical check check_scalars.py --ns 3 --series 1 -e 2
+      --le '-21.844975 0.02' -- the DMC total energy of the same deck with 64 walkers against the upstream reference window
+      (DIAMOND2_DMC_SCALARS; upstream applies this window to 1- and 4-rank populations of the deck, i.e. to different total walker
+      counts, so applying it to this population is upstream's own expectation; the error bar grows with fewer walkers and enters
+      check_scalars' sigma test).
+    covers: all
+    timeout: 3600
+  case: diamondC-2x1x1-pp
+  variant: size
+  source:
+    kind: derived
+    derivation: total_walkers 64
+  params:
+    case: diamond2
+    walkers: 64
+  env:
+    HPCPERF_QMCPACK_CASE: diamond2
+    HPCPERF_SCALE_MODE: strong
+    HPCPERF_QMCPACK_WALKERS: '64'
+  runtime_config:
+    gpus: 1
+    ranks: 1
+  build_config: null
+  backends_validated:
+  - cuda

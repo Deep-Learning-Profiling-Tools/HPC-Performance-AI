@@ -32,6 +32,11 @@
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Registered inputs (inputs.yaml): HPCPERF_EXACMECH_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" HPCPERF_EXACMECH_INPUT || exit 2
 REPO_ROOT="$(cd "${SRC_DIR}/../.." && pwd)"
 BACKEND="${1:-CUDA}"
 BACKEND_UPPER="$(echo "${BACKEND}" | tr '[:lower:]' '[:upper:]')"

@@ -8,7 +8,8 @@
 #   source    level3/lammps/src                         (frozen source bundle materialized by tools/prepare_benchmark.sh;
 #                                                       the app owns its Kokkos in src/lib/kokkos; identity in provenance/;
 #                                                       backend-independent -- never copied per backend)
-#   profile   <cuda|hip>   (override HPCPERF_LAMMPS_PROFILE; a profile must name its backend)
+#   profile   <cuda|hip> or <variant>.<cuda|hip> with HPCPERF_LAMMPS_VARIANT=reaxff (+REAXFF package)
+#             (override HPCPERF_LAMMPS_PROFILE; a profile must name its backend)
 #   build     build/level3/lammps/<profile>
 #   install   .deps/level3/lammps/<profile>/install     (+ .hpcperf-l3-fingerprint)
 #   logs      .deps/level3/lammps/<profile>/logs
@@ -42,11 +43,20 @@ SRC="$HERE/src"
 [ -f "$SRC/cmake/CMakeLists.txt" ] || { echo "build.sh: $SRC is not a LAMMPS source tree -- run tools/prepare_benchmark.sh level3 lammps" >&2; exit 3; }
 SHA="$(l3_source_commit "$HERE")"; TREE_SHA="$(l3_source_tree_sha "$HERE")"
 KOKKOS_VER="$(sed -n 's/^set(Kokkos_VERSION_\(MAJOR\|MINOR\|PATCH\) \([0-9]*\))/\2/p' "$SRC/lib/kokkos/CMakeLists.txt" | paste -sd.)"
-PROFILE="$(l3_backend_profile LAMMPS "$MODEL")"
+# Build variant (HPCPERF_LAMMPS_VARIANT): "" = the default package set (profile <backend>);
+# "reaxff" = the same set plus the REAXFF package (profile reaxff.<backend>) for the CORAL-2
+# ReaxFF/HNS workload. A variant is its own profile: own build/install/logs/cache trees and
+# its own fingerprint (the package list is part of it); the default profile is never rebuilt
+# or extended by it, and the frozen source tree is shared read-only.
+VARIANT="${HPCPERF_LAMMPS_VARIANT:-}"
+case "$VARIANT" in ""|reaxff) ;; *) echo "build.sh: HPCPERF_LAMMPS_VARIANT must be empty or 'reaxff' (got '$VARIANT')" >&2; exit 2;; esac
+PROFILE="$(l3_backend_profile LAMMPS "$MODEL" "$VARIANT")"
 l3_paths_profile lammps "$PROFILE" "$MODEL" || exit 2
 BUILD_DIR="$L3_BUILD"
 JOBS="${HPCPERF_BUILD_JOBS:-32}"
 PKGS=(-DPKG_KOKKOS=yes -DPKG_MOLECULE=yes -DPKG_KSPACE=yes -DPKG_MANYBODY=yes -DPKG_RIGID=yes -DPKG_GRANULAR=yes)
+PKGLIST="KOKKOS,MOLECULE,KSPACE,MANYBODY,RIGID,GRANULAR"
+if [ "$VARIANT" = reaxff ]; then PKGS+=(-DPKG_REAXFF=yes); PKGLIST="$PKGLIST,REAXFF"; fi
 
 case "$BACKEND" in
     CUDA)
@@ -69,7 +79,7 @@ esac
 
 # Image output libs are disabled: the node has a libjpeg runtime but no headers
 # (jpeglib.h), and dump image is not part of any benchmark here.
-CMAKE_OPTS="BUILD_MPI=yes BUILD_OMP=yes CXX_STANDARD=17 Kokkos_ENABLE_${BACKEND}=yes Kokkos_ARCH_${KARCH} Kokkos_ENABLE_OPENMP=yes Kokkos_ENABLE_SERIAL=yes FFT=KISS FFT_KOKKOS=${GPU_FLAGS[-1]#-DFFT_KOKKOS=} WITH_JPEG=no WITH_PNG=no PKGS=KOKKOS,MOLECULE,KSPACE,MANYBODY,RIGID,GRANULAR"
+CMAKE_OPTS="BUILD_MPI=yes BUILD_OMP=yes CXX_STANDARD=17 Kokkos_ENABLE_${BACKEND}=yes Kokkos_ARCH_${KARCH} Kokkos_ENABLE_OPENMP=yes Kokkos_ENABLE_SERIAL=yes FFT=KISS FFT_KOKKOS=${GPU_FLAGS[-1]#-DFFT_KOKKOS=} WITH_JPEG=no WITH_PNG=no PKGS=$PKGLIST"
 FP="$(l3_fingerprint_text lammps "$SHA" "$MODEL" "kokkos(bundled)=$KOKKOS_VER" "$CMAKE_OPTS" "runtime(-pk kokkos gpu/aware)")"
 l3_fingerprint_check "$L3_INSTALL" "$FP" || exit 1
 

@@ -37,6 +37,9 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
+# the sources include tools/timing/ROI markers (header-only, a no-op unless measured): the same
+# include path build.sh exports, so the CPU-only reference configures from the same main.cc
+export CPATH="$R/tools/timing/roi${CPATH:+:$CPATH}"
 
 BACKEND="$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')"
 case "$BACKEND" in
@@ -101,92 +104,13 @@ if ! mpirun -np 1 "$EXE" "$DECK" "${DECK_ARGS[@]}" > "$BUILD/validate_marshak_gp
     fail "GPU run exited non-zero (log: $BUILD/validate_marshak_gpu.log)"
 fi
 
-# Python helper: parses a Branson log into per-step records and does the
-# checks. Usage: python3 - <mode> <gpu.log> [cpu.log]
+# The parser/checker lives in check_log.py (also usable on any deck's log by tools/inputs):
+# mode gpu = check (B), mode cmp = check (C). Usage: check_py <mode> <gpu.log> [cpu.log]
 check_py() {
-python3 - "$@" <<'PY'
-import re, sys
-mode, logs = sys.argv[1], sys.argv[2:]
-NUM = r'([-+]?[0-9.]+(?:[eE][-+]?[0-9]+)?)'
-
-def parse(path):
-    steps, cur = [], None
-    text = open(path, errors='replace').read()
-    for line in text.splitlines():
-        if line.startswith('Step:'):
-            cur = {'Te': [], 'gpu': False}
-            steps.append(cur)
-            continue
-        if cur is None:
-            continue
-        if 'cell(s) to the GPU' in line:
-            cur['gpu'] = True
-        m = re.match(r'\s*(\d+)\s+' + NUM + r'\s+' + NUM + r'\s+' + NUM + r'\s*$', line)
-        if m:
-            cur['Te'].append(float(m.group(2)))
-        for key, pat in (('Emission', r'Emission E: ' + NUM), ('Source', r'Source E: ' + NUM),
-                         ('Absorption', r'Absorption E: ' + NUM), ('Exit', r'Exit E: ' + NUM),
-                         ('PreCensus', r'Pre census E: ' + NUM), ('PreMat', r'Pre mat E: ' + NUM),
-                         ('PostMat', r'Post mat E: ' + NUM),
-                         ('RadCons', r'Radiation conservation: ' + NUM),
-                         ('MatCons', r'Material conservation: ' + NUM)):
-            m = re.search(pat, line)
-            if m:
-                cur[key] = float(m.group(1))
-    return steps, text
-
-errors = []
-gpu_steps, gpu_text = parse(logs[0])
-if mode == 'gpu':
-    if len(gpu_steps) != 5:
-        errors.append(f'expected 5 time steps, found {len(gpu_steps)}')
-    if 'GPU kernel not available' in gpu_text:
-        errors.append('transport fell back to the CPU ("GPU kernel not available")')
-    if 'Photons Per Second (FOM)' not in gpu_text:
-        errors.append('no final "Photons Per Second (FOM)" line -- run did not finish')
-    for i, s in enumerate(gpu_steps, 1):
-        need = ('Emission', 'Source', 'PreCensus', 'PreMat', 'RadCons', 'MatCons')
-        if any(k not in s for k in need):
-            errors.append(f'step {i}: conservation block incomplete'); continue
-        if not s['gpu']:
-            errors.append(f'step {i}: no "cell(s) to the GPU" transfer -> GPU transport not used')
-        rad_scale = s['Emission'] + s['Source'] + s['PreCensus']
-        rad_rel = abs(s['RadCons']) / rad_scale
-        mat_rel = abs(s['MatCons']) / s['PreMat']
-        print(f'   step {i}: |rad cons| = {abs(s["RadCons"]):.3e} ({rad_rel:.2e} rel), '
-              f'|mat cons| = {abs(s["MatCons"]):.3e} ({mat_rel:.2e} rel)')
-        if rad_rel > 1e-9:
-            errors.append(f'step {i}: radiation conservation {rad_rel:.3e} rel > 1e-9')
-        if mat_rel > 1e-9:
-            errors.append(f'step {i}: material conservation {mat_rel:.3e} rel > 1e-9')
-else:  # compare final step of gpu vs cpu
-    cpu_steps, _ = parse(logs[1])
-    if len(cpu_steps) != len(gpu_steps) or not gpu_steps:
-        errors.append(f'step count differs: GPU {len(gpu_steps)} vs CPU {len(cpu_steps)}')
-    else:
-        g, c = gpu_steps[-1], cpu_steps[-1]
-        for key in ('PostMat', 'Absorption', 'Exit'):
-            rel = abs(g[key] - c[key]) / abs(c[key])
-            print(f'   final {key:<10s} E: GPU {g[key]:.6e}  CPU {c[key]:.6e}  rel diff {rel:.3e}')
-            if rel > 0.05:
-                errors.append(f'{key} E differs by {rel:.3e} (> 5e-2)')
-        if len(g['Te']) != len(c['Te']) or not g['Te']:
-            errors.append(f'T_e cell count differs: GPU {len(g["Te"])} vs CPU {len(c["Te"])}')
-        else:
-            dmax = max(abs(a - b) for a, b in zip(g['Te'], c['Te']))
-            imax = max(range(len(g['Te'])), key=lambda i: abs(g['Te'][i] - c['Te'][i]))
-            print(f'   final T_e: {len(g["Te"])} cells, max |GPU-CPU| = {dmax:.4f} at cell {imax} '
-                  f'(GPU {g["Te"][imax]:.5f}, CPU {c["Te"][imax]:.5f}); '
-                  f'front cells GPU {[round(x,4) for x in g["Te"][:3]]} CPU {[round(x,4) for x in c["Te"][:3]]}')
-            if dmax > 0.02:
-                errors.append(f'T_e differs by {dmax:.4f} (> 0.02) at cell {imax}')
-for e in errors:
-    print('   ERROR:', e)
-sys.exit(1 if errors else 0)
-PY
+    python3 "$HERE/check_log.py" "$@"
 }
 
-check_py gpu "$BUILD/validate_marshak_gpu.log" || fail "GPU physics checks failed (log: $BUILD/validate_marshak_gpu.log)"
+check_py gpu "$BUILD/validate_marshak_gpu.log" --steps 5 || fail "GPU physics checks failed (log: $BUILD/validate_marshak_gpu.log)"
 echo "   $(grep 'Total transport:' "$BUILD/validate_marshak_gpu.log" | tail -1), $(grep 'FOM' "$BUILD/validate_marshak_gpu.log" | tail -1)"
 
 # ------------------------------------------------ (C) CPU reference cross-check
@@ -204,7 +128,7 @@ if [ ! -x "$CPU_EXE" ]; then
     fi
 fi
 echo "== (C) CPU reference run: mpirun -np 1 $CPU_EXE $DECK ${DECK_ARGS[*]}"
-if ! mpirun -np 1 "$CPU_EXE" "$DECK" "${DECK_ARGS[@]}" > "$BUILD/validate_marshak_cpu.log" 2>&1; then
+if ! mpirun -np 1 --bind-to none "$CPU_EXE" "$DECK" "${DECK_ARGS[@]}" > "$BUILD/validate_marshak_cpu.log" 2>&1; then
     tail -20 "$BUILD/validate_marshak_cpu.log"
     fail "CPU reference run exited non-zero (log: $BUILD/validate_marshak_cpu.log)"
 fi

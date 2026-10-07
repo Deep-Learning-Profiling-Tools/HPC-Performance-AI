@@ -42,9 +42,9 @@ fi
 mkdir -p "$TMP/fb/level1"
 rows="$(python3 "$TOOLS/cases.py" resolve --level 1 --build-root "$TMP/fb" --no-env-check all 2>&1 | noise)"
 n1="$(printf '%s\n' "$rows" | /usr/bin/grep -c .)"
-nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=19' | wc -l)"
+nbad="$(printf '%s\n' "$rows" | awk -F'\t' 'NF!=20' | wc -l)"
 nbm="$(ls -d "$REPO"/level1/*/CMakeLists.txt 2>/dev/null | wc -l)"
-if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 19 fields ($nbm benchmarks)"
+if [ "$nbad" -eq 0 ] && [ "$n1" -ge "$nbm" ]; then ok "1c: level 1 resolves to $n1 cases of 20 fields ($nbm benchmarks)"
 else bad "1c: level 1 resolve: $n1 rows, $nbad malformed"; fi
 if printf '%s\n' "$rows" | awk -F'\t' '$9 ~ /verify\.py|python/' | /usr/bin/grep -q .; then
     bad "1d: a Level 1 case runs a python wrapper instead of the binary"
@@ -112,6 +112,178 @@ print("ALLOK" if not bad else "\n".join(bad))
 PY
 
 echo
+echo "=== 1r: registered inputs (inputs.yaml -> generated cases/level<N>_registry.tsv)"
+pycheck "1r1: registry tables: one case per registered input (counts from the registry), case == input_id, no drift" <<'PY'
+import os, subprocess, sys, glob
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+bad = []
+repo = os.environ["REPO"]
+for lvl, fn in ((1, cases.level1_registry_rows), (2, cases.level2_registry_rows), (3, cases.level3_registry_rows)):
+    rows, _ = fn("CUDA")
+    n = 0
+    for f in glob.glob(os.path.join(repo, f"level{lvl}", "*", "inputs.yaml")):
+        out = subprocess.run([sys.executable, os.path.join(repo, "tools/inputs/hpcperf_inputs.py"), "list", os.path.dirname(f)],
+                             capture_output=True, text=True).stdout
+        n += len([l for l in out.splitlines() if l.strip()])
+    if len(rows) != n:
+        bad.append(f"level {lvl}: {len(rows)} registry cases for {n} registered inputs")
+    if any(r["case"] != r["input_id"] or not r["input_id"] for r in rows):
+        bad.append(f"level {lvl}: a registry case without its input id")
+if g.check():
+    bad.append("drift: " + "; ".join(g.check()))
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r2: registry Level 1: a compile-time input runs its OWN binary (NPB class A/C), generated data per input id" <<'PY'
+import os, sys, shlex
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+rows, _ = cases.level1_registry_rows("CUDA")
+by = {(r["app"], r["case"]): r for r in rows}
+bad = []
+for b in ("cg", "ep", "ft", "is", "mg"):
+    for cls, d in (("class-a", "cuda-classA"), ("class-c", "cuda-classC"), ("class-b", "cuda")):
+        exe = shlex.split(by[(b, cls)]["argv"])[0]
+        if not exe.endswith(f"/build/{b}/{d}/{b}_cuda"):
+            bad.append(f"{b}/{cls} runs {exe}")
+for app, iid, data in (("aes", "plaintext-4mib", "input_4MB.hex"), ("aes", "plaintext-16mib", "input_16MB.hex"),
+                       ("pagerank", "nodes4096", "4096.data"), ("pagerank", "nodes1024", "1024.data")):
+    argv = shlex.split(by[(app, iid)]["argv"])
+    if not any(a.endswith(data) and os.path.isabs(a) for a in argv):
+        bad.append(f"{app}/{iid}: {data} not passed as an absolute path: {argv}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r3: registry Level 2: selector allowed only as the registry declares it; stray / conflicting / hand-written selector and knobs refused" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases
+bad = []
+def refused(fn, *a):
+    try:
+        fn(*a); return False
+    except cases.CaseError:
+        return True
+rows, _ = cases.level2_registry_rows("CUDA")
+reg = cases.registry_l2()
+for r in rows:
+    sel = reg[r["app"]][0]
+    if r["env"] != f"{sel}={r['input_id']}":
+        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}")
+if "HPCPERF_XSBENCH_INPUT" not in cases.allowed_env("xsbench", ""):
+    bad.append("the registry selector of xsbench is not an allowed input variable")
+for internal in ("HPCPERF_INPUT_ARGS", "HPCPERF_INPUT_ID"):
+    if internal in cases.allowed_env("xsbench", ""):
+        bad.append(f"{internal} (set inside run.sh by the selector helper) is settable by a case")
+kz = [r for r in rows if r["app"] == "kripke" and r["case"] == "z64-g64-q128"]
+kd, _ = cases.level2_rows("CUDA")
+kd = [r for r in kd if r["app"] == "kripke"]
+if not refused(cases.refuse_undeclared, kd, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128"}):
+    bad.append("a selector in the shell was not refused for the hand-written kripke case")
+if not refused(cases.refuse_undeclared, kd, {"KRIPKE_ZONES": "8,8,8"}):
+    bad.append("a registry knob in the shell was not refused")
+if not refused(cases.refuse_undeclared, kz, {"HPCPERF_KRIPKE_INPUT": "z32-g32-q64"}):
+    bad.append("a conflicting selector value in the shell was not refused")
+try:
+    cases.refuse_undeclared(kz, {"HPCPERF_KRIPKE_INPUT": "z64-g64-q128", "UNRELATED": "1"})
+except cases.CaseError as e:
+    bad.append(f"an identical declared value was refused: {e}")
+if not refused(cases.parse_env, "HPCPERF_GITHUB_TOKEN=x", "t"):
+    bad.append("a credential-looking variable was accepted")
+tmp = os.path.join(os.environ["TMP"], "casedir_reg")
+os.makedirs(tmp, exist_ok=True)
+for f in ("level2_apps.tsv", "level2_registry.tsv"):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+with open(os.path.join(tmp, "level2_cases.tsv"), "w") as f:
+    f.write("kripke\tsneaky\t1\tHPCPERF_KRIPKE_INPUT=z64-g64-q128\t-\t-\t-\t-\n")
+orig = cases.CASES
+cases.CASES = tmp
+if not refused(cases.level2_rows, "CUDA"):
+    bad.append("a hand-written case that sets the registry selector was accepted")
+cases.CASES = orig
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+pycheck "1r4: drift: a hand edit of a generated registry table is detected" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"])
+import cases, gen_registry_cases as g
+tmp = os.path.join(os.environ["TMP"], "casedir_drift")
+os.makedirs(tmp, exist_ok=True)
+for f in os.listdir(cases.CASES):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+p = os.path.join(tmp, "level1_registry.tsv")
+text = open(p).read().replace("build/cg/cuda-classC/cg_cuda", "build/cg/cuda/cg_cuda", 1)
+open(p, "w").write(text)
+cases.CASES = tmp
+problems = g.check()
+print("ALLOK" if any("level1_registry.tsv" in m for m in problems) else f"not detected: {problems}")
+PY
+out="$(bash "$TOOLS/measure_level1.sh" --registry --dry-run --no-profile cg/class-a cg/class-c 2>&1 || true)"
+if printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classA/cg_cuda' && printf '%s\n' "$out" | /usr/bin/grep -q 'build/cg/cuda-classC/cg_cuda' \
+   && printf '%s\n' "$out" | /usr/bin/grep -q 'input    class-a (registry level1/cg/inputs.yaml'; then
+    ok "1r5: registry dry run: class-a / class-c commands name their materialized binaries and the registry input"
+else
+    bad "1r5: registry dry run: $(printf '%s\n' "$out" | /usr/bin/grep -E 'command|input' | head -4 | tr '\n' ' ')"
+fi
+
+echo
+pycheck "1r4: registry Level 3: one case per registered input, selector env (+ the build-variant variable of a ReaxFF input), GPUs from runtime_config, NVTX range / profile default from the apps table; stray, conflicting and hand-written selector refused" <<'PY'
+import os, sys, shutil
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import cases, hpcperf_inputs as hi
+R = os.environ["REPO"]; bad = []
+def refused(fn, *a):
+    try:
+        fn(*a); return False
+    except cases.CaseError:
+        return True
+rows, apps = cases.level3_registry_rows("CUDA")
+reg = cases.registry_l3()
+for r in rows:
+    sel = reg[r["app"]][0]
+    doc = hi.load(os.path.join(R, "level3", r["app"])); inp = hi.get_input(doc, r["input_id"])
+    variant = (inp.get("params") or {}).get("variant")
+    want = f"{sel}={r['input_id']}" + (f";HPCPERF_LAMMPS_VARIANT={variant}" if variant and variant != "default" else "")
+    if r["env"] != want or r["case"] != r["input_id"] or r["level"] != "3":
+        bad.append(f"{r['app']}/{r['case']}: env {r['env']!r}, want {want!r}")
+    if r["gpus"] != str((inp.get("runtime_config") or {}).get("gpus", 1)):
+        bad.append(f"{r['app']}/{r['case']}: gpus {r['gpus']} != runtime_config")
+    if r["nvtx_roi"] != apps[r["app"]]["nvtx_roi"] or r["profile"] != apps[r["app"]]["profile"] or r["verify_vs_roi"] != "outside":
+        bad.append(f"{r['app']}/{r['case']}: nvtx/profile/verify not from the apps table")
+if not any(r["app"] == "warpx" and r["nvtx_roi"] == "WarpX::Evolve()" for r in rows):
+    bad.append("warpx rows lack the NVTX range")
+if not any(r["app"] == "qmcpack" and r["profile"].startswith("no (") for r in rows):
+    bad.append("qmcpack rows lack the no-profile default")
+rx = [r for r in rows if r["app"] == "lammps" and r["case"].startswith("reaxff-")]
+if len(rx) != 2 or any("HPCPERF_LAMMPS_VARIANT=reaxff" not in r["env"] for r in rx):
+    bad.append(f"ReaxFF cases do not carry the build-variant variable: {[r['env'] for r in rx]}")
+if any("HPCPERF_LAMMPS_VARIANT" in r["env"] for r in rows if r["app"] == "lammps" and not r["case"].startswith("reaxff-")):
+    bad.append("a non-ReaxFF LAMMPS case carries a build-variant variable")
+if "HPCPERF_LAMMPS_INPUT" not in cases.allowed_env("lammps", "", level=3):
+    bad.append("the Level 3 registry selector is not an allowed input variable")
+lj = [r for r in rows if r["app"] == "lammps" and r["case"] == "lj-32k"]
+hand, _ = cases.level3_rows("CUDA"); hand = [r for r in hand if r["app"] == "lammps"]
+if not refused(cases.refuse_undeclared, hand, {"HPCPERF_LAMMPS_INPUT": "lj-32k"}):
+    bad.append("a Level 3 selector in the shell was not refused for the hand-written lammps case")
+if not refused(cases.refuse_undeclared, lj, {"HPCPERF_LAMMPS_INPUT": "lj-2m"}):
+    bad.append("a conflicting Level 3 selector value in the shell was not refused")
+cp = [r for r in rows if r["app"] == "cp2k" and r["case"] == "h2o-64"]
+if not refused(cases.refuse_undeclared, cp, {"HPCPERF_CP2K_SYSTEM": "32"}):
+    bad.append("a Level 3 registry knob in the shell was not refused")
+try:
+    cases.refuse_undeclared(lj, {"HPCPERF_LAMMPS_INPUT": "lj-32k"})
+except cases.CaseError as e:
+    bad.append(f"an identical declared selector value was refused: {e}")
+tmp = os.path.join(os.environ["TMP"], "casedir_reg3"); os.makedirs(tmp, exist_ok=True)
+for f in ("level3_apps.tsv", "level3_registry.tsv", "level2_registry.tsv"):
+    shutil.copy(os.path.join(cases.CASES, f), tmp)
+with open(os.path.join(tmp, "level3_cases.tsv"), "w") as f:
+    f.write("lammps\tsneaky\t1\tHPCPERF_LAMMPS_INPUT=lj-32k\t-\t-\t-\t-\t-\n")
+orig = cases.CASES; cases.CASES = tmp
+if not refused(cases.level3_rows, "CUDA"):
+    bad.append("a hand-written Level 3 case that sets the registry selector was accepted")
+cases.CASES = orig
+print("ALLOK" if not bad else "\n".join(bad))
+PY
 echo "=== 2: ROI log v2 and the vendor-neutral analysis"
 pycheck "2a: ROI log parsing: entries, excluded time, unterminated, unmatched, version check" <<'PY'
 import os, sys
@@ -627,18 +799,25 @@ if /usr/bin/grep -rn 'HPCPERF_ROI_LOG\|HPCPERF_SKIP_VERIFY' "$REPO"/level1/*/CMa
 else
     ok "6c: no ctest command or validate.sh sets HPCPERF_ROI_LOG / HPCPERF_SKIP_VERIFY"
 fi
-BR=""
-for cand in "$REPO/build/gcc13" "$REPO/build/all"; do [ -d "$cand/level1" ] && { BR="$cand"; break; }; done
+# the executables the registry cases run (build/<benchmark>/cuda*/...), else a legacy build root
+exes="$(/usr/bin/awk -F'\t' '!/^#/ {print $5}' "$TOOLS/cases/level1_registry.tsv" | sed "s#{REPO}#$REPO#" | sort -u)"
+BR="registry"
+if [ -z "$(for e in $exes; do [ -x "$e" ] && echo y && break; done)" ]; then
+    BR=""; exes=""
+    for cand in "$REPO/build/gcc13" "$REPO/build/all"; do
+        [ -d "$cand/level1" ] && { BR="$cand"; exes="$(ls "$cand"/level1/*/*_cuda 2>/dev/null)"; break; }
+    done
+fi
 if [ -z "$BR" ]; then
     skip "6d: no Level 1 build tree"
 else
-    nb=0; missing=""
-    for exe in "$BR"/level1/*/*_cuda; do
-        [ -x "$exe" ] || continue
+    nb=0; absent=0; missing=""
+    for exe in $exes; do
+        [ -x "$exe" ] || { absent=$((absent+1)); continue; }
         nb=$((nb+1))
-        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing $(basename "$exe")"
+        /usr/bin/grep -q 'hpcperf:roi' "$exe" || missing="$missing ${exe#$REPO/}"
     done
-    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR)" \
+    [ "$nb" -gt 0 ] && [ -z "$missing" ] && ok "6d: all $nb built Level 1 binaries carry the markers ($BR; $absent not built)" \
                                          || bad "6d: $nb binaries, without markers:$missing"
 fi
 
@@ -861,6 +1040,9 @@ m = re.search(r'<script type="application/json" id="timing-data">(.*?)</script>'
 if not m:
     print("no embedded data"); raise SystemExit
 D = json.loads(m.group(1))
+if [c.get("kind") for c in D.get("campaigns", [{}])] != ["cases"]:
+    bad.append(f"case-table records should give one campaign of kind 'cases': {[c.get('kind') for c in D.get('campaigns', [])]}")
+D = D["campaigns"][0]
 plats = [p["id"] for p in D["platforms"]]
 if "test-platform" not in plats or "nvidia-b200.cuda13.2" not in plats:
     bad.append(f"platforms {plats} (measured ones and those with a conformance record)")
@@ -931,14 +1113,579 @@ case "$out" in *"json_written=0 "*) ok "12d: summarize --run-id processes only t
 out="$(bash "$TOOLS/measure_level1.sh" --build-root "$TMP/fb" --dry-run --collector none daxpy 2>&1 | noise)"
 case "$out" in *summarizing*) bad "12f: a dry run summarized" ;;
                *) ok "12f: a dry run neither measures nor summarizes" ;; esac
+# an invalidated raw run (INVALIDATED.json) builds no record, and an existing record of it is not loaded
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --no-report >/dev/null 2>&1
+nrec="$(find "$TMP/res_inv" -name '*.json' -path '*/level*' | wc -l)"
+for r in $(find "$TMP/raw" -name run_meta.txt -exec dirname {} \;); do echo '{"reason": "test"}' > "$r/INVALIDATED.json"; done
+o1="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv2" --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+o2="$(python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/res_inv" --csv-only --no-report 2>&1 | noise | /usr/bin/grep '^summarize: json')"
+find "$TMP/raw" -name INVALIDATED.json -delete
+case "$o1|$o2" in
+    *"json_written=0 "*"invalidated_raw=$nrec "*"|"*" records=0 "*"invalidated_records=$nrec"*)
+        ok "12g: $nrec invalidated raw runs build no record and their existing records are not loaded" ;;
+    *) bad "12g: invalidated runs still summarized ($nrec runs): $o1 / $o2" ;;
+esac
+
+echo "=== 13: registry run verifier (verify_registry_runs.py) -- negative cases"
+# A fake repository and records in the engine's layout: a Level 2 app whose registry names
+# wk/SLD10.dat, and an MFEM-like app with option arguments. Each record is verified read-only.
+pycheck "13a-13o: same-name file, relative/absolute path, controlled copy, dropped args, duplicate options" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vr"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/vl/wk/SLD10.dat", "registered deck\n")
+w(f"{R}/level2/vl/other/SLD10.dat", "a different deck with the same name\n")
+w(f"{R}/build/level2/vl/run/SLD10.dat", "registered deck\n")          # byte-identical copy
+w(f"{R}/build/level2/vl/bad/SLD10.dat", "tampered copy\n")
+w(f"{R}/build/level2/vl/vlp4d", ""); w(f"{R}/build/level2/rh/remhos", "")
+os.makedirs(f"{R}/build/level2/vl/cwd", exist_ok=True)
+deck_sha = V.sha(f"{R}/level2/vl/wk/SLD10.dat")
+rules_plain = {1: {}, 2: {"vl": {"search_dirs": ["wk"]}, "rh": {}, "lw": {"last_wins": "test parser"}}}
+rules_copy = {1: {}, 2: {"vl": {"search_dirs": ["wk"], "copies": {"wk/SLD10.dat": "build/level2/vl/"}}}}
+n = [0]
+def record(app, args, argv, cwd, files=None, sel="SEL", selval=None):
+    n[0] += 1
+    raw = f"{T}/raw/{n[0]}"; wl = {"input_id": "x", "args": args, "env": {}, "files_sha256": files or {}, "params": {}}
+    ident = {"schema": "hpcperf-workload-identity-1", "benchmark": app, "input_id": "x", "level": 2, "complete": True,
+             "selector": sel, "arg_files_sha256": {}, "workload": wl}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{100 + i}", f"# hpcperf-roi-log 2\npid {100 + i}\nrank 0\nexe {argv[0]}\ncwd {cwd}\nargv {json.dumps(argv)}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "done\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    rec = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": "x", "status": "ok",
+           "registry": {"input_id": "x", "identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {sel: selval or "x"}, "processes": []},
+           "roi": {"runs_s": [1.0, 1.0]}, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": "t"}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(rec)); return p
+bad = []
+def expect(label, path, rules, verdict, needle=""):
+    r = V.verify_record(path, os.path.realpath(R), rules)
+    txt = " | ".join(r["problems"] + r["gaps"])
+    if r["verdict"] != verdict or needle not in txt:
+        bad.append(f"{label}: got {r['verdict']} ({txt}), want {verdict} /{needle}/")
+exe, cwd = f"{R}/build/level2/vl/vlp4d", f"{R}/build/level2/vl/cwd"
+files = {"wk/SLD10.dat": deck_sha}
+# (1) same name, different content / location
+expect("13a same-name other deck", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/other/SLD10.dat"], cwd, files),
+       rules_plain, "FAIL", "not passed")
+expect("13b bare same name in the process cwd (a different file)", record("vl", ["SLD10.dat"], [exe, "SLD10.dat"], f"{R}/level2/vl/other", files),
+       rules_plain, "FAIL", "not passed")
+# (2) the registered file by absolute and by cwd-relative path
+expect("13c absolute path", record("vl", ["SLD10.dat"], [exe, f"{R}/level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+expect("13d relative path", record("vl", ["SLD10.dat"], [exe, "../../../../level2/vl/wk/SLD10.dat"], cwd, files), rules_plain, "PASS")
+# (3) a byte-identical copy counts only under a declared copy rule; a differing copy never
+cp = record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/run/SLD10.dat"], cwd, files)
+expect("13e undeclared copy", cp, rules_plain, "FAIL", "not passed")
+expect("13f declared identical copy", cp, rules_copy, "PASS")
+expect("13g declared copy with other content", record("vl", ["SLD10.dat"], [exe, f"{R}/build/level2/vl/bad/SLD10.dat"], cwd, files),
+       rules_copy, "FAIL", "")
+# (4) registry arguments that never reach the program
+rx = f"{R}/build/level2/rh/remhos"
+expect("13h registry args dropped", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-rs", "4", "-dt", "0.0025", "-pa"], cwd),
+       rules_plain, "FAIL", "not passed")
+# (5) run.sh defaults plus registered overrides: the duplicated option is refused ...
+expect("13i duplicate option, parser not last-wins", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-rs", "4", "-dt", "0.0025", "-rs", "1", "-dt", "0.02", "-pa"], cwd),
+       rules_plain, "FAIL", "given 2 times")
+# ... accepted after the fix that drops the overridden defaults ...
+expect("13j overrides replace the defaults", record("rh", ["-rs", "1", "-dt", "0.02"], [rx, "-m", "cube.mesh", "-pa", "-rs", "1", "-dt", "0.02"], cwd),
+       rules_plain, "PASS")
+# ... and for a declared last-wins parser only when the LAST occurrence is the registry's
+w(f"{R}/build/level2/lw/app", "")
+lw = f"{R}/build/level2/lw/app"
+expect("13k last-wins, registry last", record("lw", ["-s", "small"], [lw, "-s", "large", "-s", "small"], cwd), rules_plain, "PASS")
+expect("13l last-wins, registry not last", record("lw", ["-s", "small"], [lw, "-s", "small", "-s", "large"], cwd), rules_plain, "FAIL", "last one")
+# the selector must name the input; the binary must be the app's own
+expect("13m wrong selector", record("rh", [], [rx], cwd, selval="y"), rules_plain, "FAIL", "selector")
+expect("13n foreign binary", record("rh", [], [exe], cwd), rules_plain, "FAIL", "own binary")
+# an env knob with no evidence rule is a gap, not a pass
+p = record("rh", [], [rx], cwd)
+d = json.load(open(p)); d["registry"]["identity"]["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}
+json.dump(d, open(p, "w")); ri = json.load(open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json"))
+ri["workload"]["env"] = {"HPCPERF_RH_KNOB": "3"}; json.dump(ri, open(f"{R}/{d['provenance']['raw_dir']}/workload_identity.json", "w"))
+expect("13o unevidenced knob", p, rules_plain, "INSUFFICIENT", "HPCPERF_RH_KNOB")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+# a changed input definition (remhos periodic-hexagon-p0: order 3 made explicit): a record of the old
+# workload is SUPERSEDED (kept, never a result of the current input); the current workload with ONE -o
+# passes; a second -o (run.sh default + registry) is refused -- MFEM is not last-wins
+pycheck "13q-13s: changed definition -> SUPERSEDED; single effective -o; duplicated -o refused (real remhos registry)" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "vq")
+doc = hi.load(os.path.join(R, "level2", "remhos")); inp = hi.get_input(doc, "periodic-hexagon-p0")
+cur = hi.registry_identity(doc, inp)
+bad = []
+if cur["workload"]["args"][-2:] != ["-o", "3"] or cur["workload"]["params"].get("o") != 3:
+    bad.append(f"registry does not state order 3: {cur['workload']['args']}")
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+echo = "   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {o}\n   --time-step 0.005\n"
+n = [0]
+def rec(wl, argv, o):
+    n[0] += 1; raw = f"{T}/raw/{n[0]}"; os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl)
+    for i in range(3):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}/build/level2/remhos/cuda/run\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(echo.format(o=o))
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "remhos", "case": "periodic-hexagon-p0", "status": "ok",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {cur["selector"]: "periodic-hexagon-p0"}},
+         "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/{n[0]}.json"; json.dump(r, open(p, "w")); return p
+rules = V.load_rules(os.path.join(os.environ["TOOLS"], "cases", "registry_evidence.yaml"))
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+for label, wl, argv, o, want in [
+        ("13q old order-2 record", old_wl, ["-o", "2"] + base, 2, "SUPERSEDED"),
+        ("13r current workload, one -o 3", cur["workload"], base + ["-o", "3"], 3, "PASS"),
+        ("13s run.sh -o 2 AND registry -o 3", cur["workload"], ["-o", "2"] + base + ["-o", "3"], 3, "FAIL")]:
+    v = V.verify_record(rec(wl, argv, o), R, rules)
+    if v["verdict"] != want:
+        bad.append(f"{label}: {v['verdict']} ({v['problems'] + v['gaps']}), want {want}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+# a registered input whose run fails before the ROI (MiniEM bdot/blob today) stays a failure: NOT_RUN,
+# never PASS, and summarize counts it as not ok
+pycheck "13t: a run that aborts before the ROI is NOT_RUN, never PASS" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "vt"); raw = os.path.join(T, "raw"); os.makedirs(os.path.join(raw, "clean.0"), exist_ok=True)
+open(os.path.join(raw, "clean.0", "run.log"), "w").write("terminate called after throwing an instance of 'Teuchos::Exceptions::InvalidParameterName'\n")
+open(os.path.join(raw, "clean.0", "run.txt"), "w").write("rc=134\n")
+ident = {"benchmark": "miniem", "input_id": "maxwell-bdot-small", "complete": True, "selector": "HPCPERF_MINIEM_INPUT",
+         "workload": {"args": [], "env": {}, "params": {}, "files_sha256": {}}}
+rec = {"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-bdot-small", "status": "clean_failed",
+       "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-bdot-small"}},
+       "roi": {"runs_s": [], "wall_s": None}, "provenance": {"raw_dir": raw}}
+p = os.path.join(T, "r.json"); json.dump(rec, open(p, "w"))
+v = V.verify_record(p, os.path.join(T, "norepo"), {1: {}, 2: {}})
+print("ALLOK" if v["verdict"] == "NOT_RUN" else f"verdict {v['verdict']}: {v['problems']}")
+PY
+out="$(python3 "$TOOLS/verify_registry_runs.py" --repo "$TMP/vr/repo" "$TMP/vr/rec" 2>&1 | noise | tail -1)"
+case "$out" in *"records)"*) ok "13p: the command line verifies a directory of records ($out)" ;;
+               *) bad "13p: verify_registry_runs.py cli: $out" ;; esac
+
+echo "=== 14: a registry dry run executes nothing"
+# Not every run.sh honours HPCPERF_DRY_RUN (the direct-launch ones ignore it), so the dry run must
+# never start run.sh or a benchmark at all. Shims for every way the engine starts a program
+# (env -i, timeout, mpirun/mpiexec/srun) record a sentinel and exit without running anything.
+SHIM="$TMP/shim"; SENT="$TMP/executed"; mkdir -p "$SHIM"
+for t in env timeout mpirun mpiexec srun; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 97\n' "$t" "$SENT" > "$SHIM/$t"; chmod +x "$SHIM/$t"
+done
+rm -f "$SENT"
+o1="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+o2="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level2.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+o3="$(PATH="$SHIM:$PATH" bash "$TOOLS/measure_level3.sh" --registry --dry-run --collector none \
+      --raw-root "$TMP/dr/raw" --results-root "$TMP/dr/res" all 2>&1 | noise)"
+n1="$(printf '%s\n' "$o1" | /usr/bin/grep -c '^    command ')"; n2="$(printf '%s\n' "$o2" | /usr/bin/grep -c '^    command ')"
+n3="$(printf '%s\n' "$o3" | /usr/bin/grep -c '^    command ')"
+r1="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level1_registry.tsv")"; r2="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level2_registry.tsv")"
+r3="$(/usr/bin/grep -vc '^#' "$TOOLS/cases/level3_registry.tsv")"
+if [ -e "$SENT" ]; then
+    bad "14a: the registry dry run started a program: $(head -3 "$SENT" | tr '\n' ' ')"
+elif [ "$n1" != "$r1" ] || [ "$n2" != "$r2" ] || [ "$n3" != "$r3" ]; then
+    bad "14a: dry run planned $n1/$r1 Level 1, $n2/$r2 Level 2 and $n3/$r3 Level 3 registry cases"
+elif [ -e "$TMP/dr/raw" ] || [ -e "$TMP/dr/res" ]; then
+    bad "14a: the dry run wrote raw or result directories"
+else
+    ok "14a: registry dry run planned all $n1 Level 1 + $n2 Level 2 + $n3 Level 3 inputs, started nothing, wrote nothing"
+fi
+# positive control: the same shims DO see a real (non-dry) run -- which they stop before any program runs
+rm -f "$SENT"
+PATH="$SHIM:$PATH" bash "$TOOLS/measure_level1.sh" --registry --collector none --no-profile --no-summary \
+    --clean-runs 1 --raw-root "$TMP/dr2/raw" --results-root "$TMP/dr2/res" daxpy/"$(/usr/bin/awk -F'\t' '!/^#/ && $1=="daxpy" {print $2; exit}' "$TOOLS/cases/level1_registry.tsv")" >/dev/null 2>&1
+[ -s "$SENT" ] && ok "14b: positive control -- a non-dry run is caught by the shims ($(head -1 "$SENT" | cut -c1-40)...)" \
+               || bad "14b: the shims did not see a non-dry run; 14a proves nothing"
+
+echo "=== 15: registered-input report (registry_view.py + report.py)"
+# Synthetic records of the REAL registry's remhos periodic-hexagon-p0 (current definition: -o 3) and
+# miniem darcy-hex: an old-definition record (SUPERSEDED), an INVALIDATED one, a current 3-run
+# record plus a 2-run adaptive extension of the same configuration, a newer 3-run record built from
+# another binary (a separate measurement), and a failed MiniEM attempt.
+pycheck "15a-15h, 15k: pooling, INVALIDATED/SUPERSEDED never current, failed input listed, nulls, determinism, vs previous only within one protocol" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import hpcperf_inputs as hi, report, registry_view as RV
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "rv"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "remhos")); cur = hi.registry_identity(doc, hi.get_input(doc, "periodic-hexagon-p0"))
+old_wl = json.loads(json.dumps(cur["workload"])); old_wl["args"] = old_wl["args"][:-2]; old_wl["params"].pop("o", None)
+exe = f"{R}/build/level2/remhos/cuda/remhos"
+base = ["-ho", "3", "-lo", "5", "-fct", "2", "-pa", "-d", "cuda", "-no-vis", "-m", f"{R}/level2/remhos/data/periodic-hexagon.mesh",
+        "-p", "0", "-rs", "2", "-dt", "0.005", "-tf", "10"]
+PLAT = "test-platform"
+def rec(run_id, wl, argv, runs, exe_sha="aa", commit="c0ffee", app="remhos", case="periodic-hexagon-p0", status="ok",
+        invalid=False, sel="HPCPERF_REMHOS_INPUT", order=3, warm=0):
+    raw = os.path.join(T, "raw", app, case, run_id); os.makedirs(raw, exist_ok=True)
+    ident = dict(cur, workload=wl, benchmark=app, input_id=case, selector=sel)
+    for i, v in enumerate(runs if status == "ok" else [None]):
+        d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+        if status == "ok":
+            open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {R}\nargv {json.dumps([exe] + argv)}\nB 1 1\nE 2 2\n")
+        open(f"{d}/run.log", "w").write(f"   --mesh /x/data/periodic-hexagon.mesh\n   --problem 0\n   --refine-serial 2\n   --order {order}\n   --time-step 0.005\n")
+    json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+    if invalid:
+        json.dump({"reason": "test: another workload"}, open(f"{raw}/INVALIDATED.json", "w"))
+    import statistics
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": app, "case": case, "status": status, "run_id": run_id,
+         "utc": "2026-01-01T00:00:%02dZ" % int(run_id[-2:]), "platform": PLAT,
+         "registry": {"input_id": case, "identity": ident, "identity_complete": True, "identity_sha256": "id-" + json.dumps(wl, sort_keys=True)[:40]},
+         "inputs": {"declared_env": {sel: case}, "processes": [], "exe_sha256": exe_sha},
+         "roi": {"runs_s": runs if status == "ok" else [], "wall_s": statistics.median(runs) if status == "ok" else None},
+         "measurement": {"protocol": {"warmup_runs": warm, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+         "device": None, "provenance": {"raw_dir": os.path.relpath(raw, R), "git_commit": commit}, "caveats": []}
+    os.makedirs(f"{root}/level2/{app}/{case}", exist_ok=True)
+    json.dump(r, open(f"{root}/level2/{app}/{case}/{run_id}.json", "w"))
+rec("run01", old_wl, ["-o", "2"] + base, [1.50, 1.52, 1.51], commit="old0001", order=2)          # SUPERSEDED
+rec("run02", cur["workload"], ["-o", "2"] + base, [1.40, 1.41, 1.42], invalid=True, commit="bad0002", order=2)  # INVALIDATED
+rec("run03", cur["workload"], base + ["-o", "3"], [2.72, 2.40, 2.38])                               # current, 3 runs
+rec("run04", cur["workload"], base + ["-o", "3"], [2.38, 2.39])                                     # adaptive +2, same config
+rec("run05", cur["workload"], base + ["-o", "3"], [9.0, 9.1, 9.2], exe_sha="bb")                    # other binary: separate
+rec("run07", cur["workload"], base + ["-o", "3"], [9.5, 9.6, 9.7], exe_sha="bb", warm=1)            # another protocol: a new chain
+rec("run08", cur["workload"], base + ["-o", "3"], [9.6, 9.7, 9.8], exe_sha="bb", warm=1)            # same protocol as run07
+rec("run09", cur["workload"], base + ["-o", "3"], [9.9], exe_sha="bb", warm=1)                      # ONE clean run: never a baseline
+rec("run10", cur["workload"], base + ["-o", "3"], [9.7, 9.8, 9.9], exe_sha="bb", warm=1)            # compares with run08, not run09
+json.dump({"schema": "hpcperf-timing-measurement-groups-1", "groups": [{"id": "g1", "level": 2, "app": "remhos",
+           "case": "periodic-hexagon-p0", "base_run_id": "run03", "extension_run_ids": ["run04"], "evidence": ["test"]}]},
+          open(os.path.join(root, "measurement_groups.json"), "w"))                                  # the explicit link
+ms = hi.load(os.path.join(R, "level2", "miniem")); mcur = hi.registry_identity(ms, hi.get_input(ms, "darcy-hex"))
+rec("run06", mcur["workload"], [], [], app="miniem", case="darcy-hex", status="clean_failed", sel="HPCPERF_MINIEM_INPUT")
+bad = []
+b1 = report.build_bundle([root]); b2 = report.build_bundle([root])
+if json.dumps(b1, sort_keys=True) != json.dumps(b2, sort_keys=True): bad.append("15a: two builds differ")
+c = b1["campaigns"][0]
+if c["kind"] != "registry": bad.append("15b: registry records not rendered as the registry view")
+rows = {i["input_id"]: i for a in c["levels"]["2"] for i in a["inputs"]}
+nreg = sum(1 for x in RV.registered_inputs(R) if x["level"] == 2)
+if len(rows) != nreg: bad.append(f"15c: {len(rows)} Level 2 inputs listed, registry has {nreg}")
+h = rows["periodic-hexagon-p0"]; m = h["cells"].get(PLAT)
+if not m or m["set"]["run_ids"] != ["run10"]:
+    bad.append(f"15d: current should be the newest configuration run10 (another binary / protocol is a separate measurement): {m and m['set']['run_ids']}")
+sets = {tuple(s["run_ids"]): s for s in h["sets"]}
+p = sets.get(("run03", "run04"))
+if not p or p["n"] != 5 or abs(p["median"] - 2.39) > 1e-9: bad.append(f"15e: adaptive 3+2 not pooled into 5 samples: {p}")
+if sets.get(("run01",), {}).get("verdict") != "SUPERSEDED" or sets[("run01",)]["current_definition"]: bad.append("15f: old definition not SUPERSEDED")
+if sets[("run01",)].get("vs_previous") is not None or p.get("vs_previous") is not None:
+    bad.append("15f: vs previous computed across workload definitions")
+if not sets.get(("run05",)) or sets[("run05",)]["vs_previous"] is None: bad.append("15f: vs previous missing between same-workload measurements")
+if sets.get(("run07",), {}).get("vs_previous") is not None: bad.append("15k: vs previous computed across protocols (warm-up 0 -> 1)")
+if not sets.get(("run08",)) or sets[("run08",)]["vs_previous"] is None: bad.append("15k: vs previous missing between two measurements of the same protocol")
+if "warm-up 1" not in sets.get(("run07",), {}).get("protocol_key", ""): bad.append(f"15k: protocol key not shown: {sets.get(('run07',), {}).get('protocol_key')}")
+if m and m["set"]["run_ids"] != ["run10"]: bad.append(f"15d/15k: current should now be run10: {m['set']['run_ids']}")
+if sets.get(("run09",), {}).get("vs_previous") is not None: bad.append("15l: a single-sample measurement got a vs previous")
+r10 = sets.get(("run10",), {})
+if r10.get("vs_previous") is None or abs(r10["vs_previous"] - (9.8 - 9.7) / 9.7) > 1e-9:
+    bad.append(f"15l: vs previous of run10 should skip the single-sample run09 and use run08: {r10.get('vs_previous')}")
+if any(tuple(s["run_ids"]) == ("run02",) for s in h["sets"]) or not any(a["verdict"] == "INVALIDATED" for a in h["attempts"]):
+    bad.append("15g: INVALIDATED record used as a measurement or not shown in the attempts")
+f = rows["darcy-hex"]
+if f["status"] != "RUN_FAILED" or any(f["cells"].values()): bad.append(f"15h: failed input: status {f['status']}")
+if m and (m.get("device") is not None or m["roi"].get("profiler_inflation") is not None): bad.append("15h: no-profile fields not null")
+if c["counts"]["roi_success"]["level2"] != 1: bad.append(f"15h: counts {c['counts']['roi_success']}")
+report.write([root], os.path.join(T, "page"))
+md = open(os.path.join(T, "page", "README.md")).read()
+if "darcy-hex**: RUN_FAILED" not in md or "SUPERSEDED remhos / periodic-hexagon-p0" not in md: bad.append("15h: README lacks the failed / superseded entries")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if command -v node >/dev/null 2>&1; then
+    printf '%s\n' '[{"name":"15i overview","level":"2","expect":["1 ROI timing SUCCESS"]},
+ {"name":"15i hexagon","level":"2","app":"remhos","input":"periodic-hexagon-p0","platform":"test-platform","expect":["run05","SUPERSEDED","INVALIDATED","earlier definition","Where the process spends its time","Device activity inside the ROI","no collector observed this run","Runs of this input"]},
+ {"name":"15i failed","level":"2","app":"miniem","input":"darcy-hex","platform":"test-platform","expect":["run failed","NOT_RUN"],"absent":["ROI (median of"]}]' > "$TMP/rv/checks.json"
+    out="$(node "$HERE/page_smoke.js" "$TMP/rv/page/index.html" "$TMP/rv/checks.json" 2>&1)"
+    [ $? -eq 0 ] && ok "15i: the page's own script renders the synthetic campaign (DOM shim, $(echo "$out" | grep -c '^ok') checks)" \
+                 || bad "15i: page smoke: $(echo "$out" | grep FAIL | head -3 | tr '\n' ' ')"
+else
+    skip "15i: node not available for the page smoke test"
+fi
+
+echo "=== 16: pooling needs an explicit measurement group"
+pycheck "16a-16h: linked 3+2 -> 5; unlinked 3+3 -> 2; other campaign -> 2; inconsistent or malformed group refused; duplicate record -> once" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import registry_view as RV
+T = os.path.join(os.environ["TMP"], "rg")
+def rec(root, run_id, runs, exe="aa", ident="id1", warm=0, verdict="PASS"):
+    return {"schema": "hpcperf-timing-2", "level": 2, "app": "app", "case": "in", "run_id": run_id, "status": "ok", "utc": run_id,
+            "platform": "p", "registry": {"identity_sha256": ident, "identity": {"workload": {"k": ident}}},
+            "inputs": {"exe_sha256": exe}, "provenance": {"git_commit": "c"},
+            "measurement": {"protocol": {"warmup_runs": warm, "clean_runs": len(runs), "profiled_runs": 0}, "collector": {"name": "none"}},
+            "roi": {"runs_s": runs}, "_root": os.path.realpath(root), "_verdict": verdict, "_path": os.path.join(root, run_id)}
+def grp(root, base, ext):
+    return {"id": f"{base}+{ext}", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": [ext],
+            "_root": os.path.realpath(root)}
+A, B = os.path.join(T, "campaignA"), os.path.join(T, "campaignB")
+bad = []
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])], [grp(A, "r1", "r2")])
+if [len(m["samples"]) for m in sets] != [5] or not sets[0]["adaptive"] or pr:
+    bad.append(f"16a linked 3+2: {[m['run_ids'] for m in sets]} {pr}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r3", [1.0, 1.1, 1.2])], [])
+if [len(m["samples"]) for m in sets] != [3, 3] or any(m["adaptive"] for m in sets):
+    bad.append(f"16b unlinked, same configuration, same campaign: {[m['run_ids'] for m in sets]}")
+sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(B, "r9", [1.0, 1.1, 1.2])], [grp(A, "r1", "r9")])
+if [len(m["samples"]) for m in sets] != [3, 3] or not pr:
+    bad.append(f"16c other campaign, same configuration (even with a cross-directory link): {[m['run_ids'] for m in sets]} {pr}")
+for label, other in (("binary", dict(exe="bb")), ("workload", dict(ident="id2")), ("protocol", dict(warm=1))):
+    sets, pr = RV.measurements([rec(A, "r1", [1.0, 1.1, 1.2]), rec(A, "r2", [1.1, 1.1], **other)], [grp(A, "r1", "r2")])
+    if [len(m["samples"]) for m in sets] != [3, 2] or not pr or "not pooled" not in pr[0]:
+        bad.append(f"16d linked but different {label}: {[m['run_ids'] for m in sets]} {pr}")
+# a malformed member list is rejected as a whole, never repaired: no sample counted twice
+def g2(base, ext):
+    return {"id": "bad", "level": 2, "app": "app", "case": "in", "base_run_id": base, "extension_run_ids": ext, "_root": os.path.realpath(A)}
+three, two = rec(A, "r1", [1.0, 1.2, 1.4]), rec(A, "r2", [1.1, 1.1])
+for label, g, reason in (("16f extension listed twice", g2("r1", ["r2", "r2"]), "more than once"),
+                         ("16g base listed as an extension", g2("r1", ["r1", "r2"]), "base run id is also listed"),
+                         ("16h missing base", g2("", ["r2"]), "base_run_id"),
+                         ("16h empty extension list", g2("r1", []), "extension_run_ids"),
+                         ("16h extension list not a list", g2("r1", "r2"), "extension_run_ids")):
+    sets, pr = RV.measurements([three, two], [g])
+    if sorted(len(m["samples"]) for m in sets) != [2, 3] or not pr or reason not in pr[0] or any(m["adaptive"] for m in sets):
+        bad.append(f"{label}: {[len(m['samples']) for m in sets]} {pr}")
+# the same record under two roots (a copied results directory): loaded once
+for root in (A, B):
+    d = os.path.join(root, "level2", "app", "in"); os.makedirs(d, exist_ok=True)
+    r = rec(root, "r1", [1.0, 1.1, 1.2])
+    for k in ("_root", "_verdict", "_path"):
+        r.pop(k)
+    json.dump(r, open(os.path.join(d, "r1.json"), "w"))
+recs, dups = RV.load_records([A, B])
+if len(recs) != 1 or len(dups) != 1:
+    bad.append(f"16e duplicate record: {len(recs)} loaded, {len(dups)} duplicates")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 17: input-file identity through declared copies and logged reads (MiniEM-like)"
+pycheck "17a-17e: copies with the registered content pass; changed deck / changed solver config / unlogged config do not" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import verify_registry_runs as V
+T = os.path.join(os.environ["TMP"], "fi"); R = os.path.join(T, "repo")
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+w(f"{R}/level2/me/src/decks/deck.xml", "<deck/>\n"); w(f"{R}/level2/me/src/decks/solver.xml", "<solver/>\n")
+w(f"{R}/build/level2/me/exe", "")
+rules = {1: {}, 2: {"me": {"copy_dirs": {"src/decks": "build/level2/me/decks"}, "logged_reads": r"^Loading solver config from (\S+)$"}}}
+files = {"src/decks/deck.xml": V.sha(f"{R}/level2/me/src/decks/deck.xml"), "src/decks/solver.xml": V.sha(f"{R}/level2/me/src/decks/solver.xml")}
+n = [0]
+def case(deck, solver, logged=True):
+    n[0] += 1
+    w(f"{R}/build/level2/me/decks/deck.xml", deck); w(f"{R}/build/level2/me/decks/solver.xml", solver)
+    V._sha_cache.clear()
+    raw = f"{T}/raw/{n[0]}"; cwd = f"{R}/build/level2/me/decks"
+    ident = {"benchmark": "me", "input_id": "x", "complete": True, "selector": "SEL", "arg_files_sha256": {},
+             "workload": {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": files}}
+    for i in range(2):
+        w(f"{raw}/clean.{i}/roi.{i}", f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {R}/build/level2/me/exe\ncwd {cwd}\n"
+          f"argv {json.dumps([R + '/build/level2/me/exe', '--inputFile=deck.xml'])}\nB 1 1\nE 2 2\n")
+        w(f"{raw}/clean.{i}/run.log", "Loading solver config from solver.xml\n" if logged else "\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    r = {"schema": "hpcperf-timing-2", "level": 2, "app": "me", "case": "x", "status": "ok", "run_id": f"r{n[0]}",
+         "registry": {"identity": ident, "identity_complete": True}, "inputs": {"declared_env": {"SEL": "x"}},
+         "roi": {"runs_s": [1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(r))
+    return V.verify_record(p, R, rules)
+bad = []
+v = case("<deck/>\n", "<solver/>\n")
+if v["verdict"] != "PASS" or not any("declared copy" in e for e in v["evidence"]):
+    bad.append(f"17a identical copies: {v['verdict']} {v['problems'] + v['gaps']}")
+v = case("<deck changed='1'/>\n", "<solver/>\n")
+if v["verdict"] != "FAIL" or "deck.xml" not in " ".join(v["problems"]):
+    bad.append(f"17b changed deck, same name and argv: {v['verdict']}")
+v = case("<deck/>\n", "<solver changed='1'/>\n")
+if v["verdict"] != "FAIL" or "solver.xml" not in " ".join(v["problems"]):
+    bad.append(f"17c changed solver config: {v['verdict']}")
+v = case("<deck/>\n", "<solver/>\n", logged=False)
+if v["verdict"] != "INSUFFICIENT" or "solver.xml" not in " ".join(v["gaps"]):
+    bad.append(f"17d solver config not named by the run: {v['verdict']}")
+old = {"input_id": "x", "args": [], "env": {}, "params": {}, "files_sha256": {}}
+if V.files_added(old, dict(old, files_sha256=files)) != files or V.files_added(old, dict(old, params={"a": 1})) is not None:
+    bad.append("17e files_added does not isolate an added-files-only change")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+if [ -f "$REPO/build/level2/miniem/cuda/decks/maxwell-large.xml" ]; then
+pycheck "17f: MiniEM record measured before its files were registered: INSUFFICIENT without a complete, bound supplement" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "fm"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level2", "miniem")); cur = hi.registry_identity(doc, hi.get_input(doc, "maxwell-large-weak48"))
+ident = json.loads(json.dumps(cur)); ident["workload"]["files_sha256"] = {}          # as captured before the files were registered
+exe = f"{R}/build/level2/miniem/cuda/PanzerMiniEM_BlockPrec"; cwd = f"{R}/build/level2/miniem/cuda/decks"
+raw = os.path.join(T, "raw")
+for i in range(3):
+    d = f"{raw}/clean.{i}"; os.makedirs(d, exist_ok=True)
+    open(f"{d}/roi.{i}", "w").write(f"# hpcperf-roi-log 2\npid {i}\nrank 0\nexe {exe}\ncwd {cwd}\nargv " + json.dumps([exe,
+        "--inputFile=maxwell-large.xml", "--solver=MueLu", "--linAlgebra=Tpetra", "--numTimeSteps=3", "--x-elements=48",
+        "--y-elements=48", "--z-elements=48", "--stacked-timer"]) + "\nB 1 1\nE 2 2\n")
+    open(f"{d}/run.log", "w").write("Loading solver config from solverMueLu.xml\nLoading solver config from solverMueLuCuda.xml\n")
+json.dump(ident, open(f"{raw}/workload_identity.json", "w"))
+os.makedirs(f"{root}/level2/miniem/maxwell-large-weak48", exist_ok=True)
+p = f"{root}/level2/miniem/maxwell-large-weak48/rX.json"
+json.dump({"schema": "hpcperf-timing-2", "level": 2, "app": "miniem", "case": "maxwell-large-weak48", "status": "ok", "run_id": "rX",
+           "registry": {"identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {"HPCPERF_MINIEM_INPUT": "maxwell-large-weak48"}},
+           "roi": {"runs_s": [1, 1, 1]}, "provenance": {"raw_dir": os.path.relpath(raw, R)}}, open(p, "w"))
+rules = V.load_rules(V.DEFAULT_RULES)
+bad = []
+v = V.verify_record(p, R, rules)
+if v["verdict"] != "INSUFFICIENT" or v["file_identity"] != "insufficient":
+    bad.append(f"no supplement: {v['verdict']} {v['file_identity']}")
+full = {"level": 2, "app": "miniem", "case": "maxwell-large-weak48", "run_id": "rX", "files_sha256": cur["workload"]["files_sha256"],
+        "basis": "test basis", "evidence": ["test source"], "record_sha256": V.sha(p), "raw_dir": os.path.relpath(raw, R)}
+def with_sup(entry, schema="hpcperf-file-identity-supplement-1"):
+    json.dump({"schema": schema, "records": [entry]}, open(f"{root}/{V.SUPPLEMENT}", "w"))
+    return V.verify_record(p, R, rules)
+for label, entry, schema in (
+        ("hashes differ from the registry", dict(full, files_sha256=dict(full["files_sha256"], **{"src/decks/solverMueLu.xml": "0" * 64})), None),
+        ("identity + current hashes only, no basis / evidence", {k: full[k] for k in ("level", "app", "case", "run_id", "files_sha256")}, None),
+        ("empty basis", dict(full, basis=" "), None),
+        ("no evidence sources", dict(full, evidence=[]), None),
+        ("not bound to the record (record_sha256)", dict(full, record_sha256="0" * 64), None),
+        ("not bound to the raw runs (raw_dir)", dict(full, raw_dir="elsewhere"), None),
+        ("wrong schema", full, "other-schema")):
+    v = with_sup(entry, schema or "hpcperf-file-identity-supplement-1")
+    if v["verdict"] == "PASS" or v["file_identity"] != "insufficient":
+        bad.append(f"a supplement with {label} was accepted: {v['verdict']} {v['file_identity']}")
+v = with_sup(full)
+if v["verdict"] != "PASS" or v["file_identity"] != "supplement":
+    bad.append(f"complete matching supplement: {v['verdict']} {v['problems'] + v['gaps']}")
+if json.load(open(f"{raw}/workload_identity.json"))["workload"]["files_sha256"] != {}:
+    bad.append("the stored identity was changed")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+else
+    skip "17f: MiniEM build decks not present"
+fi
+
+echo "=== 18: stability depends on the sample size"
+pycheck "18a-18d: range rule below 10 samples, IQR rule from 10, one outlier in 20, two levels flagged" <<'PY'
+import os, sys
+sys.path.insert(0, os.environ["TOOLS"])
+import registry_view as RV
+bad = []
+st, rule, iqr, two = RV.stability([1.0, 1.05, 1.12, 1.0, 1.01])            # 5 samples, range 12 %
+if st or "max-min" not in rule: bad.append(f"18a 5 samples, range 12 %: {st} {rule}")
+st, rule, iqr, two = RV.stability([1.0, 1.01, 1.02, 1.0, 1.01])            # 5 samples, range 2 %
+if not st: bad.append("18a 5 samples, range 2 %: unstable")
+s = [1.0 + 0.001 * i for i in range(19)] + [1.6]                            # 20 samples, one outlier
+st, rule, iqr, two = RV.stability(s)
+if not st or "IQR" not in rule or two: bad.append(f"18b 20 samples with one outlier: {st} {rule} two={two}")
+s = [1.0, 1.01] * 5 + [1.3, 1.31] * 5                                       # 20 samples, two groups of 10
+st, rule, iqr, two = RV.stability(s)
+if st or not two: bad.append(f"18c two levels: stable={st} two={two}")
+s = [1.0 + 0.002 * i for i in range(20)]                                    # 20 samples, 4 % steady spread
+st, rule, iqr, two = RV.stability(s)
+if not st or two: bad.append(f"18d steady 20: {st} {two}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 19: placement probe (probes/bindprobe.c) and the record's placement block"
+BP="$TMP/bp"; mkdir -p "$BP"
+if command -v cc >/dev/null 2>&1 && cc -O2 -shared -fPIC -o "$BP/bindprobe.so" "$TOOLS/probes/bindprobe.c" 2> "$BP/cc.log"; then
+    # a process that wrote an ROI log records its placement; one that did not records nothing
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_PLACEMENT_LOG="$BP/bind" HPCPERF_ROI_LOG="$BP/roi" \
+        /bin/sh -c 'echo "# fake" > "$HPCPERF_ROI_LOG.$$"; exit 0'
+    env -i PATH="$PATH" LD_PRELOAD="$BP/bindprobe.so" HPCPERF_PLACEMENT_LOG="$BP/bind_plain" HPCPERF_ROI_LOG="$BP/roi_plain" \
+        /bin/sh -c 'exit 0'
+    mine="$(/usr/bin/grep Cpus_allowed_list /proc/self/status | cut -f2)"
+    n=$(ls "$BP"/bind.* 2>/dev/null | wc -l); np=$(ls "$BP"/bind_plain.* 2>/dev/null | wc -l)
+    if [ "$n" = 1 ] && [ "$np" = 0 ] && /usr/bin/grep -q "^cpus_allowed_end $mine\$" "$BP"/bind.* \
+       && /usr/bin/grep -q "^roi_log 1$" "$BP"/bind.* && /usr/bin/grep -q "^task .* last_cpu [0-9]" "$BP"/bind.*; then
+        ok "19a: the probe records the ROI process's CPU set ($mine), thread placement; a plain shell writes nothing"
+    else
+        bad "19a: bind files: roi=$n plain=$np; $(cat "$BP"/bind.* 2>/dev/null | head -20 | tr '\n' '|')"
+    fi
+else
+    skip "19a: no C compiler for the placement probe"
+fi
+# summarize: bind.<pid> next to the ROI log -> placement block; consistent across clean runs
+mkraw "$RAW/appd/default/r1" none 1 "Rate: 1"
+echo "bind_probe=bindprobe.c@test" >> "$RAW/appd/default/r1/run_meta.txt"
+for i in 0 1; do
+    printf '# hpcperf-bind-log 1\npid 9\nexe /x/app\nroi_log 1\ncpu_start 3\ncpu_end 5\ncpus_allowed_start 0-7\nmems_allowed_start 0\ncpus_allowed_end 0-7\nmems_allowed_end 0\nthreads 2\nvoluntary_ctxt_switches 3\nnonvoluntary_ctxt_switches 1\ntask 9 cpus 0-7 last_cpu 5 name app\ntask 10 cpus 0-7 last_cpu 6 name cuda-EvtHandlr\ngpu minor 2 bus 0000:52:00.0\nenv CUDA_VISIBLE_DEVICES=GPU-abc\n' \
+        > "$RAW/appd/default/r1/clean.$i/bind.9"
+done
+mkraw "$RAW/appe/default/r1" none 1 "Rate: 1"
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/out19" --no-report >/dev/null 2>&1
+pycheck "19b: placement block from bind logs (consistent), empty without the probe" <<'PY'
+import json, os, glob
+bad = []
+d = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out19/level2/appd/default/*.json"))[0]))
+p = d["placement"]
+if p["probe"] != "bindprobe.c@test": bad.append(f"probe id {p['probe']}")
+if len(p["clean_runs"]) != 2 or len(p["clean_runs"][0]) != 1: bad.append("one process per clean run expected")
+q = p["clean_runs"][0][0]
+if q["cpus_allowed"] != "0-7" or q["gpus"] != ["0000:52:00.0"] or q["last_cpus"] != [5, 6] or q["thread_cpusets"] != {"0-7": 2}:
+    bad.append(f"process placement {q}")
+if q["env"].get("CUDA_VISIBLE_DEVICES") != "GPU-abc": bad.append("env not kept")
+s = p["summary"]
+if not (s["consistent"] and s["cpus_allowed"] == ["0-7"] and s["gpus"] == ["0000:52:00.0"] and s["processes_recorded"] == 2):
+    bad.append(f"summary {s}")
+e = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out19/level2/appe/default/*.json"))[0]))["placement"]
+if e["probe"] is not None or e["clean_runs"] != [[], []] or e["summary"]["consistent"]: bad.append(f"no-probe record {e}")
+import csv
+rows = {r["app"]: r for r in csv.DictReader(open(os.path.join(os.environ["TMP"], "out19/summary_level2.csv")))}
+if rows["appd"]["placement_gpus"] != "0000:52:00.0" or rows["appd"]["placement_consistent"] != "1" or rows["appe"]["placement_consistent"] != "":
+    bad.append(f"csv {rows['appd']['placement_gpus']} {rows['appd']['placement_consistent']!r} {rows['appe']['placement_consistent']!r}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 20: warm-up runs are recorded, never counted"
+mkraw "$RAW/appf/default/r1" none 1 "Rate: 1"
+mkdir -p "$RAW/appf/default/r1/warmup.0"
+echo "start_ns=1000000000 end_ns=1000900000 rc=0" > "$RAW/appf/default/r1/warmup.0/run.txt"
+printf '# hpcperf-roi-log 2\npid 9\nrank 0\nargv ["x"]\nB 0 1000100000\nE 2500000 1002600000\n' > "$RAW/appf/default/r1/warmup.0/roi.9"   # 2.5 ms, ~5x the clean runs
+python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw" --out-root "$TMP/out20" --no-report >/dev/null 2>&1
+pycheck "20a: roi.warmup_runs_s holds the warm-up ROI; wall_s / runs_s unchanged" <<'PY'
+import json, os, glob
+bad = []
+d = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out20/level2/appf/default/*.json"))[0]))
+r = d["roi"]
+if r["warmup_runs_s"] != [0.0025]: bad.append(f"warmup_runs_s {r['warmup_runs_s']}")
+if abs(r["wall_s"] - 0.00055) > 1e-9 or len(r["runs_s"]) != 2: bad.append(f"clean statistics changed: {r['wall_s']} {r['runs_s']}")
+e = json.load(open(glob.glob(os.path.join(os.environ["TMP"], "out20/level2/appe/default/*.json"))[0]))["roi"]
+if e["warmup_runs_s"] != []: bad.append(f"no warm-up dir -> {e['warmup_runs_s']}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 21: the GPU a profiled run's kernels executed on is joined per process"
+pycheck "21a: nsys gpus_used follows (pid, cudaId) -> gpuId, not the ordinal alone" <<'PY'
+import os, sqlite3, sys
+sys.path.insert(0, os.environ["TOOLS"])
+from collectors import nvidia_nsys
+d = os.path.join(os.environ["TMP"], "t21", "prof"); os.makedirs(d, exist_ok=True)
+db = sqlite3.connect(os.path.join(d, "trace.sqlite"))
+db.executescript("""
+create table TARGET_INFO_GPU (id int, busLocation text);
+insert into TARGET_INFO_GPU values (0, '0000:43:00.0'), (1, '0000:52:00.0');
+create table TARGET_INFO_CUDA_DEVICE (gpuId int, cudaId int, pid int);
+insert into TARGET_INFO_CUDA_DEVICE values (0, 0, 4000), (1, 1, 4000), (1, 0, 5000);  -- 4000: a helper seeing both GPUs; 5000: the app under CUDA_VISIBLE_DEVICES=<52:00.0>
+create table CUPTI_ACTIVITY_KIND_KERNEL (globalPid int, deviceId int);
+insert into CUPTI_ACTIVITY_KIND_KERNEL values (((1 << 24) | 5000) << 24, 0), (((1 << 24) | 5000) << 24, 0);
+""")
+db.commit(); db.close()
+t = nvidia_nsys.open(os.path.dirname(d) + "/prof")
+info = t.info(); t.close()
+bad = []
+if info.get("gpus_used") != ["0000:52:00.0"]: bad.append(f"gpus_used {info.get('gpus_used')} (the helper's ordinal 0 must not win)")
+if info.get("gpus_visible") != ["0000:43:00.0", "0000:52:00.0"]: bad.append(f"gpus_visible {info.get('gpus_visible')}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
 
 echo "=== 13: Level 3 (the applications' own timers)"
 rows3="$(python3 "$TOOLS/cases.py" resolve --level 3 --no-env-check all 2>&1 | noise)"
 n3="$(printf '%s\n' "$rows3" | /usr/bin/grep -c .)"
-nbad3="$(printf '%s\n' "$rows3" | awk -F'\t' 'NF!=19' | wc -l)"
+nbad3="$(printf '%s\n' "$rows3" | awk -F'\t' 'NF!=20' | wc -l)"
 napps3="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import cases; print(len(cases.level3_apps_in_suite()))' "$TOOLS" 2>&1 | noise)"
 if [ "$nbad3" -eq 0 ] && [ "$n3" -ge "$napps3" ] && [ "$napps3" -gt 0 ]; then
-    ok "13a: level 3 resolves to $n3 cases of 19 fields ($napps3 applications)"
+    ok "13a: level 3 resolves to $n3 cases of 20 fields ($napps3 applications)"
 else bad "13a: level 3 resolve: $n3 rows, $nbad3 malformed, $napps3 apps: $(printf '%s' "$rows3" | head -3)"; fi
 # every case is a declared input of a real run.sh; an undeclared variable in the shell is refused
 out="$(HPCPERF_LAMMPS_STEPS=7 python3 "$TOOLS/cases.py" resolve --level 3 lammps 2>&1 | noise)"
@@ -1134,9 +1881,16 @@ print("ALLOK" if not bad else "\n".join(bad))
 PY
 out="$(bash "$TOOLS/measure_level3.sh" --dry-run --collector none lammps 2>&1 | noise)"
 if echo "$out" | /usr/bin/grep -q 'HPCPERF_L3_RUN_SUBDIR=run.timing-' && ! echo "$out" | /usr/bin/grep -q 'HPCPERF_ROI_LOG' \
-   && echo "$out" | /usr/bin/grep -q "application's own timer" && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=2'; then
-    ok "13g: a Level 3 dry run uses its own run-directory tree, no ROI log, 2 GPUs"
+   && echo "$out" | /usr/bin/grep -q "application's own timer" && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=2' \
+   && echo "$out" | /usr/bin/grep -q 'protocol=warmup:0,clean:3,profiled:1'; then
+    ok "13g: a Level 3 dry run uses its own run-directory tree, no ROI log, 2 GPUs, the final protocol 0 warm-up + 3 clean + 1 profiled"
 else bad "13g: level 3 dry run: $out"; fi
+out="$(bash "$TOOLS/measure_level3.sh" --registry --dry-run --collector none lammps/lj-32k 2>&1 | noise)"
+if echo "$out" | /usr/bin/grep -q 'HPCPERF_LAMMPS_INPUT=lj-32k' && echo "$out" | /usr/bin/grep -q 'HPCPERF_GPUS=1' \
+   && echo "$out" | /usr/bin/grep -q 'registry level3/lammps/inputs.yaml; workload identity: ok' && echo "$out" | /usr/bin/grep -q 'apptimers.py: lammps' \
+   && echo "$out" | /usr/bin/grep -q 'runs     warmup=0 clean=3 profiled=1'; then
+    ok "13k: a Level 3 registry dry run sets the selector and the input's GPU count, captures the workload identity, 3 clean runs by default"
+else bad "13k: level 3 registry dry run: $(echo "$out" | head -8 | tr '\n' ' ' | cut -c1-300)"; fi
 
 # summarize: a synthetic Level 3 raw run -> an app_timer record; a run without its timer -> app_timer_missing
 mkraw3() {   # mkraw3 <run_id> <with timer: 1|0>
@@ -1191,9 +1945,9 @@ PY
 # an application the table does not profile by default: skipped with its reason, --profile-all overrides
 out="$(bash "$TOOLS/measure_level3.sh" --dry-run qmcpack 2>&1 | noise)"
 out2="$(bash "$TOOLS/measure_level3.sh" --dry-run --profile-all qmcpack 2>&1 | noise)"
-if echo "$out" | /usr/bin/grep -q 'profiled=0 collector=none' && echo "$out" | /usr/bin/grep -q 'skipped by default' \
+if echo "$out" | /usr/bin/grep -q 'warmup=0 clean=3 profiled=0 collector=none' && echo "$out" | /usr/bin/grep -q 'skipped by default' \
    && echo "$out2" | /usr/bin/grep -q 'profiled=1' && ! echo "$out2" | /usr/bin/grep -q 'skipped by default'; then
-    ok "13i: QMCPACK is not profiled by default (reason shown), --profile-all profiles it"
+    ok "13i: QMCPACK runs 3 clean runs and is not profiled by default (reason shown), --profile-all profiles it"
 else bad "13i: profile default: $out // $out2"; fi
 d="$TMP/raw3/level3/lammps/strong.s8/20260929T000002Z-3"
 mkdir -p "$d"; cp -r "$TMP/raw3/level3/lammps/strong.s8/20260929T000000Z-1/clean.0" "$d/"
@@ -1203,6 +1957,289 @@ python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw3" --out-root "$TMP/res5" --ru
 if /usr/bin/grep -q 'Not profiled by default.*a planted reason for the test' "$TMP/res5/level3/lammps/strong.s8/20260929T000002Z-3.json" 2>/dev/null; then
     ok "13j: a record the table kept from the profiler carries the table's reason"
 else bad "13j: no 'not profiled by default' caveat with the reason"; fi
+
+echo "=== 22: --page-level keeps one level of a published page as a current campaign"
+python3 "$TOOLS/report.py" --results-root "$TMP/out19" --out "$TMP/page22a" >/dev/null 2>&1
+python3 "$TOOLS/report.py" --results-root "$TMP/out19" --page-level "$TMP/page22a/index.html:2" --out "$TMP/page22b" >/dev/null 2>&1
+pycheck "22a: the page's level 2 becomes a second, non-historical campaign; the Markdown names its source page" <<'PY'
+import json, os, re
+bad = []
+t = open(os.path.join(os.environ["TMP"], "page22b", "index.html")).read()
+d = json.loads(re.search(r'<script type="application/json" id="timing-data">(.*?)</script>', t, re.S).group(1).replace("<\\/", "</"))
+c = d["campaigns"]
+if len(c) != 2: bad.append(f"{len(c)} campaigns")
+else:
+    x = c[1]
+    if x.get("historical") or x.get("kind") != "cases" or list(x["levels"].keys()) != ["2"]: bad.append(f"campaign {x.get('historical')} {x.get('kind')} {list(x['levels'].keys())}")
+    if x.get("source_page") != "index.html" or x.get("level_only") != "2" or not x.get("records"): bad.append(f"provenance {x.get('source_page')} {x.get('level_only')} {x.get('records')}")
+    if not str(x.get("title", "")).startswith("Level 2"): bad.append(f"title {x.get('title')}")
+md = open(os.path.join(os.environ["TMP"], "page22b", "README.md")).read()
+if "as published in index.html" not in md: bad.append("markdown lacks the source note")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+echo "=== 23: Level 2 CPU-binding policy (cases/level2_binding.tsv, --bind-policy)"
+be_h="$(python3 "$TOOLS/cases.py" binding-env hipbone 2>&1 | noise | tr '\n' ' ')"
+be_a="$(python3 "$TOOLS/cases.py" binding-env amg2023 2>&1 | noise | tr '\n' ' ')"
+be_x="$(python3 "$TOOLS/cases.py" binding-env xsbench 2>&1 | noise | tr '\n' ' ')"
+if [ "$be_h" = "HPCPERF_CPUS_PER_RANK=4 OMP_NUM_THREADS=4 OMP_PLACES=cores OMP_PROC_BIND=close " ] \
+   && [ "$be_a" = "HPCPERF_CPUS_PER_RANK=1 " ] && [ -z "$be_x" ]; then
+    ok "23a: hipBone gets PE=4 + pinned OpenMP threads, a single-host-thread MPI app PE=1, a direct-exec app nothing"
+else bad "23a: binding env hipbone=[$be_h] amg2023=[$be_a] xsbench=[$be_x]"; fi
+o_e="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none hipbone/default 2>&1 | noise)"
+o_r="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none --bind-policy runtime hipbone/default 2>&1 | noise)"
+if echo "$o_e" | /usr/bin/grep -q 'protocol=warmup:1,clean:3,profiled:1' && echo "$o_e" | /usr/bin/grep -q 'bind_policy=explicit' \
+   && echo "$o_e" | /usr/bin/grep -q 'HPCPERF_CPUS_PER_RANK=4' && echo "$o_e" | /usr/bin/grep -q 'OMP_PROC_BIND=close' \
+   && echo "$o_r" | /usr/bin/grep -q 'bind_policy=runtime' && ! echo "$o_r" | /usr/bin/grep -q 'HPCPERF_CPUS_PER_RANK'; then
+    ok "23b: Level 2 defaults are 1 warm-up + 3 clean + 1 profiled with explicit binding; --bind-policy runtime adds no binding variables"
+else bad "23b: dry runs: $(echo "$o_e" | /usr/bin/grep -E 'protocol|env ' | head -2 | cut -c1-160 | tr '\n' ' ') / $(echo "$o_r" | /usr/bin/grep -E 'protocol' | cut -c1-160)"; fi
+o_b="$(bash "$TOOLS/measure_level2.sh" --dry-run --collector none --bind-policy nowhere hipbone/default 2>&1 | noise)"
+case "$o_b" in *"--bind-policy must be explicit or runtime"*) ok "23c: an unknown binding policy is refused" ;;
+               *) bad "23c: unknown policy not refused: $(echo "$o_b" | head -2 | tr '\n' ' ')" ;; esac
+mkdir -p "$TMP/bind"; cp "$TOOLS/cases/level2_binding.tsv" "$TMP/bind/keep.tsv"
+printf 'zzz_not_an_app\tmpirun\t1\t1\tno\tplanted\n' >> "$TOOLS/cases/level2_binding.tsv"
+o_c="$(python3 "$TOOLS/cases.py" check 2>&1 | noise)"; cp "$TMP/bind/keep.tsv" "$TOOLS/cases/level2_binding.tsv"
+sed -i 's/^hipbone\tmpirun\t4\t4\tyes/hipbone\tmpirun\t4\t2\tyes/' "$TOOLS/cases/level2_binding.tsv"
+o_d="$(python3 "$TOOLS/cases.py" check 2>&1 | noise)"; cp "$TMP/bind/keep.tsv" "$TOOLS/cases/level2_binding.tsv"
+if echo "$o_c" | /usr/bin/grep -q 'zzz_not_an_app, which is not a level2 application' \
+   && echo "$o_d" | /usr/bin/grep -q 'cpus_per_rank must equal host_threads'; then
+    ok "23d: cases.py check refuses a binding row without an application and idle bound cores"
+else bad "23d: $(echo "$o_c" | tail -1) / $(echo "$o_d" | tail -1)"; fi
+d="$TMP/raw23/level2/x/default/20260930T000000Z-9"
+mkraw "$d" none 1 "Rate: 5.0"
+if [ -d "$d" ]; then
+    printf 'bind_policy=explicit\nbind_launcher=mpirun\nbind_host_threads=4\nbind_cpus_per_rank=4\nbind_omp_pin=yes\nbind_env=HPCPERF_CPUS_PER_RANK=4;OMP_NUM_THREADS=4;OMP_PLACES=cores;OMP_PROC_BIND=close\n' >> "$TMP/raw23/level2/x/default/20260930T000000Z-9/run_meta.txt"
+    python3 "$TOOLS/summarize.py" --raw-root "$TMP/raw23" --out-root "$TMP/res23" --no-report > /dev/null 2>&1
+    pycheck "23e: the record carries placement.policy (kind, cpus_per_rank, env) and the CSV a placement_policy column" <<'PY'
+import csv, glob, json, os
+bad = []
+rs = glob.glob(os.path.join(os.environ["TMP"], "res23", "level2", "x", "default", "*.json"))
+if not rs: bad.append("no record")
+else:
+    p = json.load(open(rs[0]))["placement"]["policy"]
+    if p.get("kind") != "explicit" or p.get("cpus_per_rank") != 4 or p.get("omp_pin") != "yes" or "OMP_PLACES=cores" not in p.get("env", []):
+        bad.append(f"policy {p}")
+    rows = list(csv.DictReader(open(os.path.join(os.environ["TMP"], "res23", "summary_level2.csv"))))
+    if not rows or rows[0].get("placement_policy") != "explicit:PE=4:omp_pin": bad.append(f"csv {rows and rows[0].get('placement_policy')}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+else
+    bad "23e: the synthetic Level 2 raw run was not created"
+fi
+
+
+# ---- 24. campaign notes carried by several results roots are shown once (annotations.json) --------------------
+N24="$(mktemp -d)"; mkdir -p "$N24/r1" "$N24/r2"
+printf '{"schema":"hpcperf-timing-annotations-1","campaign":{"a":"x"},"notes":["shared note","only in r1"],"inputs":[]}\n' > "$N24/r1/annotations.json"
+printf '{"schema":"hpcperf-timing-annotations-1","campaign":{"b":"y"},"notes":["shared note","only in r2"],"inputs":[]}\n' > "$N24/r2/annotations.json"
+if python3 - "$HERE/.." "$N24" <<'PY'
+import sys; sys.path.insert(0, sys.argv[1]); import registry_view as RV
+ann, meta = RV.load_annotations([sys.argv[2] + "/r1", sys.argv[2] + "/r2"])
+assert meta["notes"] == ["shared note", "only in r1", "only in r2"], meta["notes"]
+assert meta["campaign"] == {"a": "x", "b": "y"}
+PY
+then ok "24: a note present in two roots' annotations.json is listed once, root-specific notes kept in root order"; else bad "24: duplicate campaign notes"; fi
+rm -rf "$N24"
+
+
+# ---- 25. Level 3 run verification: manifest, launcher and placement evidence (registered lammps/lj-32k, synthetic raw) ----
+pycheck "25: Level 3 verification PASSes on consistent evidence (an unverified launcher audit with the placement record holding the GPU included) and FAILs on a wrong selector / rank count / GPU count / foreign or changed binary / deck / steps / audit mismatch; a missing manifest is INSUFFICIENT; app_timer_missing is judged on its evidence" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "vr3")
+doc = hi.load(os.path.join(R, "level3", "lammps")); inp = hi.get_input(doc, "lj-32k"); ident = hi.registry_identity(doc, inp)
+exe = os.path.join(R, "build", "level3", "lammps", "cuda", "lmp_kokkos_cuda")
+if not os.path.isfile(exe) or not os.path.isfile(os.path.join(R, "level3", "lammps", "src", "bench", "in.lj")):
+    print("ALLOK"); sys.exit()                       # LAMMPS not built or its source bundle not materialized here: nothing to hash / verify
+exe_sha = V.sha(exe); rules = V.load_rules(V.DEFAULT_RULES)
+n = [0]
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+def record(manifest=None, status="ok", sel_val="lj-32k", gpus="1", steps=100, exe_rec=None, audit="1 verified, 0 mismatch, 0 unverified",
+           buses=("0000:43:00.0",), with_manifest=True, binary=None, with_bind=True):
+    n[0] += 1; raw = f"{T}/raw/{n[0]}"; run = f"{raw}/clean.0"; binary = binary or exe
+    derived = f"{raw}/in.lj.input.lj-32k"; w(derived, "run ${steps}\n")
+    m = {"run_id": "r", "app": "lammps", "backend": "CUDA", "profile": "cuda", "variant": "default", "mode": "smoke", "input_id": "lj-32k",
+         "deck": "bench/in.lj", "ranks": "1", "atoms": "32000", "steps": "100", "gpu_aware": "on", "exit_code": "0",
+         "binary": binary, "binary_sha256": exe_sha, "input": derived, "input_sha256": V.sha(derived),
+         "fingerprint_sha256": "f" * 64, "log": "x", "utc": "t"}
+    m.update(manifest or {})
+    if with_manifest:
+        w(f"{run}/app/run.timing-r-c0/run_manifest.txt", "".join(f"{k}={v}\n" for k, v in m.items()))
+    log = ("# LAMMPS CUDA profile=cuda: mode=smoke input=lj-32k deck=bench/in.lj ranks=1 box=20x20x20 fcc cells = 32000 atoms (32000/rank), 100 steps, gpu-aware=on, log=x\n"
+           "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\n"
+           f"hpcperf-launch: audit summary: {audit} (of 1 ranks)\n")
+    w(f"{run}/run.log", log)
+    if with_bind:
+        w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + binary + "\nhost h\n" + "".join(f"gpu minor 1 bus {b}\n" for b in buses))
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32k", "status": status, "run_id": f"r{n[0]}",
+           "registry": {"input_id": "lj-32k", "identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {"HPCPERF_LAMMPS_INPUT": sel_val}, "processes": [], "exe_sha256": exe_sha if exe_rec is None else exe_rec},
+           "measurement": {"gpus": gpus, "protocol": {"warmup_runs": 0, "clean_runs": 1, "profiled_runs": 0}},
+           "roi": {"runs_s": [0.02] if status == "ok" else [], "wall_s": 0.02 if status == "ok" else None, "steps": steps, "source": "app_timer"},
+           "provenance": {"raw_dir": raw, "git_commit": "t"}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(rec)); return p
+bad = []
+def expect(label, path, verdict, needle=""):
+    r = V.verify_record(path, R, rules); txt = " | ".join(r["problems"] + r["gaps"])
+    if r["verdict"] != verdict or needle not in txt:
+        bad.append(f"{label}: got {r['verdict']} ({txt[:160]}), want {verdict} /{needle}/")
+expect("25a consistent evidence", record(), "PASS")
+expect("25b wrong selector value", record(sel_val="lj-2m"), "FAIL", "selector")
+expect("25c two ranks in the manifest", record({"ranks": "2"}), "FAIL", "ranks=")
+expect("25d HPCPERF_GPUS 2", record(gpus="2"), "FAIL", "runtime_config.gpus")
+expect("25e binary outside the repository", record({"binary": "/usr/bin/true", "binary_sha256": V.sha("/usr/bin/true")}, exe_rec=V.sha("/usr/bin/true"), binary="/usr/bin/true"), "FAIL", "own binary")
+expect("25f manifest sha differs from the file", record({"binary_sha256": "deadbeef" * 8}, exe_rec="deadbeef" * 8), "FAIL", "no longer hashes")
+expect("25g wrong deck in the manifest", record({"deck": "bench/in.eam"}), "FAIL", "deck=")
+expect("25h wrong step count in the manifest", record({"steps": "50"}), "FAIL", "steps=")
+expect("25i timer reports other steps", record(steps=50), "FAIL", "timer reports")
+expect("25j audit mismatch", record(audit="0 verified, 1 mismatch, 0 unverified"), "FAIL", "audit")
+expect("25p audit unverified (sampling missed a short run) but the placement record holds the GPU", record(audit="0 verified, 0 mismatch, 1 unverified"), "PASS")
+expect("25q audit unverified and no placement record", record(audit="0 verified, 0 mismatch, 1 unverified", with_bind=False), "INSUFFICIENT", "not evidenced")
+expect("25k two GPUs held", record(buses=("0000:43:00.0", "0000:52:00.0")), "FAIL", "held 2")
+expect("25l no manifest harvested", record(with_manifest=False), "INSUFFICIENT", "no run manifest")
+expect("25m app_timer_missing judged on its evidence", record(status="app_timer_missing", steps=None), "PASS")
+expect("25n app_timer_missing without a manifest is NOT_RUN", record(status="app_timer_missing", steps=None, with_manifest=False), "NOT_RUN")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
+# ---- 26. the registered Level 3 inputs on the page, in the Markdown twin and in registry_current.csv; an embedded page level as history ----
+pycheck "26: a Level 3 registry record is a SUCCESS row with run verification, the page/README show it with the application-timer columns, registry_current.csv lists it, --page-level PATH:3:history is an earlier campaign, a NO_TIMED_REGION input is neither SUCCESS nor run failed" <<'PY'
+import csv, json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi, registry_view as RV, report, summarize
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "rv3"); root = os.path.join(T, "results")
+doc = hi.load(os.path.join(R, "level3", "lammps")); inp = hi.get_input(doc, "lj-32k"); ident = hi.registry_identity(doc, inp)
+exe = os.path.join(R, "build", "level3", "lammps", "cuda", "lmp_kokkos_cuda")
+if not os.path.isfile(exe) or not os.path.isfile(os.path.join(R, "level3", "lammps", "src", "bench", "in.lj")):
+    print("ALLOK"); sys.exit()                       # LAMMPS not built or its source bundle not materialized here: nothing to hash / verify
+exe_sha = V.sha(exe); PLAT = "test-platform"
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+def evidence(raw, nclean):   # the raw evidence of one Level 3 registry run with nclean clean runs (manifest, launcher lines, placement)
+    derived = f"{raw}/in.lj.input.lj-32k"; w(derived, "run ${steps}\n")
+    m = {"run_id": "r", "app": "lammps", "backend": "CUDA", "profile": "cuda", "variant": "default", "mode": "smoke", "input_id": "lj-32k", "deck": "bench/in.lj",
+         "ranks": "1", "atoms": "32000", "steps": "100", "gpu_aware": "on", "exit_code": "0", "binary": exe, "binary_sha256": exe_sha,
+         "input": derived, "input_sha256": V.sha(derived), "fingerprint_sha256": "f" * 64, "log": "x", "utc": "t"}
+    for i in range(nclean):
+        run = f"{raw}/clean.{i}"
+        w(f"{run}/app/run.timing-r-c{i}/run_manifest.txt", "".join(f"{k}={v}\n" for k, v in m.items()))
+        w(f"{run}/run.log", "# LAMMPS CUDA profile=cuda: mode=smoke input=lj-32k deck=bench/in.lj ranks=1 box=20x20x20 fcc cells = 32000 atoms (32000/rank), 100 steps, gpu-aware=on, log=x\n"
+          "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\nhpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks)\n")
+        w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + exe + "\nhost h\ngpu minor 1 bus 0000:43:00.0\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+raw = f"{T}/raw/lammps/lj-32k/run01"; evidence(raw, 1)
+rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "lammps", "case": "lj-32k", "status": "ok", "run_id": "run01", "utc": "2026-01-01T00:00:01Z",
+       "platform": PLAT, "registry": {"input_id": "lj-32k", "identity": ident, "identity_complete": True, "identity_sha256": "id-l3"},
+       "inputs": {"declared_env": {"HPCPERF_LAMMPS_INPUT": "lj-32k"}, "processes": [], "exe_sha256": exe_sha},
+       "measurement": {"gpus": "1", "protocol": {"warmup_runs": 0, "clean_runs": 1, "profiled_runs": 0}, "collector": {"name": "none"}, "region": "app_timer"},
+       "roi": {"runs_s": [0.024], "wall_s": 0.024, "steps": 100, "source": "app_timer", "definition": "d", "where": ["x:1"], "reduction": "r", "device_sync": "s", "parts": {}},
+       "context": {"process_wall_s": 4.0}, "device": None, "fom": {"name": "Performance", "value": 45.1, "unit": "Matom-step/s", "status": "ok"},
+       "placement": {"policy": {"kind": "application"}, "summary": {"gpus": ["0000:43:00.0"]}},
+       "provenance": {"raw_dir": raw, "git_commit": "c0ffee"}, "caveats": []}
+w(f"{root}/level3/lammps/lj-32k/run01.json", json.dumps(rec))
+# the final protocol: 3 clean runs of the same input (each with its own evidence); run02 stable (spread 14.3 %), run03 the newest
+# and UNSTABLE (spread 25 %) -> current; run02 stable (spread 7.1 %); the 1-clean run01 is history and never a baseline
+for rid, samples, utc in (("run02", [0.029, 0.027, 0.028], "2026-01-01T00:00:02Z"), ("run03", [0.200, 0.160, 0.210], "2026-01-01T00:00:03Z")):
+    raw_n = f"{T}/raw/lammps/lj-32k/{rid}"; evidence(raw_n, 3)
+    rec_n = dict(rec, run_id=rid, utc=utc, roi=dict(rec["roi"], runs_s=samples, wall_s=sorted(samples)[1]), provenance={"raw_dir": raw_n, "git_commit": "c0ffee"},
+                 measurement=dict(rec["measurement"], protocol={"warmup_runs": 0, "clean_runs": 3, "profiled_runs": 1}))
+    w(f"{root}/level3/lammps/lj-32k/{rid}.json", json.dumps(rec_n))
+# a Level 3 input the registry declares NO_TIMED_REGION (no time-step loop): its record is app_timer_missing by construction
+rec2 = dict(rec, app="cp2k", case="regtest-gpw-h2o-geoopt", status="app_timer_missing", run_id="run02", utc="2026-01-01T00:00:02Z",
+            registry={"input_id": "regtest-gpw-h2o-geoopt", "identity": hi.registry_identity(hi.load(os.path.join(R, "level3", "cp2k")), hi.get_input(hi.load(os.path.join(R, "level3", "cp2k")), "regtest-gpw-h2o-geoopt")), "identity_complete": True, "identity_sha256": "id-c"},
+            inputs={"declared_env": {"HPCPERF_CP2K_INPUT": "regtest-gpw-h2o-geoopt"}, "processes": [], "exe_sha256": None},
+            roi={"runs_s": [], "wall_s": None, "steps": None, "source": "app_timer"}, fom=None, provenance={"raw_dir": f"{T}/raw/cp2k/none", "git_commit": "c0ffee"},
+            caveats=["The application's timer was not found in the clean run"])
+w(f"{root}/level3/cp2k/regtest-gpw-h2o-geoopt/run02.json", json.dumps(rec2))
+bad = []
+rows, recs, meta, orph = RV.current_view([root], R)
+ntr = next((r for r in rows if r["level"] == 3 and r["benchmark"] == "cp2k" and r["input_id"] == "regtest-gpw-h2o-geoopt"), None)
+if not ntr or ntr["status"] != "NO_TIMED_REGION" or ntr["current"] is not None:
+    bad.append(f"26n: NO_TIMED_REGION input status {ntr and ntr['status']}")
+row = next((r for r in rows if r["level"] == 3 and r["benchmark"] == "lammps" and r["input_id"] == "lj-32k"), None)
+if not row or row["status"] != "SUCCESS" or row["run_verification"] != "PASS":
+    bad.append(f"26a: row {row and (row['status'], row['run_verification'])}")
+cur3 = row and row["current"]
+if not cur3 or cur3["run_ids"] != ["run03"] or len(cur3["samples"]) != 3 or abs(cur3["median"] - 0.200) > 1e-12 \
+   or abs(cur3["min"] - 0.160) > 1e-12 or abs(cur3["max"] - 0.210) > 1e-12 or abs(cur3["spread"] - 0.25) > 1e-9 or cur3["stable"]:
+    bad.append(f"26r: the newest 3-clean set is not the current measurement with median / min / max / spread, UNSTABLE at 25 %: {cur3 and (cur3['run_ids'], cur3['median'], cur3['spread'], cur3['stable'])}")
+h2 = next((s for s in row["history_sets"] if s["run_ids"] == ["run02"]), None) if row else None
+if not h2 or len(h2["samples"]) != 3 or abs(h2["median"] - 0.028) > 1e-12 or abs(h2["spread"] - (0.029 - 0.027) / 0.028) > 1e-9 or not h2["stable"]:
+    bad.append(f"26s: the stable 3-clean set (spread 7.1 %) is not in the history with its statistics: {h2 and (h2['median'], h2['spread'], h2['stable'])}")
+k = RV.counts(rows, recs, orph)
+if k["roi_success"].get("level3") != 1 or k["registered_inputs"]["level3"] != 43 or "roi_not_supported_level3" in k:
+    bad.append(f"26b: counts {k['roi_success']} {k['registered_inputs']}")
+if k["unstable"] != ["L3 lammps/lj-32k"] or sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 41:
+    bad.append(f"26c: unstable {k['unstable']} / the other 41 Level 3 inputs are not NOT_MEASURED")
+if k.get("no_timed_region") != ["cp2k/regtest-gpw-h2o-geoopt"] or k["run_failed"] != []:
+    bad.append(f"26o: counts no_timed_region {k.get('no_timed_region')} run_failed {k['run_failed']}")
+if "no timed region by construction 1" not in report.md_status_line({"counts": k}):
+    bad.append("26p: the Markdown status line does not count the no-timed-region input")
+out = os.path.join(T, "page"); report.write([root], out)
+b = report.build_bundle([root]); c = b["campaigns"][0]
+app = next((a for a in c["levels"]["3"] if a["app"] == "lammps"), None)
+cell = next((i for i in app["inputs"] if i["input_id"] == "lj-32k"), {}).get("cells", {}).get(PLAT) if app else None
+if not cell or cell["roi"].get("source") != "app_timer" or cell["roi"].get("steps") != 100 or cell["measurement"].get("gpus") != "1":
+    bad.append(f"26d: page cell {cell and (cell['roi'].get('source'), cell['roi'].get('steps'))}")
+if cell and (cell["set"]["n"] != 3 or cell["set"]["run_ids"] != ["run03"] or abs(cell["set"]["min"] - 0.160) > 1e-12 or abs(cell["set"]["max"] - 0.210) > 1e-12
+             or cell["roi"]["runs_s"] != [0.200, 0.160, 0.210] or abs(cell["roi"]["wall_s"] - 0.200) > 1e-12 or cell["set"]["stable"]):
+    bad.append(f"26t: the page cell is not the 3-run set with its samples / min / max / UNSTABLE: {cell and cell['set']}")
+sets3 = {tuple(s["run_ids"]): s for s in (next(i for i in app["inputs"] if i["input_id"] == "lj-32k")["sets"] if app else [])}
+if ("run01",) not in sets3 or sets3[("run01",)].get("vs_previous") is not None or sets3.get(("run02",), {}).get("vs_previous") is not None:
+    bad.append(f"26u: the 1-clean run must be listed as history and never be a baseline (run02 gets no vs previous from it): {sets3}")
+if sets3.get(("run03",), {}).get("vs_previous") is None or abs(sets3[("run03",)]["vs_previous"] - (0.200 - 0.028) / 0.028) > 1e-9:
+    bad.append(f"26u: run03's vs previous must be against the 3-clean run02: {sets3.get(('run03',), {}).get('vs_previous')}")
+md = open(os.path.join(out, "README.md")).read(); html = open(os.path.join(out, "index.html")).read()
+l3 = md[md.index("### Level 3"):]
+if "| lammps | lj-32k | SUCCESS |" not in l3 or "timed region (median)" not in l3 or "200 ms" not in l3 or "| PASS |" not in l3:
+    bad.append("26e: the Markdown Level 3 table lacks the row / timer columns")
+l3row = next((ln for ln in l3.split("\n") if ln.startswith("| lammps | lj-32k |")), "")
+if "| 3 |" not in l3row or "| 160 ms |" not in l3row or "| 210 ms |" not in l3row or "| 25.0% |" not in l3row or "| UNSTABLE |" not in l3row:
+    bad.append(f"26v: the Markdown row lacks runs / min / max / spread / UNSTABLE: {l3row[:200]}")
+if "3 fixed clean runs" not in l3 or "1 clean run: not measurable" in l3:
+    bad.append("26x: the Level 3 protocol text")
+if "registered Level 1 / 2 / 3 inputs" not in md or 'data-level="3"' not in html:
+    bad.append("26f: status line / page level 3 tab")
+summarize.write_registry_current(root)
+rows_csv = [r for r in csv.DictReader(open(os.path.join(root, "registry_current.csv"))) if r["level"] == "3"]
+if len(rows_csv) != 43 or not any(r["input_id"] == "lj-32k" and r["status"] == "SUCCESS" and r["run_verification"] == "PASS" for r in rows_csv):
+    bad.append(f"26g: registry_current.csv level 3 rows {len(rows_csv)}")
+if not any(r["input_id"] == "regtest-gpw-h2o-geoopt" and r["status"] == "NO_TIMED_REGION" for r in rows_csv):
+    bad.append("26q: registry_current.csv does not carry NO_TIMED_REGION")
+h = report.load_page_level(os.path.join(out, "index.html") + ":3:history")
+if not h["historical"] or "earlier campaign" not in h["title"] or h["level_only"] != "3":
+    bad.append(f"26h: page-level history {h.get('historical')} {h.get('title')}")
+cur = report.load_page_level(os.path.join(out, "index.html") + ":3")
+if cur["historical"]:
+    bad.append("26i: a page level without :history became historical")
+# 26j: campaign metadata of several roots merges one level deep -- a Level 3 root adds protocol.level3 and keeps the Level 1/2 protocol
+ra, rb = os.path.join(T, "annA"), os.path.join(T, "annB")
+w(os.path.join(ra, RV.ANNOTATIONS), json.dumps({"schema": "hpcperf-timing-annotations-1", "campaign": {"id": "a", "title": "A", "protocol": {"level1": "P1", "level2": "P2"}}, "notes": ["n1"], "inputs": []}))
+w(os.path.join(rb, RV.ANNOTATIONS), json.dumps({"schema": "hpcperf-timing-annotations-1", "campaign": {"title": "B", "protocol": {"level3": "P3"}, "level3": "L3 text"}, "notes": ["n1", "n2"], "inputs": []}))
+_ann, meta = RV.load_annotations([ra, rb])
+camp = meta["campaign"]
+if camp.get("protocol") != {"level1": "P1", "level2": "P2", "level3": "P3"} or camp.get("title") != "B" or camp.get("id") != "a" or meta["notes"] != ["n1", "n2"]:
+    bad.append(f"26j: campaign merge {camp} {meta['notes']}")
+md3 = report.render_md_registry({"campaign": camp, "counts": k, "measured_from": None, "generated_from": None, "records": 1, "notes": [], "levels": {}})
+if "- Level 3 protocol: P3" not in md3 or "- Level 1 protocol: P1" not in md3 or "- L3 text" not in md3:
+    bad.append("26k: the Markdown twin does not list the Level 3 protocol line")
+# 26y: --latest-only keeps per input only the current set (the 1-clean run01 and the stable run02 leave the page), and a
+# NO_TIMED_REGION / failed input only its newest attempt; the counts are those of the full view
+bl = report.build_bundle([root], latest_only=True); cl = bl["campaigns"][0]
+lj = next(i for a in cl["levels"]["3"] if a["app"] == "lammps" for i in a["inputs"] if i["input_id"] == "lj-32k")
+if [s["run_ids"] for s in lj["sets"]] != [["run03"]] or [a["run_id"] for a in lj["attempts"]] != ["run03"]:
+    bad.append(f"26y: latest-only lj-32k sets {[s['run_ids'] for s in lj['sets']]} attempts {[a['run_id'] for a in lj['attempts']]}")
+nt = next(i for a in cl["levels"]["3"] if a["app"] == "cp2k" for i in a["inputs"] if i["input_id"] == "regtest-gpw-h2o-geoopt")
+if nt["status"] != "NO_TIMED_REGION" or [a["run_id"] for a in nt["attempts"]] != ["run02"]:
+    bad.append(f"26y: latest-only NO_TIMED_REGION input {nt['status']} {[a['run_id'] for a in nt['attempts']]}")
+full = report.build_bundle([root])["campaigns"][0]
+if cl["counts"]["roi_success"] != full["counts"]["roi_success"] or cl["counts"]["unstable"] != full["counts"]["unstable"] or cl["records"] != 2 or len(bl["campaigns"]) != 1:
+    bad.append(f"26y: latest-only counts / records / campaigns {cl['counts']['roi_success']} {cl['records']} {len(bl['campaigns'])}")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
 
 echo
 echo "tools/timing tests: $pass passed, $failn failed, $skipn skipped"

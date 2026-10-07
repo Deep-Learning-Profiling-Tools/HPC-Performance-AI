@@ -4,6 +4,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
 # shellcheck disable=SC1091
 source "$R/hpcperf_env.sh" 2>/dev/null
+# Registered inputs (inputs.yaml): HPCPERF_COMB_INPUT=<id> supplies this script's knobs / extra arguments
+# (tools/inputs/README.md); it is refused together with a conflicting pre-set knob or an unknown id.
+# shellcheck disable=SC1091
+source "$R/tools/inputs/hpcperf_input_selector.sh"
+hpcperf_apply_input "$HERE" HPCPERF_COMB_INPUT || exit 2
 set -euo pipefail
 
 BACKEND=CUDA
@@ -35,4 +40,4 @@ exec "$HPCPERF_LAUNCHER_BIN" --gpus "$N_RANKS" --bind wrapper -- "$EXE" \
   -ghost 2_2_2 -vars "$VARS" -cycles "$CYCLES" \
   -comm disable all -comm enable mpi -exec disable all -exec enable "$MODEL" \
   -memory disable all -memory mesh enable "${MODEL}_device" \
-  -memory buffer enable "${MODEL}_device" "$GPU_AWARE" "$@"
+  -memory buffer enable "${MODEL}_device" "$GPU_AWARE" ${HPCPERF_INPUT_ARGS[@]+"${HPCPERF_INPUT_ARGS[@]}"} "$@"

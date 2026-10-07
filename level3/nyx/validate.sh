@@ -87,7 +87,18 @@ case_tols() { # case_tols <case> -> sets TOL_SAME TOL_X DIAG
 }
 MASS_TOL=1e-9          # pre-fixed baryon mass conservation tolerance
 python3 -c 'import numpy' 2>/dev/null || { echo "validate.sh: python3 with numpy required" >&2; exit 1; }
-export HPCPERF_GPUS="$N" HPCPERF_SCALE_MODE=smoke HPCPERF_NYX_STEPS="$STEPS"
+# HPCPERF_NYX_VALIDATE_MODE (2026-10-06): smoke (default; the 32^3 decks) or strong -- the 64^3 adiabatic derivative of
+# Exec/LyA/inputs (run.sh strong, IC 64sssss_20mpc.nyx), the registered input lya-adiabatic-64cubed. strong is accepted for
+# lya_adiabatic only. Its criteria are the adiabatic ones above, UNCHANGED (same-configuration rerun 2e-10, CPU reference
+# 1e-8, |dM/M| <= 1e-9, DM count exact); they were extended to this deck on 2026-10-06 BEFORE any 64^3 comparison was run.
+VMODE="${HPCPERF_NYX_VALIDATE_MODE:-smoke}"
+case "$VMODE" in
+    smoke) ;;
+    strong) for c in $CASES; do [ "$c" = lya_adiabatic ] || { echo "validate.sh: HPCPERF_NYX_VALIDATE_MODE=strong is defined for case lya_adiabatic only (got $c)" >&2; exit 2; }; done
+            [ "$(echo "${HPCPERF_NYX_HEATCOOL:-NO}" | tr '[:lower:]' '[:upper:]')" != YES ] || { echo "validate.sh: strong mode is the adiabatic 64^3 deck; heat/cool is not defined there" >&2; exit 2; } ;;
+    *) echo "validate.sh: HPCPERF_NYX_VALIDATE_MODE must be smoke or strong" >&2; exit 2 ;;
+esac
+export HPCPERF_GPUS="$N" HPCPERF_SCALE_MODE="$VMODE" HPCPERF_NYX_STEPS="$STEPS"
 OFFLINE="${HPCPERF_NYX_OFFLINE:-}"; SKIP_PARTICLES="${HPCPERF_NYX_SKIP_PARTICLES:-}"
 [ -z "$SKIP_PARTICLES" ] || echo "validate.sh: WARNING -- HPCPERF_NYX_SKIP_PARTICLES set: DM particle comparison skipped (test harness mode, not a validation)"
 
@@ -119,13 +130,13 @@ report_dir() { # report_dir <run_dir>: where this run's comparison outputs go (n
 
 run_gpu() { # run_gpu <case> <n> <stdout-file>
     local case=$1 n=$2 out=$3 rc=0
-    if [ -n "$OFFLINE" ]; then [ -f "$GPU_RUNS/$case.smoke.np$n/run_manifest.txt" ] && return 0; echo "validate.sh: OFFLINE -- run directory $GPU_RUNS/$case.smoke.np$n missing" >&2; return 66; fi
+    if [ -n "$OFFLINE" ]; then [ -f "$GPU_RUNS/$case.$VMODE.np$n/run_manifest.txt" ] && return 0; echo "validate.sh: OFFLINE -- run directory $GPU_RUNS/$case.$VMODE.np$n missing" >&2; return 66; fi
     HPCPERF_NYX_CASE="$case" HPCPERF_GPUS="$n" timeout "$TIMEOUT" "$HERE/run.sh" "$BACKEND" > "$out" 2>&1 || rc=$?
     return $rc
 }
 run_cpu() {
     local case=$1 out=$2 rc=0
-    if [ -n "$OFFLINE" ]; then [ -f "$CPU_RUNS/$case.smoke.np1/run_manifest.txt" ] && return 0; echo "validate.sh: OFFLINE -- CPU reference $CPU_RUNS/$case.smoke.np1 missing" >&2; return 66; fi
+    if [ -n "$OFFLINE" ]; then [ -f "$CPU_RUNS/$case.$VMODE.np1/run_manifest.txt" ] && return 0; echo "validate.sh: OFFLINE -- CPU reference $CPU_RUNS/$case.$VMODE.np1 missing" >&2; return 66; fi
     HPCPERF_NYX_CASE="$case" HPCPERF_GPUS=1 HPCPERF_NYX_PROFILE="$CPU_PROFILE" timeout "$TIMEOUT" "$HERE/run.sh" CPU > "$out" 2>&1 || rc=$?
     return $rc
 }
@@ -245,15 +256,15 @@ ic_count() { # ic_count <case> <run_dir>: expected DM particle count from the IC
     local f
     case "$1" in
         minisb) f="$2/ic_sb_32.ascii"; [ -f "$f" ] && { head -1 "$f" | tr -d ' '; return 0; } ;;
-        lya_adiabatic|lya_heatcool) f="$2/32.nyx"; [ -f "$f" ] && { python3 -c "import struct; f=open('$f','rb'); print(struct.unpack('<q', f.read(8))[0])"; return 0; } ;;
+        lya_adiabatic|lya_heatcool) f="$2/32.nyx"; [ "$VMODE" = strong ] && f="$2/64sssss_20mpc.nyx"; [ -f "$f" ] && { python3 -c "import struct; f=open('$f','rb'); print(struct.unpack('<q', f.read(8))[0])"; return 0; } ;;
     esac
     echo ""
 }
 
 for CASE in $CASES; do
-    echo "validate.sh: === Nyx $BACKEND case=$CASE, $STEPS steps, $N GPU(s) [profile $GPU_PROFILE; CPU reference $CPU_PROFILE] ==="
+    echo "validate.sh: === Nyx $BACKEND case=$CASE ($VMODE), $STEPS steps, $N GPU(s) [profile $GPU_PROFILE; CPU reference $CPU_PROFILE] ==="
     case_tols "$CASE"; REL_TOL_SAME_CASE=$TOL_SAME; REL_TOL_X_CASE=$TOL_X
-    D="$GPU_RUNS/$CASE.smoke.np$N"
+    D="$GPU_RUNS/$CASE.$VMODE.np$N"
     rc=0; run_gpu "$CASE" "$N" "$GPU_RUNS/validate.$CASE.np$N.stdout" || rc=$?
     WANT_NP="$(ic_count "$CASE" "$D")"
     [ -n "$WANT_NP" ] || echo "    $CASE np$N: NOTE -- no IC file in the run directory, DM count check against the IC skipped (harness/offline run)"
@@ -266,7 +277,7 @@ for CASE in $CASES; do
 
     # reference for [2]
     if [ "$N" -eq 1 ]; then
-        REF="$GPU_RUNS/$CASE.smoke.np1.rerun"
+        REF="$GPU_RUNS/$CASE.$VMODE.np1.rerun"
         if [ -n "$OFFLINE" ]; then
             [ -f "$REF/$(final_plt)/Header" ] || { fail "$CASE np1: OFFLINE -- rerun directory $REF missing"; continue; }
         else
@@ -274,7 +285,7 @@ for CASE in $CASES; do
             # run.sh wrote into the canonical np1 dir again: move that fresh result aside as the rerun,
             # keeping the first run as the one under test (manifests record both run_ids)
             if [ "$rc" -ne 0 ]; then fail "$CASE np1 rerun exited $rc"; continue; fi
-            mv "$GPU_RUNS/$CASE.smoke.np1" "$REF"
+            mv "$GPU_RUNS/$CASE.$VMODE.np1" "$REF"
             # re-run the case under test so that $D holds a real result again (third execution)
             rc=0; run_gpu "$CASE" 1 "$GPU_RUNS/validate.$CASE.np1.stdout" || rc=$?
             [ "$rc" -eq 0 ] || { fail "$CASE np1 (re-execution) exited $rc"; continue; }
@@ -282,7 +293,7 @@ for CASE in $CASES; do
         fi
         LABEL2="same-config-rerun"
     else
-        REF="$GPU_RUNS/$CASE.smoke.np1"
+        REF="$GPU_RUNS/$CASE.$VMODE.np1"
         BIN="$(manifest_val "$D" binary_sha256)"
         if [ ! -f "$REF/$(final_plt)/Header" ] || [ "$(manifest_val "$REF" binary_sha256)" != "$BIN" ] || [ "$(manifest_val "$REF" deck_sha256)" != "$(manifest_val "$D" deck_sha256)" ] || [ "$(manifest_val "$REF" steps)" != "$STEPS" ]; then
             echo "    (1-GPU reference for $CASE missing or from a different binary/deck -- producing it now)"
@@ -295,7 +306,7 @@ for CASE in $CASES; do
     compare "$REF" "$D" "$REL_TOL_SAME_CASE" "$CASE.np$N.$LABEL2" || true
 
     # [3] CPU reference (independent backend, same Nyx/AMReX sources and deck)
-    C="$CPU_RUNS/$CASE.smoke.np1"
+    C="$CPU_RUNS/$CASE.$VMODE.np1"
     if [ ! -f "$C/$(final_plt)/Header" ] || [ "$(manifest_val "$C" deck_sha256)" != "$(manifest_val "$D" deck_sha256)" ] || [ "$(manifest_val "$C" steps)" != "$STEPS" ]; then
         echo "    (CPU reference for $CASE missing -- running the CPU profile now, 1 rank)"
         rc=0; run_cpu "$CASE" "$CPU_RUNS/validate.$CASE.cpu.stdout" || rc=$?
@@ -307,10 +318,10 @@ done
 
 CRIT="fcompare/particle rel_tol adiabatic $REL_TOL_SAME / heatcool $HC_REL_TOL vs $( [ "$N" -eq 1 ] && echo rerun || echo 1-GPU), CPU reference rel_tol adiabatic $REL_TOL_XBACKEND / heatcool $HC_REL_TOL, zero-reference fields exact, baryon mass |dM/M|<=$MASS_TOL, DM count exact, finite"
 if [ "$ok" -ne 1 ]; then
-    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES): FAIL${unsupported:+ (and UNSUPPORTED_LAYOUT [$unsupported])}${pending:+ (and I_R_CHECK_PENDING [$pending])}"; exit 1
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES [$VMODE]): FAIL${unsupported:+ (and UNSUPPORTED_LAYOUT [$unsupported])}${pending:+ (and I_R_CHECK_PENDING [$pending])}"; exit 1
 elif [ -n "$unsupported" ]; then
-    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): UNSUPPORTED_LAYOUT [$unsupported] -- plotfile comparison not performed for these pairs (different but legal box layouts are not supported by this validator); not a PASS${pending:+; I_R_CHECK_PENDING [$pending]}"; exit 4
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES [$VMODE]; $CRIT): UNSUPPORTED_LAYOUT [$unsupported] -- plotfile comparison not performed for these pairs (different but legal box layouts are not supported by this validator); not a PASS${pending:+; I_R_CHECK_PENDING [$pending]}"; exit 4
 elif [ -n "$pending" ]; then
-    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING [$pending] -- heat/cool acceptance incomplete, not a full regression PASS"; exit 3
+    echo "Nyx $BACKEND validation ($N GPU, cases: $CASES [$VMODE]; $CRIT): STATE_AND_PARTICLES_PASS; I_R_CHECK_PENDING [$pending] -- heat/cool acceptance incomplete, not a full regression PASS"; exit 3
 fi
-echo "Nyx $BACKEND validation ($N GPU, cases: $CASES; $CRIT): PASS"; exit 0
+echo "Nyx $BACKEND validation ($N GPU, cases: $CASES [$VMODE]; $CRIT): PASS"; exit 0

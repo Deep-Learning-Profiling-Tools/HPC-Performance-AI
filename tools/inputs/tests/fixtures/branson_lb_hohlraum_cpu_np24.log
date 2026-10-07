@@ -1,0 +1,139 @@
+-------- Branson, a massively parallel proxy app for Implicit Monte Carlo ------
+-------- Authors: Alex Long (along@lanl.gov), Kendra Long (keadyk@lanl.gov), Kelly Thompson (kgt@lanl.gov), and Joseph Farmer (University of Notre Dame)--------
+-------- Version: 0.83----------------------------------------------------------
+
+ Branson compiled on: CCS
+"use_combing" not found or recognized, defaulting to TRUE
+WARNING: Domain decomposition method not recognized or not set... setting to PARTICLE PASSING method
+WARNING: Number of OpenMP threads set but Branson was not configured with OpenMP, OpenMP threads will not be used
+WARNING: Mesh decomposition method is required but not recognized... setting to METIS method
+dd_batch_size not found in settings, defaulting to 10000
+event_batch_size not found in settings, defaulting to 10000
+Problem Specifications:Constants -- c: 299.792 (cm/sh) , a: 0.01372
+Run Parameters-- Photons: 250000000, time finish: 0.05 (sh), time step: 0.01 (sh) ,
+ time multiplier: 1 , max dt:1 (sh), Random number seed: 14706 , output frequency: 1
+Combing census enabled (default)
+Terse printing mode (default)
+Spatial Information -- cells x,y,z: 65 65 140
+--Material Information--
+ heat capacity: 0.3 opacity constants: 0.001 + 0^0, scattering opacity: 0
+ heat capacity: 0.3 opacity constants: 0.001 + 0^0, scattering opacity: 0
+ heat capacity: 0.3 opacity constants: 10000 + 0^0, scattering opacity: 0
+--Algorithm Information--
+Particle/census storage: AOS
+Transport loop algorithm: EVENT BASED
+ Batch size for event-based transport loops is 10000
+--Parallel Information--
+DD algorithm: PARTICLE PASSING
+DD batch size: 10000, particle message size: 200000
+Branson built WITHOUT OpenMP, number of OpenMP threads set in the input will have no affect
+Mesh decomposition: METIS
+
+partitioning...
+remapping with allreduce...
+Partition: 2.32544 seconds
+Remap: 0.048223 seconds
+********************************************************************************
+Step: 1  Start Time: 0  End Time: 0.01  dt: 0.01
+source time: 2.19196
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |      10763808     10445593 |    250694250    250694250 |
+Memory (GB)      |       1.30448       1.2582 |      30.1969      30.1969 |
+---------------------------------------------------------------------------
+WARNING: use_gpu_transporter set to true but GPU kernel not available, running transport on CPU
+Total Photons transported: 250694250
+Emission E: 0.0010863, Source E: 0, Absorption E: 0.00108474, Exit E: 1.65795e-06
+Pre census E: 8.11538e-07 Post census E: 7.08778e-07 Post census Size: 915018
+Pre mat E: 0.017745 Post mat E: 0.0177434
+Radiation conservation: -1.36176e-16
+Material conservation: -7.89993e-15
+Sends posted: 26301, sends completed: 26301
+Receives posted: 26301, receives completed: 26301
+Step particles messages sent: 26127, Step particles sent: 10452937
+Transport time max/min: 2153.21/2153.14
+********************************************************************************
+Step: 2  Start Time: 0.01  End Time: 0.02  dt: 0.01
+source time: 1.36064
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |      10808051     10468718 |    251249235    251249235 |
+Memory (GB)      |       1.30979      1.26098 |      30.2635      30.2635 |
+---------------------------------------------------------------------------
+WARNING: use_gpu_transporter set to true but GPU kernel not available, running transport on CPU
+Total Photons transported: 251249235
+Emission E: 0.00108582, Source E: 0, Absorption E: 0.00108419, Exit E: 1.62183e-06
+Pre census E: 7.08778e-07 Post census E: 7.11273e-07 Post census Size: 911256
+Pre mat E: 0.0177434 Post mat E: 0.0177418
+Radiation conservation: -2.50668e-16
+Material conservation: 2.39392e-16
+Sends posted: 26616, sends completed: 26616
+Receives posted: 26616, receives completed: 26616
+Step particles messages sent: 26442, Step particles sent: 11021696
+Transport time max/min: 2148.82/2148.76
+********************************************************************************
+Step: 3  Start Time: 0.02  End Time: 0.03  dt: 0.01
+source time: 1.31833
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |      10807594     10468556 |    251245350    251245350 |
+Memory (GB)      |       1.30973      1.26096 |       30.263       30.263 |
+---------------------------------------------------------------------------
+WARNING: use_gpu_transporter set to true but GPU kernel not available, running transport on CPU
+Total Photons transported: 251245350
+Emission E: 0.00108531, Source E: 0, Absorption E: 0.0010837, Exit E: 1.61086e-06
+Pre census E: 7.11273e-07 Post census E: 7.11142e-07 Post census Size: 910118
+Pre mat E: 0.0177418 Post mat E: 0.0177402
+Radiation conservation: -2.06215e-16
+Material conservation: 2.08167e-16
+Sends posted: 27007, sends completed: 27007
+Receives posted: 27007, receives completed: 27007
+Step particles messages sent: 26833, Step particles sent: 11000458
+Transport time max/min: 2108.35/2108.26
+********************************************************************************
+Step: 4  Start Time: 0.03  End Time: 0.04  dt: 0.01
+source time: 1.31754
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |      10807017     10468512 |    251244309    251244309 |
+Memory (GB)      |       1.30966      1.26095 |      30.2629      30.2629 |
+---------------------------------------------------------------------------
+WARNING: use_gpu_transporter set to true but GPU kernel not available, running transport on CPU
+Total Photons transported: 251244309
+Emission E: 0.00108482, Source E: 0, Absorption E: 0.00108322, Exit E: 1.59744e-06
+Pre census E: 7.11142e-07 Post census E: 7.0592e-07 Post census Size: 908728
+Pre mat E: 0.0177402 Post mat E: 0.0177386
+Radiation conservation: -1.46801e-16
+Material conservation: 1.35308e-16
+Sends posted: 26518, sends completed: 26518
+Receives posted: 26518, receives completed: 26518
+Step particles messages sent: 26344, Step particles sent: 10993260
+Transport time max/min: 2091.06/2091.01
+********************************************************************************
+Step: 5  Start Time: 0.04  End Time: 0.05  dt: 0.01
+source time: 1.31441
+                        proc_max    proc_mean |     node_max    node_mean |
+---------------------------------------------------------------------------
+Photons          |      10806826     10468454 |    251242903    251242903 |
+Memory (GB)      |       1.30964      1.26095 |      30.2627      30.2627 |
+---------------------------------------------------------------------------
+WARNING: use_gpu_transporter set to true but GPU kernel not available, running transport on CPU
+Total Photons transported: 251242903
+Emission E: 0.00108432, Source E: 0, Absorption E: 0.00108273, Exit E: 1.58954e-06
+Pre census E: 7.0592e-07 Post census E: 7.06242e-07 Post census Size: 910057
+Pre mat E: 0.0177386 Post mat E: 0.017737
+Radiation conservation: -8.58688e-17
+Material conservation: 3.81639e-17
+Sends posted: 26199, sends completed: 26199
+Receives posted: 26199, receives completed: 26199
+Step particles messages sent: 26025, Step particles sent: 10995039
+Transport time max/min: 2034.74/2034.67
+********************************************************************************
+Total particles sent: 54463390
+Total particle messages: 131771
+********************************************************************************
+particle pass aos: 10544.3
+mesh setup: 2.38522
+Total: 10546.7
+Total transport: 10536.2
+Photons Per Second (FOM): 23727.8

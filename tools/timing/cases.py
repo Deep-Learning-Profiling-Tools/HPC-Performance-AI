@@ -3,6 +3,7 @@
 
     cases.py resolve --level 1 --build-root build/gcc13 [SELECT ...]
     cases.py resolve --level 2 [SELECT ...]
+    cases.py resolve --level 1|2|3 --registry [SELECT ...] # the registered inputs (inputs.yaml)
     cases.py resolve --level 3 [SELECT ...]
     cases.py check                    # validate every table; CPU only, used by the tests
     cases.py allowed-env <app>        # the input variables a Level 2 case may set
@@ -18,6 +19,11 @@ in tools/timing/cases/, tab-separated, "-" for an empty field:
   level1_apps.tsv   per-benchmark facts: suite backends roi_excludes verify_vs_roi extra_env notes
   level2_apps.tsv   per-application facts, including the application's own FOM pattern
   level2_cases.tsv  Level 2 cases: app case gpus env args timeout_s fom_regex notes
+  level1_registry.tsv, level2_registry.tsv, level3_registry.tsv
+                    GENERATED from the inputs registry (level<N>/<app>/inputs.yaml) by
+                    gen_registry_cases.py: one case per registered input, case == input_id.
+                    Resolved only with --registry; `check` fails when they drift from the
+                    registry. The registry, not these files, defines the inputs.
   level3_apps.tsv   per-application facts for Level 3 (no markers: the region is the
                     application's own timer, defined in apptimers.py)
   level3_cases.tsv  Level 3 cases: the level2_cases.tsv columns plus `acceptance` (validate.sh
@@ -49,6 +55,8 @@ VAR_REF = re.compile(r"\$\{?(HPCPERF_[A-Z0-9_]+)")
 DENY = re.compile(r"TOKEN|SECRET|PASSWD|PASSWORD|CREDENTIAL|PRIVATE_KEY|API_KEY|SESSION")
 # set by the engine or by the launcher interface -- never an input of a case
 RESERVED = {"HPCPERF_ROI_LOG", "HPCPERF_SKIP_VERIFY", "HPCPERF_GPUS", "HPCPERF_NP", "HPCPERF_DRY_RUN",
+            # set by the registry selector helper inside run.sh (tools/inputs/hpcperf_input_selector.sh)
+            "HPCPERF_INPUT_ARGS", "HPCPERF_INPUT_ID",
             "HPCPERF_L3_RUN_SUBDIR"}
 PLATFORM = {"HPCPERF_SITE_PROFILE", "HPCPERF_LAUNCHER", "HPCPERF_LAUNCHER_BIN", "HPCPERF_NODES",
             "HPCPERF_GPUS_PER_NODE", "HPCPERF_GPU_BACKEND", "HPCPERF_RUN_TMPDIR", "HPCPERF_CPUS_PER_RANK"}
@@ -58,7 +66,10 @@ L3_COMMON_INPUTS = {"HPCPERF_SCALE_MODE"}
 
 ROW_FIELDS = ("level", "app", "case", "backend", "gpus", "cwd", "timeout_s", "env", "argv",
               "fom_name", "fom_unit", "fom_better", "fom_source", "fom_regex",
-              "roi_excludes", "verify_vs_roi", "notes", "nvtx_roi", "profile")
+              "roi_excludes", "verify_vs_roi", "notes", "input_id", "nvtx_roi", "profile")
+# input_id: the registry input a --registry case measures ("" for the hand-written cases); the
+# engine stores that input's workload identity next to the raw runs and refuses the case when the
+# identity cannot be established. nvtx_roi / profile: Level 3 (see level3_rows).
 
 
 class CaseError(Exception):
@@ -95,9 +106,88 @@ L2_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_bett
                "fom_regex", "extra_env", "roi_excludes", "app_timer_regex", "app_timer_unit", "notes")
 APP_TIMER_UNITS = {"s": 1.0, "ms": 1e-3, "us": 1e-6}
 L2_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "notes")
+L2_BIND_COLS = ("app", "launcher", "host_threads", "cpus_per_rank", "omp_pin", "basis")
+OMP_PIN_ENV = ("OMP_PLACES=cores", "OMP_PROC_BIND=close")
+
+
+def binding_table():
+    """cases/level2_binding.tsv: the CPU-binding policy of every Level 2 application, checked."""
+    rows = {r["app"]: r for r in read_table("level2_binding.tsv", L2_BIND_COLS)}
+    for r in rows.values():
+        if r["launcher"] not in ("mpirun", "direct"):
+            raise CaseError(f"{r['_where']}: launcher must be mpirun|direct")
+        if r["omp_pin"] not in ("yes", "no"):
+            raise CaseError(f"{r['_where']}: omp_pin must be yes|no")
+        if r["launcher"] == "direct":
+            if r["host_threads"] or r["cpus_per_rank"] or r["omp_pin"] == "yes":
+                raise CaseError(f"{r['_where']}: a direct-exec application has no binding (host_threads / cpus_per_rank '-', omp_pin no)")
+            continue
+        if not (r["host_threads"].isdigit() and r["cpus_per_rank"].isdigit()) or int(r["host_threads"]) < 1:
+            raise CaseError(f"{r['_where']}: host_threads and cpus_per_rank must be positive integers")
+        if int(r["cpus_per_rank"]) != int(r["host_threads"]):
+            raise CaseError(f"{r['_where']}: cpus_per_rank must equal host_threads (one core per host thread, no idle bound cores)")
+        if r["omp_pin"] == "yes" and int(r["host_threads"]) < 2:
+            raise CaseError(f"{r['_where']}: omp_pin yes needs more than one host thread")
+    return rows
+
+
+def binding_policy(app):
+    """The explicit CPU-binding policy of one Level 2 application."""
+    rows = binding_table()
+    if app not in rows:
+        raise CaseError(f"level2/{app} has no row in cases/level2_binding.tsv (its CPU-binding policy)")
+    return rows[app]
+
+
+def binding_env(app):
+    """NAME=VALUE pairs that put the explicit policy into effect through the launcher's interface
+    (HPCPERF_CPUS_PER_RANK -> mpirun --map-by ppr:N:node:PE=<cpus_per_rank> --bind-to core) and, for an
+    application with several host threads, pin its OpenMP threads one per core inside that set.
+    Empty for a direct-exec application (nothing to bind through)."""
+    r = binding_policy(app)
+    if r["launcher"] == "direct":
+        return []
+    out = [f"HPCPERF_CPUS_PER_RANK={r['cpus_per_rank']}"]
+    if r["omp_pin"] == "yes":
+        out += [f"OMP_NUM_THREADS={r['host_threads']}", *OMP_PIN_ENV]
+    return out
+
+
+def binding_meta(app, policy):
+    """run_meta.txt lines (bind_*) that record the policy applied to a run."""
+    if policy == "runtime":
+        r = binding_policy(app)
+        return [f"bind_policy=runtime", f"bind_launcher={r['launcher']}"]
+    r = binding_policy(app)
+    return ["bind_policy=explicit", f"bind_launcher={r['launcher']}", f"bind_host_threads={r['host_threads'] or '-'}",
+            f"bind_cpus_per_rank={r['cpus_per_rank'] or '-'}", f"bind_omp_pin={r['omp_pin']}",
+            "bind_env=" + ";".join(binding_env(app))]
+L1_REG_COLS = ("app", "case", "input_id", "materialized", "exe", "args", "cwd", "env", "timeout_s")
+L2_REG_COLS = ("app", "case", "input_id", "materialized", "selector", "registry_knobs", "gpus", "timeout_s")
+
+
+def registry_l2():
+    """{app: (selector, {knob names})} from the generated Level 2 registry table: the selector
+    variable run.sh reads indirectly (hpcperf_apply_input) and the knobs it sets from the registry."""
+    out = {}
+    for r in read_table("level2_registry.tsv", L2_REG_COLS):
+        out[r["app"]] = (r["selector"], set(x for x in r["registry_knobs"].split(",") if x))
+    return out
 L3_APP_COLS = ("app", "backends", "timeout_s", "fom_name", "fom_unit", "fom_better", "fom_source",
                "fom_regex", "extra_env", "nvtx_roi", "profile", "notes")
 L3_CASE_COLS = ("app", "case", "gpus", "env", "args", "timeout_s", "fom_regex", "acceptance", "notes")
+
+L3_REG_COLS = L2_REG_COLS + ("env",)      # env: what the input needs beyond the selector (a build-variant variable), from the registry
+
+
+def registry_l3():
+    """{app: (selector, {knob names})} from the generated Level 3 registry table (cases/level3_registry.tsv):
+    the same shape as registry_l2; every Level 3 run.sh applies its registered input through
+    hpcperf_apply_input (or its own equivalent, LAMMPS / SPARTA) when the selector is set."""
+    out = {}
+    for r in read_table("level3_registry.tsv", L3_REG_COLS):
+        out[r["app"]] = (r["selector"], set(x for x in r["registry_knobs"].split(",") if x))
+    return out
 
 
 def parse_env(text, where):
@@ -130,17 +220,30 @@ def run_sh_vars(app, level=2):
         return set(VAR_REF.findall(f.read()))
 
 
-def input_vars(app, level=2):
-    """Variables that change what a Level 2/3 application computes: read by its run.sh
-    (Level 3: or by the common helpers for every application), not part of the launcher /
-    platform interface."""
-    common = L3_COMMON_INPUTS if level == 3 else set()
-    return {v for v in run_sh_vars(app, level) | common if v not in RESERVED and v not in PLATFORM
+def input_vars(app, registry=None, level=2):
+    """Variables that change what a Level 2/3 application computes: read by its run.sh (directly,
+    or -- for the Level 2 registry selector -- through tools/inputs/hpcperf_input_selector.sh, which
+    the text scan cannot see; Level 3: or by the common helpers for every application), not part of
+    the launcher / platform interface."""
+    if level == 3:
+        common = L3_COMMON_INPUTS
+        reg = registry_l3() if registry is None else registry
+    else:
+        common = set()
+        reg = registry_l2() if registry is None else registry
+    sel = {reg[app][0]} if app in reg and reg[app][0] else set()
+    return {v for v in run_sh_vars(app, level) | common | sel if v not in RESERVED and v not in PLATFORM
             and not v.startswith("HPCPERF_BIND_")}
 
 
-def allowed_env(app, extra, level=2):
-    return input_vars(app, level) | CASE_SETTABLE_PLATFORM | set(x for x in extra.split(",") if x)
+def registry_knobs(app, registry=None, level=2):
+    """Knobs the registry selector sets inside run.sh; a case never sets them directly."""
+    reg = (registry_l3() if level == 3 else registry_l2()) if registry is None else registry
+    return reg.get(app, ("", set()))[1]
+
+
+def allowed_env(app, extra, registry=None, level=2):
+    return input_vars(app, registry, level) | CASE_SETTABLE_PLATFORM | set(x for x in extra.split(",") if x)
 
 
 def expand_sweep(case, env, where):
@@ -220,7 +323,74 @@ def level1_rows(build_root, backend):
             "argv": " ".join(shlex.quote(a) for a in argv),
             "fom_name": "", "fom_unit": "", "fom_better": "", "fom_source": "", "fom_regex": "",
             "roi_excludes": app["roi_excludes"], "verify_vs_roi": app["verify_vs_roi"],
-            "notes": "; ".join(x for x in (app["notes"], notes) if x), "nvtx_roi": "", "profile": "yes",
+            "notes": "; ".join(x for x in (app["notes"], notes) if x), "input_id": "", "nvtx_roi": "", "profile": "yes",
+        })
+    return out, apps
+
+
+def level1_registry_rows(backend):
+    """Level 1 cases of the registered inputs: the registry's own executable (a materialized
+    compile-time input's binary, e.g. another NPB class, is never replaced by the default one),
+    arguments and env; repository-relative paths resolved here, recorded relative in the identity."""
+    apps = {r["app"]: r for r in read_table("level1_apps.tsv", L1_APP_COLS)}
+    out, seen = [], set()
+    for r in read_table("level1_registry.tsv", L1_REG_COLS):
+        app = apps.get(r["app"])
+        if app is None:
+            raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level1_apps.tsv")
+        if r["case"] != r["input_id"] or not NAME_OK.match(r["case"]):
+            raise CaseError(f"{r['_where']}: case must equal the input id and match [A-Za-z0-9._-]+")
+        if (r["app"], r["case"]) in seen:
+            raise CaseError(f"{r['_where']}: duplicate registry case {r['app']}/{r['case']}")
+        seen.add((r["app"], r["case"]))
+        env = parse_env(r["env"], r["_where"])
+        if backend.lower() not in app["backends"].split(","):
+            continue
+        sub = lambda x: x.replace("{REPO}", REPO)
+        argv = [sub(r["exe"])] + [sub(a) for a in shlex.split(r["args"])]
+        out.append({
+            "level": "1", "app": r["app"], "case": r["case"], "backend": backend.upper(), "gpus": "",
+            "cwd": sub(r["cwd"]), "timeout_s": r["timeout_s"] or "1800", "env": env_text(env),
+            "argv": " ".join(shlex.quote(a) for a in argv),
+            "fom_name": "", "fom_unit": "", "fom_better": "", "fom_source": "", "fom_regex": "",
+            "roi_excludes": app["roi_excludes"], "verify_vs_roi": app["verify_vs_roi"],
+            "notes": "; ".join(x for x in (app["notes"], "registry input" + ("" if r["materialized"] == "1" else ", NOT materialized")) if x),
+            "input_id": r["input_id"], "nvtx_roi": "", "profile": "yes",
+        })
+    return out, apps
+
+
+def level2_registry_rows(backend):
+    """Level 2 cases of the registered inputs: run.sh with the registry selector = input id."""
+    apps = {r["app"]: r for r in read_table("level2_apps.tsv", L2_APP_COLS)}
+    reg = registry_l2()
+    out, seen = [], set()
+    for r in read_table("level2_registry.tsv", L2_REG_COLS):
+        app = apps.get(r["app"])
+        if app is None:
+            raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level2_apps.tsv")
+        if r["case"] != r["input_id"] or not NAME_OK.match(r["case"]):
+            raise CaseError(f"{r['_where']}: case must equal the input id and match [A-Za-z0-9._-]+")
+        if (r["app"], r["case"]) in seen:
+            raise CaseError(f"{r['_where']}: duplicate registry case {r['app']}/{r['case']}")
+        seen.add((r["app"], r["case"]))
+        env = parse_env(f"{r['selector']}={r['input_id']}", r["_where"])
+        allowed = allowed_env(r["app"], app["extra_env"], reg)
+        if r["selector"] not in allowed:
+            raise CaseError(f"{r['_where']}: selector {r['selector']} is not an input variable of {r['app']}")
+        gpus = r["gpus"] or "1"
+        if backend.lower() not in app["backends"].split(","):
+            continue
+        argv = ["bash", f"level2/{r['app']}/run.sh", backend.upper()]
+        out.append({
+            "level": "2", "app": r["app"], "case": r["case"], "backend": backend.upper(), "gpus": gpus,
+            "cwd": REPO, "timeout_s": r["timeout_s"] or app["timeout_s"] or "1800",
+            "env": env_text(env), "argv": " ".join(shlex.quote(a) for a in argv),
+            "fom_name": app["fom_name"], "fom_unit": app["fom_unit"], "fom_better": app["fom_better"],
+            "fom_source": app["fom_source"], "fom_regex": app["fom_regex"],
+            "roi_excludes": app["roi_excludes"], "verify_vs_roi": "outside",
+            "notes": "; ".join(x for x in (app["notes"], "registry input" + ("" if r["materialized"] == "1" else ", NOT materialized")) if x),
+            "input_id": r["input_id"], "nvtx_roi": "", "profile": "yes",
         })
     return out, apps
 
@@ -265,6 +435,10 @@ def level2_rows(backend):
             raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level2_apps.tsv")
         env = parse_env(r["env"], r["_where"])
         allowed = allowed_env(r["app"], app["extra_env"])
+        sel = registry_l2().get(r["app"], ("", set()))[0]
+        if sel and any(k == sel for k, _ in env):
+            raise CaseError(f"{r['_where']}: {sel} selects a registered input -- measure it with --registry "
+                            f"(cases/level2_registry.tsv), not as a hand-written case")
         bad = sorted(k for k, _ in env if k not in allowed)
         if bad:
             raise CaseError(f"{r['_where']}: {bad} are not read by level2/{r['app']}/run.sh "
@@ -288,7 +462,7 @@ def level2_rows(backend):
                 "fom_name": app["fom_name"], "fom_unit": app["fom_unit"], "fom_better": app["fom_better"],
                 "fom_source": app["fom_source"], "fom_regex": r["fom_regex"] or app["fom_regex"],
                 "roi_excludes": app["roi_excludes"], "verify_vs_roi": "outside",
-                "notes": "; ".join(x for x in (app["notes"], r["notes"]) if x), "nvtx_roi": "", "profile": "yes",
+                "notes": "; ".join(x for x in (app["notes"], r["notes"]) if x), "input_id": "", "nvtx_roi": "", "profile": "yes",
             })
     return out, apps
 
@@ -327,6 +501,10 @@ def level3_rows(backend):
             raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level3_apps.tsv")
         env = parse_env(r["env"], r["_where"])
         allowed = allowed_env(r["app"], app["extra_env"], level=3)
+        sel = registry_l3().get(r["app"], ("", set()))[0]
+        if sel and any(k == sel for k, _ in env):
+            raise CaseError(f"{r['_where']}: {sel} selects a registered input -- measure it with --registry "
+                            f"(cases/level3_registry.tsv), not as a hand-written case")
         bad = sorted(k for k, _ in env if k not in allowed)
         if bad:
             raise CaseError(f"{r['_where']}: {bad} are not read by level3/{r['app']}/run.sh "
@@ -352,9 +530,54 @@ def level3_rows(backend):
                 "fom_name": app["fom_name"], "fom_unit": app["fom_unit"], "fom_better": app["fom_better"],
                 "fom_source": app["fom_source"], "fom_regex": r["fom_regex"] or app["fom_regex"],
                 "roi_excludes": "", "verify_vs_roi": "outside" if r["acceptance"] else "none",
-                "notes": "; ".join(x for x in (app["notes"], r["notes"]) if x), "nvtx_roi": app["nvtx_roi"],
+                "notes": "; ".join(x for x in (app["notes"], r["notes"]) if x), "input_id": "", "nvtx_roi": app["nvtx_roi"],
                 "profile": app["profile"],
             })
+    return out, apps
+
+
+def level3_registry_rows(backend):
+    """Level 3 cases of the registered inputs: run.sh with the registry selector = input id and
+    HPCPERF_GPUS = the input's runtime_config.gpus; the region is the application's own timer
+    (apptimers.py), the FOM / NVTX range / profile default come from cases/level3_apps.tsv."""
+    import apptimers
+    apps = {r["app"]: r for r in read_table("level3_apps.tsv", L3_APP_COLS)}
+    reg = registry_l3()
+    out, seen = [], set()
+    for r in read_table("level3_registry.tsv", L3_REG_COLS):
+        app = apps.get(r["app"])
+        if app is None:
+            raise CaseError(f"{r['_where']}: {r['app']} has no row in cases/level3_apps.tsv")
+        if r["app"] not in apptimers.TIMERS:
+            raise CaseError(f"{r['_where']}: {r['app']} has no timer definition in tools/timing/apptimers.py")
+        if r["case"] != r["input_id"] or not NAME_OK.match(r["case"]):
+            raise CaseError(f"{r['_where']}: case must equal the input id and match [A-Za-z0-9._-]+")
+        if (r["app"], r["case"]) in seen:
+            raise CaseError(f"{r['_where']}: duplicate registry case {r['app']}/{r['case']}")
+        seen.add((r["app"], r["case"]))
+        env = parse_env(f"{r['selector']}={r['input_id']}" + (";" + r["env"] if r.get("env") else ""), r["_where"])
+        allowed = allowed_env(r["app"], app["extra_env"], reg, level=3)
+        if r["selector"] not in allowed:
+            raise CaseError(f"{r['_where']}: selector {r['selector']} is not an input variable of {r['app']}")
+        for k, _v in env:
+            if k not in allowed:
+                raise CaseError(f"{r['_where']}: {k} is not a variable {r['app']}'s run.sh reads")
+        gpus = r["gpus"] or "1"
+        if not gpus.isdigit() or int(gpus) < 1:
+            raise CaseError(f"{r['_where']}: gpus must be a positive integer")
+        if backend.lower() not in app["backends"].split(","):
+            continue
+        argv = ["bash", f"level3/{r['app']}/run.sh", backend.upper()]
+        out.append({
+            "level": "3", "app": r["app"], "case": r["case"], "backend": backend.upper(), "gpus": gpus,
+            "cwd": REPO, "timeout_s": r["timeout_s"] or app["timeout_s"] or "1800",
+            "env": env_text(env), "argv": " ".join(shlex.quote(a) for a in argv),
+            "fom_name": app["fom_name"], "fom_unit": app["fom_unit"], "fom_better": app["fom_better"],
+            "fom_source": app["fom_source"], "fom_regex": app["fom_regex"],
+            "roi_excludes": "", "verify_vs_roi": "outside",
+            "notes": "; ".join(x for x in (app["notes"], "registry input" + ("" if r["materialized"] == "1" else ", NOT materialized")) if x),
+            "input_id": r["input_id"], "nvtx_roi": app["nvtx_roi"], "profile": app["profile"],
+        })
     return out, apps
 
 
@@ -380,11 +603,22 @@ def refuse_undeclared(rows, environ):
     """A variable an application reads, set in the caller's shell but not declared by the
     case, would be dropped by `env -i` -- the run would silently measure another input."""
     problems = []
+    reg2, reg3 = registry_l2(), registry_l3()
     for r in rows:
         if r["level"] not in ("2", "3"):
             continue
+        level = int(r["level"])
+        reg = reg3 if level == 3 else reg2
         declared = {kv.split("=", 1)[0] for kv in r["env"].split(";") if kv}
-        stray = sorted(v for v in input_vars(r["app"], int(r["level"])) if v in environ and v not in declared)
+        watched = input_vars(r["app"], reg, level) | registry_knobs(r["app"], reg, level)
+        stray = sorted(v for v in watched if v in environ and v not in declared)
+        # the registry selector set in the shell to ANOTHER input than the case's: the case would win
+        # silently and the caller would believe the other input was measured (declared case variables
+        # otherwise keep the case's value, as before)
+        sel = reg.get(r["app"], ("", set()))[0]
+        dvals = dict(kv.split("=", 1) for kv in r["env"].split(";") if kv)
+        if sel and sel in dvals and sel in environ and environ[sel] != dvals[sel]:
+            stray.append(f"{sel} (shell {environ[sel]!r}, case {dvals[sel]!r})")
         if stray:
             problems.append(f"{r['app']}/{r['case']}: {', '.join(stray)}")
     if problems:
@@ -443,6 +677,27 @@ def check_all(build_root=None):
     for r in l2:
         if r["fom_regex"] and re.compile(r["fom_regex"], re.M).groups != 1:
             raise CaseError(f"{r['app']}/{r['case']}: fom_regex needs exactly one capture group")
+    bind = binding_table()
+    for a in l2apps:
+        if a not in bind:
+            raise CaseError(f"level2/{a} has no row in cases/level2_binding.tsv (its CPU-binding policy)")
+    for a in bind:
+        if a not in l2apps:
+            raise CaseError(f"cases/level2_binding.tsv lists {a}, which is not a level2 application")
+    msgs.append(f"level2 binding policy: {sum(1 for r in bind.values() if r['launcher'] == 'mpirun')} mpirun-launched applications "
+                f"bound through HPCPERF_CPUS_PER_RANK, {sum(1 for r in bind.values() if r['launcher'] == 'direct')} direct-exec unbound")
+    r1, _ = level1_registry_rows("CUDA")
+    r2, _ = level2_registry_rows("CUDA")
+    r3, _ = level3_registry_rows("CUDA")
+    msgs.append(f"registry: {len(r1)} Level 1, {len(r2)} Level 2 and {len(r3)} Level 3 registered inputs (cases/level<N>_registry.tsv)")
+    try:
+        import gen_registry_cases
+    except ImportError as exc:
+        raise CaseError(f"cannot check the registry tables against inputs.yaml ({exc}); source hpcperf_env.sh")
+    drift = gen_registry_cases.check()
+    if drift:
+        raise CaseError("; ".join(drift))
+    msgs.append("registry: generated tables match the inputs registry (no drift)")
     l3, l3apps = level3_rows("CUDA")
     msgs.append(f"level3: {len(l3)} CUDA cases, {len(l3apps)} applications described")
     l3_dirs = level3_apps_in_suite()
@@ -471,16 +726,24 @@ def main(argv):
     r.add_argument("--build-root", default=None)
     r.add_argument("--backend", default="CUDA")
     r.add_argument("--no-env-check", action="store_true", help="skip the undeclared-variable refusal (tests)")
+    r.add_argument("--registry", action="store_true", help="the registered inputs (cases/level<N>_registry.tsv)")
     r.add_argument("select", nargs="*")
     c = sub.add_parser("check")
     c.add_argument("--build-root", default=None)
     e = sub.add_parser("allowed-env")
     e.add_argument("--level", choices=("2", "3"), default="2")
     e.add_argument("app")
+    b = sub.add_parser("binding-env", help="NAME=VALUE pairs of the explicit CPU-binding policy of a Level 2 application")
+    b.add_argument("app")
+    bm = sub.add_parser("binding-meta", help="run_meta.txt lines recording the binding policy applied")
+    bm.add_argument("--policy", choices=("explicit", "runtime"), default="explicit")
+    bm.add_argument("app")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "resolve":
-            if a.level == "1":
+            if a.registry:
+                rows, _ = {"1": level1_registry_rows, "2": level2_registry_rows, "3": level3_registry_rows}[a.level](a.backend)
+            elif a.level == "1":
                 if not a.build_root:
                     raise CaseError("--build-root is required for Level 1")
                 rows, _ = level1_rows(a.build_root, a.backend)
@@ -495,12 +758,16 @@ def main(argv):
         elif a.cmd == "check":
             for m in check_all(a.build_root):
                 print(f"cases: {m}")
+        elif a.cmd == "binding-env":
+            sys.stdout.write("".join(f"{kv}\n" for kv in binding_env(a.app)))
+        elif a.cmd == "binding-meta":
+            sys.stdout.write("".join(f"{line}\n" for line in binding_meta(a.app, a.policy)))
         else:
             lvl = int(a.level)
             table, cols = ("level2_apps.tsv", L2_APP_COLS) if lvl == 2 else ("level3_apps.tsv", L3_APP_COLS)
             apps = {r["app"]: r for r in read_table(table, cols)}
             extra = apps.get(a.app, {}).get("extra_env", "")
-            print("\n".join(sorted(allowed_env(a.app, extra, lvl))))
+            print("\n".join(sorted(allowed_env(a.app, extra, level=lvl))))
     except CaseError as exc:
         print(f"cases: {exc}", file=sys.stderr)
         return 2
