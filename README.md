@@ -2,10 +2,10 @@
 
 An End-to-End AI Framework for Performance Prediction and Optimization in HPC Applications
 
-> 📈 **Timing results:** [interactive page](docs/timing/index.html) · [table view](docs/timing/README.md)
-> -- region-of-interest time of every registered Level 1 / Level 2 input, with its samples, stability,
-> run verification and correctness status. GitHub shows `index.html` as source: open the table view here,
-> or download `docs/timing/index.html` and open it in a browser.
+> 📈 **Timing results:** [interactive page](https://deep-learning-profiling-tools.github.io/HPC-Performance-AI/timing/) · [table view](docs/timing/README.md)
+> -- the latest timing of every registered Level 1 / 2 / 3 input (Level 3: the application's own timer), with
+> its samples, stability, run verification and correctness status. The interactive page is served by GitHub
+> Pages from `docs/timing/index.html` on `main`.
 
 ## 🧱 Benchmark Levels
 
@@ -191,7 +191,7 @@ validation all passed on the machine above.
 **region of interest** -- the computation marked in its source, without start-up,
 set-up, warm-up and verification -- and records the device activity inside it, per
 (application, input, platform). Results go to `results/timing/` (not in git); the
-published results are [docs/timing/index.html](docs/timing/index.html) (interactive page, open in a
-browser) and [docs/timing/README.md](docs/timing/README.md) (the same results as tables). Start with
+published results are the [interactive page](https://deep-learning-profiling-tools.github.io/HPC-Performance-AI/timing/) (GitHub Pages, from
+`docs/timing/index.html`) and [docs/timing/README.md](docs/timing/README.md) (the same results as tables). Start with
 [tools/timing/DESIGN.md](tools/timing/DESIGN.md) (what changed, why, interfaces) and
 [tools/timing/README.md](tools/timing/README.md) (method).
