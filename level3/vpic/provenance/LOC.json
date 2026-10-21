@@ -1,0 +1,71 @@
+{
+ "benchmark": "vpic",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c",
+ "test_code_loc": {
+  "code": 15282,
+  "files": 19,
+  "languages": {
+   "C/C++ Header": 13901,
+   "C++": 1242,
+   "CMake": 121,
+   "Python": 18
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 242145,
+  "files": 1469,
+  "languages": {
+   "C/C++ Header": 176917,
+   "C++": 50780,
+   "CMake": 6108,
+   "Markdown": 3264,
+   "YAML": 1841,
+   "Bourne Again Shell": 1268,
+   "Groovy": 806,
+   "Dockerfile": 315,
+   "Python": 280,
+   "Fortran 77": 265,
+   "Bourne Shell": 194,
+   "PHP": 90,
+   "CUDA": 7,
+   "Text": 4,
+   "Windows Module Definition": 4,
+   "C": 2
+  }
+ },
+ "application_owned_code_loc": {
+  "code": 24310,
+  "files": 123,
+  "languages": {
+   "C++": 15870,
+   "C/C++ Header": 8440
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {},
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 591,
+  "files": 6,
+  "languages": {
+   "CMake": 407,
+   "Markdown": 101,
+   "YAML": 83
+  }
+ },
+ "total_materialized_code_loc": 282328,
+ "summary": {
+  "application_owned_code_loc": 24310,
+  "bundled_dependency_code_loc": 242145,
+  "benchmark_specific_dependency_code_loc": 0,
+  "test_code_loc": 15282,
+  "total_materialized_code_loc": 282328,
+  "unclassified_code_loc": 591
+ }
+}

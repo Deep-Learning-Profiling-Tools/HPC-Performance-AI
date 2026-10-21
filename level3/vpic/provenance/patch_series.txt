@@ -1,0 +1,2 @@
+# order	component	patch	sha256	category	upstream_source	files
+# (no patches: the bundle is the exact upstream tree)

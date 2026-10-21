@@ -1,0 +1,57 @@
+name: vpic
+level: 3
+application: VPIC (vpic-kokkos, VPIC 2.0)
+description: Kokkos/CUDA relativistic electromagnetic particle-in-cell; registered inputs (inputs.yaml) are compiled deck
+  executables derived from upstream's sample/test decks (Harris-sheet reconnection at three resolutions, a 1-D Weibel instability,
+  a 2-D laser-plasma short pulse), one MPI rank on one GPU each
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (Kokkos CUDA); the registered decks fix a 1 x 1 x 1 rank topology (compile-time inputs);
+  host-staged particle/field exchanges (VPIC_ENABLE_GPU_AWARE_MPI=OFF, upstream default)
+default_scale_mode: smoke
+scale_modes:
+  smoke: the registered deck executables (inputs.yaml); no strong/weak derivation -- VPIC decks are compiled programs, every
+    size is its own registered deck
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: not applicable (one-rank decks)
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 as nvcc_wrapper host compiler, CUDA 13.2.78, Open MPI 5.0.10, site profile
+  gmu-hopper)
+install_root: .deps/level3/vpic/cuda
+profile_scheme: '<backend> (cuda validated; hip: build path present, untested -- no ROCm on the validation node); override
+  HPCPERF_VPIC_PROFILE must name the backend; generated state .deps/level3/vpic/<profile>/ and build/level3/vpic/<profile>/
+  (deck executables under build/level3/vpic/<profile>/decks/)'
+dependency_installs: []
+inputs:
+- decks/harris-256sq.cxx
+- decks/harris-512sq.cxx
+- decks/harris-1024sq.cxx
+- decks/weibel-1d-131072.cxx
+- decks/shortpulse-2d-500sq.cxx
+registered_inputs: inputs.yaml
+references:
+- src/test/integrated/legacy/accel.deck
+- src/test/integrated/legacy/cyclo.deck
+- src/test/integrated/legacy/inbndj.deck
+- src/test/integrated/legacy/interpe.deck
+- reference/*.json (frozen energies histories, inputs.yaml)
+upstream_version: devel
+redistribution_status: cleared
+suite_status: retained
+source_version: hpcperf-l3-v1
+source_tree_sha256: 464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c
+source_artifact:
+  filename: vpic-hpcperf-l3-v1.tar.zst
+  archive_sha256: ac0aec44f3245b6078021ba1cea0ba9b3e604b3d8ac2489f7807cb3c2d177950
+  source_tree_sha256: 464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c
+  size: 1937373
+  uncompressed_size: 17019061
+  file_count: 1786
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished

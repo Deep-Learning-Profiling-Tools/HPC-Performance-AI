@@ -1,0 +1,149 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: vpic
+  level: 3
+  application: VPIC (vpic-kokkos)
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/lanl/vpic-kokkos.git
+  tag: devel
+  commit: 7eb2947e12741df4931088a3ae6175adb21a6535
+artifact:
+  filename: vpic-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 1937373
+  sha256: ac0aec44f3245b6078021ba1cea0ba9b3e604b3d8ac2489f7807cb3c2d177950
+  source_tree_sha256: 464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.7
+  uncompressed_size: 17019061
+  tar_entries: 1990
+  file_count: 1786
+  symlink_count: 0
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c
+  algorithm: hpcperf-tree-1
+  entries: 1786
+  layout:
+  - src/
+patches: []
+dependencies:
+  bundled:
+  - path: kokkos
+    project: Kokkos
+    version: 5.2.2
+    license: Apache-2.0 WITH LLVM-exception
+    component: src
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (nvcc_wrapper host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/lanl/vpic-kokkos.git
+  ref: devel
+  commit: 7eb2947e12741df4931088a3ae6175adb21a6535
+  sha256: null
+  checkout: _upstream/level3/vpic-kokkos
+  submodules:
+  - path: kokkos
+    url: https://github.com/kokkos/kokkos.git
+    ref: 6d4434baacc86ec428b5300ebe853a085760d9af
+    commit: 6d4434baacc86ec428b5300ebe853a085760d9af
+    note: the Kokkos commit upstream pins (5.2.2); built by VPIC's own CMake (BUILD_INTERNAL_KOKKOS=ON, upstream's arch/CUDA-Release
+      recipe)
+  excluded: []
+  license:
+    spdx: BSD-3-Clause
+    files:
+    - README.md
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/vpic-kokkos
+  status: EQUIVALENT
+  summary:
+    identical: 1786
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 1786
+    validated_entries_considered: 1786
+licenses:
+- path: src
+  project: vpic-kokkos (VPIC 2.0)
+  license: BSD-3-Clause (README.md "Copyright" section; Triad National Security, LLC, 2022)
+  url: https://github.com/lanl/vpic-kokkos
+  commit: 7eb2947e12741df4931088a3ae6175adb21a6535
+- path: src/kokkos
+  project: Kokkos (bundled submodule)
+  license: Apache-2.0 WITH LLVM-exception
+  version: 5.2.2
+license_notes:
+- VPIC 2.0 is BSD-3-Clause (the license text is the "Copyright" section of README.md; the repository ships no separate LICENSE
+  file); the unmodified source with that README is redistributed as a source bundle.
+- The input decks under level3/vpic/decks/ are this benchmark's files, derived from upstream's sample and test decks as documented
+  in inputs.yaml; they are not part of the frozen artifact.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  - src/deck/*
+  bundled:
+  - src/kokkos/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/test/*
+  exclude:
+  - src/docs/*
+  - src/sample/*
+  - src/arch/*
+  - src/TestScripts/*
+  - src/scripts/*
+  - src/post/*
+  - src/interfaces/*
+  - src/utilities/*
+  - src/cmake/*
+  - src/bin/*
+scan_allow: []
+freeze:
+  tool_version: freeze-2.0
+  timestamp: '2026-10-21T01:03:08Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
