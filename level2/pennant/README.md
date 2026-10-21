@@ -247,7 +247,26 @@ vendored (upstream `hip` branch), untested (no ROCm).
 
 ## RESULTS
 
-See the timing page (`docs/timing/`, Level 2) for the campaign records of the
-registered inputs (1 discarded warm-up + 3 clean runs + 1 profiled run each;
-headline = median of the clean runs) and `inputs.yaml` for the correctness
-verdicts' definition.
+Campaign of 2026-10-21 (results directory `l2-ext-2026-10-20`, GPU 0000:9D:00.0, Slurm job 2732030, commit
+01caa24): final Level 2 protocol -- 1 discarded whole-process warm-up, 3 clean runs (headline = median,
+spread = (max - min) / median, stable when <= 10 %), 1 separate nsys-profiled run; direct exec, unbound; one
+input at a time on a quiet node. Timing SUCCESS, workload verification (`verify_registry_runs.py`) and
+scientific correctness (`hpcperf_inputs.py check` + `verdict`) are three separate results:
+
+| input | timed loop (median of 3) | min / max | spread | stable | device busy (profiled run) | run verification | correctness |
+|---|---|---|---|---|---|---|---|
+| sedovbig-540sq | 1.854 s | 1.849 / 1.857 s | 0.4 % | yes | 80 % | PASS | PASS |
+| sedovflatx4-1920x2160 | 63.82 s | 63.78 / 63.91 s | 0.2 % | yes | 99 % | PASS | PASS |
+| leblancbig-160x1440 | 1.529 s | 1.470 / 1.529 s | 3.9 % | yes | 77 % | PASS | PASS |
+| nohsquare-360sq | 2.004 s | 2.002 / 2.119 s | 5.9 % | yes | 72 % | PASS | PASS |
+| nohpoly-hex251-6000cycles | 1.466 s | 1.463 / 1.467 s | 0.3 % | yes | 62 % | PASS | PASS |
+
+The three small decks are host-latency bound (0.45-0.5 ms per cycle: five kernel launches, five device
+synchronisations and three symbol copies per cycle at 60-80 % device busy); `sedovflatx4` (4.1 M zones) is
+device bound (99 % busy, 5.1 ms per cycle). Two earlier measurements of the first two inputs that overlapped
+with a 32-thread CPU job of the operator in the same cpuset doubled their cycle time (sedovbig 3.27 s) and
+were set aside, as was a complete first pass whose registry listed the frozen references as program files
+(workload verification INSUFFICIENT); the results directory keeps both as evidence
+(`raw-perturbed/`, `raw-superseded/`). Every correctness check: the run's `.xy` against
+`reference/<id>.json` with the 1e-5 rule -- the largest observed deviation of these runs is 5.7e-8 relative
+(sedovflatx4 zp), i.e. the same accumulated roundoff as the single runs the rule was set from.

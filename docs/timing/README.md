@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs: Level 1 campaign 2026-09-23..28, Level 2 final protocol 2026-09-30, Level 3 final protocol 2026-10-03
 
-Measured 2026-09-26T19:11:40Z .. 2026-10-04T04:09:18Z (266 records). 134 + 89 + 43 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 89 + 40 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 266; UNSTABLE 17.
+Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 43 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 94 + 40 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 271; UNSTABLE 17.
 
 - Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5, 2026-09-26/27, GPU 0000:52:00.0); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median); channel_shuffle g2-w255-h255 in phase 7 (2026-09-28)
 - Level 2 protocol: FINAL PROTOCOL (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application (cases/level2_binding.tsv through the launcher's HPCPERF_CPUS_PER_RANK; hipBone PE=4 with pinned OpenMP threads, the other mpirun-launched applications PE=1, direct-exec unbound), 1 whole-process warm-up run discarded from every statistic (its ROI kept as roi.warmup_runs_s), 3 measured clean runs (headline = median), 1 nsys profiled run; no adaptive extension; one input at a time.
@@ -18,7 +18,7 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-04T04:09:18Z (266 records). 134 + 89 + 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
-| 2 | 89 | 0 | 0 | 0 |
+| 2 | 94 | 0 | 0 | 0 |
 | 3 | 35 | 6 | 0 | 2 |
 
 - Level 2: every registered input measured under the final protocol (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application, 1 discarded whole-process warm-up + 3 clean runs (headline = median) + 1 nsys-profiled run, one input at a time.
@@ -27,6 +27,8 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-04T04:09:18Z (266 records). 134 + 89 + 
 - Level 3: every registered input measured under the final protocol (2026-10-03 decision, campaign 2026-10-04): 0 warm-up + 3 clean runs (headline = median, spread &lt;= 10 % or UNSTABLE) + 1 profiled run (QMCPACK unprofiled), each input with its own runtime_config (1 GPU / 1 rank).
 - Level 3 run verification: every clean run's manifest, the launcher's GPU-audit line and the placement records are judged by cases/registry_evidence.yaml (level3); PASS is not 'exit 0'.
 - Level 3 correctness (2026-10-06): 35 PASS / 6 INCOMPLETE / 0 FAIL / 2 none -- executable checks per input with the basis stated; still open with the missing criterion named: CP2K h2o-32 / 128 / 256, nekRS ethier x3 (no tolerance for the plain configuration), Nyx lya-heatcool-32cubed (I_R), SPARTA sphere-1m. No tolerance was invented.
+- PENNANT (Level 2, 2026-10-21): five registered inputs measured under the final protocol on GPU 0000:9D:00.0 (NUMA node 1, cpuset 56-87 of Slurm job 2732030). The first measurements of sedovbig-540sq and sedovflatx4-1920x2160 overlapped with a 32-thread CPU job of the operator in the same cpuset and were set aside (raw-perturbed/, results-perturbed/, logs/campaign.log); both inputs were re-measured in the quiet state. PENNANT's cycle loop is host-latency bound (five kernel launches, five device synchronisations and three symbol copies per cycle), so CPU contention doubles its cycle time.
+- PENNANT correctness: the per-zone profile of every input against a frozen run of upstream's CPU implementation at the same code version (reference/&lt;id&gt;.json, rule 1e-5 relative in populated zones = 30 x the measured CPU/GPU roundoff), plus the stdout quantities; see level2/pennant/README.md.
 
 ### Level 1
 
@@ -239,6 +241,11 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-04T04:09:18Z (266 records). 134 + 89 + 
 | p3_heat3d | n1024-200 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 0.0% | 0.0% | yes | 100% | 200 | 1.00 | PASS | PASS | dd4040b831 |
 | p3_vlp4d | sld10-large | SUCCESS | nvidia-b200.cuda13.2 | 2.31 s | 3 | 0.2% | 0.1% | yes | 99% | 2,445 | 1.00 | PASS | PASS | dd4040b831 |
 | p3_vlp4d | sld10 | SUCCESS | nvidia-b200.cuda13.2 | 728 ms | 3 | 0.0% | 0.0% | yes | 99% | 773 | 1.00 | PASS | PASS | dd4040b831 |
+| pennant | sedovbig-540sq | SUCCESS | nvidia-b200.cuda13.2 | 1.85 s | 3 | 0.4% | 0.2% | yes | 80% | 19,410 | 1.06 | PASS | PASS | 01caa24771 |
+| pennant | sedovflatx4-1920x2160 | SUCCESS | nvidia-b200.cuda13.2 | 63.8 s | 3 | 0.2% | 0.1% | yes | 99% | 62,555 | 1.01 | PASS | PASS | 01caa24771 |
+| pennant | leblancbig-160x1440 | SUCCESS | nvidia-b200.cuda13.2 | 1.53 s | 3 | 3.9% | 2.2% | yes | 77% | 18,875 | 1.08 | PASS | PASS | 01caa24771 |
+| pennant | nohsquare-360sq | SUCCESS | nvidia-b200.cuda13.2 | 2 s | 3 | 5.9% | 3.4% | yes | 72% | 38,385 | 1.19 | PASS | PASS | 01caa24771 |
+| pennant | nohpoly-hex251-6000cycles | SUCCESS | nvidia-b200.cuda13.2 | 1.47 s | 3 | 0.3% | 0.2% | yes | 62% | 30,000 | 1.12 | PASS | PASS | 01caa24771 |
 | quicksilver | p1-profile-8c-100k-20s | SUCCESS | nvidia-b200.cuda13.2 | 7 s | 3 | 1.2% | 0.6% | yes | 59% | 410 | 1.26 | PASS | PASS | dd4040b831 |
 | quicksilver | coral2-p1-1rank | SUCCESS | nvidia-b200.cuda13.2 | 54.5 s | 3 | 6.6% | 3.5% | yes | 41% | 2,085 | 0.91 | PASS | PASS | dd4040b831 |
 | quicksilver | coral2-p2-1rank | SUCCESS | nvidia-b200.cuda13.2 | 145.7 s | 3 | 3.4% | 1.7% | yes | 61% | 11,844 | 1.58 | PASS | PASS | dd4040b831 |
