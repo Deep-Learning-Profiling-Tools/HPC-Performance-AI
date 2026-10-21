@@ -18,8 +18,7 @@ file with the problem set-up and diagnostics, compiled against `libvpic` into it
   repository ships no separate LICENSE file); Kokkos Apache-2.0 WITH LLVM-exception (`provenance/LICENSES.md`).
 - Frozen source bundle (scheme 3, `provenance/source.lock.yaml`): `src/` = the upstream tree with its
   `kokkos/` submodule, no patches (`patch_series.txt` empty, `original_vs_baseline.diff` empty), 1786 entries,
-  `source_tree_sha256 464de895...`, artifact `vpic-hpcperf-l3-v1.tar.zst` (1.8 MB, unpublished until the
-  maintainer publishes it). `tools/prepare_benchmark.sh level3 vpic [--artifact FILE]` materializes it.
+  `source_tree_sha256 464de895...`, artifact `vpic-hpcperf-l3-v1.tar.zst` (1.8 MB, published 2026-10-21 as an asset of the GitHub prerelease `level3-source-hpcperf-l3-v1-ext1` of this repository (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/vpic-hpcperf-l3-v1.tar.zst; anonymous download verified against the lock, `provenance/remote_artifact_verification.yaml`)). `tools/prepare_benchmark.sh level3 vpic [--artifact FILE]` materializes it.
 - `fetch.sh` (freeze time only) clones the pinned commit with the Kokkos submodule into `_upstream/level3/vpic-kokkos`.
 
 ## Build strategy: NATIVE (upstream CMake + the Kokkos submodule)
@@ -191,5 +190,4 @@ their executables on disk (`verify_registry_runs.py`: binary hash mismatch); the
 ## Source distribution
 
 Scheme 3 (`level3/EXTERNAL_ARTIFACT_DESIGN.md`): `provenance/source.lock.yaml` (schema hpcperf-source-lock-2),
-artifact `vpic-hpcperf-l3-v1.tar.zst` in the maintainer's local staging, `publish_status: unpublished` until
-published by the user. LOC: `provenance/LOC.md`.
+artifact `vpic-hpcperf-l3-v1.tar.zst` published 2026-10-21 as an asset of the GitHub prerelease `level3-source-hpcperf-l3-v1-ext1` of this repository (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/vpic-hpcperf-l3-v1.tar.zst; anonymous download verified against the lock, `provenance/remote_artifact_verification.yaml`); `publish_status: published`. LOC: `provenance/LOC.md`.
