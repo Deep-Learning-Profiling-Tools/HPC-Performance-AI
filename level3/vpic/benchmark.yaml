@@ -39,7 +39,11 @@ references:
 - src/test/integrated/legacy/cyclo.deck
 - src/test/integrated/legacy/inbndj.deck
 - src/test/integrated/legacy/interpe.deck
-- reference/*.json (frozen energies histories, inputs.yaml)
+- reference/harris-256sq.json
+- reference/harris-512sq.json
+- reference/harris-1024sq.json
+- reference/weibel-1d-131072.json
+- reference/shortpulse-2d-500sq.json
 upstream_version: devel
 redistribution_status: cleared
 suite_status: retained
