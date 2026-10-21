@@ -44,8 +44,10 @@ inherit `-march=nocona` and the conda rpaths through CMake.
 
 None in the frozen source. The registered decks under `decks/` are this benchmark's files, derived from
 upstream's `sample/harris`, `test/integrated/energy_comparison/weibel.deck` and `sample/short_pulse.cxx` as
-`inputs.yaml` states for each (resolution / cell count, dump intervals, and for the short pulse the rank
-topology); the physics, units, boundary conditions, particle loading and step-count rules are upstream's.
+`inputs.yaml` states for each (resolution / cell count, dump intervals, for the Weibel deck the box length
+scaled with the cell count so that the cell size and the physical duration of its 700 steps stay upstream's,
+and for the short pulse the rank topology); the physics, units, boundary conditions, particle loading and
+step-count rules are upstream's.
 
 ## Execution model
 
@@ -64,7 +66,7 @@ the executable and its sha256, num_step, grid and particle counts.
 | harris-256sq | Harris-sheet magnetic reconnection (sample/harris), nx = ny = 256 | 256 x 256 x 1 | 4.2 M | 1939 | 5.35 s | CPU (Kokkos OpenMP) run of the same deck |
 | harris-512sq (default) | same, 512 | 512 x 512 x 1 | 16.8 M | 3878 | 28.2 s | CPU run of the same deck |
 | harris-1024sq | same, 1024 | 1024 x 1024 x 1 | 67.1 M | 7757 | 190.8 s | this build's own frozen run (no CPU run of this size) |
-| weibel-1d-131072 | Weibel instability of the energy_comparison test deck, 131072 cells | 131072 x 1 x 1 | 52.4 M | 700 | 10.1 s | CPU run of the same deck |
+| weibel-1d-131072 | counter-streaming (Weibel / two-stream) instability of the energy_comparison test deck, 131072 cells, box scaled with the cell count (upstream's cell size and physical duration) | 131072 x 1 x 1 | 52.4 M | 700 | RESULTS | CPU run of the same deck |
 | shortpulse-2d-500sq | 2-D laser-plasma short pulse (sample/short_pulse.cxx, RUN3D = 0), one rank | 500 x 1 x 500 | 6.7 M (slab) | 8652 | 60.7 s | CPU run of the same deck |
 
 The upstream decks as shipped (32^2 Harris with dumps every status interval, the 16-cell Weibel test) run in
@@ -118,9 +120,16 @@ and checks total-energy conservation:
 - References: harris-256sq, harris-512sq, weibel-1d-131072, shortpulse-2d-500sq from the Kokkos OpenMP
   (CPU) build of the same frozen source (independent realisation; `provenance.binary`); harris-1024sq from
   this unmodified CUDA build's own run (a CPU run of 67 M particles x 7757 steps is ~10 h; self-baseline of
-  the unoptimized implementation, stated as such). For the short pulse the laser injects energy through the
-  boundary (open system), so its reference is frozen with `drift_tol none`: the conservation term is not
-  applied (the observed drift is recorded) and the injected energy is itself compared column by column.
+  the unoptimized implementation, stated as such).
+- The short pulse is reproducible only statistically: the laser-plasma interaction amplifies the
+  non-deterministic particle reductions, and five realisations of the unmodified source (the CPU build and
+  four runs of this CUDA build, same deck and loading) differ per column by up to 15 % and in the energy
+  sums by up to 10 % (total), 11 % (particles), 12 % (fields) over the run (1e-3 at step 500, growing with
+  the interaction). A per-column rule has no basis there, so its reference is frozen in the checker's
+  `groups` mode: at every sampled step the sums total / particles / fields within 0.35 relative (3 x the
+  largest observed sum deviation), no per-column and no conservation bound (open system: the laser injects
+  energy). This is a coarse check by construction -- it distinguishes a wrong field solve, push or
+  injection (order-1 changes) from a correct realisation, not two correct roundings.
 - Three separate results per input: timing SUCCESS (the `*** Done` record of a clean run), workload
   verification PASS (`verify_registry_runs.py`: the manifest's deck sha256 = the registered deck, the
   executable's hash, the `Run Details` num_step / grid / particle counts and the launcher audit) and
@@ -129,7 +138,32 @@ and checks total-energy conservation:
 
 ## Results on dgx003 (B200, CUDA 13.2.78)
 
-RESULTS_PLACEHOLDER
+Campaign `l3-ext-2026-10-20` (2026-10-21 01:27-01:55 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
+Level 3 protocol: 0 warm-up + 3 clean + 1 nsys-profiled run per input, headline = median of the application
+timer, spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock locking, strictly serial;
+`docs/timing/index.html` has the current rows):
+
+| input | timer median (s) | min / max (s) | spread | stable | profiled run (s) | run verification | correctness |
+|---|---|---|---|---|---|---|---|
+| harris-256sq | 5.346 | 5.331 / 5.918 | 11.0 % | RESULTS_STAB_256 | 6.409 | PASS | RESULTS_CORR_256 |
+| harris-512sq (default) | 28.157 | 28.150 / 28.316 | 0.6 % | yes | 30.311 | PASS | RESULTS_CORR_512 |
+| harris-1024sq | 190.838 | 190.581 / 190.917 | 0.2 % | yes | 194.971 | PASS | RESULTS_CORR_1024 |
+| weibel-1d-131072 | 10.103 | 10.097 / 10.168 | 0.7 % | yes | 10.492 | PASS | RESULTS_CORR_WEIBEL |
+| shortpulse-2d-500sq | 60.678 | 60.607 / 60.684 | 0.1 % | yes | 66.152 | PASS | RESULTS_CORR_SHORTPULSE |
+
+- Timing SUCCESS for all five (`*** Done` of every clean run; `verify_registry_runs.py` PASS 5/5: manifest deck
+  sha256 = the registered deck, the executable's hash, `Run Details` num_step / grid / particle counts, the
+  launcher audit `1 verified, 0 mismatch`). RESULTS_STAB_NOTE
+- The profiled run (nsys, CUDA trace) is 2-20 % slower than the clean median (harris-256sq 20 %: the shortest
+  run, launch-bound); its device picture is the whole-process one (no NVTX range in VPIC).
+- Correctness (`check_energies.py` against the frozen references, `run_checks.sh vpic` = one fresh run of each
+  registered deck in `run.check.<id>`, then `hpcperf_inputs.py verdict`): RESULTS_CORR_NOTE
+- References: harris-256sq from the Kokkos OpenMP build (`vpic-cpu`, 563 s), harris-1024sq from this CUDA
+  build's own `run.reference` run (660.7 s under a CPU-loaded node: the loop is host-latency sensitive; a
+  reference's value does not depend on its speed); RESULTS_REF_NOTE. Tolerance usage of the campaign's own
+  four runs against the frozen references: harris-256sq up to 21.5 % of the rule (the profiled run's ion
+  column, 2.2e-6 relative), harris-1024sq 5.4 % -- all PASS.
+
 
 ## Limitations
 

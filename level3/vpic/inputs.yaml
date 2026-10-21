@@ -154,9 +154,12 @@ inputs:
       kind: derived
       upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: test/integrated/energy_comparison/weibel.deck}
       derivation: >-
-        the energy_comparison test deck with nx = 131072 cells (upstream 16; the deck's 1-D periodic box, 200
-        macro-particles per cell of each species, 700 steps, counter-streaming drift, no dumps) and energies every
-        10 steps (upstream: every step). 2 lines differ from the upstream deck.
+        the energy_comparison test deck with nx = 131072 cells (upstream 16) and the box length scaled with the
+        cell count (Lx = 2.0944 de x 131072/16, so the cell size 0.131 de, the Courant time step and the physical
+        duration of the 700 steps are upstream's -- with upstream's fixed box the cells would be 1e-4 Debye lengths
+        and the 700 steps 0.01 plasma periods, nothing evolving); 200 macro-particles per cell of each species,
+        counter-streaming drift, no dumps, energies every 10 steps (upstream: every step). 3 lines differ from the
+        upstream deck.
     params: {deck: decks/weibel-1d-131072.cxx, nx: 131072, ny: 1, nz: 1, grid: 131072x1x1, nppc: 200, particles: 52428800, num_step: 700, energies_interval: 10, energies_file: energies, reference: reference/weibel-1d-131072.json}
     files: [decks/weibel-1d-131072.cxx]
     runtime_config: {gpus: 1, ranks: 1}
@@ -199,9 +202,10 @@ inputs:
       fail_regex: '^FAIL: VPIC energies check'
       basis: >-
         the energies history against a frozen CPU (Kokkos OpenMP) run of the same deck
-        (reference/shortpulse-2d-500sq.json), per-column rule as the other inputs; the laser injects energy through
-        the boundary (open system), so the reference is frozen with drift_tol none: the conservation term is not
-        applied and the injected energy is itself compared column by column
+        (reference/shortpulse-2d-500sq.json) in the checker's statistical `groups` mode: the sums total / particles /
+        fields at every sampled step within 0.35 relative = 3 x the largest deviation observed among five realisations
+        of the unmodified source (CPU + 4 CUDA runs: 10 % total, 11 % particles, 12 % fields; per column up to 15 %),
+        no per-column and no conservation bound (open system: the laser injects energy) -- a coarse check (README)
       covers: all
       timeout: 3600
     notes: particles = the two species' initial counts (3,333,823 each, the slab); the laser enters through the -x boundary.

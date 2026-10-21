@@ -74,7 +74,7 @@ begin_initialization {
   double topology_x = nproc();  // Number of domains in x, y, and z
   double topology_y = 1;
   double topology_z = 1;  // For load balance, best to keep "1" or "2" for Harris sheet
-  double Lx        = 2.09439510239320; //4.62*de; //6.7*de; //10.0*de;  // How big should the box be in the x direction
+  double Lx        = 2.09439510239320*(131072.0/16.0); // HPC-Performance-AI: upstream's 2.09439510239320 is the 16-cell box; scaled with nx so that dx (0.131 de), dt and the physical time of the 700 steps stay upstream's
   double Ly        = 1; //0.0721875*de;  // How big should the box be in the y direction
   double Lz        = 1; //0.0721875*de;  // How big should the box be in the z direction
   double nx        = 131072;

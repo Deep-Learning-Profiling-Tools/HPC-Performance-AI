@@ -21,6 +21,10 @@ leapfrog / Yee / Esirkepov scheme conserves only approximately (no exact invaria
     the boundary injects energy) records the observed drift and skips this term: its energy history is then
     bounded only by the column-wise comparison above.
 
+A statistically reproducible input (the laser-driven short pulse: two correct realisations differ by ~10 % per
+column) is frozen with --groups-rel instead: the sums total / particles / fields at every sampled step within
+that relative tolerance (rule mode 'groups'), no per-column or conservation bound.
+
 The tolerances are recorded in the reference at freeze time from the stated basis (the input's README: the
 deviation between two correct realisations of the same deck -- the Kokkos OpenMP build vs this CUDA build --
 or, where no independent run of that size exists, the print precision and the measured drift of the unmodified
@@ -65,8 +69,41 @@ def drift_of(rows):
     return max(abs(sum(r[1:]) - e0) / abs(e0) for r in rows) if e0 != 0 else float("inf")
 
 
+def compare_groups(cols, rows, ref):
+    """Statistical inputs (rule mode 'groups'): the sums of column groups -- total, particles, fields -- at every
+    sampled step within group_rel relative of the reference. Used where single columns of two correct realisations
+    differ at the 10 % level (the laser-driven short pulse) and a per-column rule has no basis."""
+    rule = ref["rule"]; grel = float(rule["group_rel"]); groups = rule["groups"]
+    lines, ok = [], True
+    if cols != ref["columns"]:
+        return False, [f"  layout {cols} != reference {ref['columns']}: BAD"]
+    rrows = {int(r[0]): r for r in ref["rows"]}
+    if [r[0] for r in rows] != [int(r[0]) for r in ref["rows"]]:
+        return False, [f"  sampled steps ({len(rows)}) != reference ({len(rrows)}): BAD"]
+    idx = {c: i for i, c in enumerate(cols)}
+    for name, members in groups.items():
+        cols_g = cols[1:] if members == "all" else members
+        worst = 0.0; bad = 0; first = None
+        for r in rows:
+            rr = rrows[r[0]]
+            a = sum(r[idx[c]] for c in cols_g); b = sum(rr[idx[c]] for c in cols_g)
+            d = abs(a - b) / abs(b) if b != 0 else (0.0 if a == 0 else float("inf"))
+            worst = max(worst, d)
+            if d > grel:
+                bad += 1; first = first or (r[0], a, b)
+        good = bad == 0; ok &= good
+        lines.append(f"  group {name} ({'all columns' if members == 'all' else '+'.join(members)}): worst relative deviation {worst:.3e} (tol {grel:.2f}) violations={bad}"
+                     + (f" first at step {first[0]}: run {first[1]:.6e} ref {first[2]:.6e}" if first else "") + (" ok" if good else " BAD"))
+    e0 = sum(rows[0][1:]); drift = drift_of(rows)
+    lines.append(f"  conservation: not applied (rule mode groups, open system); E_total(0)={e0:.6e}, max |E_total(step) - E_total(0)| / E_total(0) = {drift:.3e} (reference run: {ref['provenance'].get('observed_drift', float('nan')):.3e})")
+    return ok, lines
+
+
 def compare(cols, rows, ref):
-    rule = ref["rule"]; rel_tol, floor = float(rule["rel_tol"]), float(rule["floor"])
+    rule = ref["rule"]
+    if rule.get("mode") == "groups":
+        return compare_groups(cols, rows, ref)
+    rel_tol, floor = float(rule["rel_tol"]), float(rule["floor"])
     drift_tol = None if rule["drift_tol"] is None else float(rule["drift_tol"])
     lines, ok = [], True
     if cols != ref["columns"]:
@@ -109,6 +146,7 @@ def main():
     ap.add_argument("--rel-tol", type=float); ap.add_argument("--floor", type=float)
     ap.add_argument("--drift-tol", type=lambda v: None if v == "none" else float(v), help="closed-system bound, or 'none' (open system: recorded, not checked)")
     ap.add_argument("--basis", default="")
+    ap.add_argument("--groups-rel", type=float, help="rule mode 'groups' instead of per-column: total / particles / fields sums within this relative tolerance")
     a = ap.parse_args()
     label = a.label or os.path.basename(a.run)
     try:
@@ -116,7 +154,9 @@ def main():
     except (OSError, ValueError) as ex:
         print(f"FAIL: VPIC energies check ({label}): cannot read the run's energies file: {ex}"); return 1
     if a.make_reference:
-        if not (a.out and a.deck and a.log and a.rel_tol is not None and "--drift-tol" in sys.argv and a.floor is not None):
+        if a.groups_rel is not None and not (a.out and a.deck and a.log):
+            print("usage: --make-reference --groups-rel needs --out --deck --log", file=sys.stderr); return 2
+        if a.groups_rel is None and not (a.out and a.deck and a.log and a.rel_tol is not None and "--drift-tol" in sys.argv and a.floor is not None):
             print("usage: --make-reference needs --out --deck --log --rel-tol --floor --drift-tol", file=sys.stderr); return 2
         if os.path.exists(a.out):
             print(f"refusing to overwrite the existing reference {a.out}", file=sys.stderr); return 2
@@ -125,14 +165,18 @@ def main():
                "provenance": {"made_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "deck": os.path.basename(a.deck), "deck_sha256": sha256(a.deck),
                               "energies_sha256": sha256(a.run), "log": os.path.basename(a.log), "log_sha256": sha256(a.log), "binary": a.binary,
                               "host": os.uname().nodename, "note": a.note, "observed_drift": drift},
-               "rule": {"rel_tol": a.rel_tol, "floor": a.floor, "drift_tol": a.drift_tol, "basis": a.basis,
+               "rule": ({"mode": "groups", "group_rel": a.groups_rel, "basis": a.basis,
+                         "groups": {"total": "all", "particles": [c for c in cols[1:] if c not in ("ex", "ey", "ez", "bx", "by", "bz")], "fields": [c for c in cols[1:] if c in ("ex", "ey", "ez", "bx", "by", "bz")]},
+                         "text": "at every sampled step the sums total / particles / fields within group_rel relative of the reference; no per-column or conservation bound (statistical input)"}
+                        if a.groups_rel is not None else
+                        {"rel_tol": a.rel_tol, "floor": a.floor, "drift_tol": a.drift_tol, "basis": a.basis,
                         "text": "at every sampled step every column: |run - ref| <= max(rel_tol * |ref|, floor * E_total(ref row)); "
-                                + ("|E_total(step) - E_total(0)| / E_total(0) <= drift_tol" if a.drift_tol is not None else "open system: no conservation bound (observed drift recorded in provenance)")},
+                                + ("|E_total(step) - E_total(0)| / E_total(0) <= drift_tol" if a.drift_tol is not None else "open system: no conservation bound (observed drift recorded in provenance)")}),
                "columns": cols, "rows": rows}
         os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
         with open(a.out, "w") as f:
             json.dump(ref, f, indent=1)
-        print(f"reference written: {a.out} ({len(rows)} rows x {len(cols) - 1} columns, rel_tol {a.rel_tol:.1e}, floor {a.floor:.1e}, drift_tol {a.drift_tol}, observed drift {drift:.3e})")
+        print(f"reference written: {a.out} ({len(rows)} rows x {len(cols) - 1} columns, " + (f"groups rule rel {a.groups_rel:.2f}" if a.groups_rel is not None else f"rel_tol {a.rel_tol:.1e}, floor {a.floor:.1e}, drift_tol {a.drift_tol}") + f", observed drift {drift:.3e})")
         return 0
     if not a.reference:
         print("usage: --reference is required for a check", file=sys.stderr); return 2
