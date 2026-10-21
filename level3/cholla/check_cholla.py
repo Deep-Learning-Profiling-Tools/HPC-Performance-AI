@@ -30,7 +30,7 @@ time equals the parameter file's tout (relative 1e-9: a run that stopped early i
              gamma = 5/3): the analytic post-shock state is density 64 inside the shock radius t/3 and the
              pre-shock density (1 + t/r)^2 outside. The mean density of the cells inside 0.8 x t/3 must be within
              noh_tol of 64 (default 0.10: the wall-heating dip of second-order Godunov codes is ~5 % of the plateau,
-             Stone et al. 2008, Athena test 11; GIZMO's upstream Noh test accepts 15 %) and the mean relative error
+             Stone et al. 2008, Athena test 11; the Noh tests of other hydrodynamics codes accept 15 %) and the mean relative error
              of the density in the shell 0.80 <= r <= 0.95 (pre-shock, inside the unit cube) is reported.
   blast      the spherical over-pressure blast in a periodic box (init=Spherical_Overpressure_3D): no analytic
              solution; the conservative scheme must conserve total mass, momentum and energy between the initial

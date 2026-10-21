@@ -56,11 +56,11 @@ parameter file's hash, the problem (`init`), grid and `tout`, the executable's h
 
 | id | problem (upstream file) | grid | cells | tout | steps | timed loop (B200, campaign median) | correctness |
 |---|---|---|---|---|---|---|---|
-| sod-256 (default) | Sod shock tube, planar along x (`examples/3D/sod256.txt` as shipped) | 256^3 | 16.8 M | 0.2 | 402 | RESULTS | exact Riemann solution (L1 rule) + frozen digest |
-| sod-512 | the same at 512^3 (derived: nx = ny = nz = 512) | 512^3 | 134 M | 0.2 | 806 | RESULTS | exact Riemann solution (L1 rule) + frozen digest |
-| sound-wave-512 | linear sound wave, A = 1e-4, one period (derived from `examples/3D/sound_wave.txt`: 512^3, tout 1.0) | 512^3 | 134 M | 1.0 | 427 | RESULTS | analytic sine, 0.1 A (upstream's one-period linear-wave rule) + frozen digest |
-| noh-200 | Noh implosion (`examples/3D/Noh_3D.txt`; outstep 0.01 -> 2.0: only the final snapshot) | 200^3 | 8.0 M | 2.0 | 1709 | RESULTS | analytic post-shock density 64 within 10 % + frozen digest |
-| blast-256 | spherical over-pressure blast, periodic box (`examples/3D/Spherical_Overpressure.txt`; outstep 0.01 -> 0.1) | 256^3 | 16.8 M | 0.1 | 570 | RESULTS | conservation of mass / momentum / energy (1e-9) + frozen digest |
+| sod-256 (default) | Sod shock tube, planar along x (`examples/3D/sod256.txt` as shipped) | 256^3 | 16.8 M | 0.2 | 402 | 7.32 s | exact Riemann solution (L1 rule) + frozen digest |
+| sod-512 | the same at 512^3 (derived: nx = ny = nz = 512) | 512^3 | 134 M | 0.2 | 806 | 111.9 s | exact Riemann solution (L1 rule) + frozen digest |
+| sound-wave-512 | linear sound wave, A = 1e-4, one period (derived from `examples/3D/sound_wave.txt`: 512^3, tout 1.0) | 512^3 | 134 M | 1.0 | 427 | 46.1 s | analytic sine, 0.1 A (upstream's one-period linear-wave rule) + frozen digest |
+| noh-200 | Noh implosion (`examples/3D/Noh_3D.txt`; outstep 0.01 -> 2.0: only the final snapshot) | 200^3 | 8.0 M | 2.0 | 1709 | 11.0 s | analytic post-shock density 64 within 10 % + frozen digest |
+| blast-256 | spherical over-pressure blast, periodic box (`examples/3D/Spherical_Overpressure.txt`; outstep 0.01 -> 0.1) | 256^3 | 16.8 M | 0.1 | 570 | 9.68 s | conservation of mass / momentum / energy (1e-9) + frozen digest |
 
 `sod-256` is upstream's `examples/3D/sod256.txt` as shipped (its `outdir=./` line removed: `run.sh` supplies `outdir`);
 the other four are derived from upstream's examples as stated per input in `inputs.yaml` (`source.derivation`): the grid
@@ -115,8 +115,8 @@ dumps + numpy; no h5py) and asserts first that its time equals `tout`, then:
   wavelength), L1 lower. The transverse momenta are not checked (not part of the eigenvector; upstream does not either).
 - `noh-200`: the analytic Noh solution at t = 2 (gamma = 5/3, 3-D): the mean density of the cells inside 0.8 x the shock
   radius t/3 within 10 % of the post-shock value 64; measured 62.77 (deviation 1.9 %; the wall-heating dip at the centre
-  of second-order Godunov codes is ~5 % of the plateau, Stone et al. 2008 test 11; GIZMO's upstream Noh test accepts
-  15 %). The pre-shock profile (1 + t/r)^2 in the shell 0.80 <= r <= 0.95 is reported (measured mean relative error
+  of second-order Godunov codes is ~5 % of the plateau, Stone et al. 2008 test 11; the Noh tests of other
+  hydrodynamics codes accept 15 %). The pre-shock profile (1 + t/r)^2 in the shell 0.80 <= r <= 0.95 is reported (measured mean relative error
   1.0e-3).
 - `blast-256`: no analytic solution for a finite over-pressure region; the conservative scheme in the periodic box must
   conserve the total mass, momentum and energy between the initial and the final output to 1e-9 relative (the momenta
@@ -129,7 +129,32 @@ dumps + numpy; no h5py) and asserts first that its time equals `tout`, then:
 
 ## Results on dgx003 (B200, CUDA 13.2.78)
 
-RESULTS_PLACEHOLDER
+Campaign `l3-ext-2026-10-20` (2026-10-21 14:23-14:48 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
+Level 3 protocol: 0 warm-up + 3 clean + 1 nsys-profiled run per input, headline = median of the application timer,
+spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock locking, strictly serial;
+`docs/timing/index.html` has the current rows):
+
+| input | timer median (s) | min / max (s) | spread | stable | profiled run (s) | device busy (nsys, whole process) | run verification | correctness |
+|---|---|---|---|---|---|---|---|---|
+| sod-256 (default) | 7.317 | 7.317 / 7.320 | 0.04 % | yes | 7.322 | 36 % | PASS | PASS (L1 = the frozen values; digest 0) |
+| sod-512 | 111.916 | 111.914 / 111.916 | 0.00 % | yes | 111.919 | 72 % | PASS | PASS (L1 = the frozen values; digest 0) |
+| sound-wave-512 | 46.120 | 46.119 / 46.121 | 0.00 % | yes | 46.124 | 50 % | PASS | PASS (max error 0.101 of the 0.1 A rule; digest 0) |
+| noh-200 | 10.963 | 10.962 / 10.963 | 0.01 % | yes | 11.025 | 49 % | PASS | PASS (62.77 vs 64, 1.9 % of the 10 % rule; digest 0) |
+| blast-256 | 9.684 | 9.683 / 9.684 | 0.01 % | yes | 9.692 | 42 % | PASS | PASS (conservation 6e-20 of 1e-9; digest 0) |
+
+- Timing SUCCESS for all five (the per-step lines of every clean run; `verify_registry_runs.py` PASS 5/5: the manifest's
+  parameter-file hash, problem, grid and tout, the parameter banner, the registered step count, the final snapshot, the
+  launcher audit `1 verified, 0 mismatch`). The runs are reproducible to 0.04 % or better: the loop is kernel-bound and
+  the step sequence deterministic.
+- The nsys-profiled run (CUDA trace) is within 0.6 % of the clean median for every input: the kernels are large and few
+  per step (Cholla launches a handful of grid-wide kernels per step), so tracing costs nothing measurable. The
+  "device busy" fraction is nsys's kernel-active share of the whole process (initialization and the two HDF5 writes
+  included); within the loop the device is busier.
+- Correctness (`run_checks.sh cholla` = one fresh run of every input in `run.check.<id>`, then `check_cholla.py` and
+  `hpcperf_inputs.py verdict`; 2026-10-21 14:48-14:54 UTC): all five PASS. The digests of the check runs equal the
+  frozen references exactly (deviation 0: deterministic), the Sod L1 errors equal the frozen values, the sound wave is
+  at 0.101 of its rule (1.0 % of the amplitude after one period, the discretization error of PLMC at 512 cells per
+  wavelength), the Noh plateau 62.77 (1.9 % below 64), the blast's conserved totals change by 6e-20.
 
 ## Limitations
 

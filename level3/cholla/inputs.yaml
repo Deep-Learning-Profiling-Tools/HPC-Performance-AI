@@ -173,7 +173,7 @@ inputs:
       pass_regex: '^PASS: Cholla check'
       fail_regex: '^FAIL: Cholla check'
       basis: >-
-        the analytic Noh solution at t = 2 (Noh 1987; gamma = 5/3, 3-D): the mean density of the cells inside 0.8 x the shock radius t/3 within 10 % of the post-shock value 64 (second-order Godunov codes show a ~5 % wall-heating dip at the centre, Stone et al. 2008 test 11; GIZMO's upstream Noh test accepts 15 %), the pre-shock profile (1 + t/r)^2 in the shell 0.80 <= r <= 0.95 reported; plus the frozen self-baseline digest; the final output time must equal tout
+        the analytic Noh solution at t = 2 (Noh 1987; gamma = 5/3, 3-D): the mean density of the cells inside 0.8 x the shock radius t/3 within 10 % of the post-shock value 64 (second-order Godunov codes show a ~5 % wall-heating dip at the centre, Stone et al. 2008 test 11; the Noh tests of other hydrodynamics codes accept 15 %), the pre-shock profile (1 + t/r)^2 in the shell 0.80 <= r <= 0.95 reported; plus the frozen self-baseline digest; the final output time must equal tout
       covers: all
       timeout: 1800
     notes: "the 200^3 Noh implosion (derived only in the output cadence, see source.derivation)"
