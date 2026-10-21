@@ -1,0 +1,216 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: picongpu
+  level: 3
+  application: PIConGPU
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/ComputationalRadiationPhysics/picongpu.git
+  tag: dev
+  commit: 93cba5b61b628659a6ec8181f5e2dd28b8006f29
+artifact:
+  filename: picongpu-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 160232498
+  sha256: d243d831a44ec7c845464839594de73d6eeb55e7c5b63080a00ae0c74a03d91f
+  source_tree_sha256: 70d87f93d3a6fd7bf5625a3dbea3dd301e0a4572fcf2e8f5d4328575eab7454a
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.7
+  uncompressed_size: 185825989
+  tar_entries: 4482
+  file_count: 3634
+  symlink_count: 0
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 70d87f93d3a6fd7bf5625a3dbea3dd301e0a4572fcf2e8f5d4328575eab7454a
+  algorithm: hpcperf-tree-1
+  entries: 3634
+  layout:
+  - src/
+  - deps/
+patches: []
+dependencies:
+  bundled:
+  - path: thirdParty/alpaka
+    project: alpaka
+    license: MPL-2.0
+    component: src
+  - path: thirdParty/mallocMC
+    project: mallocMC
+    license: MIT
+    component: src
+  - path: thirdParty/nlohmann_json
+    project: nlohmann/json
+    license: MIT
+    component: src
+  - path: thirdParty/toml11
+    project: toml11
+    license: MIT
+    component: src
+  - path: thirdParty/cmake-modules
+    project: CMake modules (ComputationalRadiationPhysics)
+    license: see thirdParty/cmake-modules
+    component: src
+  - path: thirdParty/cuda_memtest
+    project: cuda_memtest
+    license: see thirdParty/cuda_memtest (not built here)
+    component: src
+  benchmark_specific:
+  - path: deps/boost_1_86_0.tar.gz
+    project: Boost 1.86.0 (program_options + headers; the conda environment ships no Boost)
+    version: 1.86.0
+    url: https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz
+    commit: null
+    sha256: 2575e74ffc3ef1cd0babac2c1ee8bdb5782a0ee672b1912da40e5b4b591ca01f
+    license: null
+  - path: deps/gsl-2.8.tar.gz
+    project: GNU Scientific Library 2.8 (the conda environment ships none)
+    version: 2.8
+    url: https://ftp.gnu.org/gnu/gsl/gsl-2.8.tar.gz
+    commit: null
+    sha256: 6a99eeed15632c6354895b1dd542ed5a855c0f15d9ad1326c6fe2b2c9e423190
+    license: null
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (CUDA host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: CMake / Ninja
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/ComputationalRadiationPhysics/picongpu.git
+  ref: dev
+  commit: 93cba5b61b628659a6ec8181f5e2dd28b8006f29
+  sha256: null
+  checkout: _upstream/level3/picongpu
+  submodules: []
+  excluded:
+  - path: thirdParty/catch2
+    reason: git submodule of the unit tests, not checked out and not built
+  - path: docs
+    reason: documentation (sphinx sources, images); not built
+  license:
+    spdx: GPL-3.0-or-later
+    files:
+    - LICENSE.md
+    - COPYING
+    - COPYING.LESSER
+- dest: deps/boost_1_86_0.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz
+  ref: null
+  commit: null
+  sha256: 2575e74ffc3ef1cd0babac2c1ee8bdb5782a0ee672b1912da40e5b4b591ca01f
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+- dest: deps/gsl-2.8.tar.gz
+  kind: file
+  category: benchmark_specific
+  url: https://ftp.gnu.org/gnu/gsl/gsl-2.8.tar.gz
+  ref: null
+  commit: null
+  sha256: 6a99eeed15632c6354895b1dd542ed5a855c0f15d9ad1326c6fe2b2c9e423190
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/picongpu
+  status: EQUIVALENT
+  summary:
+    identical: 3632
+    expected_patch_difference: 0
+    expected_generated_difference: 0
+    expected_normalization_excluded: 308
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 3632
+    validated_entries_considered: 3940
+licenses:
+- path: src
+  project: PIConGPU (main simulation, buildsystem, etc, include/picongpu, share, src/tools)
+  license: GPL-3.0-or-later (LICENSE.md, COPYING)
+  url: https://github.com/ComputationalRadiationPhysics/picongpu
+  commit: 93cba5b61b628659a6ec8181f5e2dd28b8006f29
+- path: src/include/pmacc
+  project: PMacc (PIConGPU's parallel library)
+  license: LGPL-3.0-or-later (LICENSE.md, COPYING.LESSER)
+- path: src/thirdParty
+  project: alpaka (MPL-2.0), mallocMC (MIT), nlohmann/json (MIT), toml11 (MIT), cmake-modules, cuda_memtest
+  license: per thirdParty/<name>/LICENSE
+- path: deps/boost_1_86_0.tar.gz
+  project: Boost
+  license: BSL-1.0
+  version: 1.86.0
+- path: deps/gsl-2.8.tar.gz
+  project: GNU Scientific Library
+  license: GPL-3.0-or-later
+  version: 2.8
+license_notes:
+- PIConGPU is GPLv3+ (PMacc LGPLv3+); the unmodified source with its bundled third-party libraries is redistributed as a source
+  bundle (no patches).
+- Boost and GSL are redistributed as their unmodified upstream release tarballs (BSL-1.0 / GPLv3+) because the conda environment
+  ships neither; build.sh builds them under .deps/level3/picongpu/<profile>/install.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/include/picongpu/*
+  - src/include/pmacc/*
+  - src/src/*
+  - src/buildsystem/*
+  - src/bin/*
+  - src/etc/*
+  - src/lib/*
+  bundled:
+  - src/thirdParty/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/test/*
+  - src/share/picongpu/tests/*
+  exclude:
+  - src/docs/*
+  - src/share/picongpu/examples/*
+  - src/share/picongpu/pypicongpu/*
+  - src/share/picongpu/benchmarks/*
+scan_allow: []
+freeze:
+  tool_version: freeze-2.0
+  timestamp: '2026-10-21T03:33:37Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)

@@ -1,0 +1,126 @@
+schema: hpcperf-freeze-spec-1
+name: picongpu
+level: 3
+application: PIConGPU
+benchmark_source_version: hpcperf-l3-v1
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/picongpu
+  url: https://github.com/ComputationalRadiationPhysics/picongpu.git
+  ref: dev
+  commit: 93cba5b61b628659a6ec8181f5e2dd28b8006f29
+  note: the dev branch (0.9.0-dev, 2026-10-20); the last release tag 0.8.0 predates the alpaka/CUDA 13 support, so the identity is this commit
+  submodules: []
+  exclude:
+  - path: thirdParty/catch2
+    reason: git submodule of the unit tests, not checked out and not built
+  - path: docs
+    reason: documentation (sphinx sources, images); not built
+  patches: []
+  license:
+    spdx: GPL-3.0-or-later
+    files:
+    - LICENSE.md
+    - COPYING
+    - COPYING.LESSER
+  bundled:
+  - path: thirdParty/alpaka
+    project: alpaka
+    license: MPL-2.0
+  - path: thirdParty/mallocMC
+    project: mallocMC
+    license: MIT
+  - path: thirdParty/nlohmann_json
+    project: nlohmann/json
+    license: MIT
+  - path: thirdParty/toml11
+    project: toml11
+    license: MIT
+  - path: thirdParty/cmake-modules
+    project: CMake modules (ComputationalRadiationPhysics)
+    license: see thirdParty/cmake-modules
+  - path: thirdParty/cuda_memtest
+    project: cuda_memtest
+    license: see thirdParty/cuda_memtest (not built here)
+- dest: deps/boost_1_86_0.tar.gz
+  category: benchmark_specific
+  kind: file
+  url: https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz
+  sha256: 2575e74ffc3ef1cd0babac2c1ee8bdb5782a0ee672b1912da40e5b4b591ca01f
+  project: Boost 1.86.0 (program_options + headers; the conda environment ships no Boost)
+  version: 1.86.0
+- dest: deps/gsl-2.8.tar.gz
+  category: benchmark_specific
+  kind: file
+  url: https://ftp.gnu.org/gnu/gsl/gsl-2.8.tar.gz
+  sha256: 6a99eeed15632c6354895b1dd542ed5a855c0f15d9ad1326c6fe2b2c9e423190
+  project: GNU Scientific Library 2.8 (the conda environment ships none)
+  version: 2.8
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC (CUDA host compiler)
+  version: 13.3.0
+  provided_by: .conda_env
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: CMake / Ninja
+  provided_by: .conda_env
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/picongpu
+  ignore:
+  - .git/*
+  - '*/.git'
+  - '*/.git/*'
+  excluded:
+  - thirdParty/catch2/*
+  - docs/*
+licenses:
+- path: src
+  project: PIConGPU (main simulation, buildsystem, etc, include/picongpu, share, src/tools)
+  license: GPL-3.0-or-later (LICENSE.md, COPYING)
+  url: https://github.com/ComputationalRadiationPhysics/picongpu
+  commit: 93cba5b61b628659a6ec8181f5e2dd28b8006f29
+- path: src/include/pmacc
+  project: PMacc (PIConGPU's parallel library)
+  license: LGPL-3.0-or-later (LICENSE.md, COPYING.LESSER)
+- path: src/thirdParty
+  project: alpaka (MPL-2.0), mallocMC (MIT), nlohmann/json (MIT), toml11 (MIT), cmake-modules, cuda_memtest
+  license: per thirdParty/<name>/LICENSE
+- path: deps/boost_1_86_0.tar.gz
+  project: Boost
+  license: BSL-1.0
+  version: 1.86.0
+- path: deps/gsl-2.8.tar.gz
+  project: GNU Scientific Library
+  license: GPL-3.0-or-later
+  version: 2.8
+license_notes:
+- PIConGPU is GPLv3+ (PMacc LGPLv3+); the unmodified source with its bundled third-party libraries is redistributed as a source bundle (no patches).
+- Boost and GSL are redistributed as their unmodified upstream release tarballs (BSL-1.0 / GPLv3+) because the conda environment ships neither; build.sh builds them under .deps/level3/picongpu/<profile>/install.
+redistribution_status: cleared
+source_scope:
+  application_owned:
+  - src/include/picongpu/*
+  - src/include/pmacc/*
+  - src/src/*
+  - src/buildsystem/*
+  - src/bin/*
+  - src/etc/*
+  - src/lib/*
+  bundled:
+  - src/thirdParty/*
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/test/*
+  - src/share/picongpu/tests/*
+  exclude:
+  - src/docs/*
+  - src/share/picongpu/examples/*
+  - src/share/picongpu/pypicongpu/*
+  - src/share/picongpu/benchmarks/*

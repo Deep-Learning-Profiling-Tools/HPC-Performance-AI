@@ -144,7 +144,7 @@ level3/<app>/
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
 - Registered inputs (since 2026-09-21; every active benchmark since 2026-09-22 -- 50 Level 1,
-  26 Level 2 (PENNANT since 2026-10-20, Nekbone since 2026-10-21), 11 Level 3 (VPIC since 2026-10-21); the LAMMPS ReaxFF inputs run on the separate `reaxff.cuda` profile
+  26 Level 2 (PENNANT since 2026-10-20, Nekbone since 2026-10-21), 12 Level 3 (VPIC and PIConGPU since 2026-10-21); the LAMMPS ReaxFF inputs run on the separate `reaxff.cuda` profile
   via `HPCPERF_LAMMPS_VARIANT=reaxff`): each benchmark carries `inputs.yaml` (schema
   `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
   content, source kind upstream-file / upstream-parameterized / derived / custom, the
