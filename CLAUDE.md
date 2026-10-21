@@ -8,7 +8,7 @@ on one node (dgx003: 4x NVIDIA B200 / sm_100, CUDA 13.2.78, RHEL 10, 64 CPUs,
 | Level | Content | Where the truth lives |
 |---|---|---|
 | `level1/` | 50 standalone GPU kernels (CMake, `-DBACKEND=CUDA\|HIP`, ctest validation) | `level1/README.md`, per-benchmark README |
-| `level2/` | 24 mini-apps with upstream build systems + `build.sh/run.sh/validate.sh` | `level2/README.md`, `level2/SCALEOUT_AUDIT.md`, `level2/tools/README.md` |
+| `level2/` | 25 mini-apps with upstream build systems + `build.sh/run.sh/validate.sh` | `level2/README.md`, `level2/SCALEOUT_AUDIT.md`, `level2/tools/README.md` |
 | `level3/` | full production applications, multi-GPU by design | `level3/README.md`, `level3/APPLICATION_AUDIT.md`, `level3/BUILD_STRATEGY.md`, `level3/CORRECTNESS_FIXES.md`, `level3/SECOND_BATCH_STATUS.md`, per-app README |
 
 Read the per-level status document before touching a level; they record what
@@ -144,7 +144,7 @@ level3/<app>/
   static cudart), `l3_rundir`, `l3_run_id`, `l3_manifest`, `l3_fingerprint_*`,
   `l3_scale_mode`, `hpcperf_ranks`, `hpcperf_topology`, `hpcperf_forbid_args`.
 - Registered inputs (since 2026-09-21; every active benchmark since 2026-09-22 -- 50 Level 1,
-  24 Level 2, 10 Level 3; the LAMMPS ReaxFF inputs run on the separate `reaxff.cuda` profile
+  25 Level 2 (PENNANT since 2026-10-20), 10 Level 3; the LAMMPS ReaxFF inputs run on the separate `reaxff.cuda` profile
   via `HPCPERF_LAMMPS_VARIANT=reaxff`): each benchmark carries `inputs.yaml` (schema
   `hpcperf-inputs-1`, read by `tools/inputs/hpcperf_inputs.py`; ids defined by workload
   content, source kind upstream-file / upstream-parameterized / derived / custom, the
@@ -228,7 +228,7 @@ Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
   `tools/timing/roi/hpcperf_roi.h` (C/C++; Fortran module + C shim; Python twin):
   after set-up and warm-up, before verification and final output; bulk output and
   in-loop checks are carved out with `HPCPERF_ROI_EXCLUDE_*`. All 50 Level 1
-  benchmarks (CUDA + HIP sources) and all 24 Level 2 apps carry markers as PURE
+  benchmarks (CUDA + HIP sources) and all 25 Level 2 apps carry markers as PURE
   INSERTIONS (Level 1 CMake include path; Level 2 `build.sh` exports `CPATH`). A
   no-op unless `HPCPERF_ROI_LOG` is set or a profiler is injected, so ctest and
   validate.sh are unchanged. Placement rule: `tools/timing/roi/README.md`. A new
@@ -250,7 +250,7 @@ Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
   Level 3 0 warm-up + 3 clean + 1 profiled (QMCPACK unprofiled), headline = median, no adaptive extension.
   The headline `roi_wall_s` comes from the CLEAN runs (the markers' own log, no
   profiler); the profiled run only gives device activity clipped to the same
-  markers. FOMs (16 of 24 Level 2 apps; the other 8 BLANK) are read from the clean run.
+  markers. FOMs (16 of 25 Level 2 apps; the other 9 BLANK) are read from the clean run.
 - Cases: `tools/timing/cases/*.tsv` via `cases.py`; identity (level, app, case,
   platform); sweeps `NAME=a|b`; an input variable set in your shell but not declared
   by the case is REFUSED. Hardware neutrality: collector adapters
@@ -377,7 +377,7 @@ Build systems
 
 - Level 1: 50/50 CUDA validated (ctest per benchmark directory; the aggregate
   `cmake -S level1` configure has no top-level `enable_testing()`).
-- Level 2: 24/24 CUDA single-GPU working/validated on dgx003 (clean-clone
+- Level 2: 25/25 CUDA single-GPU working/validated on dgx003 (PENNANT added 2026-10-20; clean-clone
   protocol, 2026-09-15). 11 applications (amg2023, branson, cloverleaf,
   examinimd, exampm, haccabanapm, kripke, laghos, remhos, tealeaf, miniem) are
   the subset with verified 4-rank x 4-B200 single-node multi-GPU correctness.

@@ -71,6 +71,11 @@ p3_heat3d	n256-1000	n256-1000	1	HPCPERF_P3_HEAT3D_INPUT	-	1	1800
 p3_heat3d	n1024-200	n1024-200	1	HPCPERF_P3_HEAT3D_INPUT	-	1	1800
 p3_vlp4d	sld10-large	sld10-large	1	HPCPERF_P3_VLP4D_INPUT	-	1	1800
 p3_vlp4d	sld10	sld10	1	HPCPERF_P3_VLP4D_INPUT	-	1	1800
+pennant	sedovbig-540sq	sedovbig-540sq	1	HPCPERF_PENNANT_INPUT	-	1	1800
+pennant	sedovflatx4-1920x2160	sedovflatx4-1920x2160	1	HPCPERF_PENNANT_INPUT	-	1	1800
+pennant	leblancbig-160x1440	leblancbig-160x1440	1	HPCPERF_PENNANT_INPUT	-	1	1800
+pennant	nohsquare-360sq	nohsquare-360sq	1	HPCPERF_PENNANT_INPUT	-	1	1800
+pennant	nohpoly-hex251-6000cycles	nohpoly-hex251-6000cycles	1	HPCPERF_PENNANT_INPUT	-	1	1800
 quicksilver	p1-profile-8c-100k-20s	p1-profile-8c-100k-20s	1	HPCPERF_QUICKSILVER_INPUT_ID	-	1	1800
 quicksilver	coral2-p1-1rank	coral2-p1-1rank	1	HPCPERF_QUICKSILVER_INPUT_ID	-	1	1800
 quicksilver	coral2-p2-1rank	coral2-p2-1rank	1	HPCPERF_QUICKSILVER_INPUT_ID	-	1	1800
