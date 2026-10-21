@@ -1,0 +1,47 @@
+{
+ "schema": "hpcperf-nekbone-cg-reference-1",
+ "input_id": "n16-e8192",
+ "provenance": {
+  "made_utc": "2026-10-21T03:05:42Z",
+  "SIZE_sha256": "06d196065932251ac6f8b3e32e7dd7a15a431a700d6db22b2926536b6cd1d704",
+  "data_rea_sha256": "e6f75bb57f478a0e9637d6d2626b8c4cffd6e04933008a1a46fcfbacef987831",
+  "log": "n16-e8192.cpu.log",
+  "log_sha256": "f85d37047bf4ecdfdb02f3e97f7db84e3df90d14ead2c555626162521fe1d282",
+  "binary": "CPU build of the same source (build.sh CPU: upstream makenek.mpi code path, nvfortran 25.7 -O2/-O3, no -acc/-cuda), one rank on dgx003",
+  "host": "dgx003.orc.gmu.edu",
+  "note": "Solve Time =   0.3130E+03"
+ },
+ "rule": {
+  "r0_tol": 0.0001,
+  "x_tol": 1e-10,
+  "reduction_factor": 10.0,
+  "basis": "two correct realisations of every registered input (the CPU build's host code path and this CUDA build, same SIZE + data.rea) agree in every printed cg: quantity (r0, rN, alpha, beta, pap; 5 significant digits) exactly and in sqrt(x^T C x) and x^T C f to <= 6e-16 relative (README, 2026-10-21, before any optimized candidate existed): r0_tol 1e-4 = one unit of the 5th printed digit; x_tol 1e-10 = 1e5 x the observed solution deviation; reduction_factor 10 = the residual reduction within an order of magnitude of the reference's (observed ratio 1.00)",
+  "text": "timed solve: r0 within r0_tol relative, xnorm and xf within x_tol relative, rN/r0 <= reduction_factor x the reference's rN/r0; nelt / np / nx1 / iteration count equal"
+ },
+ "run": {
+  "solves": [
+   {
+    "r0": 3104.5,
+    "iter": 101,
+    "rN": 2.3525e-08,
+    "alpha": 0.52705,
+    "beta": 0.57046,
+    "pap": 1.7589e-15
+   },
+   {
+    "r0": 3138.0,
+    "iter": 101,
+    "rN": 2.4454e-08,
+    "alpha": 0.529,
+    "beta": 0.5692,
+    "pap": 1.8942e-15
+   }
+  ],
+  "xnorm": 4774.229339836645,
+  "xf": 10121370.452253964,
+  "nelt": 8192,
+  "np": 1,
+  "nx1": 16,
+  "elements": 8192
+ }
+}

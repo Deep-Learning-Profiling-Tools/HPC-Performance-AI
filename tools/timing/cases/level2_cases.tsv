@@ -31,6 +31,7 @@ miniem	default	1	-	-	-	-	-
 miniweather	default	1	-	-	-	-	-
 p3_heat3d	default	1	-	-	-	-	-
 p3_vlp4d	default	1	-	-	-	-	-
+nekbone	default	1	-	-	-	-	the run.sh default input (inputs.yaml default_input n16-e32768: 32768 elements of order 16 = 134 M points on one rank, the timed 100-iteration CG solve)
 pennant	default	1	-	-	-	-	the run.sh default deck test/sedovbig/sedovbig.pnt (Sedov blast wave, 540 x 540 rect = 291,600 zones, 3882 cycles to tstop 1.0)
 quicksilver	default	1	-	-	-	-	-
 remhos	default	1	-	-	-	-	-
