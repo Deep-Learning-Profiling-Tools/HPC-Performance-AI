@@ -36,8 +36,12 @@ inputs:
 - inputs/blast-256.txt
 registered_inputs: inputs.yaml
 references:
-- src/src/system_tests/input_files/tHYDROtMHDSYSTEMSoundWave3D_CorrectInputExpectCorrectOutput.txt (validate.sh)
-- reference/*.json (frozen self-baseline digests + the frozen L1 errors of the Sod inputs, inputs.yaml)
+- src/src/system_tests/input_files/tHYDROtMHDSYSTEMSoundWave3D_CorrectInputExpectCorrectOutput.txt
+- reference/sod-256.json
+- reference/sod-512.json
+- reference/sound-wave-512.json
+- reference/noh-200.json
+- reference/blast-256.json
 upstream_version: v3.0.0
 redistribution_status: cleared
 suite_status: retained
