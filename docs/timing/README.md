@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs: Level 1 campaign 2026-09-23..28, Level 2 final protocol 2026-09-30, Level 3 final protocol 2026-10-03
 
-Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 43 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 94 + 40 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 271; UNSTABLE 17.
+Measured 2026-09-26T19:11:40Z .. 2026-10-21T05:37:17Z (276 records). 134 + 94 + 48 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 94 + 45 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 276; UNSTABLE 18.
 
 - Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5, 2026-09-26/27, GPU 0000:52:00.0); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median); channel_shuffle g2-w255-h255 in phase 7 (2026-09-28)
 - Level 2 protocol: FINAL PROTOCOL (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application (cases/level2_binding.tsv through the launcher's HPCPERF_CPUS_PER_RANK; hipBone PE=4 with pinned OpenMP threads, the other mpirun-launched applications PE=1, direct-exec unbound), 1 whole-process warm-up run discarded from every statistic (its ROI kept as roi.warmup_runs_s), 3 measured clean runs (headline = median), 1 nsys profiled run; no adaptive extension; one input at a time.
@@ -19,7 +19,7 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
 | 2 | 94 | 0 | 0 | 0 |
-| 3 | 35 | 6 | 0 | 2 |
+| 3 | 40 | 6 | 0 | 2 |
 
 - Level 2: every registered input measured under the final protocol (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application, 1 discarded whole-process warm-up + 3 clean runs (headline = median) + 1 nsys-profiled run, one input at a time.
 - CPU binding (2026-09-30 A/B, 3 sessions): the explicit policy changes only hipBone's thread placement (four OpenMP threads on four cores of the allocation -- GPU-local on the current machine, verified; the policy itself names no socket -- instead of five threads on one core) and leaves its ROI unchanged; gamess benz-kern, miniem darcy-hex, remhos periodic-square-p5 and tealeaf bm4 show per-invocation discrete ROI levels with identical placement. Cause UNKNOWN.
@@ -29,6 +29,8 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 
 - Level 3 correctness (2026-10-06): 35 PASS / 6 INCOMPLETE / 0 FAIL / 2 none -- executable checks per input with the basis stated; still open with the missing criterion named: CP2K h2o-32 / 128 / 256, nekRS ethier x3 (no tolerance for the plain configuration), Nyx lya-heatcool-32cubed (I_R), SPARTA sphere-1m. No tolerance was invented.
 - PENNANT (Level 2, 2026-10-21): five registered inputs measured under the final protocol on GPU 0000:9D:00.0 (NUMA node 1, cpuset 56-87 of Slurm job 2732030). The first measurements of sedovbig-540sq and sedovflatx4-1920x2160 overlapped with a 32-thread CPU job of the operator in the same cpuset and were set aside (raw-perturbed/, results-perturbed/, logs/campaign.log); both inputs were re-measured in the quiet state. PENNANT's cycle loop is host-latency bound (five kernel launches, five device synchronisations and three symbol copies per cycle), so CPU contention doubles its cycle time.
 - PENNANT correctness: the per-zone profile of every input against a frozen run of upstream's CPU implementation at the same code version (reference/&lt;id&gt;.json, rule 1e-5 relative in populated zones = 30 x the measured CPU/GPU roundoff), plus the stdout quantities; see level2/pennant/README.md.
+- VPIC (Level 3, 2026-10-21): five registered deck executables (Harris reconnection 256/512/1024, Weibel 1-D 131072, 2-D short pulse) measured under the final Level 3 protocol on GPU 0000:9D:00.0 (one rank per deck; the step loop's own '*** Done' clock).
+- VPIC correctness: the energies history of a fresh run of each deck against a frozen reference (CPU Kokkos-OpenMP run of the same deck for the sizes where one exists, the unmodified build's own run for harris-1024sq) plus total-energy conservation; see level3/vpic/README.md.
 
 ### Level 1
 
@@ -312,6 +314,11 @@ No markers: the timed region is the application's own timer for its time-step lo
 | specfem3d | homogeneous-halfspace-mesh-default-5000 | SUCCESS | nvidia-b200.cuda13.2 | 711 ms | 3 | 710 ms | 722 ms | 1.8% | 1.0% | yes | 5,000 | 142 us | 27.2 s | 2.6% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | specfem3d | homogeneous-halfspace-refine2-1000 | SUCCESS | nvidia-b200.cuda13.2 | 885 ms | 3 | 885 ms | 887 ms | 0.2% | 0.1% | yes | 1,000 | 885 us | 257.8 s | 0.3% | null | 1.00 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | specfem3d | homogeneous-halfspace-refine2-5000 | SUCCESS | nvidia-b200.cuda13.2 | 4.44 s | 3 | 4.44 s | 4.45 s | 0.4% | 0.2% | yes | 5,000 | 888 us | 261.7 s | 1.7% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
+| vpic | harris-256sq | SUCCESS | nvidia-b200.cuda13.2 | 5.36 s | 3 | 5.33 s | 6.13 s | 14.9% | 8.5% | UNSTABLE | 1,939 | 2.76 ms | 15.2 s | 35.3% | null | 1.19 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | harris-512sq | SUCCESS | nvidia-b200.cuda13.2 | 28.2 s | 3 | 28.2 s | 28.4 s | 0.8% | 0.5% | yes | 3,878 | 7.27 ms | 39.7 s | 71.1% | null | 1.08 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | harris-1024sq | SUCCESS | nvidia-b200.cuda13.2 | 190.8 s | 3 | 190.7 s | 191.0 s | 0.1% | 0.1% | yes | 7,757 | 24.6 ms | 209.4 s | 91.1% | null | 1.02 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | weibel-1d-131072 | SUCCESS | nvidia-b200.cuda13.2 | 10.4 s | 3 | 10.4 s | 10.4 s | 0.4% | 0.2% | yes | 700 | 14.9 ms | 25.6 s | 40.7% | null | 1.03 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | shortpulse-2d-500sq | SUCCESS | nvidia-b200.cuda13.2 | 60.9 s | 3 | 60.9 s | 60.9 s | 0.0% | 0.0% | yes | 8,652 | 7.04 ms | 73.7 s | 82.7% | null | 1.09 | none printed | 1 | PASS | PASS | 148f236fd9 |
 | warpx | uniform-plasma-64x32x32-10 | SUCCESS | nvidia-b200.cuda13.2 | 110 ms | 3 | 79 ms | 237 ms | 144.0% | 76.4% | UNSTABLE | 10 | 11 ms | 7.7 s | 1.4% | 3% (NVTX range) | 0.72 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | uniform-plasma-128cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 181 ms | 3 | 175 ms | 195 ms | 11.1% | 5.7% | UNSTABLE | 20 | 9.03 ms | 7.8 s | 2.3% | 33% (NVTX range) | 1.06 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | uniform-plasma-256cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 579 ms | 3 | 572 ms | 601 ms | 5.0% | 2.6% | yes | 20 | 29 ms | 8.66 s | 6.7% | 72% (NVTX range) | 1.07 | none printed | 1 | PASS | PASS | 04f66c6f5e |

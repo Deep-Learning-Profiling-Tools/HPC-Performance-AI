@@ -61,13 +61,13 @@ the executable and its sha256, num_step, grid and particle counts.
 
 ## Registered inputs (`inputs.yaml`, `HPCPERF_VPIC_INPUT`)
 
-| id | problem | grid | particles | steps | timed loop (B200, campaign median 2026-10-21, RESULTS) | correctness reference |
+| id | problem | grid | particles | steps | timed loop (B200, campaign median 2026-10-21) | correctness reference |
 |---|---|---|---|---|---|---|
-| harris-256sq | Harris-sheet magnetic reconnection (sample/harris), nx = ny = 256 | 256 x 256 x 1 | 4.2 M | 1939 | 5.35 s | CPU (Kokkos OpenMP) run of the same deck |
+| harris-256sq | Harris-sheet magnetic reconnection (sample/harris), nx = ny = 256 | 256 x 256 x 1 | 4.2 M | 1939 | 5.36 s | CPU (Kokkos OpenMP) run of the same deck |
 | harris-512sq (default) | same, 512 | 512 x 512 x 1 | 16.8 M | 3878 | 28.2 s | CPU run of the same deck |
 | harris-1024sq | same, 1024 | 1024 x 1024 x 1 | 67.1 M | 7757 | 190.8 s | this build's own frozen run (no CPU run of this size) |
-| weibel-1d-131072 | counter-streaming (Weibel / two-stream) instability of the energy_comparison test deck, 131072 cells, box scaled with the cell count (upstream's cell size and physical duration) | 131072 x 1 x 1 | 52.4 M | 700 | RESULTS | CPU run of the same deck |
-| shortpulse-2d-500sq | 2-D laser-plasma short pulse (sample/short_pulse.cxx, RUN3D = 0), one rank | 500 x 1 x 500 | 6.7 M (slab) | 8652 | 60.7 s | CPU run of the same deck |
+| weibel-1d-131072 | counter-streaming (Weibel / two-stream) instability of the energy_comparison test deck, 131072 cells, box scaled with the cell count (upstream's cell size and physical duration) | 131072 x 1 x 1 | 52.4 M | 700 | 10.4 s | CPU run of the same deck |
+| shortpulse-2d-500sq | 2-D laser-plasma short pulse (sample/short_pulse.cxx, RUN3D = 0), one rank | 500 x 1 x 500 | 6.7 M (slab) | 8652 | 60.9 s | statistical group rule against this build's frozen run (five realisations differ by ~10 %) |
 
 The upstream decks as shipped (32^2 Harris with dumps every status interval, the 16-cell Weibel test) run in
 seconds dominated by I/O and are not registered; `validate.sh` runs upstream's own analytic and completion
@@ -94,7 +94,9 @@ deposition of a boundary-entering particle: position and divergence tests within
 (field interpolation against the exact linear interpolation), plus `to_completion/simple` (a small Harris
 run that must reach `*** Done`). The harness adds exit code, timeout, the `ENABLE_KOKKOS_CUDA: ON` build
 banner (the GPU backend) and the launcher audit. `pcomm` (8 ranks) and `outbndj` are not built by upstream's
-CMake and are not run. Result: see RESULTS.
+CMake and are not run. Result (2026-10-21, 1 GPU): PASS -- accel, cyclo, inbndj, interpe print their `pass`,
+`to_completion/simple` reaches `*** Done`; 13 s in all (the launcher audit reports the ranks as `unverified`: the
+runs are too short for its nvidia-smi sampling).
 
 ### Correctness of the registered inputs (`check_energies.py`, frozen references)
 
@@ -116,7 +118,8 @@ and checks total-energy conservation:
   the total), so a field evolution that is wrong or missing is caught; 1e-3 drift is 30 x the measured drift
   of the two correct realisations. The worst tolerance usage of the CUDA run against the CPU reference is
   5.4 % (species columns). The same rule is applied to every input whose two realisations satisfy it with a
-  comparable margin; the reference of an input records its own observed usage (RESULTS).
+  comparable margin; the reference of an input records its own observed usage (the check usages are in
+  the results section below).
 - References: harris-256sq, harris-512sq, weibel-1d-131072, shortpulse-2d-500sq from the Kokkos OpenMP
   (CPU) build of the same frozen source (independent realisation; `provenance.binary`); harris-1024sq from
   this unmodified CUDA build's own run (a CPU run of 67 M particles x 7757 steps is ~10 h; self-baseline of
@@ -138,31 +141,42 @@ and checks total-energy conservation:
 
 ## Results on dgx003 (B200, CUDA 13.2.78)
 
-Campaign `l3-ext-2026-10-20` (2026-10-21 01:27-01:55 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
+Campaign `l3-ext-2026-10-20` (2026-10-21 05:02-05:43 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
 Level 3 protocol: 0 warm-up + 3 clean + 1 nsys-profiled run per input, headline = median of the application
 timer, spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock locking, strictly serial;
-`docs/timing/index.html` has the current rows):
+`docs/timing/index.html` has the current rows). The day's first campaign (01:27-01:55 UTC) measured the previous deck
+build; `build.sh` recompiles every registered deck, so the Weibel deck change (03:17 UTC) left those records without
+their executables on disk (`verify_registry_runs.py`: binary hash mismatch); they are set aside in the results tree
+(`raw-superseded/`, README there) and every input was re-measured on the current build:
 
 | input | timer median (s) | min / max (s) | spread | stable | profiled run (s) | run verification | correctness |
 |---|---|---|---|---|---|---|---|
-| harris-256sq | 5.346 | 5.331 / 5.918 | 11.0 % | RESULTS_STAB_256 | 6.409 | PASS | RESULTS_CORR_256 |
-| harris-512sq (default) | 28.157 | 28.150 / 28.316 | 0.6 % | yes | 30.311 | PASS | RESULTS_CORR_512 |
-| harris-1024sq | 190.838 | 190.581 / 190.917 | 0.2 % | yes | 194.971 | PASS | RESULTS_CORR_1024 |
-| weibel-1d-131072 | 10.103 | 10.097 / 10.168 | 0.7 % | yes | 10.492 | PASS | RESULTS_CORR_WEIBEL |
-| shortpulse-2d-500sq | 60.678 | 60.607 / 60.684 | 0.1 % | yes | 66.152 | PASS | RESULTS_CORR_SHORTPULSE |
+| harris-256sq | 5.357 | 5.333 / 6.129 | 14.9 % | no (UNSTABLE) | 6.366 | PASS | PASS (10.8 % of the rule) |
+| harris-512sq (default) | 28.200 | 28.180 / 28.410 | 0.8 % | yes | 30.414 | PASS | PASS (5.4 %) |
+| harris-1024sq | 190.822 | 190.714 / 190.953 | 0.1 % | yes | 195.286 | PASS | PASS (5.4 %) |
+| weibel-1d-131072 | 10.404 | 10.403 / 10.440 | 0.4 % | yes | 10.765 | PASS | PASS (0.2 %) |
+| shortpulse-2d-500sq | 60.895 | 60.879 / 60.902 | 0.0 % | yes | 66.536 | PASS | PASS (5.8 % of the group rule) |
 
 - Timing SUCCESS for all five (`*** Done` of every clean run; `verify_registry_runs.py` PASS 5/5: manifest deck
   sha256 = the registered deck, the executable's hash, `Run Details` num_step / grid / particle counts, the
-  launcher audit `1 verified, 0 mismatch`). RESULTS_STAB_NOTE
-- The profiled run (nsys, CUDA trace) is 2-20 % slower than the clean median (harris-256sq 20 %: the shortest
+  launcher audit `1 verified, 0 mismatch`). harris-256sq is UNSTABLE by the 10 % rule: its first clean run took
+  6.129 s, the next two 5.357 / 5.333 s (0.5 % apart); the set-aside record of the previous build shows the same
+  pattern (5.918, then 5.346 / 5.331) and harris-512sq a faint one (28.410, then 28.180 / 28.200). The first run after
+  an idle GPU is the slow one in every record; the cause is not established (UNKNOWN: the protocol has no warm-up run
+  and no clock locking, and nothing else ran on the GPU). The median is unaffected (5.357 vs 5.346 s).
+- The profiled run (nsys, CUDA trace) is 2-19 % slower than the clean median (harris-256sq 19 %: the shortest
   run, launch-bound); its device picture is the whole-process one (no NVTX range in VPIC).
 - Correctness (`check_energies.py` against the frozen references, `run_checks.sh vpic` = one fresh run of each
-  registered deck in `run.check.<id>`, then `hpcperf_inputs.py verdict`): RESULTS_CORR_NOTE
+  registered deck in `run.check.<id>`, then `hpcperf_inputs.py verdict`): all five PASS (2026-10-21 05:08-05:17 UTC,
+  the executables of the campaign records). Worst tolerance usage: harris-256sq 10.8 % (the ion column), harris-512sq
+  5.4 %, harris-1024sq 5.4 %, weibel-1d-131072 0.2 %, shortpulse-2d-500sq 5.8 % of the 0.35 group rule (the fields
+  sum; total 2.6 %, particles 2.2 %); the short pulse has no conservation bound (open system: its total energy grows
+  1.9e3-fold with the laser injection, in the run as in the reference).
 - References: harris-256sq from the Kokkos OpenMP build (`vpic-cpu`, 563 s), harris-1024sq from this CUDA
   build's own `run.reference` run (660.7 s under a CPU-loaded node: the loop is host-latency sensitive; a
-  reference's value does not depend on its speed); RESULTS_REF_NOTE. Tolerance usage of the campaign's own
-  four runs against the frozen references: harris-256sq up to 21.5 % of the rule (the profiled run's ion
-  column, 2.2e-6 relative), harris-1024sq 5.4 % -- all PASS.
+  reference's value does not depend on its speed); harris-512sq and weibel-1d-131072 from the Kokkos OpenMP build
+  as well (3490 s and 1683 s, single-threaded), shortpulse-2d-500sq from this build's `run.reference` run with the
+  statistical group rule (five realisations). Every reference's rule and basis are recorded in its JSON.
 
 
 ## Limitations
