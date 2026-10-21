@@ -15,7 +15,7 @@ of `.param` files); grid, step count, boundaries and plugins are runtime argumen
   `thirdParty/` (alpaka, mallocMC, nlohmann_json, toml11, cmake-modules, cuda_memtest; the `catch2` submodule of the
   unit tests and `docs/` excluded), **no patches**; `deps/boost_1_86_0.tar.gz` and `deps/gsl-2.8.tar.gz` = the
   unmodified upstream release tarballs of the two libraries the conda environment lacks (sha256-pinned `kind: file`
-  components). Artifact `picongpu-hpcperf-l3-v1.tar.zst` (153 MB, unpublished until the maintainer publishes it);
+  components). Artifact `picongpu-hpcperf-l3-v1.tar.zst` (153 MB, published 2026-10-21 as an asset of the GitHub prerelease `level3-source-hpcperf-l3-v1-ext1` of this repository (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/picongpu-hpcperf-l3-v1.tar.zst; anonymous download verified against the lock, `provenance/remote_artifact_verification.yaml`));
   `tools/prepare_benchmark.sh level3 picongpu [--artifact FILE]` materializes it. `fetch.sh` (freeze time only)
   clones the pinned commit into `_upstream/level3/picongpu`.
 
@@ -125,5 +125,5 @@ spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock lock
 ## Source distribution
 
 Scheme 3 (`level3/EXTERNAL_ARTIFACT_DESIGN.md`): `provenance/source.lock.yaml`, artifact
-`picongpu-hpcperf-l3-v1.tar.zst` in the maintainer's local staging, `publish_status: unpublished`. LOC:
+`picongpu-hpcperf-l3-v1.tar.zst` published 2026-10-21 as an asset of the GitHub prerelease `level3-source-hpcperf-l3-v1-ext1` of this repository (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/picongpu-hpcperf-l3-v1.tar.zst; anonymous download verified against the lock, `provenance/remote_artifact_verification.yaml`); `publish_status: published`. LOC:
 `provenance/LOC.md`.
