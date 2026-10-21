@@ -169,7 +169,7 @@ spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock lock
 
 ## Source distribution
 
-Scheme 3: the frozen bundle in the maintainer's staging (`provenance/source.lock.yaml`: `publish_status: unpublished`
-until the publisher pushes it); a fresh clone runs `tools/prepare_benchmark.sh level3 cholla` (artifact from the cache,
-the recorded URL or `--artifact FILE`), then `./build.sh` -- nothing is fetched at build time. `fetch.sh` is for a
+Scheme 3: the frozen bundle published 2026-10-21 as an asset of the GitHub prerelease `level3-source-hpcperf-l3-v1-ext1` of this repository (https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/cholla-hpcperf-l3-v1.tar.zst; anonymous download verified against the lock, `provenance/remote_artifact_verification.yaml`); `provenance/source.lock.yaml`: `publish_status: published`. A fresh clone runs
+`tools/prepare_benchmark.sh level3 cholla` (the artifact from the recorded URL, verified by size, sha256 and
+`source_tree_sha256`; or from the cache / `--artifact FILE`), then `./build.sh` -- nothing is fetched at build time. `fetch.sh` is for a
 re-freeze only.
