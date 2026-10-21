@@ -1751,6 +1751,16 @@ w("vpic", "run.log", """# VPIC CUDA profile=cuda: input=harris-256sq deck=decks/
 *** Cleaning up
 normal exit
 """)
+w("cholla", "run.log", """Parameter values:  nx = 256, ny = 256, nz = 256, tout = 0.200000, init = Riemann, boundaries = 3 3 3 3 3 3
+Starting calculations.
+n_step: 1   sim time:  0.0025355   sim timestep: 2.5355e-03  timestep time =     7.616 ms   total time =    6.0364 s
+
+n_step: 2   sim time:  0.0042665   sim timestep: 1.7310e-03  timestep time =     1.430 ms   total time =    6.0378 s
+
+n_step: 3   sim time:  0.2000000   sim timestep: 9.2435e-04  timestep time =     1.398 ms   total time =    6.2561 s
+
+Saving Snapshot: 1 
+""")
 w("picongpu", "run.log", """PIConGPU: 0.9.0-dev
   5 % =      150 | time elapsed:              4sec 400msec | avg time per step:  29msec
 100 % =     3000 | time elapsed:       1min 27sec 543msec | avg time per step:  27msec
@@ -1837,7 +1847,7 @@ want = {"lammps": (0.0709434, 100), "sparta": (0.0411685, 100), "warpx": (0.0242
         "nyx": (0.044260893 + 0.035151909, 2), "nekrs": (0.817425 - 0.00804749, 30),
         "specfem3d": (0.560349008, 5000), "exaca": (1.6139, None), "cp2k": (2.260197 + 2.291654, 2),
         "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2),
-        "vpic": (4.85707, 1939), "picongpu": (87.543, 3000)}
+        "vpic": (4.85707, 1939), "picongpu": (87.543, 3000), "cholla": ((7.616 + 1.430 + 1.398) / 1000.0, 3)}
 bad = []
 for app, (wall, steps) in want.items():
     try:

@@ -1,0 +1,2518 @@
+{
+ "algorithm": "hpcperf-tree-1",
+ "algorithm_description": "hpcperf_source -- shared library for Level 3 source freezing / artifact verification / materialization /\nworkspace checks (scheme 3: project-controlled external source artifacts + automatic materialization).\n\nEverything here is deterministic and side-effect free unless a function says otherwise.\n\nSource-tree identity (source_tree_sha256, algorithm \"hpcperf-tree-1\"):\n    Walk the tree; take every regular file and symlink (directories carry no identity, empty ones are\n    ignored); skip the materialization markers and nothing else. Sort the relative paths by their UTF-8\n    bytes. For each entry append one line\n        \"F\\t<relative path>\\t<sha256 of the file content>\\n\"     (regular file)\n        \"L\\t<relative path>\\t<sha256 of the symlink target>\\n\"    (symlink; the target string, never followed)\n    and hash the concatenation with SHA-256. mtime, uid/gid, mode and the executable bit are NOT part of\n    the identity (the executable bit is recorded in SOURCE_MANIFEST.json). Re-freezing the same content\n    therefore gives the same source_tree_sha256, while the archive SHA-256 also depends on the archiver.",
+ "archive": {
+  "compressed_size": 356496,
+  "compression": "zstd",
+  "file_count": 356,
+  "sha256": "bdc734e8674b9bc2764078e25128a9dc8aa06dcbd18e278bcb5145812d155506",
+  "symlink_count": 0,
+  "tar_entries": 390,
+  "tar_format": "hpcperf-tar-1",
+  "uncompressed_size": 2825391,
+  "zstd_level": 19,
+  "zstd_version": "1.5.7"
+ },
+ "entries": 356,
+ "files": 356,
+ "manifest": [
+  {
+   "exec": false,
+   "path": "src/.clang-format",
+   "sha256": "fbd2e7ed243937a2a8fe6f1ff32639381bac6c19d01d6d63528baf9d31412b50",
+   "size": 6713,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.clang-tidy",
+   "sha256": "e3f32e99495869433c682681feb8c4c97f6b9f12fa0789ac1c14298cfd042279",
+   "size": 7506,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.git-blame-ignore-revs",
+   "sha256": "9a3959dfba0a837c0a7cd6a05c1c4001f6332421770b51ea1d2e6aebb8673d4b",
+   "size": 671,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.github/workflows/build_and_lint.yml",
+   "sha256": "34af92d5f1633e698135ee51b6a172b8007efc69ca4fe320d688a3c4a72f1747",
+   "size": 3234,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.github/workflows/code_formatting.yml",
+   "sha256": "49359cf1e39d9254bd693ae672cbce3104ddec8c1f66f787b0b7a9b89a7e58b4",
+   "size": 1021,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.gitignore",
+   "sha256": "3f19cad9f6308d7255b0593e4f3f4f0e88eff8318b8b0fa94d2279bece4864a0",
+   "size": 985,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.gitmodules",
+   "sha256": "2bc1a435187c49ed0477603a38efe318d7a1e504e44c7f547e2b0beb81b0b8ff",
+   "size": 119,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/Jenkinsfile",
+   "sha256": "ad5695244816dc86093e581b5b026d03319b567b1d38fc208ea57a87bea1c444",
+   "size": 4056,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/LICENSE.txt",
+   "sha256": "0d24d0d26d43227625c30aeedbf67b0df53a3bb00ed3893aec219b40a6f5c90a",
+   "size": 1080,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/Makefile",
+   "sha256": "55d131bf0c494995fdfca23bb0d4eb07586ce0047ba756815a579a022fddd45a",
+   "size": 7637,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/README.md",
+   "sha256": "eab238a5c27cbc8fe13fd7baa437d0953106c846f9cd3ff7792433f32b296410",
+   "size": 3449,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/check.sh",
+   "sha256": "408312acaac23258683e299ce92c0fb5864676f275a856de1b0d5395d00b6343",
+   "size": 499,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/machine.sh",
+   "sha256": "7acb01567b2416621d2b68d8ced5d7227075a3b304231938b0ab1b6861366ec6",
+   "size": 559,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.c3po",
+   "sha256": "c3a0a96b91410ee4a5759f7d02a68a0301a7094a476176b3c9c0ed7e5c0ebe43",
+   "size": 776,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.crc",
+   "sha256": "83f79c941765da62a02f092fc607ed673c9198186f5ede9f3ef3da979acbcf32",
+   "size": 723,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.frontier",
+   "sha256": "dba94859a2ee3ec3629c420f07c65a65c85e2c94fb58bac6ce5d87762e4a0711",
+   "size": 900,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.github",
+   "sha256": "45fcc53c08b226c3f6fbb24086265060acf805cb4e585f280d5b335cec01bc8c",
+   "size": 924,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.lux",
+   "sha256": "60c453262b342ed9f7e7d3254cac874dcfd3cce6e87505637a840c1822cf7e49",
+   "size": 579,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.poplar",
+   "sha256": "75c2dc4e4f1fa0f367d54441a9628a25d6a85a409576d05edc5e6e7ab7a25b42",
+   "size": 494,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.poplar.aomp",
+   "sha256": "81cef4e03785ea6a822655e05b9d4f93e01244be30e1984543ecc768bf9fb044",
+   "size": 505,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.poplar.cce+hip",
+   "sha256": "b12bd7c54b0fbb4777d0ca4fc076d92ba47177e441c083daf7b70c7af75d0b1f",
+   "size": 508,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.shamrock",
+   "sha256": "314fc2f657c354165bb531088d48a0d2bdead7c042137de2c27be996cb58d396",
+   "size": 668,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.spock",
+   "sha256": "899a3b477280e305ce76b436351e4d298d3d7a1e1f8943d1d8aeeeb77a19c2a6",
+   "size": 709,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.summit",
+   "sha256": "10ded921b86eda71ad2baa7014dc1b504fecf52d612780c1c31dd344ce7c58b5",
+   "size": 892,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.host.tornado",
+   "sha256": "9da5cb928112388ae2b1634d56a4811bedb7a07b6e74b9284d50ea3fac1d3f89",
+   "size": 467,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.inc.template",
+   "sha256": "474da2eb344b0be8950e804d1bd0e2b7dea5dc28a1522efd1f767ea72b2977b6",
+   "size": 2264,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.FOM",
+   "sha256": "2c576a3c4783fd3a676b01ce2ac4f55140c541a269ddaf773eaffbc9eef62c79",
+   "size": 684,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.basic_scalar",
+   "sha256": "4926c5a76b59d4834889c2299b4e61235708286e31d62369b19582ab3227b2f9",
+   "size": 755,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.cloudy",
+   "sha256": "d577b779e5df569a18b51c39811e6fb92e019d586eb09660f777da5e1306107a",
+   "size": 1095,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.cooling",
+   "sha256": "78aeb02ad6407a09b8cdeeeeb1116fd8d3111febe1ce65e6f0b97fcb237793b6",
+   "size": 1096,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.cosmology",
+   "sha256": "870f2543bd3df622268d07c977673f9ead64bfac7857179e4dfafcc2e8952527",
+   "size": 998,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.disk",
+   "sha256": "c67d2895c1d16e90033091df838dcebe3c6a9122ec794e36ee009b72a8797ac4",
+   "size": 1119,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.dust",
+   "sha256": "92899eadb232826d693d439b23cc52d41a2d8c86b9669b03157430e20bf24157",
+   "size": 1010,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.gravity",
+   "sha256": "98901e8ef6d9cc3380a9043dceb5d9508168237ff207d4d5396d22402e135873",
+   "size": 1005,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.hydro",
+   "sha256": "de36068bd9ef2a8eb2a11bd2ea5a152ba6271a01dc1dfedc19c985df33efd853",
+   "size": 693,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.mhd",
+   "sha256": "7063db92ff2023cf4a83f0c77160a05a0d1a87593c89a0b58712d1dbdce8b625",
+   "size": 1275,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.particles",
+   "sha256": "91871da944adf5c4d7d63fa5e729463f98b09180de87ba9f4c800ed2887280aa",
+   "size": 849,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.rot_proj",
+   "sha256": "961fc40ef7f7358abaefc26d5f1bc1f7fc4a9629be1540cbe619431fdb345cbc",
+   "size": 694,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/make.type.static_grav",
+   "sha256": "06cdfb1a1f33c8ff4793bec8ebc72d33c10e6605aded49e90dc5a8d212e13383",
+   "size": 680,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/prereq.sh",
+   "sha256": "affd557caa413e4c5f1b84fe850df0e1fe189bd05053bd5d699c3573eca97950",
+   "size": 1690,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/run_tests.sh",
+   "sha256": "32b0ce09f878ec24ec0e22c9aff9262f00ee9352b27ddd7804c3253d283fd76f",
+   "size": 10759,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.birch.cce.sh",
+   "sha256": "42274edf3c7fdb25585704c76f7b0fe1d3469707dbbd525ceb9d21224f8b3060",
+   "size": 416,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.c3po.gcc.sh",
+   "sha256": "f244e15562a39c07ec4c2e909d1c7025427f0c418e64e39f9d3775817a508755",
+   "size": 230,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.crc.gcc.sh",
+   "sha256": "0a943e6756a6791238f1e60b93463ddd22347d84079b670d99306d844a7d3f3c",
+   "size": 334,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.frontier.cce.sh",
+   "sha256": "26ebc7acdc73cc7382477b2eee0ed2c50d8a75cd515ccb979b4e3cd7c5c3a706",
+   "size": 431,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.github.gcc.sh",
+   "sha256": "57b74bf4704b200ba015451ec0b8c743fecd9b5103795045bb0e4953304fdcdd",
+   "size": 155,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.lux.sh",
+   "sha256": "0a40a0edd0c828907110b4ba88ffd38e861895b8bf26f7d7817e31acb2691fd7",
+   "size": 108,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.poplar.aomp.sh",
+   "sha256": "a47f1e2f9639210845aa796f4b7c9cdb12b7592308a3e2a65ea9e6749e3725c4",
+   "size": 298,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.poplar.cce+hip.sh",
+   "sha256": "6f1b21d7d08c407e0a86298d77d4bf5d287dfef370b10c28fc6a941e5630f541",
+   "size": 557,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.shamrock.sh",
+   "sha256": "c1035b27df94ef8c6efebacd8d1f68c1c6165dd61dec9248f4ce90ca5b4f2480",
+   "size": 62,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.spock.cce.sh",
+   "sha256": "b9f7d9d7d2b6c74aaaf0193591402b7cd296d260dfdc51be98531423987fe324",
+   "size": 446,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.summit.gcc.sh",
+   "sha256": "0038b9fbf91275fafd0ddfeb285cd3b74be5c491c91f9c550513faa9a4ae2ec1",
+   "size": 267,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/builds/setup.summit.xl.sh",
+   "sha256": "ea46ece82e03a52e718ac0171c9677ae53a995000dd15cdee031a4a1690b5c9d",
+   "size": 223,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/builds/setup.tornado.sh",
+   "sha256": "6e96420303ebd4e8bb3bdee68ff0375d82c094d51f522b4271dcc6f9f1185c8f",
+   "size": 61,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/123.txt",
+   "sha256": "8312ffadddce0c8133528ab5ec83f24920202c9bc115792044ce3ad12387b0a7",
+   "size": 1037,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/Creasey_shock.txt",
+   "sha256": "91b8ca6cdcc32f167346c674f7c03c855986f101ff167480e9313750e1e14571",
+   "size": 1053,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/Shu_Osher.txt",
+   "sha256": "99abb0f0650025e516c39042b5aee22a43ea77cf104fad9c7958493cbfda0390",
+   "size": 683,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/blast_1D.txt",
+   "sha256": "98840319e6de49b039f302282659d6b2ce2e25dd8dee87098458762c6cc840b1",
+   "size": 667,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/constant.txt",
+   "sha256": "80480bc782aa9f796cd8a2f7a15e1a7ad83744b8112128e07a9c30c004873cc8",
+   "size": 753,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/noh_1D.txt",
+   "sha256": "ba2b71a0ea640d84ff846f3bb9f0456db8ac2ae5552399775d6ffe0f0bde0da3",
+   "size": 969,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/sod.txt",
+   "sha256": "db3896fc496e2a97beb8bac6ad8ac2bc4d52140f94b607a39ceca128c2949ff9",
+   "size": 950,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/sound_wave.txt",
+   "sha256": "542db1122b40ee719f4bde4c77aa2341cec144f682554706a9b72ef41b31175a",
+   "size": 879,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/square_wave.txt",
+   "sha256": "0d3d6869d29c54d98e2d3dd2783cfe600d8f17558e5676c1e40a0e27e500bd04",
+   "size": 891,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/stationary.txt",
+   "sha256": "ccd5e71815105c1ae3421d11bc21d93235a851c10d643c4990c3173adaab9a8b",
+   "size": 1073,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/strong_shock.txt",
+   "sha256": "f6077a959d773f626edaa8c9103a4e30a563c6da92f6d4f88d1828b4111dc421",
+   "size": 958,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/test_3.txt",
+   "sha256": "c0fd6842560c4b1ea6b13e2f28cc6f0c7f85cc7eec57803d64b52ae10fb9d850",
+   "size": 1016,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/trac_pen.txt",
+   "sha256": "afb2cab27d0c7c2d6afa989ceceb100c72e6126a4a238908e4c255a69a3689d4",
+   "size": 991,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/1D/two_shocks.txt",
+   "sha256": "19a903bab848a2c8f4dd8028f341353ffb9f66ba4cd73774fd678bbce3c2cf2d",
+   "size": 1052,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/Gresho.txt",
+   "sha256": "ce565672a75c52b53ce0c8b07281bafa582ec601e240b99cc10d019d7877394e",
+   "size": 612,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/Implosion_2D.txt",
+   "sha256": "24137458260bfc491760f6a897693a9f1338e0c2980620ab8a2e38add1d4fe17",
+   "size": 601,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/KH_discontinuous_2D.txt",
+   "sha256": "82aa1b0eab508bae6926bc566f3ffd2ffc51fd06c46ef5f257f5c95008b74bd0",
+   "size": 604,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/KH_res_ind_2D.txt",
+   "sha256": "3437e6c3a4a24c7921140163f239ce1dbefb30a22edb32527436c82e0c7a17ea",
+   "size": 620,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/Noh_2D.txt",
+   "sha256": "b548637d42bc527dff8f5dc931e5ddf9afb5c44b9d5d620a2f771fa09de25835",
+   "size": 608,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/Rayleigh_Taylor.txt",
+   "sha256": "6eb03e997ef2326fcac961481e942ddc777409146f61af9abcbf7aefd4ee6ba1",
+   "size": 629,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/constant.txt",
+   "sha256": "6a04b76c4d832a2f1465b3be5a0e9011f186ecc523631be64d0a9dc5a9678a8a",
+   "size": 757,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/disk.txt",
+   "sha256": "0ad250dacf836899e9fcc70ae34cec1e026a81bbac6897e6e24bfb6196701e21",
+   "size": 624,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/sod.txt",
+   "sha256": "1a2a89ff8eba3aaae3c9533fda2566ac86f3e2b7402484ea4bcb6dda3ca9d47d",
+   "size": 952,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/2D/sound_wave.txt",
+   "sha256": "589cc0a9470a3cedb51a3a200fc136804804f112d1dd6300b487fdab76262e6a",
+   "size": 884,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Brio_and_Wu.txt",
+   "sha256": "f9f5b563a75383a10105e3ce46d02d42eab1385a8fcf58889520714aa3f856da",
+   "size": 1196,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_Scaling_128.txt",
+   "sha256": "aba7844aa9d1c9b19fc6995d32d186a32d563e0c9870be09ff8df9f51906c94e",
+   "size": 997,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_Scaling_256.txt",
+   "sha256": "7917f49631c0bd2890902f4bde7e32d04b980eba4eacfc9281568ed2c70f1adf",
+   "size": 998,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_Scaling_384.txt",
+   "sha256": "b806fd3bf805203d2fb50da9449393988594cc4ffb7e715683f65013947fed1a",
+   "size": 1001,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_cool_UV_50Mpc.txt",
+   "sha256": "224cfd416bcf1146ad44e17b830f32ca7e81392d7454c4fe474b242970c3c2e5",
+   "size": 1231,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_dm_50Mpc.txt",
+   "sha256": "83d20ddc5ec501f8bf71a151e8a6d0e913e2fa19211a6e1cfc01403415e1978b",
+   "size": 1398,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Cosmological_hydro_256_50Mpc.txt",
+   "sha256": "7ab323f2dae1b18bb7f5bc6ac8277dd7e3b36d8ab68985fc4beb28fe575bd23e",
+   "size": 1253,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Dai_and_Woodward.txt",
+   "sha256": "c1d1c6442c6692c77b1efa0d6536c226bbdd0e1f7ae78e7c477d34479b63e190",
+   "size": 1367,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Einfeldt_Strong_Rarefaction.txt",
+   "sha256": "4ae85f61f8d48e52ed65ef0878175bc308cd374d49c5f48c060c64d514d83320",
+   "size": 1186,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/KH_res_ind_3D.txt",
+   "sha256": "2ba27c477626dd154d40ff7f98ff8ca2861d4552938311a9fc7e79c3b814f47d",
+   "size": 624,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Noh_3D.txt",
+   "sha256": "a906e863b37856978b2b2ba4a011308a2ef23722fc16228db448edf61a7b0d0b",
+   "size": 608,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Ryu_and_Jones_1a.txt",
+   "sha256": "0f0eb1f96e957df1da4a4dad577d2cdadaf0f78417c38c108681f50501511266",
+   "size": 1414,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Ryu_and_Jones_4d.txt",
+   "sha256": "b841a071e58348d283cb366d1748bf8bc976ce3e92f784ebeab4f1dec70530d1",
+   "size": 1347,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Scaling_128.txt",
+   "sha256": "c057e7c6e3f1f46275a8ddf84d3fc552540fb96c20a96162474363396f30b829",
+   "size": 1103,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Scaling_256.txt",
+   "sha256": "6c72be3ef02534ce4ce6f28ca549fc99bfef5e09a3c8776a672e3bddb39bfe0a",
+   "size": 1105,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Spherical_Collapse.txt",
+   "sha256": "cc358cfcebe4d37089dc9d7609ff81882bfe51abecec96fd99137e59b01998e1",
+   "size": 589,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Spherical_Overpressure.txt",
+   "sha256": "379208502336fd885bba289af9be97082a5372ec74aa7eac021d252f7cb37c36",
+   "size": 593,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Uniform.txt",
+   "sha256": "2c0e34962beb5f7e074bc20e3dd65cc4f20414adaf8279131a6b33a0c354c3b1",
+   "size": 568,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/Zeldovich_Pancake.txt",
+   "sha256": "2362abc037a874bfb5a58e87b7a78b6d08cc6bf8c5ff0b2f44d67f6759e18e7a",
+   "size": 870,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/advecting_field_loop.txt",
+   "sha256": "8f9bbfaede9230df5e7385116f69b9f2cdb4749cb88a23de152f35a9568affeb",
+   "size": 1079,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/alfven_wave.txt",
+   "sha256": "c60ff84f5cc584de33c554d7992187b55c6542d4cd53803e3ed4eaf8ae25755f",
+   "size": 1525,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/circularly_polarized_alfven_wave.txt",
+   "sha256": "a4c49d143b85590502e83bf5200fb7bada33ddb8a542de3ecd4474fe4e518ff6",
+   "size": 1043,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/constant.txt",
+   "sha256": "eeaa565bf6dbea2639c7bfef4f1316af79a246a2a060f9c640f950746dc7fe46",
+   "size": 767,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/disk.txt",
+   "sha256": "90bbc3bb3f6a3534047540ac4d605a57d1c143222cce1b5e19add9b9156e2b58",
+   "size": 697,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/fast_magnetosonic.txt",
+   "sha256": "383ab291867863251404acc81936eea6d8856d9aa5fdefe780a3a750e2187d45",
+   "size": 1643,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/float32_sound_wave.txt",
+   "sha256": "5e220201955a5a0fdc44ece0c68152b613f75f788ee7a758b64b785e13e67348",
+   "size": 1070,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/mhd_blast.txt",
+   "sha256": "8c366d1bc2b6c1b23cce9c14c8c938d5faef6a34aff56ccf7076f0b68e4d2408",
+   "size": 1358,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/mhd_contact_wave.txt",
+   "sha256": "04edfd32f8b003b16d7979b434d677258e473313abde9909cc05cb0dadd03a28",
+   "size": 1521,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/orszag_tang_vortex.txt",
+   "sha256": "ade94e9791db1b9959694f3f41e04f450c6ed2e69bb6939c78c53699d0fabccb",
+   "size": 952,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/slow_magnetosonic.txt",
+   "sha256": "2b21bfc0ad08390fcea2d381bc22f3ea55feb775c2913357b5426f8a369a3021",
+   "size": 1643,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/sod.txt",
+   "sha256": "7d95002ecf513a7974272112c6a683289a6bb37eca14e8c389d3a45de40e3afb",
+   "size": 970,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/sod256.txt",
+   "sha256": "846cc869ddd325f0054570b26330dcc91359a4813391645c883aaa1a03f7724c",
+   "size": 970,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/3D/sound_wave.txt",
+   "sha256": "2c1e974f6dc86f099c67c0b9dac48982b6953094528382696c5e749acee80c69",
+   "size": 886,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/sample.txt",
+   "sha256": "56344cd5ab9e08710663c55b3e3297c3139f09e10cc01f832f56e48af846cc6f",
+   "size": 1339,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-hydro.sh",
+   "sha256": "a3facb5015d3e8c10ec252539d06178f4be3628c4dce51cdee2615806e2a0647",
+   "size": 517,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-paris-hipfft.sh",
+   "sha256": "b3da232a160bfbc27aa401ea0e0ecad55609fc11f3db77135d154a358f9fdbe7",
+   "size": 539,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-paris-pfft.sh",
+   "sha256": "040991ba47a4b32a2a838e88a28cbb6e8b2ed7ac8a45c9f2f1d325bd5153320c",
+   "size": 613,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-paris-sor.sh",
+   "sha256": "b286bc79113aa71b5a8e64e1e536e080f8cca3d7c3877f8902d534f27eb21055",
+   "size": 535,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-paris.sh",
+   "sha256": "fb123d9fa5d4e8e54887bb92c2ef342ddc8390f35ddd208df91c364e3e0432f9",
+   "size": 533,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/acrun-sor.sh",
+   "sha256": "0c47e65162bb0ba6e556c90c9310daa583c3330ac2d0c473c691d9ca594373bd",
+   "size": 529,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-hydro.sh",
+   "sha256": "d6ee638ff1106490067f9ee47143e8c39b8e5a1b7daaeb35560faf97895a8796",
+   "size": 491,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-paris-hipfft.sh",
+   "sha256": "9176748d1dde50a269e9bf77d52f52badb8e6fb4df9bb4e44c60fb22fd299c4d",
+   "size": 512,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-paris-pfft.sh",
+   "sha256": "0ce8ab35d645a7b5e249f9b77370a0c15a0d915ece8496c91fb58e0a8e72edc0",
+   "size": 544,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-paris-sor.sh",
+   "sha256": "ba5f24796a8d4ae5ba7b42d20d59507cda9e9074770b7c3205a6c59c3b158f90",
+   "size": 522,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-paris-sphere.sh",
+   "sha256": "f924e8b17482935a28293329da7a0d1b5e2e86f523c09e7ffbb1af947fd9547a",
+   "size": 497,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-paris.sh",
+   "sha256": "32a074f532f3fa7d965dfdc7914e45eca8afd76be5b6b9488e8517b2203f8761",
+   "size": 507,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/arun-sor.sh",
+   "sha256": "9877d1632d2027940f3cbc8f562df87a0215d3dd8ec3224f2939480c930d922f",
+   "size": 484,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/nrun-paris-cufft.sh",
+   "sha256": "422453a79fcf490ee181e9d66129f660f7c82bd7f0f50d81fb55e2fd722ddc21",
+   "size": 443,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/nrun-paris-pfft.sh",
+   "sha256": "d5ace23bb6b688fa51e410593ee514daa3331fcad41a04a6c2baa25644b5dc12",
+   "size": 527,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/nrun-paris-sor.sh",
+   "sha256": "d9c96fade1bf227c31e98fe63c6a13528384ae9e30a8798a9fb0824b6351e775",
+   "size": 451,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/nrun-paris.sh",
+   "sha256": "89b04392835aa76bc9620bb051db9c66e804ac8b2d9aa1397f8bc8129a7cf562",
+   "size": 442,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/nrun-sor.sh",
+   "sha256": "036e61742ecbddc4bf5ed297ed33b06bf2ca67fa8769639ac58c124b267868c3",
+   "size": 430,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/scripts/parameter_file.txt",
+   "sha256": "dd428ea960bab7c0951736a116c2baad56f4219222b9ca9aeb7fe726e71a7ff0",
+   "size": 814,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/examples/scripts/sphere.txt",
+   "sha256": "a36b6a94d74330a4b0ee9454dd93849123d67ccee60393237e87dabdfc29dcc6",
+   "size": 605,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/srun-paris-cufft.sh",
+   "sha256": "5f8252161bd1852787fb9da5103122c19b0d71e8ec833076734c13c3cf2925a3",
+   "size": 373,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/srun-paris-pfft.sh",
+   "sha256": "8e50fd4d161cdf1e89009f9ec25d97e6cd8f6f6261a318b14d8311416f3cd7af",
+   "size": 374,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/srun-paris-sor.sh",
+   "sha256": "9be55d50525bcf1f606424a70e1c8124f27e84ab4808452669a3411066f11148",
+   "size": 363,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/examples/scripts/srun-paris.sh",
+   "sha256": "d9b79f3d6aab3d0dd6ddf17fcf6ba7b96e69bc20b13e81d1b4d027a7a84ca4cd",
+   "size": 359,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/analysis.cpp",
+   "sha256": "203959b4ec2342ee7d81c75d40481553d2604163bb372a51712192c69ca74786",
+   "size": 8663,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/analysis.h",
+   "sha256": "85661e7c21390d66d0ce34573739e2e70c035e5a66e82ebdd8effacdfcf8ca6b",
+   "size": 7197,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/feedback_analysis.cpp",
+   "sha256": "1344de725eab5809aea11d008f5272741c053e0d7c097bc7767e1ee489cb5935",
+   "size": 4849,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/feedback_analysis.h",
+   "sha256": "4191aa5a441cc9bdacee4bb4ff04f5c5ff2bfe618b5c97f657252387b7883f8e",
+   "size": 555,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/feedback_analysis_gpu.cu",
+   "sha256": "2865d3cb0343cdd2c0b53c3b821be6adc72ad461105dbd30ae12f96631cbf0f8",
+   "size": 6273,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/io_analysis.cpp",
+   "sha256": "ab12b1d5170fc86cc9de6ecfc2a9117d8ac02631ed9b4bae33cbe6e9e21da550",
+   "size": 30929,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/lya_statistics.cpp",
+   "sha256": "61fd77928c2a03e649fd8a743de074c2d53e2c1c6a1a61418e243c55b77c22b3",
+   "size": 69890,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/analysis/phase_diagram.cpp",
+   "sha256": "017276976fde141fd1dbf4788a81332a40a7a3a2963dbf27438f03c60bbc6963",
+   "size": 4339,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/chemistry_functions.cpp",
+   "sha256": "783f1ff5e1d02437a0863c3d4038eb747fd4a45775958a49956014e9c4f5dfb2",
+   "size": 11400,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/chemistry_functions_gpu.cu",
+   "sha256": "8f7759b2e6479ec3b51daa195f4e5cf55278f22bf90e2a57b0306369ecf70930",
+   "size": 39624,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/chemistry_gpu.h",
+   "sha256": "1466ae28bedd5cc0d2fb065e52fae36f474945e586ef07b623c51e9a67f023dc",
+   "size": 3695,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/chemistry_io.cpp",
+   "sha256": "bd527c5e0a1416584dac211b69faf0f1760801916d957f1d6341acc36697c385",
+   "size": 2904,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/rates.cuh",
+   "sha256": "886ffc979d6adb937e0b28f65fd8dae0f3c4b12eeaeb537e69c924ac448beacb",
+   "size": 5844,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/rates_Katz95.cuh",
+   "sha256": "d7c630cf69f6b63a7e60c19b1d867dd7806d4774327b88cc5ec9307a92d59ab7",
+   "size": 1963,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/uvb_rates_P19.txt",
+   "sha256": "2d291cdecd6f68db020fded65d18134d782b6c8a6a6ff7111582e9de3b54798b",
+   "size": 10453,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/chemistry_gpu/uvb_rates_V21.txt",
+   "sha256": "ff25529f8ea99d052ba15cbe887502d548ae1209f76f7e62b85f8156369da5db",
+   "size": 24978,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cloudy_coolingcurve.txt",
+   "sha256": "977d720ab4f6f449558ae2e6b2c8358ef59f94583c4e0db335579a118c61692b",
+   "size": 362674,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling_cuda.cu",
+   "sha256": "f65178fb040c93cd79f99eae3cc0e1802cbaeb717e1c49ed7a7690023b36d9e1",
+   "size": 12315,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling_cuda.h",
+   "sha256": "ba0d514b83865f3d3f920fca954b28af028fc55b864b36dfe8d630239d8dea10",
+   "size": 2132,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/load_cloudy_texture.cu",
+   "sha256": "a066724b77b34709bdd4b8ffc0ac0fb8e02f59f8434059d8fd55f3dec3955587",
+   "size": 10181,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/load_cloudy_texture.h",
+   "sha256": "3496dbe1f1fa8202c4006e5f3d49f16206d9db0ede305a08a0918beb58beb1eb",
+   "size": 487,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/texture_utilities.h",
+   "sha256": "94dd5b1af1036a5e086aee7167788e48a1844220e67516dd7532c504472393d1",
+   "size": 1320,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling_grackle/cool_grackle.cpp",
+   "sha256": "5651305c38128f4045b7151c5751029474e2bd7b8b80ef036f0a544c638ef5d2",
+   "size": 6292,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling_grackle/cool_grackle.h",
+   "sha256": "c1074aa5e61190612d8e7b48afdd4a149f685440270f0408e161a2195d3d8fa1",
+   "size": 776,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling_grackle/grackle_functions.cpp",
+   "sha256": "1c334b60b5b3687ee37615312ebe816f73f4007631998fa661f8e166d954c0f9",
+   "size": 6305,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/cosmology.cpp",
+   "sha256": "0a091163d8a6a833d0f47f2d57e82f10915b3ea1a4be31ca74d9be53db94be6f",
+   "size": 2158,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/cosmology.h",
+   "sha256": "a10381d9ffaa134ea29d425a164aff237910d90b0674f23ca3703d4cfdba6fcf",
+   "size": 1193,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/cosmology_functions.cpp",
+   "sha256": "0611b9df41a8e368aeaee449ff00b74e8f337f49763553dd8ab8e8782972b51a",
+   "size": 3725,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/cosmology_functions_gpu.cu",
+   "sha256": "51bae14a52141136aca95a4f7ceba599a8a025bd4a908adeb359c446e637c996",
+   "size": 2919,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/cosmology_functions_gpu.h",
+   "sha256": "f635a70c2bfeac9c08432e79bfc341fbeac73eb36fe71cbf701021045c476338",
+   "size": 343,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cosmology/io_cosmology.cpp",
+   "sha256": "b22bc2d8a08732f6fcf17dc5a8d2c79ab44676d90f18a268475bfd04c70994a9",
+   "size": 2501,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/dust/dust_cuda.cu",
+   "sha256": "5890c12afba7a16c0ba4de83491fe5c239d574effdbd7726d4386b8d92e7b31a",
+   "size": 5667,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/dust/dust_cuda.h",
+   "sha256": "6704fb37bf688f82fc3dbf6f5fd26e11e8dc1952008499cd544e410dcce87c18",
+   "size": 2537,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/dust/dust_cuda_tests.cpp",
+   "sha256": "c102392fefd21c6c232789665809674775384dffa671a577e4cf7189044143a8",
+   "size": 2322,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/global/global.cpp",
+   "sha256": "faddc8efcaacdb66debab47c1e5769b6d01d6f77f17f1148f64c64b9fa3b088d",
+   "size": 16757,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/global/global.h",
+   "sha256": "5e5abd16dfbaf1ac5b358987ac096e9f032aba7da69d1148bca841e4895cecbd",
+   "size": 11017,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/global/global_cuda.cu",
+   "sha256": "3aab50c06e678af4665090cffff32c7f8c8e6306228c7b87c08310ef881f0fbb",
+   "size": 498,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/global/global_cuda.h",
+   "sha256": "9a57eb58c7184cda759ff0eb000fc0bdfbff1fdf468f111744c458e6e71cb946",
+   "size": 2092,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/grav3D.cpp",
+   "sha256": "11b256e11d26c59785588a762bfc6e60fa27c65192e7372fa20fbf9f3b9994d0",
+   "size": 6264,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/grav3D.h",
+   "sha256": "3475f369f25fb31a6ea11c5ebad83c3fe5214e1a3a86d7d11eb319a3a353fcc4",
+   "size": 4957,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_boundaries.cpp",
+   "sha256": "81a177b672645ec3c3bc5a7c36742c1010dd5dedf2e781035271cf2eab9b2ee6",
+   "size": 13537,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_boundaries_gpu.cu",
+   "sha256": "584f683debf325186644d55256a409b2fd763cb1b59229d53a3278f36bcb69a8",
+   "size": 13059,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_functions.cpp",
+   "sha256": "01cd7c7f167cb840468e896e7207a6efa5f241869ec5aa5a9095bb8c5a52fe66",
+   "size": 26649,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_functions_gpu.cu",
+   "sha256": "c51c6ce14d700256b97b028437e38248308e9a605d96eeec5c341482193c960a",
+   "size": 9629,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_restart.cpp",
+   "sha256": "b6b5190314411794a6ecab41094736695b413511253ece97cdcc8a0dcc700d7a",
+   "size": 2863,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/HenryPeriodic.cu",
+   "sha256": "e3b681b3e1febced814281b8aa000839275d2a34ba77ab241545a02b5646021a",
+   "size": 3178,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/HenryPeriodic.hpp",
+   "sha256": "b4d5c983f98161a02ed16d17c94ab46185ff0f6696137f518574add1bb6eef23",
+   "size": 15387,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/ParisPeriodic.cu",
+   "sha256": "d50f1d595b65b31122f9d4b34d94af4fa7e8c0b5ffd119d220be3acecab460f8",
+   "size": 3036,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/ParisPeriodic.hpp",
+   "sha256": "3c23234934f0d357119af3231d3082f3a4d392f7f8b831aa7ad281c1c72a4000",
+   "size": 2173,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/PoissonZero3DBlockedGPU.cu",
+   "sha256": "dbd6178f8708b09862ac65fd6afa7de0adef1b5219f4b6df449bec85c5471660",
+   "size": 22745,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/PoissonZero3DBlockedGPU.hpp",
+   "sha256": "34d27055613c577a85321362c62141b1801f5509a1505cd9190d860f80fab8d3",
+   "size": 704,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/paris/README.md",
+   "sha256": "286cef6d45e8279240693e8a43c44fd678e1105c1e2f9c05091be26297ff8bcb",
+   "size": 3421,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_SOR_3D.cpp",
+   "sha256": "4cef87aec8e39f5d63190ba088b9c66d0964d279513bc0692e6cdf95e2dda8df",
+   "size": 21936,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_SOR_3D.h",
+   "sha256": "655488e44a65c5e9b44cdc93e35323faff72603b1a73cbce6eeb1ee84a419560",
+   "size": 5880,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_SOR_3D_gpu.cu",
+   "sha256": "71c4b066973fe118f0ce07cda28be9198487e28d1f258d6b298f8a00dd2c733b",
+   "size": 28131,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_paris_3D.cu",
+   "sha256": "37666914f8bde99f7a9afd9fa758ee11ba2b133b137977861f076c235832b1bd",
+   "size": 6272,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_paris_3D.h",
+   "sha256": "fb8e779613ed9d7782252a48534b4c7e538fa67c3019cc00d8a227f2acef6d05",
+   "size": 685,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_paris_galactic.cu",
+   "sha256": "75e97e48b2b83a761e0ad0d755e64729c6578bf7d33d60a379286656046ca5f3",
+   "size": 5843,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/potential_paris_galactic.h",
+   "sha256": "c68ce73eef575fcc575779e61c63996469e263b7cb68e3714952f3a180c3bcca",
+   "size": 789,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/static_grav.h",
+   "sha256": "7fe864d9469e4d61c3580d2721b8573ff7a357a9baa5d1dd7a9fb6b71054670c",
+   "size": 8434,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/boundary_conditions.cpp",
+   "sha256": "d28acbdff73da5d0f75c742e96896bac93fda56a531b01d8b304b535a7b55414",
+   "size": 17623,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/cuda_boundaries.cu",
+   "sha256": "ef21e4a381c2fe72bffa3143aca545f12e3ae748970cea1e2187c536e11565c3",
+   "size": 17498,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/cuda_boundaries.h",
+   "sha256": "3b01c54e033389539e72d54a5afab2e4a809a675b57c9a453d968112ebe2574a",
+   "size": 1430,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/grid3D.cpp",
+   "sha256": "cc410506db76c91c2012472fabb8c0c7e738f2b0f80b7337a72c1f0648af6c92",
+   "size": 19542,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/grid3D.h",
+   "sha256": "5bc8804d039cbd128a50beb669f372fb041e80548213b79b11c010966bc93aab",
+   "size": 28614,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/grid_enum.h",
+   "sha256": "802702ced2d55902b4a0fb1a0c85e4ed5ef3569f28dc0bb45337734ff81a6ec6",
+   "size": 3162,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/initial_conditions.cpp",
+   "sha256": "d642c1c44532f553fc1b46760af7d10ce0fea17c2f5f0e78daf4ca6ee377ef78",
+   "size": 68121,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/grid/mpi_boundaries.cpp",
+   "sha256": "8ac259700c0e06b445d38788ff8333ee51fc1fe7ac51d13e8fe61bcf2a6bebd4",
+   "size": 36513,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/h_correction/flux_correction.h",
+   "sha256": "bf6ace282694e8d049833a87e7c0ca0c79da3a49ecd95534b1165bcaf38153b2",
+   "size": 1714,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/h_correction/h_correction_2D_cuda.cu",
+   "sha256": "c5b725595ccfacc95365e1b74d1c6aed78216dcfabaa99b425c732242362a500",
+   "size": 6966,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/h_correction/h_correction_2D_cuda.h",
+   "sha256": "9955dd8b9036460955e32d00a2d96358749afe7f2324c1f851a69aff0dd926b8",
+   "size": 2080,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/h_correction/h_correction_3D_cuda.cu",
+   "sha256": "ce1615b213c55a1a8e6718c3132bd97fc88c13f81f4d6d82385cd227a9f4b9f0",
+   "size": 11458,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/h_correction/h_correction_3D_cuda.h",
+   "sha256": "6c7e0adfe3006d6f0485eae0e1c5d78d0cf62dbc3c18da333a389cb03f11e5a2",
+   "size": 3031,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_cuda.cu",
+   "sha256": "adf7ad382d5e27d5bdb8ba1b5d95ff2f9d8a7efca93ac65a5cf4323ce7540cba",
+   "size": 53957,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_cuda.h",
+   "sha256": "5f218c466a53435057702fea13e79d3efb8de9a1eb762e02f5f013b04369bd05",
+   "size": 6939,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_cuda_tests.cu",
+   "sha256": "5e64107be0464db31a257e4bd63bc040f319c6a0468d91c6456e9b533c515dc5",
+   "size": 7957,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_1D_cuda.cu",
+   "sha256": "dc3638e6f639c5d958b412c5d2a3dcbab7bf06dba44af73a25c54af499fcf070",
+   "size": 8626,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_1D_cuda.h",
+   "sha256": "30df8c5fa5dae6f4c807ac8816c4f217bbe268e715d81372e723eba20a903d39",
+   "size": 388,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_2D_cuda.cu",
+   "sha256": "962cee1d11dfad784b66fce085062d741e16c2226116d3ca893ccb7a8a3f7c48",
+   "size": 11861,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_2D_cuda.h",
+   "sha256": "77daf9d17e4679f9d46cacb703e9bbf80bfd8a3f9feace8d3c39c1d586cdc1ff",
+   "size": 429,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_3D_cuda.cu",
+   "sha256": "d4c508cbe5ce85ba846bf1c133598e71dc723efacaa3ff12caefbf92eeeb3124",
+   "size": 28707,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/VL_3D_cuda.h",
+   "sha256": "d11e931d7e0e7c551b510cdf4b979752d93fbbbc434aca142e7a2541c92977c2",
+   "size": 567,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_1D_cuda.cu",
+   "sha256": "1e23c4ebd9c72096f7fc23ac6c85f1c2500a77bd7c9beac38089509430d66170",
+   "size": 4583,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_1D_cuda.h",
+   "sha256": "39c36aecf5fbcc25037abc4b1f3554a2414a8d2993cee8ab44718e6ba8084f70",
+   "size": 400,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_2D_cuda.cu",
+   "sha256": "fdab131dd7fac90c0e2fb7b89c385de209b9f8dd0cdd4a81d3dc903651bb0171",
+   "size": 5974,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_2D_cuda.h",
+   "sha256": "d13f4b989417687040dd221ab2bf61013681ac6ad14af81fcee497f095d8bbe4",
+   "size": 461,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_3D_cuda.cu",
+   "sha256": "0f46b13720f2e560ec7978fc4a2a4cc8a197a10d19008ca80a986314353f3976",
+   "size": 9242,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/integrators/simple_3D_cuda.h",
+   "sha256": "898e59c320b7528eccb6ebac90c98ee144c4d4ab7bce50729607320b38653d71",
+   "size": 647,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/io/io.cpp",
+   "sha256": "a57493176e2eb94c5e0d817f43430641d58d6cc7033a9fe7ee1b0cb36bd57160",
+   "size": 101262,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/io/io.h",
+   "sha256": "ac0ffc665f0a388c863b73cc1f94df6e20c484dfdf387eb8a569e603a9def59c",
+   "size": 5931,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/io/io_gpu.cu",
+   "sha256": "cf6aa3a5386779b9ed4f2f42e12717f9b7932f1d217396c220e60243052e9c18",
+   "size": 7092,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/io/io_parallel.cpp",
+   "sha256": "5d1ee4c00815e1fe66e14a25f06712a202b454782596cd3b14bfbd23f5863752",
+   "size": 5379,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/io/io_tests.cpp",
+   "sha256": "dd58840012cbae3a5a29c8928f4b7ae8e4a5bd10d889f5ee04050b6c6a6eccbe",
+   "size": 1425,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/main.cpp",
+   "sha256": "3d0e5a2883a1940a209df8b0b9fd8fa04f55eace4ff629e40f2c8014fbabc4c7",
+   "size": 10300,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/main_tests.cpp",
+   "sha256": "87bd62fea18a668db32399be404cd9628d9e29a91933efa46a16ae458d0ff3ae",
+   "size": 4643,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/ct_electric_fields.cu",
+   "sha256": "28bdfcff1c3a8c0345313094f9f3ca49090cd58bdd82d73c8733134b5f5e5303",
+   "size": 15797,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/ct_electric_fields.h",
+   "sha256": "72f3815cebace31dc61ba8e16f4faa71d1170c742192966514de1f30549a1fd7",
+   "size": 7260,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/ct_electric_fields_tests.cu",
+   "sha256": "0c90d4751de29d629a4c77c134584cd29ee78f079199de99007a52f6d4f2134b",
+   "size": 11868,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_divergence.cu",
+   "sha256": "bf654db3cb8559e0c91a26702a703186c619042274a0629294a12f4644f66692",
+   "size": 5578,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_divergence.h",
+   "sha256": "20c9ea3c51de0b573e6683b60ba5ffc3978c4b6ea849019be065d78d0a43d996",
+   "size": 2307,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_divergence_tests.cu",
+   "sha256": "664eb727928571f8b4276d22e7ba4ea2cf3f3210f3fc4649e8bf1954a31c15f5",
+   "size": 2296,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_update.cu",
+   "sha256": "a6010676cbec7bdaf0d416b7083433c5dbe093ab27f0c6c476bd3b617663235b",
+   "size": 3973,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_update.h",
+   "sha256": "9e58915ea45149ec8bccd05ef6d7c421e90676e3deb66a61ee330a89d80e8d5b",
+   "size": 1883,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mhd/magnetic_update_tests.cu",
+   "sha256": "20dcde5492a28482f722e7738ef162bb966800703ac614a0db648fb05bba09d5",
+   "size": 4707,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/model/disk_ICs.cpp",
+   "sha256": "3200822c4496750682d6fe7650989da9b5731ff7a3d6926ca0ce351c05e58760",
+   "size": 33057,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/model/disk_galaxy.h",
+   "sha256": "719866cab04e5e7b301b6302b994e2b9e1a3a24f8ee99457bb59ef03728093f7",
+   "size": 5436,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mpi/cuda_mpi_routines.cu",
+   "sha256": "4b06324896b1a623b49f8590c17eb04e1e1cd0a147076e40523fc5bcbfea24c5",
+   "size": 1646,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mpi/cuda_mpi_routines.h",
+   "sha256": "26f0e2498aa27dd6a688bb2732f0f6adcb6e9ca0c88a7fda63f0977a5a00525e",
+   "size": 330,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mpi/mpi_routines.cpp",
+   "sha256": "941a8447ba0c44e433a89280cc2bf9c507212686fb7a95e961ce16c4c4e09c55",
+   "size": 30789,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mpi/mpi_routines.h",
+   "sha256": "bf4c97be6ac1b2e36bbb8960f90e04f2ebe017b4238d54a8014c3f9ad647b676",
+   "size": 7168,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/density_CIC.cpp",
+   "sha256": "d6253cc74273fa8d1b8c95a426d431089d774cd4d511d21e6324f08ca9e3e235",
+   "size": 13814,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/density_CIC.h",
+   "sha256": "7db672f6559125a761493b58f66f6feba442905851ed3c0ce9a8431e05823a61",
+   "size": 263,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/density_CIC_gpu.cu",
+   "sha256": "c03bbfe45079f30a9bc48e0fb1e6d133a5af1ef43ae9910ca96884e6532fbe3f",
+   "size": 6876,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/density_boundaries.cpp",
+   "sha256": "b37502913e384bb8239165609551e4dfe8528beee431322980d3fcfcc395db7a",
+   "size": 7370,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/density_boundaries_gpu.cu",
+   "sha256": "310a9ce8fa22233d69824f7c9db291013fd427d11139fc3a2e4cc5863a6c664a",
+   "size": 8302,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/feedback_CIC_gpu.cu",
+   "sha256": "f54748999fc8bcb33db0cddef389b0e114c1aeff2c456e5e0bc31e5f9324dd95",
+   "size": 34615,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/gravity_CIC.cpp",
+   "sha256": "bdcc1558085246be4f0a515022fd4ad4cad78645817d9385394d2d3627cf9b54",
+   "size": 13663,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/gravity_CIC_gpu.cu",
+   "sha256": "cc13f9911d2f70bb97ffee792257c9a207d422cf2f4863ee387a430ba9924428",
+   "size": 14046,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/io_particles.cpp",
+   "sha256": "bda8166cf85a4dec3c3d51205e7403a353588b987071bcac627bf27f8db78e36",
+   "size": 29259,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_3D.cpp",
+   "sha256": "9cd3381f41bbc4d1740f1203ff12b9fdd19117c69ee7d11a17e7d6b5e6022631",
+   "size": 30199,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_3D.h",
+   "sha256": "c741253f6880f73255fee6cdc625f47edef8a01599691ee40a5710c0455661b3",
+   "size": 12522,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_3D_gpu.cu",
+   "sha256": "58010312907340ce2f62f9a11ea2a8d4ed3102d381f593426e1cbc9e43588c66",
+   "size": 7146,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_boundaries.cpp",
+   "sha256": "a0a203ecc296bc72c4a9805304fa3f893771915bf95b478ab79399279a0ce654",
+   "size": 44292,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_boundaries_cpu.cpp",
+   "sha256": "7960deb5239275d6a0c57abd50c48de4085e1aef518b87ed19de64d51aa80587",
+   "size": 23706,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_boundaries_gpu.cu",
+   "sha256": "132fb6dc490bc5e3b1ff41d98ee0cf87366faff74ae0590a04516606a82d559a",
+   "size": 18527,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_boundaries_gpu.h",
+   "sha256": "a2f83f6c68e52429e67bf6b7e225d3b75e4ddec5fcb21b1e146e02bdb4320adb",
+   "size": 2321,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_dynamics.cpp",
+   "sha256": "df1b0eca95021da85ccccadbbc8e1be26d7c6aa6d03a1edc3911cba64a582cb5",
+   "size": 14287,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/particles_dynamics_gpu.cu",
+   "sha256": "c0e3497cc8cc3762cd6daaf1e31ab653c8f5c1ae8268a9dfd69fcdd75e4e22aa",
+   "size": 12154,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/src/particles/starburst99_snr.txt",
+   "sha256": "a1572e89d860da3f16c6ab6806abfceddb92b13a7e13512b13c98a4b74068667",
+   "size": 125383,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/particles/supernova.h",
+   "sha256": "364e08c58335de5999c3555d45428262e47ee259545b87411ec39c73e87cd2e2",
+   "size": 1363,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/pcm_cuda.cu",
+   "sha256": "78f252708f1d888948d6434c5473fcb9de21b04345e2da6d47f099ec0c1c384c",
+   "size": 13699,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/pcm_cuda.h",
+   "sha256": "2d09306a4d3bd20b86f679d917a61af5c57e6bb8a37933ccb864bceb9150bab3",
+   "size": 965,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/plmc_cuda.cu",
+   "sha256": "560a69090dff363e497645e07aa7d39611e502fcf04fea07f9e1928798de88d3",
+   "size": 12667,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/plmc_cuda.h",
+   "sha256": "acea7d94ec05e4a73706150f2502ec5ba85b7acc283e7c9736ae41d0f7a90ee6",
+   "size": 872,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/plmc_cuda_tests.cu",
+   "sha256": "04230efd8ac151354ca6d0b808fede5c80aed20058f9490b73afbd7167fd2b2b",
+   "size": 15169,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/plmp_cuda.cu",
+   "sha256": "75e4a03e924c28fdc673948f62a2a2c3e86d5e15c3ff8b82dee3471ba581330f",
+   "size": 11385,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/plmp_cuda.h",
+   "sha256": "33cad6755717a88225b6420cc6817c396e38f9dd49d49b33fa6aa7378f3f06f1",
+   "size": 1074,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/ppmc_cuda.cu",
+   "sha256": "434c42b70ad4635447761ca9bafb1ec9f7dcdf5980a3e9d2ad54b7b9d7402637",
+   "size": 32375,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/ppmc_cuda.h",
+   "sha256": "7c884ad9ce902025d2bb0829fd7bbee5210f99225ba0858a6bb94b7fd9fb63bc",
+   "size": 2950,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/ppmc_cuda_tests.cu",
+   "sha256": "1d6435e64fcae1530df4a7fdba5298e4022e2c9d46ad8cc241ba7437207e7424",
+   "size": 15184,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/ppmp_cuda.cu",
+   "sha256": "0e1b4e8edebd1c5c019e1f378a069fce04548b66bd6f23f6ee4bf5608cc9d5e4",
+   "size": 29233,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/ppmp_cuda.h",
+   "sha256": "28eb15d04dd7637bc9159118594ca485f927177739fef6b3a8c66babc6d26ee7",
+   "size": 1835,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/reconstruction.h",
+   "sha256": "505ad8a8f37d32226b863d4680c0278ea23b0fa296267e067898844257ab2ba5",
+   "size": 46733,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/reconstruction/reconstruction_tests.cu",
+   "sha256": "50a15f7f6dc060fa16225dcd6b4501b21701b85aaad0cc1f3af0a1252f8ed8ca",
+   "size": 39836,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/exact_cuda.cu",
+   "sha256": "5acf916dc08cec9879fd205cb774b91ab9de8aca2fbe0cd480a3db7d0f4eee79",
+   "size": 10897,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/exact_cuda.h",
+   "sha256": "992d483640ff1b38e9cecf69d00db92cd3a56b410f4171962240e2c646b93727",
+   "size": 1262,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hll_cuda.cu",
+   "sha256": "3fcebb02061c075a5fa53d40552b4441b7ba46fa87e2739b7d7026d8af0fc925",
+   "size": 8154,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hll_cuda.h",
+   "sha256": "036d13ae9d3935a3aca04aa3c5773b24814210b23be0ea9bff94e888c56173f8",
+   "size": 665,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hllc_cuda.cu",
+   "sha256": "12b85f8f97a315790f607ee2bd5171d39bef76ecf8a121d03711b995178c8e35",
+   "size": 9481,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hllc_cuda.h",
+   "sha256": "b439cc791082bac99eedc33f5690dedd41007446123f6e5702d0065607ca1a7b",
+   "size": 669,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hllc_cuda_tests.cu",
+   "sha256": "936a52fd83f718bcf8c36714ed908b11a1a0e4c5840df6b5c47c8f7cc75cd002",
+   "size": 7628,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hlld_cuda.cu",
+   "sha256": "c74d7952c34f27f1f71dc9e682634fc5851af8b4ddebf44d1ce50319fd1f1217",
+   "size": 25096,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hlld_cuda.h",
+   "sha256": "0bab81a8d74d4a524cc369df491dc88440fa4f8e2c42f12739715e975fcf9b03",
+   "size": 10804,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/hlld_cuda_tests.cu",
+   "sha256": "27412e72ae500321bd962c9a12575b3a53adb7fecdde245233e367329de2d7dc",
+   "size": 134107,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/roe_cuda.cu",
+   "sha256": "11beb1c7194576c2474e2fd87477bbbedcbb53f1f2e8f855c28b7eca6640e142",
+   "size": 12522,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/riemann_solvers/roe_cuda.h",
+   "sha256": "ea2019dbe790e1f7232c7bc4d1993627eef60dc6af393d87650401289ff61692",
+   "size": 677,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/cooling_system_tests.cpp",
+   "sha256": "26b2e224796d65265871ad37102927a2f7db37981787e60652b7b6ae7aaab517",
+   "size": 2529,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/gravity_system_tests.cpp",
+   "sha256": "9f5f91e4d3bd343c6fecf70fa9e98da910b7fbe80c26696ea3a20268466f0178",
+   "size": 900,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/hydro_system_tests.cpp",
+   "sha256": "d1035825ac979176a54ff0921cb8e30c11a94b068be939c00cd3b5cc0bc507d6",
+   "size": 11876,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/blank_settings_file.txt",
+   "sha256": "3363112f1edb4c54300f99604e1d52450820a90ee88cec71a3eb8f377177710e",
+   "size": 140,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tCOOLINGSYSTEMConstant5_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "c7acf077fccf054096590322b9067e48c9790c5487af5ccd44b661c6c625f70a",
+   "size": 1235,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tCOOLINGSYSTEMConstant7_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "db8094b185e0cc4247d9ec60d5465ea05021c7ed2986f867568613b21fb42f62",
+   "size": 1235,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tCOOLINGSYSTEMConstant8_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "8e084f785a1f1b2a40e925ce7a05897555fa7834365429d50f74b60639194ee5",
+   "size": 1227,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tGRAVITYSYSTEMSphericalCollapse_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "cfc4a32d4e92cf9b5d12388f6ff323840b3d22498fb61bf4d42391aea0f333df",
+   "size": 583,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROSYSTEMSodShockTube_OneDimensionalCorrectInputExpectCorrectOutput.txt",
+   "sha256": "459fa7ea5006c84f3887f3b5a6954da151c8c211141ad47ac7e3d9a530b5cada",
+   "size": 948,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROSYSTEMSodShockTube_TwoDimensionalCorrectInputExpectCorrectOutput.txt",
+   "sha256": "ba77db227b49ec91db075f2df584ac228d62bdc3f6f247ae3a270f57bcae423e",
+   "size": 949,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROtMHDReadGridHdf5_RestartSlowWaveExpectCorrectOutput.txt",
+   "sha256": "7dfdb4c0c754909c42bc7ae2191ebdcc36412fb5ccc0e078fabf6cbc9592f684",
+   "size": 1640,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROtMHDSYSTEMConstant_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "352fc1db75e13bea9545a00478a476ae45d1314b474f236b28a65f8bcee0a712",
+   "size": 681,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROtMHDSYSTEMSodShockTubeParameterizedMpi_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "5da342f90283d57fa5abafacb14e01cfc030a40f09ad2150b154743d7d31fa08",
+   "size": 950,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tHYDROtMHDSYSTEMSoundWave3D_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "bce29b5fba67ed2e4cdc071c281c35a974e1a35f397601be994330b5cbbd16e4",
+   "size": 1136,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_AdvectingFieldLoopCorrectInputExpectCorrectOutput.txt",
+   "sha256": "ff65df9d32c069dac22ab34d798edaaaa2e54b33dfb4d50b5f22cfd60368d92f",
+   "size": 1068,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_BrioAndWuShockTubeCorrectInputExpectCorrectOutput.txt",
+   "sha256": "54211dd739a45baa50546ebbf676cdb6eac059561c2794a53724a614bebd0b42",
+   "size": 1193,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_ConstantWithMagneticFieldCorrectInputExpectCorrectOutput.txt",
+   "sha256": "d953c4b6f11e272518fa25623ccb2b7186f5af1b72dca693ab505f479f586d73",
+   "size": 767,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_ConstantWithZeroMagneticFieldCorrectInputExpectCorrectOutput.txt",
+   "sha256": "3d9be79c8a79fa30cdf6bde84fdb72d105329a53a79f399af008500a2529c45b",
+   "size": 758,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_DaiAndWoodwardShockTubeCorrectInputExpectCorrectOutput.txt",
+   "sha256": "2c117017f35ee678b1d36b4b1df094eb933806a94ec690e124feed4067ff2205",
+   "size": 1364,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_EinfeldtStrongRarefactionCorrectInputExpectCorrectOutput.txt",
+   "sha256": "4ae85f61f8d48e52ed65ef0878175bc308cd374d49c5f48c060c64d514d83320",
+   "size": 1186,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_MhdBlastWaveCorrectInputExpectCorrectOutput.txt",
+   "sha256": "ba5097d1c5c9ede455a417e2f3323e26a5c087969b6aea64cfea898c71287555",
+   "size": 1356,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_OrszagTangVortexCorrectInputExpectCorrectOutput.txt",
+   "sha256": "b9dbe531ee9c8dd8ce0b28ef76d80b899a161a909db3dd1ecdd09a56654c2817",
+   "size": 949,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_RyuAndJones1aShockTubeCorrectInputExpectCorrectOutput.txt",
+   "sha256": "9f6ca2c5adf33123be8302bf9671eaedd6966a527c0ab677b7329e2c74a1d1fd",
+   "size": 1411,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tMHDSYSTEMParameterizedMpi_RyuAndJones4dShockTubeCorrectInputExpectCorrectOutput.txt",
+   "sha256": "b841a071e58348d283cb366d1748bf8bc976ce3e92f784ebeab4f1dec70530d1",
+   "size": 1347,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/input_files/tPARTICLESSYSTEMSphericalCollapse_CorrectInputExpectCorrectOutput.txt",
+   "sha256": "93aa104cd78e2ec498ac8d8f8546746f090629713521ec1fc3f7fe3e4f9b33d2",
+   "size": 613,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/mhd_system_tests.cpp",
+   "sha256": "926466fb03aa262172d48d3736048821701b831c3e4e0fcd7ef3d50baea97994",
+   "size": 38530,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/particles_system_tests.cpp",
+   "sha256": "8a5d4cd7f2798bc7cf31a7017d3b03743a48c79346e76b7785cd9b6b97700f31",
+   "size": 915,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/system_tester.cpp",
+   "sha256": "b73d20bf0e2e372879029977bbe0387abae75abe201eec78e5e9fa8e217b4770",
+   "size": 32370,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system_tests/system_tester.h",
+   "sha256": "d47ac6ddd1a6dce1833dd685a881c33e4dfa656f4f228b75287d4f519fb4b53d",
+   "size": 14121,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/DeviceVector.h",
+   "sha256": "bb281da74e5b187ccb9a896ec6710380ab928635931bf4e627bc67487fe25d64",
+   "size": 11586,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/DeviceVector_tests.cu",
+   "sha256": "0985ca32b47d441ca0593a18c0bf251941a3d5b45db3e073ce5a7dabdb499a0d",
+   "size": 11017,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/cuda_utilities.cpp",
+   "sha256": "0d8f209bddc96c6293fc9450070a3926e64be7a5b357989d3072efc03f5667d1",
+   "size": 1284,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/cuda_utilities.h",
+   "sha256": "a2cf203e8eb95d8d67429e33bd2931e3f49a94682165f90566cd84d4c4631b90",
+   "size": 4307,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/cuda_utilities_tests.cpp",
+   "sha256": "275d6fc73f16211c54396b1b9aa2604582ac5335604d083fec0c05581f744fa6",
+   "size": 3305,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/debug_utilities.cu",
+   "sha256": "eeef081f62d3c1d0d83c56f1c9d24b37e7edf6dfa49a999c74954b12ee02302c",
+   "size": 1892,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/error_check_cuda.cu",
+   "sha256": "1c7cfef8c1e2e2899d780c279541c9e3f3fe4b365aaaf06ecedb7ce5d8ad23e7",
+   "size": 1963,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/error_check_cuda.h",
+   "sha256": "a234798d95a34c5ae1c6c9263efb2649ed65283dbcafd9a3a86d5127425f94b0",
+   "size": 534,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/error_handling.cpp",
+   "sha256": "00ace5d79db396dcee402d7ac313e8a3ea303ca70e27c532366e6c60f194a626",
+   "size": 6627,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/error_handling.h",
+   "sha256": "9beb717e9d8a1487f2768ebe1a23ad1fbecb0a3bfd51cf46c72804f43978e38c",
+   "size": 2705,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/gpu.hpp",
+   "sha256": "ea69369995817b03623b9a0d1448c71796596249e4ed3a1dbc2165edd4b3e4e1",
+   "size": 14890,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/gpu_arrays_functions.cu",
+   "sha256": "029437b89d3ed67124513e055d1c4e06e2a52da248868cd3549427e5ca5de09b",
+   "size": 2051,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/gpu_arrays_functions.h",
+   "sha256": "37e0677cda8de62c897b809deaaf018f6506f999ccf22a4ff7359735a1241c34",
+   "size": 1727,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/hydro_utilities.cpp",
+   "sha256": "e0bd01ae4b3e84eb0898bb81f1e6cfb52898adaabe5e553efe7b976ebe92f81d",
+   "size": 103,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/hydro_utilities.h",
+   "sha256": "de7f502d97653bd8d11859262e39f4a0b607e12b053fb66e561b807160b14e86",
+   "size": 7286,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/hydro_utilities_tests.cpp",
+   "sha256": "df0d66f927c4d3b7296f786c8cfc2fa6e1162205191a99fbc6a6c9a976f0a7e4",
+   "size": 11265,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/math_utilities.h",
+   "sha256": "7edc9df54faeda2d163def816dc6f5d7dd24edeb4475bf8db68b68e78a70a212",
+   "size": 3459,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/math_utilities_tests.cpp",
+   "sha256": "e9547e7177227f18214e8dedb6ae2c836e37465f7f7605e163083250f6139f88",
+   "size": 2727,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/mhd_utilities.cu",
+   "sha256": "3177372e97e2d0b98ab2a01784e22ccdb4aa5b3800c06257572728a99f6e3c2d",
+   "size": 2094,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/mhd_utilities.h",
+   "sha256": "e124db9f4b90082b84bea4a1b9af0de9f4c43b57a8a77f0931820be7640b0eaf",
+   "size": 11216,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/mhd_utilities_tests.cu",
+   "sha256": "7bc6344c0224abcb689ef11ab037fe4ba06fdc5059a145614d28f7b46ae9877a",
+   "size": 17600,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/parallel_omp.cpp",
+   "sha256": "fbd1ed6da93d807de159ac67048f1ca272adf67851c7a95a9fcfdbcbee19c9cd",
+   "size": 1394,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/parallel_omp.h",
+   "sha256": "423071f4b39e5ae9e844862be24117bfa2a6ebbd2539a7278af81fa8f6d851cf",
+   "size": 599,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/prng_utilities.h",
+   "sha256": "6692f285b0be76d71bce45da032b2f2b59eb84af84c2df03bb9365f0684b5da1",
+   "size": 1262,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/reduction_utilities.cu",
+   "sha256": "8130843d2e8d40f6afcef38c9f8d99df56c5de61ae3cb7b11760b943bdd2b962",
+   "size": 1337,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/reduction_utilities.h",
+   "sha256": "53acd38f5e846b11c35ff4d55ee845f7958c3fa82dd48092eae6890ad4e98955",
+   "size": 10342,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/reduction_utilities_tests.cu",
+   "sha256": "128447da28a416666078ac978ec154ef9fce9fef553823c04f0d6be88ea04912",
+   "size": 2462,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/testing_utilities.cpp",
+   "sha256": "cec6ea69eb6ee39aa20b340aed504aec6b8c1104dade23f964689aecf0de99f5",
+   "size": 4109,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/testing_utilities.h",
+   "sha256": "1a329edc3b0415e9b5763d5d33fb174e6b14851772e329f4e44f0520cfc46d99",
+   "size": 8760,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/timing_functions.cpp",
+   "sha256": "77c29da348e732a5e35cc9024d5631cc4a04a1417391ae973887931f45b96473",
+   "size": 6758,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/utils/timing_functions.h",
+   "sha256": "28e8ba39f14eec807d163c8f72e522dcd5c72aec13ed5a12023e4ff06deb50ff",
+   "size": 2043,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/tools/analyze_tidy_checks.py",
+   "sha256": "113bc8f8e20ce4b75cb8ca6d5a997045803472f0b5c9e2eba56ae45d4e2db335",
+   "size": 3309,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/tools/cholla-nv-compute-sanitizer.sh",
+   "sha256": "a94a91a42c94a88711a3541d4a8c3aad759378165c662fd60aa769a09eb175b3",
+   "size": 3447,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/tools/clang-format_runner.sh",
+   "sha256": "231f2be6345d3bb96332fe3c91ad30c031d77d9ece2fe9d16a254a4971631abe",
+   "size": 581,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/tools/clang-tidy_runner.sh",
+   "sha256": "ee6d152f1c2d82d2d6130d895a2f715525cb317d500f46fd2620f1902cf32b4a",
+   "size": 664,
+   "type": "F"
+  }
+ ],
+ "name": "cholla",
+ "schema": "hpcperf-source-manifest-1",
+ "source_tree_sha256": "44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450",
+ "symlinks": 0,
+ "uncompressed_size": 2825391,
+ "variant": null
+}

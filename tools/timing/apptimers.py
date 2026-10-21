@@ -361,7 +361,36 @@ def picongpu(d):
             "parts": {}, "files": ["run.log"]}
 
 
+def cholla(d):
+    """Cholla: the sum of the application's own per-step timer over the time-step loop.
+
+    src/main.cpp:247-325: inside `while (G.H.t < P.tout)` the program takes start_step = Get_Time() (line 252)
+    before the step (set_dt, the hydro update, Update_Time, boundary conditions) and stop_step = Get_Time()
+    (line 316) after it, and prints 'n_step: N   sim time: t   sim timestep: dt  timestep time = <ms> ms
+    total time = <s> s' (lines 322-325); the HDF5 output of the step (Write_Data, line 344) comes after the
+    print. The timed region is the sum of the 'timestep time' values of all steps = the whole hydrodynamics
+    loop without initialization (grid set-up, initial conditions, the initial snapshot: all before 'Starting
+    calculations.') and without the output writes; steps = the last n_step. 'total time' (wall since program
+    start, initialization included) is recorded as the set-up estimate: the first line's total minus its step."""
+    t = _stdout(d)
+    rows = re.findall(r"^n_step:\s+(\d+)\s+sim time:\s+" + NUM + r"\s+sim timestep:\s+" + NUM + r"\s+timestep time =\s+" + NUM + r" ms\s+total time =\s+" + NUM + r" s\s*$", t, re.M)
+    if not rows:
+        raise TimerMissing("no 'n_step: ... timestep time = <ms> ms' line in run.log (the time-step loop did not run)")
+    wall = sum(float(r[3]) for r in rows) / 1000.0
+    setup = float(rows[0][4]) - float(rows[0][3]) / 1000.0
+    return {"wall_s": wall, "steps": int(rows[-1][0]), "excluded_s": None, "setup_s": setup,
+            "parts": {"final_time": float(rows[-1][1])}, "files": ["run.log"]}
+
+
 TIMERS = {
+    "cholla": Timer(
+        cholla, [],
+        "sum of the per-step 'timestep time' of every step of the time-step loop (src/main.cpp:247-325: set_dt, "
+        "the hydro update, Update_Time, boundaries); initialization, the initial snapshot and the output writes "
+        "are outside.",
+        ["src/main.cpp:247-252", "src/main.cpp:316-325", "src/main.cpp:344"],
+        "rank 0's clock (one rank per registered input)",
+        "effectively: Calc_Inverse_Timestep / set_dt copy the time-step reduction from the device at every step"),
     "picongpu": Timer(
         picongpu, [],
         "'calculation  simulation time' = the time-step loop (particle push, current deposition, field solve, "

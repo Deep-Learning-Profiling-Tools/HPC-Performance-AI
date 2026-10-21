@@ -1,0 +1,208 @@
+# Registered inputs of Cholla (v3.0.0, hydro build type; schema hpcperf-inputs-1), selected through
+# HPCPERF_CHOLLA_INPUT=<id> in run.sh (tools/inputs/README.md). An input is a parameter file under inputs/
+# derived from upstream's examples/3D (the derivation stated per input; sod-256 is upstream's file as shipped
+# without its outdir line); run.sh gives Cholla the registered file in place and the run directory's out/ as the
+# only command-line override (upstream's own key=value mechanism). One MPI rank on one GPU per input.
+schema: hpcperf-inputs-1
+benchmark: cholla
+level: 3
+selector: HPCPERF_CHOLLA_INPUT
+default_input: sod-256
+entry:
+  kind: run.sh
+  path: level3/cholla/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    Cholla's own per-step timer: src/main.cpp:247-325 takes Get_Time() before (line 252) and after (line 316) every
+    iteration of `while (G.H.t < P.tout)` -- set_dt, the hydro update (reconstruction, Riemann solver, Van Leer
+    update), Update_Time, the boundary conditions -- and prints it as 'timestep time = <ms> ms'. The timed region
+    is the sum over all steps = the whole hydrodynamics loop; initialization (grid, initial conditions, the initial
+    snapshot, all before 'Starting calculations.') and the HDF5 output writes (Write_Data after the print, line 344)
+    are outside. The same sum is the headline timer of tools/timing (apptimers.py: cholla).
+  kind: app_timer
+  app_timer:
+    source: tools/timing/apptimers.py:cholla
+    region: "sum of 'timestep time' over the n_step lines = every iteration of the time-step loop (src/main.cpp:247-325)"
+    relation: identical
+baseline:
+  method: >-
+    every input is checked by check_cholla.py (the `check` block) on its final HDF5 output: the problem's physical or
+    analytic criterion (the exact Riemann solution for the Sod tubes, the analytic sound wave, the analytic Noh state,
+    conservation for the blast) plus a frozen self-baseline digest of the final fields (reference/<id>.json: sums,
+    extrema and 8^3 block means per field, within 5e-12 of the unmodified build's run -- upstream's fixed epsilon for
+    its fiducial-data system tests; Cholla is deterministic run to run). The registry keeps from stdout the parameter
+    banner (grid, tout, init: exact), the step count the loop ran (exact: the CFL sequence of the registered problem),
+    the final simulation time (= tout) and the final snapshot index.
+  reference: >-
+    frozen references reference/<id>.json (check_cholla.py --make-reference, provenance and the rule inside) through
+    the `check` block; stdout quantities against the registered parameter file
+  quantities:
+    - name: steps
+      role: required
+      regex: '^n_step:\s+(?P<value>\d+)\s+sim time:'
+      select: last
+      compare: {rule: exact}
+    - name: final_sim_time
+      role: required
+      regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:'
+      select: last
+      compare: {rule: exact}
+    - name: final_snapshot
+      role: required
+      regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$'
+      select: last
+      compare: {rule: exact}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    four physical problems of upstream's examples/3D at one-GPU sizes: the Sod shock tube at two grid sizes (256^3
+    and 512^3), a linear sound wave over one period (512^3), the Noh implosion (200^3) and a spherical blast (256^3)
+  upstream_inputs_not_added:
+    - "examples/3D/KH_res_ind_3D.txt (Kelvin-Helmholtz, 128^3, t = 3): 3445 steps of 2 ms, no analytic criterion -- not registered"
+    - "examples/3D/Scaling_*.txt and the Cosmological_* inputs: cosmology / particle build types with initial-condition files that are not shipped"
+    - "the MHD examples (mhd build type) and the 1-D / 2-D problems (too small for a GPU): not registered"
+inputs:
+  - id: sod-256
+    case: sod-shock-tube
+    variant: default
+    source:
+      kind: upstream-file
+      upstream: {repo: cholla-hydro/cholla, version: v3.0.0 8478c9ede8a5e2cb72d6481a50023666d489a763, path: examples/3D/sod256.txt}
+    params: {id: sod-256, params: inputs/sod-256.txt, problem: sod, init: Riemann, grid: 256x256x256, nx: 256, ny: 256, nz: 256, cells: 16.8 M, tout: 0.2, tout_printed: '0.200000', steps: 402, final_snapshot: 1, reference: reference/sod-256.json}
+    files: [inputs/sod-256.txt]
+    runtime_config: {gpus: 1, ranks: 1}
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: parameter_banner, role: required, regex: '^Parameter values:\s+nx = 256, ny = 256, nz = 256, tout = 0.200000, init = Riemann,', compare: {rule: present}}
+        - {name: steps, role: required, regex: '^n_step:\s+(?P<value>\d+)\s+sim time:', select: last, compare: {rule: near, value: 402, tol: 0}}
+        - {name: final_sim_time, role: required, regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:', select: last, compare: {rule: near, value: 0.2, tol: 1.0e-6}}
+        - {name: final_snapshot, role: required, regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 1, tol: 0}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.sod-256}
+      command: [python3, '{bench_dir}/check_cholla.py', sod, --run-dir, '{repo}/build/level3/cholla/cuda/run.check.sod-256/sod-256.np1', --params, '{bench_dir}/{param:params}', --reference, '{bench_dir}/{param:reference}', --label, sod-256]
+      pass_regex: '^PASS: Cholla check'
+      fail_regex: '^FAIL: Cholla check'
+      basis: >-
+        the exact solution of the Riemann problem (Toro 1999) at t = 0.2 against the y,z-averaged profiles: L1 errors of density, velocity and pressure within 1.5 x the unmodified build's frozen L1 errors (reference/sod-256.json; a Riemann-solver or reconstruction defect raises them by 4-10 x), plus the frozen self-baseline digest (upstream's system tests compare whole fields to fiducial files at a fixed epsilon of 5e-12; the hydro step is deterministic: two runs agree bitwise); the final output time must equal tout
+      covers: all
+      timeout: 1800
+    notes: "the run.sh default: upstream's examples/3D/sod256.txt as shipped (the Sod shock tube, planar along x, 256^3 cells, t = 0.2)"
+  - id: sod-512
+    case: sod-shock-tube
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: cholla-hydro/cholla, version: v3.0.0 8478c9ede8a5e2cb72d6481a50023666d489a763, path: examples/3D/sod256.txt}
+      derivation: >-
+        upstream's examples/3D/sod256.txt with nx = ny = nz = 512 (134 M cells; everything else as shipped): the same problem at the next grid size, 806 time steps instead of 402
+    params: {id: sod-512, params: inputs/sod-512.txt, problem: sod, init: Riemann, grid: 512x512x512, nx: 512, ny: 512, nz: 512, cells: 134 M, tout: 0.2, tout_printed: '0.200000', steps: 806, final_snapshot: 1, reference: reference/sod-512.json}
+    files: [inputs/sod-512.txt]
+    runtime_config: {gpus: 1, ranks: 1}
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: parameter_banner, role: required, regex: '^Parameter values:\s+nx = 512, ny = 512, nz = 512, tout = 0.200000, init = Riemann,', compare: {rule: present}}
+        - {name: steps, role: required, regex: '^n_step:\s+(?P<value>\d+)\s+sim time:', select: last, compare: {rule: near, value: 806, tol: 0}}
+        - {name: final_sim_time, role: required, regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:', select: last, compare: {rule: near, value: 0.2, tol: 1.0e-6}}
+        - {name: final_snapshot, role: required, regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 1, tol: 0}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.sod-512}
+      command: [python3, '{bench_dir}/check_cholla.py', sod, --run-dir, '{repo}/build/level3/cholla/cuda/run.check.sod-512/sod-512.np1', --params, '{bench_dir}/{param:params}', --reference, '{bench_dir}/{param:reference}', --label, sod-512]
+      pass_regex: '^PASS: Cholla check'
+      fail_regex: '^FAIL: Cholla check'
+      basis: >-
+        as sod-256 (its own frozen L1 errors and digest, reference/sod-512.json)
+      covers: all
+      timeout: 1800
+    notes: "the 512^3 Sod shock tube (derived, see source.derivation)"
+  - id: sound-wave-512
+    case: sound-wave
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: cholla-hydro/cholla, version: v3.0.0 8478c9ede8a5e2cb72d6481a50023666d489a763, path: examples/3D/sound_wave.txt}
+      derivation: >-
+        upstream's examples/3D/sound_wave.txt (a linear sound wave of amplitude 1e-4 on a 4^3 periodic box, c_s = 1, wavelength 1) with nx = ny = nz = 512 instead of 256 and tout = outstep = 1.0 instead of 0.05 / 0.01: exactly one wave period (upstream's example stops after 1/20 of a period), with the initial and the final output only
+    params: {id: sound-wave-512, params: inputs/sound-wave-512.txt, problem: soundwave, init: Sound_Wave, grid: 512x512x512, nx: 512, ny: 512, nz: 512, cells: 134 M, tout: 1.0, tout_printed: '1.000000', steps: 427, final_snapshot: 1, reference: reference/sound-wave-512.json}
+    files: [inputs/sound-wave-512.txt]
+    runtime_config: {gpus: 1, ranks: 1}
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: parameter_banner, role: required, regex: '^Parameter values:\s+nx = 512, ny = 512, nz = 512, tout = 1.000000, init = Sound_Wave,', compare: {rule: present}}
+        - {name: steps, role: required, regex: '^n_step:\s+(?P<value>\d+)\s+sim time:', select: last, compare: {rule: near, value: 427, tol: 0}}
+        - {name: final_sim_time, role: required, regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:', select: last, compare: {rule: near, value: 1.0, tol: 1.0e-6}}
+        - {name: final_snapshot, role: required, regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 1, tol: 0}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.sound-wave-512}
+      command: [python3, '{bench_dir}/check_cholla.py', soundwave, --run-dir, '{repo}/build/level3/cholla/cuda/run.check.sound-wave-512/sound-wave-512.np1', --params, '{bench_dir}/{param:params}', --reference, '{bench_dir}/{param:reference}', --label, sound-wave-512]
+      pass_regex: '^PASS: Cholla check'
+      fail_regex: '^FAIL: Cholla check'
+      basis: >-
+        the analytic linear sound wave at t = 1 (one period): density = 1 + A sin(2 pi (x - c_s t)), momentum_x = A sin(2 pi (x - c_s t)); L1 and maximum error of both within 0.1 x A = upstream's one-period linear-wave tests (hydro_system_tests.cpp tHYDROtMHDSYSTEMLinearWavesParameterizedMpi: allowedL1Error = allowedError = 1e-7 for A = 1e-6 with PLMC); plus the frozen self-baseline digest; the final output time must equal tout
+      covers: all
+      timeout: 1800
+    notes: "the 512^3 linear sound wave over one period (derived, see source.derivation)"
+  - id: noh-200
+    case: noh-implosion
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: cholla-hydro/cholla, version: v3.0.0 8478c9ede8a5e2cb72d6481a50023666d489a763, path: examples/3D/Noh_3D.txt}
+      derivation: >-
+        upstream's examples/3D/Noh_3D.txt (200^3, t = 2, reflecting lower and the analytic Noh inflow upper boundaries) with outstep = 2.0 instead of 0.01: the initial and the final output only instead of 200 intermediate snapshots of 320 MB (the computation is unchanged; the snapshot writes are outside the timed region in any case)
+    params: {id: noh-200, params: inputs/noh-200.txt, problem: noh, init: Noh_3D, grid: 200x200x200, nx: 200, ny: 200, nz: 200, cells: 8.0 M, tout: 2.0, tout_printed: '2.000000', steps: 1709, final_snapshot: 1, reference: reference/noh-200.json}
+    files: [inputs/noh-200.txt]
+    runtime_config: {gpus: 1, ranks: 1}
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: parameter_banner, role: required, regex: '^Parameter values:\s+nx = 200, ny = 200, nz = 200, tout = 2.000000, init = Noh_3D,', compare: {rule: present}}
+        - {name: steps, role: required, regex: '^n_step:\s+(?P<value>\d+)\s+sim time:', select: last, compare: {rule: near, value: 1709, tol: 0}}
+        - {name: final_sim_time, role: required, regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:', select: last, compare: {rule: near, value: 2.0, tol: 1.0e-6}}
+        - {name: final_snapshot, role: required, regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 1, tol: 0}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.noh-200}
+      command: [python3, '{bench_dir}/check_cholla.py', noh, --run-dir, '{repo}/build/level3/cholla/cuda/run.check.noh-200/noh-200.np1', --params, '{bench_dir}/{param:params}', --reference, '{bench_dir}/{param:reference}', --label, noh-200]
+      pass_regex: '^PASS: Cholla check'
+      fail_regex: '^FAIL: Cholla check'
+      basis: >-
+        the analytic Noh solution at t = 2 (Noh 1987; gamma = 5/3, 3-D): the mean density of the cells inside 0.8 x the shock radius t/3 within 10 % of the post-shock value 64 (second-order Godunov codes show a ~5 % wall-heating dip at the centre, Stone et al. 2008 test 11; GIZMO's upstream Noh test accepts 15 %), the pre-shock profile (1 + t/r)^2 in the shell 0.80 <= r <= 0.95 reported; plus the frozen self-baseline digest; the final output time must equal tout
+      covers: all
+      timeout: 1800
+    notes: "the 200^3 Noh implosion (derived only in the output cadence, see source.derivation)"
+  - id: blast-256
+    case: blast-wave
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: cholla-hydro/cholla, version: v3.0.0 8478c9ede8a5e2cb72d6481a50023666d489a763, path: examples/3D/Spherical_Overpressure.txt}
+      derivation: >-
+        upstream's examples/3D/Spherical_Overpressure.txt (a spherical over-pressure region in a periodic 256^3 box, t = 0.1) with outstep = 0.1 instead of 0.01: the initial and the final output only instead of 10 snapshots of 670 MB (the computation is unchanged)
+    params: {id: blast-256, params: inputs/blast-256.txt, problem: blast, init: Spherical_Overpressure_3D, grid: 256x256x256, nx: 256, ny: 256, nz: 256, cells: 16.8 M, tout: 0.1, tout_printed: '0.100000', steps: 570, final_snapshot: 1, reference: reference/blast-256.json}
+    files: [inputs/blast-256.txt]
+    runtime_config: {gpus: 1, ranks: 1}
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: parameter_banner, role: required, regex: '^Parameter values:\s+nx = 256, ny = 256, nz = 256, tout = 0.100000, init = Spherical_Overpressure_3D,', compare: {rule: present}}
+        - {name: steps, role: required, regex: '^n_step:\s+(?P<value>\d+)\s+sim time:', select: last, compare: {rule: near, value: 570, tol: 0}}
+        - {name: final_sim_time, role: required, regex: '^n_step:\s+\d+\s+sim time:\s+(?P<value>[0-9.]+)\s+sim timestep:', select: last, compare: {rule: near, value: 0.1, tol: 1.0e-6}}
+        - {name: final_snapshot, role: required, regex: '^Saving Snapshot:\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 1, tol: 0}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.blast-256}
+      command: [python3, '{bench_dir}/check_cholla.py', blast, --run-dir, '{repo}/build/level3/cholla/cuda/run.check.blast-256/blast-256.np1', --params, '{bench_dir}/{param:params}', --reference, '{bench_dir}/{param:reference}', --label, blast-256]
+      pass_regex: '^PASS: Cholla check'
+      fail_regex: '^FAIL: Cholla check'
+      basis: >-
+        no analytic solution for a finite over-pressure region: conservation of the total mass, momentum and energy between the initial and the final output to 1e-9 relative (the momenta relative to M sqrt(E/M); the conservative scheme in a periodic box conserves them to double-precision roundoff, measured 6e-20), plus the frozen self-baseline digest (the only field-level criterion); the final output time must equal tout
+      covers: all
+      timeout: 1800
+    notes: "the 256^3 spherical over-pressure blast (derived only in the output cadence, see source.derivation)"

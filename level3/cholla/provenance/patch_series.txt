@@ -1,0 +1,2 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/0001-makefile-git-hash-from-make-variable.patch	37921368a75e258d90dcbe83a56c8dc5dd24c8b9e2561a6ba4f174a6e0bf5435	D	local 3-line Makefile change: GIT_HASH ?= $(shell git rev-parse --verify HEAD) so that build.sh can pass the frozen commit (the bundle is not a git checkout; upstream static_asserts a 40-character GIT_HASH, error_handling.cpp:41)	src/Makefile
