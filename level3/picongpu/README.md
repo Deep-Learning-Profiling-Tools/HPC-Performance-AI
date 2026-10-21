@@ -44,10 +44,10 @@ step count, the executable and its hash.
 
 | id | input set (upstream) | grid | steps | timed loop (B200) | correctness |
 |---|---|---|---|---|---|
-| khi-192x512 | tests/KHI_growthRate (electron-scale Kelvin-Helmholtz, gamma = 1.021 shear, 2-D with 12 cells in z) | 192 x 512 x 12 | 3000 | RESULTS | growth rate of the Bx energy vs 1/(sqrt(8) gamma), 20 % (upstream criterion) |
-| khi-384x1024 (default) | same set, 4 x the cells | 384 x 1024 x 12 | 3000 | RESULTS | same |
-| khi-768x2048 | same set, 16 x the cells | 768 x 2048 x 12 | 3000 | RESULTS | same |
-| lwfa-192x1024x192 | examples/LaserWakefield (3-D laser-driven wakefield; upstream's 1.cfg: 1 device, sliding window off) | 192 x 1024 x 192 | 2000 | RESULTS | charge conservation + energy histories vs this build's frozen first run (self-baseline) |
+| khi-192x512 | tests/KHI_growthRate (electron-scale Kelvin-Helmholtz, gamma = 1.021 shear, 2-D with 12 cells in z) | 192 x 512 x 12 | 3000 | 76.4 s | growth rate of the Bx energy vs 1/(sqrt(8) gamma), 20 % (upstream criterion) |
+| khi-384x1024 (default) | same set, 4 x the cells | 384 x 1024 x 12 | 3000 | 173.0 s | same |
+| khi-768x2048 | same set, 16 x the cells | 768 x 2048 x 12 | 3000 | 611.3 s | same |
+| lwfa-192x1024x192 | examples/LaserWakefield (3-D laser-driven wakefield; upstream's 1.cfg: 1 device, sliding window off) | 192 x 1024 x 192 | 2000 | 53.8 s | charge conservation + energy histories vs this build's frozen first run (self-baseline) |
 
 The KHI test's physics is per cell (cell size, time step, shear velocity and density from the `.param` files), so
 a larger grid is a larger box of the same plasma with the same fastest-growing mode: upstream's analytic criterion
@@ -70,7 +70,8 @@ Upstream's `tests/KHI_growthRate/bin/ci.sh` builds the test input set, runs it (
 matplotlib, absent here). `validate.sh` runs the registered `khi-192x512` input (that command line on that input
 set) through `run.sh` and applies the ESKHI criterion through `check_khi_growth.py` (standard library only; the
 physical parameters gamma = 1.021, BASE_DENSITY_SI = 1e25, DELTA_T_SI = 1.79e-16 x 0.86 from the set's param
-files; theory 1/(sqrt(8) gamma), acceptance 0.2 as `config.py`). Result: RESULTS.
+files; theory 1/(sqrt(8) gamma), acceptance 0.2 as `config.py`). Result (2026-10-21, 1 GPU): PASS, growth-rate
+deviation 0.070 (run 2026-10-21 09:45 UTC alongside a GIZMO smoke run on the same GPU: the result is not a timing).
 
 ### Correctness of the registered inputs
 
@@ -80,13 +81,36 @@ frequency within 20 % of 1/(sqrt(8) gamma). LWFA: `check_lwfa.py` against `refer
 this unmodified build's own first run (a self-baseline, stated as such): the charge-conservation plugin's maximal
 |div E - rho| (in macro-particle charges) at every sampled step within a factor of the reference and the total
 field / electron kinetic energies within a relative tolerance recorded from the observed run-to-run spread
-(RESULTS). Three results per input: timing SUCCESS (the timer line of a clean run), workload verification PASS
+(charge_factor 1.1 and energy_rel 1e-3 from the observed spread of two realisations: 0.1 % in the charge deviation,
+9.6e-5 in the energies -- 100 x and 10 x that spread; the campaign day's check run deviated by 1.001 and 2.1e-4). Three
+results per input: timing SUCCESS (the timer line of a clean run), workload verification PASS
 (`verify_registry_runs.py`: manifest input set hash, grid and steps, the registered argv, the `100 % = <steps>`
 line, the launcher audit), scientific correctness PASS (`hpcperf_inputs.py check` + `verdict`).
 
 ## Results on dgx003 (B200, CUDA 13.2.78)
 
-RESULTS_PLACEHOLDER
+Campaign `l3-ext-2026-10-20` (2026-10-21 06:45-09:22 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
+Level 3 protocol: 0 warm-up + 3 clean + 1 nsys-profiled run per input, headline = median of the application timer,
+spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock locking, strictly serial;
+`docs/timing/index.html` has the current rows):
+
+| input | timer median (s) | min / max (s) | spread | stable | profiled run (s) | run verification | correctness |
+|---|---|---|---|---|---|---|---|
+| khi-192x512 | 76.421 | 75.863 / 77.081 | 1.6 % | yes | 88.175 | PASS | PASS (growth-rate deviation 0.080 of the 0.2 acceptance) |
+| khi-384x1024 (default) | 172.954 | 172.942 / 173.319 | 0.2 % | yes | 196.232 | PASS | PASS (0.037) |
+| khi-768x2048 | 611.310 | 607.404 / 613.463 | 1.0 % | yes | 631.635 | PASS | PASS (0.107) |
+| lwfa-192x1024x192 | 53.842 | 53.811 / 54.093 | 0.5 % | yes | 68.573 | PASS | PASS (charge-deviation ratio 1.001 of 1.1; energies 2.1e-4 of 1e-3) |
+
+- Timing SUCCESS for all four (`calculation  simulation time` of every clean run; `verify_registry_runs.py` PASS 4/4:
+  manifest input-set hash, grid and steps, the registered argv, the `100 % = <steps>` line, the launcher audit). The
+  nsys trace shows the device busy 80-98 % of the loop (the LWFA run 80 %: many short kernels per step).
+- The profiled run is 3-27 % slower than the clean median (khi-768x2048 3 %, lwfa 27 %); its device picture is the
+  whole-process one (no NVTX range).
+- Correctness (`run_checks.sh picongpu` = one fresh run of every input, then `hpcperf_inputs.py verdict`): all four
+  PASS (2026-10-21 09:23-09:38 UTC). The KHI growth rate grows from the simulation's own noise seed and varies between
+  realisations of the same input (deviations 0.04-0.13 across the smoke, campaign-day check and earlier runs);
+  upstream's 20 % acceptance covers that, a tighter per-run bound would have no basis. The LWFA self-baseline
+  rule (above) is used to 0.1 % / 21 %.
 
 ## Limitations
 
