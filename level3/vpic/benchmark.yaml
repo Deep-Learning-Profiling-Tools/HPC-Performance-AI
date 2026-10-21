@@ -53,5 +53,5 @@ source_artifact:
   uncompressed_size: 17019061
   file_count: 1786
   source_version: hpcperf-l3-v1
-  primary_url: null
-  publish_status: unpublished
+  primary_url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/vpic-hpcperf-l3-v1.tar.zst
+  publish_status: published
