@@ -58,14 +58,17 @@ reads) and logs under `output/`.
 | sedov (default) | test/sedov (Sedov-Taylor blast) | 2,097,152 | 0.03 (10) | MFM hydro, periodic box 6, no gravity | RESULTS | radial density profile vs `sedov_exact.txt` (upstream criterion) |
 | sedov-t0.01 | derived: test/sedov to TimeMax 0.01 (the first third of the blast; same Config.sh, IC, parameters) | 2,097,152 | 0.01 (10) | MFM hydro, periodic box 6, no gravity | RESULTS | radial density profile vs `sedov_exact.txt` rescaled self-similarly from t = 0.03 to 0.01 (upstream criterion) |
 | noh | test/noh (Noh implosion) | 2,097,152 | 1 (10) | MFM hydro, periodic box 6, no gravity | RESULTS | post-shock density vs the analytic 64 (upstream criterion) |
-| blob | test/blob (cloud-crushing blob) | 9,641,651 | 2 (4) | MFM hydro, periodic 1 x 1 x 3 box, no gravity | RESULTS | mass conservation + blob survival (upstream criterion) |
 
-Four inputs are upstream's test problems as shipped (`Config.sh`, `.params`, the IC its harness downloads); only
-the two run-location lines of the parameter file are rewritten at run time. `sedov-t0.01` is the one derived
+Three inputs are upstream's test problems as shipped (`Config.sh`, `.params`, the IC its harness downloads); only
+the two run-location lines of the parameter file are rewritten at run time. `test/blob` (9.6 M particles, the
+largest upstream test IC, TimeMax 2) was built and smoke-run but is not registered as shipped: on the B200 it takes
+35 s per global step with the GPU 25 % busy (hydro 53 %, tree build 11 %, domain decomposition 8 % of the step;
+the cause of the low device utilisation was not investigated), i.e. ~19 h per run to upstream's final time; its
+initial conditions stay in the frozen bundle (`deps/ics/blob_ics.hdf5`, `inputs/blob/`). `sedov-t0.01` is the one derived
 input: upstream's Sedov parameter file with `TimeMax` 0.03 -> 0.01 and `TimeBetSnapshot` 0.003 -> 0.001 (the
-first 765 of the 1512 global steps of the full problem, ~13 min instead of ~52 min on a B200); the Sedov-Taylor
-blast is self-similar, so its check is upstream's own criterion against `sedov_exact.txt` with the radii scaled
-by (0.01/0.03)^(2/5). The remaining ~80 upstream tests are
+first third of the full problem in time: 882 global steps against 1512, ~18 min instead of ~52 min on a B200);
+the Sedov-Taylor blast is self-similar, so its check is upstream's own criterion against `sedov_exact.txt` with
+the radii scaled by (0.01/0.03)^(2/5). The remaining ~80 upstream tests are
 CPU-sized (thousands of particles), use physics modules without a GPU path, or ship no acceptance criterion.
 
 ## Timed region (`tools/timing/apptimers.py: gizmo`)

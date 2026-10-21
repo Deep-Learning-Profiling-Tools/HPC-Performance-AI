@@ -58,12 +58,13 @@ baseline:
 coverage:
   status: MULTI_INPUT
   reason: >-
-    four of upstream's test problems with their own initial conditions and acceptance criteria: the Evrard
+    three of upstream's test problems with their own initial conditions and acceptance criteria: the Evrard
     collapse (self-gravity + hydro, 27k particles, the GPU-path smoke problem), the Sedov-Taylor blast and the Noh
-    implosion (2.1 M particles each, pure hydro) and the blob test (9.6 M particles, the largest upstream test IC);
-    plus one derived input, the Sedov blast integrated to a third of upstream's TimeMax (the same problem at a
-    size that can be iterated on; checked against the self-similar rescaling of the same reference)
+    implosion (2.1 M particles each, pure hydro); plus one derived input, the Sedov blast integrated to a third of
+    upstream's TimeMax (the same problem at a size that can be iterated on; checked against the self-similar
+    rescaling of the same reference)
   upstream_inputs_not_added:
+    - "test/blob (9.6 M particles, TimeMax 2, the largest upstream test IC; its IC is in the frozen bundle): 35 s per global step on a B200 in the smoke run (the GPU 25 % busy; cause not investigated), i.e. ~19 h per run to upstream's TimeMax -- not registered as shipped"
     - "the other ~80 test problems of src/test: CPU-sized (thousands of particles), physics modules without a GPU path (MHD, cooling networks, radiation, dust, sinks ...) or without a shipped acceptance criterion"
 inputs:
   - id: evrard
@@ -142,8 +143,8 @@ inputs:
         Sedov-Taylor blast is self-similar: the density profile at t = 0.01 is upstream's reference profile at
         t = 0.03 with the radii scaled by (0.01/0.03)^(2/5), which is how the check reads sedov_exact.txt
         (--exact-time 0.03). Registered because the upstream integration to t = 0.03 takes ~52 min on a B200
-        (1512 global steps); the first third of it (765 steps, ~13 min) is the blast-wave workload at a size
-        that can be iterated on.
+        (1512 global steps); the first third of it (882 global steps with the denser snapshot cadence, ~18 min)
+        is the blast-wave workload at a size that can be iterated on.
     params: {id: sedov-t0.01, config: inputs/sedov/Config.sh, params: inputs/sedov-t0.01/sedov-t0.01.params, ic: deps/ics/sedov_ics.hdf5, ic_name: sedov_ics, particles: 2097152, time_max: 0.01, snapshots: 10, box_size: 6, exact: deps/exact/sedov_exact.txt, exact_time: 0.03}
     files: [inputs/sedov-t0.01/sedov-t0.01.params]
     runtime_config: {gpus: 1, ranks: 1}
@@ -169,7 +170,7 @@ inputs:
         only); the final snapshot time must equal TimeMax
       covers: all
       timeout: 3600
-    notes: the shorter integration of the default problem (the first 765 of its 1512 global steps)
+    notes: the shorter integration of the default problem (its first third in time; 882 global steps against 1512)
   - id: noh
     case: noh-implosion
     variant: case
@@ -199,32 +200,3 @@ inputs:
         15 % of the analytic post-shock density 64 (gamma = 5/3 Noh problem); the final snapshot time must equal TimeMax
       covers: all
       timeout: 7200
-  - id: blob
-    case: blob-test
-    variant: size
-    source:
-      kind: upstream-file
-      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/blob (Config.sh, blob.params; blob_ics.hdf5 from the harness download site)}
-    params: {id: blob, config: inputs/blob/Config.sh, params: inputs/blob/blob.params, ic: deps/ics/blob_ics.hdf5, ic_name: blob_ics, particles: 9641651, time_max: 2, snapshots: 4, box_size: 2000}
-    files: [inputs/blob/blob.params]
-    runtime_config: {gpus: 1, ranks: 1}
-    build_config: {config: inputs/blob/Config.sh}
-    input_form: compile-time
-    backends_validated: [cuda]
-    baseline:
-      quantities:
-        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 9641651, tol: 0}}
-        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 9641651, tol: 0}}
-        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 2, tol: 1.0e-12}}
-        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
-    check:
-      kind: post_run
-      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.blob}
-      command: [python3, '{bench_dir}/check_profile.py', blob, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.blob/blob.np1', --label, blob]
-      pass_regex: '^PASS: GIZMO profile check'
-      fail_regex: '^FAIL: GIZMO profile check'
-      basis: >-
-        upstream test/blob/test_blob.py: total gas mass of the final snapshot equal to the initial one to 1e-3 relative
-        and the cloud-destruction criterion of the test; the final snapshot time must equal TimeMax
-      covers: all
-      timeout: 14400

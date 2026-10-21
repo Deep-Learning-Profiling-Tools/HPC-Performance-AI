@@ -3,7 +3,7 @@ level: 3
 application: GIZMO (gpu_kokkos_unified branch)
 description: Lagrangian meshless finite-mass hydrodynamics + gravity tree (Hopkins 2015) with the gravity tree, density, gradient,
   hydro and cooling loops offloaded through Kokkos (CUDA); registered inputs (inputs.yaml) are upstream's own test problems
-  with their initial conditions (Evrard collapse, Sedov-Taylor blast, Noh implosion, the blob test), one MPI rank on one GPU
+  with their initial conditions (Evrard collapse, Sedov-Taylor blast at two integration lengths, Noh implosion), one MPI rank on one GPU
   each, each a compile-time Config.sh build
 supported_backends:
 - cuda

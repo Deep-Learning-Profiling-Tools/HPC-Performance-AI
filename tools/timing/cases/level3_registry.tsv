@@ -19,7 +19,6 @@ gizmo	evrard	evrard	1	HPCPERF_GIZMO_INPUT	-	1	7200	-
 gizmo	sedov	sedov	1	HPCPERF_GIZMO_INPUT	-	1	7200	-
 gizmo	sedov-t0.01	sedov-t0.01	1	HPCPERF_GIZMO_INPUT	-	1	7200	-
 gizmo	noh	noh	1	HPCPERF_GIZMO_INPUT	-	1	7200	-
-gizmo	blob	blob	1	HPCPERF_GIZMO_INPUT	-	1	7200	-
 lammps	lj-32k	lj-32k	1	HPCPERF_LAMMPS_INPUT	-	1	1800	-
 lammps	lj-2m	lj-2m	1	HPCPERF_LAMMPS_INPUT	-	1	1800	-
 lammps	lj-16m	lj-16m	1	HPCPERF_LAMMPS_INPUT	-	1	1800	-
