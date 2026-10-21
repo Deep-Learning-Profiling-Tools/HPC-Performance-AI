@@ -1,0 +1,230 @@
+# Registered inputs of GIZMO (schema hpcperf-inputs-1), selected through HPCPERF_GIZMO_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Every registered input is one of upstream's own test problems: its compile-time
+# Config.sh (physics selection -> one executable per input, build.sh), its parameter file and its initial
+# conditions (the HDF5 file upstream's test harness downloads, frozen in the source bundle under deps/ics/).
+# run.sh rewrites only InitCondFile and OutputDir of the parameter file (the run's locations).
+schema: hpcperf-inputs-1
+benchmark: gizmo
+level: 3
+selector: HPCPERF_GIZMO_INPUT
+default_input: sedov
+entry:
+  kind: run.sh
+  path: level3/gizmo/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    GIZMO's own cumulative wall-clock accounting (core/main.cc:222-224 starts All.CPU_Sum before begrun; core/run.cc
+    write_cpu_log appends a block per step to <OutputDir>/cpu.txt: 'Step N, Time: t, CPUs: n' and 'total <s>'). The
+    timed region is total(final step) - total(Step 0): every time-integration step -- domain decomposition, tree build
+    and gravity, density, gradients, hydro forces, kicks/drifts, the snapshots written in the loop -- without the
+    start-up (parameters, initial conditions, memory arenas, the Step 0 evaluation of the initial state) and the
+    shut-down. The same difference is the headline timer of tools/timing (apptimers.py: gizmo).
+  kind: app_timer
+  app_timer:
+    source: tools/timing/apptimers.py:gizmo
+    region: "cpu.txt 'total' of the final step block minus the Step 0 block = all time-integration steps"
+    relation: identical
+baseline:
+  method: >-
+    upstream's own test acceptance per problem (src/test/<name>/test_<name>.py, re-implemented without the
+    h5py / scipy / matplotlib stack: h5dump binary dumps of the final snapshot + the Python standard library):
+    Evrard -- L1 of |log10 rho_sim - log10 rho_exact| over 30 log-spaced radial bins (per-bin medians) against
+    evrard_exact.txt < 0.3; Noh -- the median post-shock density within 15 % of the analytic 64; Sedov and blob:
+    see their entries. The registry additionally keeps from stdout the initial-condition file the program read
+    with its particle count (exact: the registered IC), the total particle count, TimeMax as the program parsed
+    it and the 'Final time=... reached. Simulation ends.' line (a run that stopped earlier is no result).
+  reference: upstream's analytic / exact-solution references through the `check` blocks; stdout quantities against the registered IC and parameter file
+  quantities:
+    - name: ic_particles
+      role: required
+      regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)"
+      select: last
+      compare: {rule: exact}
+    - name: total_particles
+      role: required
+      regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: time_max
+      role: required
+      regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: final_time_reached
+      role: required
+      regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.'
+      compare: {rule: present}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    four of upstream's test problems with their own initial conditions and acceptance criteria: the Evrard
+    collapse (self-gravity + hydro, 27k particles, the GPU-path smoke problem), the Sedov-Taylor blast and the Noh
+    implosion (2.1 M particles each, pure hydro) and the blob test (9.6 M particles, the largest upstream test IC);
+    plus one derived input, the Sedov blast integrated to a third of upstream's TimeMax (the same problem at a
+    size that can be iterated on; checked against the self-similar rescaling of the same reference)
+  upstream_inputs_not_added:
+    - "the other ~80 test problems of src/test: CPU-sized (thousands of particles), physics modules without a GPU path (MHD, cooling networks, radiation, dust, sinks ...) or without a shipped acceptance criterion"
+inputs:
+  - id: evrard
+    case: evrard-collapse
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/evrard (Config.sh, evrard.params; evrard_ics.hdf5 from the harness download site)}
+    params: {id: evrard, config: inputs/evrard/Config.sh, params: inputs/evrard/evrard.params, ic: deps/ics/evrard_ics.hdf5, ic_name: evrard_ics, particles: 27001, time_max: 0.8, snapshots: 8, exact: src/test/evrard/evrard_exact.txt}
+    files: [inputs/evrard/evrard.params]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {config: inputs/evrard/Config.sh}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 27001, tol: 0}}
+        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 27001, tol: 0}}
+        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 0.8, tol: 1.0e-12}}
+        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.evrard}
+      command: [python3, '{bench_dir}/check_profile.py', evrard, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.evrard/evrard.np1', --exact, '{bench_dir}/src/test/evrard/evrard_exact.txt', --label, evrard]
+      pass_regex: '^PASS: GIZMO profile check'
+      fail_regex: '^FAIL: GIZMO profile check'
+      basis: >-
+        upstream test/evrard/test_evrard.py: the final snapshot's density binned in 30 log-spaced radial bins
+        (per-bin median) against evrard_exact.txt (Hopkins 2015 high-resolution reference): mean
+        |log10 rho_sim - log10 rho_exact| < 0.3; the final snapshot time must equal TimeMax
+      covers: all
+      timeout: 3600
+    notes: the 27k-particle problem is latency-bound on a B200 (0.7 s per step); kept as the self-gravity + adaptive-softening workload and the problem the GPU path was validated with
+  - id: sedov
+    case: sedov-blast
+    variant: default
+    source:
+      kind: upstream-file
+      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/sedov (Config.sh, sedov.params; sedov_ics.hdf5 from the harness download site)}
+    params: {id: sedov, config: inputs/sedov/Config.sh, params: inputs/sedov/sedov.params, ic: deps/ics/sedov_ics.hdf5, ic_name: sedov_ics, particles: 2097152, time_max: 0.03, snapshots: 10, box_size: 6, exact: deps/exact/sedov_exact.txt}
+    files: [inputs/sedov/sedov.params]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {config: inputs/sedov/Config.sh}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 0.03, tol: 1.0e-12}}
+        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.sedov}
+      command: [python3, '{bench_dir}/check_profile.py', sedov, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.sedov/sedov.np1', --exact, '{bench_dir}/deps/exact/sedov_exact.txt', --label, sedov]
+      pass_regex: '^PASS: GIZMO profile check'
+      fail_regex: '^FAIL: GIZMO profile check'
+      basis: >-
+        upstream test/sedov/test_sedov.py: the final snapshot's radial density profile from the box centre (30 linear
+        bins to 0.9 x the reference's outer radius, per-bin medians) against sedov_exact.txt (the reference the
+        upstream harness downloads; radius, temperature, density, radial velocity at TimeMax): over the bins where
+        the reference density exceeds 0.01, mean |rho_sim - rho_exact| / mean rho_exact < 0.3; the final snapshot
+        time must equal TimeMax
+      covers: all
+      timeout: 7200
+    notes: the run.sh default (2.1 M particles, pure hydro, periodic box)
+  - id: sedov-t0.01
+    case: sedov-blast
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/sedov (Config.sh, sedov.params; sedov_ics.hdf5 from the harness download site)}
+      derivation: >-
+        upstream's sedov.params with TimeMax 0.03 -> 0.01 and TimeBetSnapshot 0.003 -> 0.001 (the same ten snapshots
+        over the shorter integration); the same Config.sh, initial conditions and every other parameter. The
+        Sedov-Taylor blast is self-similar: the density profile at t = 0.01 is upstream's reference profile at
+        t = 0.03 with the radii scaled by (0.01/0.03)^(2/5), which is how the check reads sedov_exact.txt
+        (--exact-time 0.03). Registered because the upstream integration to t = 0.03 takes ~52 min on a B200
+        (1512 global steps); the first third of it (765 steps, ~13 min) is the blast-wave workload at a size
+        that can be iterated on.
+    params: {id: sedov-t0.01, config: inputs/sedov/Config.sh, params: inputs/sedov-t0.01/sedov-t0.01.params, ic: deps/ics/sedov_ics.hdf5, ic_name: sedov_ics, particles: 2097152, time_max: 0.01, snapshots: 10, box_size: 6, exact: deps/exact/sedov_exact.txt, exact_time: 0.03}
+    files: [inputs/sedov-t0.01/sedov-t0.01.params]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {config: inputs/sedov/Config.sh}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 0.01, tol: 1.0e-12}}
+        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.sedov-t0.01}
+      command: [python3, '{bench_dir}/check_profile.py', sedov, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.sedov-t0.01/sedov-t0.01.np1', --exact, '{bench_dir}/deps/exact/sedov_exact.txt', --exact-time, '0.03', --label, sedov-t0.01]
+      pass_regex: '^PASS: GIZMO profile check'
+      fail_regex: '^FAIL: GIZMO profile check'
+      basis: >-
+        upstream test/sedov/test_sedov.py's criterion (30 radial bins, per-bin medians, mean relative density error
+        over the post-shock bins < 0.3) against the self-similar rescaling of sedov_exact.txt from t = 0.03 to the
+        snapshot time t = 0.01 (radii x (0.01/0.03)^(2/5); the Sedov-Taylor density profile is a function of r/R(t)
+        only); the final snapshot time must equal TimeMax
+      covers: all
+      timeout: 3600
+    notes: the shorter integration of the default problem (the first 765 of its 1512 global steps)
+  - id: noh
+    case: noh-implosion
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/noh (Config.sh, noh.params; noh_ics.hdf5 from the harness download site)}
+    params: {id: noh, config: inputs/noh/Config.sh, params: inputs/noh/noh.params, ic: deps/ics/noh_ics.hdf5, ic_name: noh_ics, particles: 2097152, time_max: 1, snapshots: 10, box_size: 6}
+    files: [inputs/noh/noh.params]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {config: inputs/noh/Config.sh}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 2097152, tol: 0}}
+        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 1, tol: 1.0e-12}}
+        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.noh}
+      command: [python3, '{bench_dir}/check_profile.py', noh, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.noh/noh.np1', --label, noh]
+      pass_regex: '^PASS: GIZMO profile check'
+      fail_regex: '^FAIL: GIZMO profile check'
+      basis: >-
+        upstream test/noh/test_noh.py: the median density of the post-shock region of the final snapshot within
+        15 % of the analytic post-shock density 64 (gamma = 5/3 Noh problem); the final snapshot time must equal TimeMax
+      covers: all
+      timeout: 7200
+  - id: blob
+    case: blob-test
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: pfhopkins/gizmo, version: gpu_kokkos_unified e9d2d0bea23b08872f747b780cdcedb5847a2bff, path: test/blob (Config.sh, blob.params; blob_ics.hdf5 from the harness download site)}
+    params: {id: blob, config: inputs/blob/Config.sh, params: inputs/blob/blob.params, ic: deps/ics/blob_ics.hdf5, ic_name: blob_ics, particles: 9641651, time_max: 2, snapshots: 4, box_size: 2000}
+    files: [inputs/blob/blob.params]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {config: inputs/blob/Config.sh}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: ic_particles, role: required, regex: "^Reading file `[^']*' on task=0 \\(contains (?P<value>\\d+) particles\\.\\)", select: last, compare: {rule: near, value: 9641651, tol: 0}}
+        - {name: total_particles, role: required, regex: '^Reading done\. Total number of particles :\s+(?P<value>\d+)\s*$', select: last, compare: {rule: near, value: 9641651, tol: 0}}
+        - {name: time_max, role: required, regex: '^TimeMax\s+(?P<value>[0-9.eE+-]+)\s*$', select: last, compare: {rule: near, value: 2, tol: 1.0e-12}}
+        - {name: final_time_reached, role: required, regex: '^Final time=[0-9.eE+-]+ reached\. Simulation ends\.', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.blob}
+      command: [python3, '{bench_dir}/check_profile.py', blob, --run-dir, '{repo}/build/level3/gizmo/cuda/run.check.blob/blob.np1', --label, blob]
+      pass_regex: '^PASS: GIZMO profile check'
+      fail_regex: '^FAIL: GIZMO profile check'
+      basis: >-
+        upstream test/blob/test_blob.py: total gas mass of the final snapshot equal to the initial one to 1e-3 relative
+        and the cloud-destruction criterion of the test; the final snapshot time must equal TimeMax
+      covers: all
+      timeout: 14400

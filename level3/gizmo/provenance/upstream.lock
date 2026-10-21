@@ -1,0 +1,6 @@
+src	https://github.com/pfhopkins/gizmo.git	gpu_kokkos_unified	e9d2d0bea23b08872f747b780cdcedb5847a2bff
+deps/ics/evrard_ics.hdf5	http://www.tapir.caltech.edu/~phopkins/sims/evrard_ics.hdf5		sha256:0b3f63ce6927705a6769d54503899f5f57f38b415e6f599448ee2d6a9a70ab71
+deps/ics/sedov_ics.hdf5	http://www.tapir.caltech.edu/~phopkins/sims/sedov_ics.hdf5		sha256:f2aedf59b8d44eb652728f7d2527751031d1778d29baf7861433070d646fdb03
+deps/ics/noh_ics.hdf5	http://www.tapir.caltech.edu/~phopkins/sims/noh_ics.hdf5		sha256:3df4f0e5c44b9dbfd649c15e89a0b664e395b54f14b230efc4379544696e29a1
+deps/ics/blob_ics.hdf5	http://www.tapir.caltech.edu/~phopkins/sims/blob_ics.hdf5		sha256:7ede6d0b05f832a4d93bc7b8d0b380ce04cec0f1fd5d113ddddbfd3294fb41fe
+deps/exact/sedov_exact.txt	http://www.tapir.caltech.edu/~phopkins/sims/sedov_exact.txt		sha256:3b9063434370fbc946aa1c1e211f7f2515a0bb96cf868c79fb2a24845a439cfb

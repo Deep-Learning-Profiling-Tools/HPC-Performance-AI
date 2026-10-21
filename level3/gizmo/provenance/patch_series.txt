@@ -1,0 +1,3 @@
+# order	component	patch	sha256	category	upstream_source	files
+1	src	patches/0001-proto-h-glibc-cmath-pow.patch	b0adafff899eef85cf88a7d91f2ed295f86b986f47a8da11a4218b4165096bcc	D	local 7-line fix: <cmath> + using std::isfinite/isnan/isinf (glibc 2.39 + C++17 keep them in std::), and the DEC-Alpha pow() prototype guarded against glibc (declared noexcept there; a second plain prototype is an error with GCC 13)	src/src/core/proto.h
+2	src	patches/0002-cuda13-cudaMemAdvise-location.patch	580177fda997c6597086e135fadfeb2c32060eff29d1738fef5d43b10d11da0e	D	local 9-line fix: CUDA 13 removed the int-device form of cudaMemAdvise; the cudaMemLocation form (same meaning) under CUDART_VERSION >= 13000	src/src/system/gpu_particles_arena.cc

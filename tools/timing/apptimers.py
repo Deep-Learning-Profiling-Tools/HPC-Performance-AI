@@ -345,7 +345,44 @@ def vpic(d):
             "parts": {}, "files": ["run.log"]}
 
 
+def gizmo(d):
+    """GIZMO: the time-integration loop from the application's own per-step wall-clock accounting.
+
+    GIZMO keeps cumulative wall-clock timers (All.CPU_Sum[], my_second() = MPI_Wtime; src/core/main.cc:222-224
+    starts them before begrun) and write_cpu_log (called at the top of every step iteration, src/core/run.cc:196-200;
+    a block is printed on global time steps -- all particles active -- and after a domain decomposition,
+    src/core/run.cc:1296-1320) appends to <OutputDir>/cpu.txt: `Step N, Time: t, CPUs: n` then `total <seconds>
+    100.0%` and the per-phase lines. The first block (Step 0) follows the evaluation of the initial conditions, the
+    last one the final time (TimeMax is a global synchronization point). The timed region is the
+    difference of the two `total` values: every time-integration step (domain decomposition, tree
+    build and gravity, density, gradients, hydro forces, kicks/drifts, snapshots written in the loop)
+    without the start-up (parameter and IC reading, memory arenas, the Step 0 evaluation) and the
+    shut-down; steps = the step counter of the last block minus the first's."""
+    files = _find(d, "output/cpu.txt")
+    if not files:
+        raise TimerMissing("output/cpu.txt not harvested (GIZMO did not reach its first step)")
+    t = _read(files[-1])
+    blocks = re.findall(r"^Step (\d+), Time: " + NUM + r", CPUs: \d+\s*\n(?:.*\n)*?total\s+" + NUM + r"\s+", t, re.M)
+    if len(blocks) < 2:
+        raise TimerMissing(f"cpu.txt holds {len(blocks)} step block(s); the first (Step 0) and the final step are needed")
+    first, last = blocks[0], blocks[-1]
+    wall = float(last[2]) - float(first[2])
+    if wall <= 0:
+        raise TimerMissing(f"cpu.txt total did not advance ({first[2]} -> {last[2]})")
+    return {"wall_s": wall, "steps": int(last[0]) - int(first[0]), "excluded_s": None, "setup_s": float(first[2]),
+            "parts": {"final_time": float(last[1])}, "files": ["output/cpu.txt"]}
+
+
 TIMERS = {
+    "gizmo": Timer(
+        gizmo, ["output/cpu.txt"],
+        "cpu.txt `total` of the final step block minus the Step 0 block: every time-integration step (domain "
+        "decomposition, tree + gravity, density, gradients, hydro forces, kicks/drifts, in-loop snapshots) "
+        "without the start-up (parameters, initial conditions, arenas, the Step 0 evaluation) and shut-down.",
+        ["src/core/main.cc:222-224", "src/core/run.cc:196-200", "src/core/run.cc:1296-1320"],
+        "rank 0's MPI_Wtime accounting (CPU_ALL; one rank per registered input)",
+        "effectively: every Kokkos phase ends in a fence before its timer bucket is closed (CPU_Step accounting "
+        "in the host loop); the per-step snapshot / log I/O stays inside"),
     "lammps": Timer(
         lammps, ["log.*.lammps"],
         "'Loop time' of the last `run` command: all timesteps, without integrate->setup and the "

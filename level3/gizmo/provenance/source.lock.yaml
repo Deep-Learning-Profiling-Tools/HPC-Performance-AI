@@ -1,0 +1,256 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: gizmo
+  level: 3
+  application: GIZMO (gpu_kokkos_unified branch)
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/pfhopkins/gizmo.git
+  tag: gpu_kokkos_unified
+  commit: e9d2d0bea23b08872f747b780cdcedb5847a2bff
+artifact:
+  filename: gizmo-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  - deps/
+  size: 189117163
+  sha256: db789253b08349d429e7b77c9f1b0f98a73a9a1d1fb85106e6a1c923ead15444
+  source_tree_sha256: 27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.7
+  uncompressed_size: 620943529
+  tar_entries: 840
+  file_count: 724
+  symlink_count: 0
+  immutable: true
+  primary:
+    url: null
+    status: unpublished
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912
+  algorithm: hpcperf-tree-1
+  entries: 724
+  layout:
+  - src/
+  - deps/
+patches:
+- path: patches/0001-proto-h-glibc-cmath-pow.patch
+  sha256: b0adafff899eef85cf88a7d91f2ed295f86b986f47a8da11a4218b4165096bcc
+  category: D
+  upstream_reference: 'local 7-line fix: <cmath> + using std::isfinite/isnan/isinf (glibc 2.39 + C++17 keep them in std::),
+    and the DEC-Alpha pow() prototype guarded against glibc (declared noexcept there; a second plain prototype is an error
+    with GCC 13)'
+  component: src
+  files:
+  - src/src/core/proto.h
+- path: patches/0002-cuda13-cudaMemAdvise-location.patch
+  sha256: 580177fda997c6597086e135fadfeb2c32060eff29d1738fef5d43b10d11da0e
+  category: D
+  upstream_reference: 'local 9-line fix: CUDA 13 removed the int-device form of cudaMemAdvise; the cudaMemLocation form (same
+    meaning) under CUDART_VERSION >= 13000'
+  component: src
+  files:
+  - src/src/system/gpu_particles_arena.cc
+dependencies:
+  bundled: []
+  benchmark_specific:
+  - path: deps/ics/evrard_ics.hdf5
+    project: GIZMO test initial conditions (Evrard collapse, 27,001 gas particles)
+    version: null
+    url: http://www.tapir.caltech.edu/~phopkins/sims/evrard_ics.hdf5
+    commit: null
+    sha256: 0b3f63ce6927705a6769d54503899f5f57f38b415e6f599448ee2d6a9a70ab71
+    license: null
+  - path: deps/ics/sedov_ics.hdf5
+    project: GIZMO test initial conditions (Sedov-Taylor blast, 2,097,152 gas particles, box 6)
+    version: null
+    url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_ics.hdf5
+    commit: null
+    sha256: f2aedf59b8d44eb652728f7d2527751031d1778d29baf7861433070d646fdb03
+    license: null
+  - path: deps/ics/noh_ics.hdf5
+    project: GIZMO test initial conditions (Noh implosion, 2,097,152 gas particles, box 6)
+    version: null
+    url: http://www.tapir.caltech.edu/~phopkins/sims/noh_ics.hdf5
+    commit: null
+    sha256: 3df4f0e5c44b9dbfd649c15e89a0b664e395b54f14b230efc4379544696e29a1
+    license: null
+  - path: deps/ics/blob_ics.hdf5
+    project: GIZMO test initial conditions (blob test, 9,641,651 gas particles, box 2000 x 2000 x 6000)
+    version: null
+    url: http://www.tapir.caltech.edu/~phopkins/sims/blob_ics.hdf5
+    commit: null
+    sha256: 7ede6d0b05f832a4d93bc7b8d0b380ce04cec0f1fd5d113ddddbfd3294fb41fe
+    license: null
+  - path: deps/exact/sedov_exact.txt
+    project: GIZMO test reference solution (Sedov-Taylor blast at TimeMax 0.03; columns radius, temperature, density, radial
+      velocity)
+    version: null
+    url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_exact.txt
+    commit: null
+    sha256: 3b9063434370fbc946aa1c1e211f7f2515a0bb96cf868c79fb2a24845a439cfb
+    license: null
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (nvcc_wrapper host compiler)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: Kokkos
+    version: 5.2.1 (CUDA + OpenMP)
+    provided_by: .deps/install/kokkos (the repository's Level 2 Kokkos install)
+  - name: HDF5, FFTW (single precision, MPI)
+    provided_by: .conda_env
+  - name: zlib
+    provided_by: system (/usr/include/zlib.h, -idirafter)
+  - name: perl
+    provided_by: system (/usr/bin/perl; the conda environment ships none)
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/pfhopkins/gizmo.git
+  ref: gpu_kokkos_unified
+  commit: e9d2d0bea23b08872f747b780cdcedb5847a2bff
+  sha256: null
+  checkout: _upstream/level3/gizmo
+  submodules: []
+  excluded:
+  - path: docs
+    reason: documentation (images, manual); not built
+  - path: analysis
+    reason: post-processing scripts; not built, not run
+  license:
+    spdx: GPL-2.0-or-later
+    files:
+    - README.md
+- dest: deps/ics/evrard_ics.hdf5
+  kind: file
+  category: benchmark_specific
+  url: http://www.tapir.caltech.edu/~phopkins/sims/evrard_ics.hdf5
+  ref: null
+  commit: null
+  sha256: 0b3f63ce6927705a6769d54503899f5f57f38b415e6f599448ee2d6a9a70ab71
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+- dest: deps/ics/sedov_ics.hdf5
+  kind: file
+  category: benchmark_specific
+  url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_ics.hdf5
+  ref: null
+  commit: null
+  sha256: f2aedf59b8d44eb652728f7d2527751031d1778d29baf7861433070d646fdb03
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+- dest: deps/ics/noh_ics.hdf5
+  kind: file
+  category: benchmark_specific
+  url: http://www.tapir.caltech.edu/~phopkins/sims/noh_ics.hdf5
+  ref: null
+  commit: null
+  sha256: 3df4f0e5c44b9dbfd649c15e89a0b664e395b54f14b230efc4379544696e29a1
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+- dest: deps/ics/blob_ics.hdf5
+  kind: file
+  category: benchmark_specific
+  url: http://www.tapir.caltech.edu/~phopkins/sims/blob_ics.hdf5
+  ref: null
+  commit: null
+  sha256: 7ede6d0b05f832a4d93bc7b8d0b380ce04cec0f1fd5d113ddddbfd3294fb41fe
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+- dest: deps/exact/sedov_exact.txt
+  kind: file
+  category: benchmark_specific
+  url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_exact.txt
+  ref: null
+  commit: null
+  sha256: 3b9063434370fbc946aa1c1e211f7f2515a0bb96cf868c79fb2a24845a439cfb
+  checkout: null
+  submodules: []
+  excluded: []
+  license: null
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/gizmo
+  status: EQUIVALENT
+  summary:
+    identical: 717
+    expected_patch_difference: 2
+    expected_generated_difference: 0
+    expected_normalization_excluded: 25
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 719
+    validated_entries_considered: 744
+licenses:
+- path: src
+  project: GIZMO
+  license: GPL-2.0-or-later (README.md section 2 "free software, distributed under the GNU General Public License"; the repository
+    ships no separate license file)
+  url: https://github.com/pfhopkins/gizmo
+  commit: e9d2d0bea23b08872f747b780cdcedb5847a2bff
+- path: deps/ics
+  project: GIZMO test initial conditions (P. F. Hopkins, tapir.caltech.edu/~phopkins/sims)
+  license: distributed with the GIZMO test suite (the files its harness downloads); redistributed unchanged
+- path: deps/exact
+  project: GIZMO test reference solution (sedov_exact.txt, same site)
+  license: distributed with the GIZMO test suite (the file its harness downloads); redistributed unchanged
+license_notes:
+- GIZMO is GPL (README.md); the patched source is redistributed as a source bundle with the two local patches stated in patch_series.txt,
+  as the license requires modifications to be indicated.
+- The initial-condition files are the ones upstream's own tests download; they are bundled unchanged so that the benchmark's
+  workloads are reproducible without network access.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled: []
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/test/*
+  exclude:
+  - src/docs/*
+  - src/analysis/*
+  - src/scripts/*
+  - src/data/*
+  - src/initial_conditions/*
+  - src/dev/*
+scan_allow: []
+freeze:
+  tool_version: freeze-2.0
+  timestamp: '2026-10-21T04:29:20Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)

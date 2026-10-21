@@ -1,0 +1,5094 @@
+{
+ "algorithm": "hpcperf-tree-1",
+ "algorithm_description": "hpcperf_source -- shared library for Level 3 source freezing / artifact verification / materialization /\nworkspace checks (scheme 3: project-controlled external source artifacts + automatic materialization).\n\nEverything here is deterministic and side-effect free unless a function says otherwise.\n\nSource-tree identity (source_tree_sha256, algorithm \"hpcperf-tree-1\"):\n    Walk the tree; take every regular file and symlink (directories carry no identity, empty ones are\n    ignored); skip the materialization markers and nothing else. Sort the relative paths by their UTF-8\n    bytes. For each entry append one line\n        \"F\\t<relative path>\\t<sha256 of the file content>\\n\"     (regular file)\n        \"L\\t<relative path>\\t<sha256 of the symlink target>\\n\"    (symlink; the target string, never followed)\n    and hash the concatenation with SHA-256. mtime, uid/gid, mode and the executable bit are NOT part of\n    the identity (the executable bit is recorded in SOURCE_MANIFEST.json). Re-freezing the same content\n    therefore gives the same source_tree_sha256, while the archive SHA-256 also depends on the archiver.",
+ "archive": {
+  "compressed_size": 189117163,
+  "compression": "zstd",
+  "file_count": 724,
+  "sha256": "db789253b08349d429e7b77c9f1b0f98a73a9a1d1fb85106e6a1c923ead15444",
+  "symlink_count": 0,
+  "tar_entries": 840,
+  "tar_format": "hpcperf-tar-1",
+  "uncompressed_size": 620943529,
+  "zstd_level": 19,
+  "zstd_version": "1.5.7"
+ },
+ "entries": 724,
+ "files": 724,
+ "manifest": [
+  {
+   "exec": false,
+   "path": "deps/exact/sedov_exact.txt",
+   "sha256": "3b9063434370fbc946aa1c1e211f7f2515a0bb96cf868c79fb2a24845a439cfb",
+   "size": 195142,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "deps/ics/blob_ics.hdf5",
+   "sha256": "7ede6d0b05f832a4d93bc7b8d0b380ce04cec0f1fd5d113ddddbfd3294fb41fe",
+   "size": 424239188,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "deps/ics/evrard_ics.hdf5",
+   "sha256": "0b3f63ce6927705a6769d54503899f5f57f38b415e6f599448ee2d6a9a70ab71",
+   "size": 1194588,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "deps/ics/noh_ics.hdf5",
+   "sha256": "3df4f0e5c44b9dbfd649c15e89a0b664e395b54f14b230efc4379544696e29a1",
+   "size": 92281232,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "deps/ics/sedov_ics.hdf5",
+   "sha256": "f2aedf59b8d44eb652728f7d2527751031d1778d29baf7861433070d646fdb03",
+   "size": 92281232,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.github/workflows/pytest.yml",
+   "sha256": "dfaabbbe2a0c5fe2decbbb3e046def5cae46304a1691f8ea1a6947bcdd2007af",
+   "size": 1049,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.gitignore",
+   "sha256": "2d953b8f3e87b29c7b74550b1efd3226c06042fefe573df722af4a276ff95813",
+   "size": 3286,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.rsyncignore",
+   "sha256": "c52d993301034b1c0ad4971be3517eac0902219a9fdfaee1b37d61d2ad842a74",
+   "size": 259,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/.vscode/settings.json",
+   "sha256": "7a9be1cc68a69ed62fdc8101bbd93c2a64c12b3c5dadb626b300201cd4ce07cc",
+   "size": 143,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/Makefile",
+   "sha256": "28d8a2138eb0874364f9ecfafcd1b40da2455a3ba713a3ef6e088ca639174bd8",
+   "size": 676,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/README.md",
+   "sha256": "bacde09db94229f861db92be06bad8e9f6cd8928f995224894a12990eb6844fc",
+   "size": 3818,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/data/cooling/TREECOOL",
+   "sha256": "c8bc47cca189c02696fa288845d02e6222549503fdb6fe2fd8d40e2a9a11c2f1",
+   "size": 17306,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/data/cooling/TREECOOL_pre2020",
+   "sha256": "81c175b4a61358b6afe15d12a9218777e4cbf6a9e672b05bd0d38c004babc84a",
+   "size": 20443,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/dev/compress_cleanup_sim.sh",
+   "sha256": "1b9002d017d6b09a2fb12e9cf9630f045ce1dfd038091c73a25ddc2c4d2a888e",
+   "size": 5687,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/dev/diffcheck.sh",
+   "sha256": "5c321b3b310d7baf9a98c9ac168acc32f65272b9425d7c316087d7371ba970f9",
+   "size": 468,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/dev/indent.sh",
+   "sha256": "b8b64516ce9e24098384cb6ab1b1766f2f57258c8069f9ad5d5323d2411d2ba7",
+   "size": 85,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/dev/run_gizmo_test.sh",
+   "sha256": "3a048a3043b85ab329b8d031eea4fde0f32a07464042e9b64e347028b879953e",
+   "size": 9851,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/dev/snapshot_diff.py",
+   "sha256": "c7704883a1738bfaa47ae70eb930aec55205d2d3bc53a2fdf6d4897a5ffa0f13",
+   "size": 2664,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/dev/test_dirty_tracker.cc",
+   "sha256": "0bc49ead4e42f28877cd490a3585760a465d374a56652e5f087f1f2453906224",
+   "size": 7239,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/README.md",
+   "sha256": "aec28033cb921145a6bffd27db3df7ab91d11865c41d528a84c2c4c434f82c7d",
+   "size": 976,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/__init__.py",
+   "sha256": "6f7025d1e2f89850c33c1ca9e447c15fae253f9f7a8e0f82a3b9ec2c6dcb428a",
+   "size": 40,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/__init__.py",
+   "sha256": "14e7c12860016486397653d53e7e42f6a193b30a9fed3163521bc8dc157ffffc",
+   "size": 217,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/build_layered_body.py",
+   "sha256": "148ef584646cfc6fac6c2b58d265e2cd9fb9884f95928c5a03fd46d1b9168198",
+   "size": 4551,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/cms_to_sesame.py",
+   "sha256": "9105a6db19d0c91b2dc311910b0fcd8813d74f2154e663e0e601ee6050cad769",
+   "size": 15506,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/eos_dispatch.py",
+   "sha256": "17dca1471c7d0333f51d5ad08512cc82796b380d1d68c57fee13190f65c65894",
+   "size": 5583,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/hse_solver.py",
+   "sha256": "02003e81f1ed1a4a876fe41c51477b389aaf7a2243730d34ea91e4e70981b497",
+   "size": 8375,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/sesame_loader.py",
+   "sha256": "615c12290900ed8c4e0c0a52297d773aedab47a51ffeb87034a94c10ad2a697e",
+   "size": 4260,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/shell_placement.py",
+   "sha256": "8b7ae4bf2eb83778dbaed6ec20c99f4b56fc6076d99cc341acead72fb2047e82",
+   "size": 14028,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/sph_density.py",
+   "sha256": "5f671f471cbb90ef19845c5e5d88f20940be2ac603e466c98e6c06ed2ab3e242",
+   "size": 5027,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/test_hse_earth.py",
+   "sha256": "ab0b1db66db1ca50acf62b384de2526f3ba7213e36a8a0dd042a0a2356983692",
+   "size": 2247,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/eos_tools/tillotson.py",
+   "sha256": "25935ef3f3baa3b89286ecf7d67d5c3960c290e6841847d5ba051e559611964a",
+   "size": 5526,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/make_IC.py",
+   "sha256": "76140c29183c1996a408364a94387e75cd0f4427eacee71f2edbe7ea0474f6e2",
+   "size": 9679,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/initial_conditions/update_legacy_gizmosnapshot_to_modern.py",
+   "sha256": "fa48329263372c6b2e145ebfc6a179c1a36a4dac589b8dd7e302ed33af473ddb",
+   "size": 3932,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/pyproject.toml",
+   "sha256": "6711fc52dd5812db7eaf068bcaec82f5587b5e5865e71c16e851e4892294ace2",
+   "size": 655,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/scripts/get_citations.py",
+   "sha256": "eeb60afebf95073f5e083053aa2cef7cb9fe3aa94525309b695a990ad5f97a10",
+   "size": 11639,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/scripts/gizmo_sources.bib",
+   "sha256": "264132ed35cea7d4233f453de88abeaa4df639d695c67c26f7c3493eeb008653",
+   "size": 79251,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/Makefile",
+   "sha256": "641e55329de095514c175155710c6b32a67ee47cb66ef98870c739cfdaa35e7d",
+   "size": 54764,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/Makefile.systype",
+   "sha256": "490507a993cbf2465c97b1148344da47e051075de1c919f9bc7d20300c691a8f",
+   "size": 715,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/Template_Config.sh",
+   "sha256": "a8bd29f87e8257da54a761fd1968fe6602d7f27b2cc79bf13a91cbf67dd959ff",
+   "size": 123958,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/config-makefile",
+   "sha256": "8b9727abe1119b2027f8d3b04b672b030128732e9d6eb19b9d223e931f019a64",
+   "size": 206,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/README.txt",
+   "sha256": "eaa0324a48ab5e002b5f2d10d5a4f1f2bcfd8fc87dc362aee22e107bb6abd4da",
+   "size": 8679,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes.cc",
+   "sha256": "14c5e74c9cba51620eb5c24a79915f8ab9d7c4cae8482b05aa00935eb08f893b",
+   "size": 17990,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes_cooling.cc",
+   "sha256": "f26015d4d4b6d8b24aedb07ce93054d826d879a2545e976768c6ddc1002cd9f5",
+   "size": 35483,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes_gizmo_doc.md",
+   "sha256": "689d76d5fd36da78cabe9279359303362936a227f41071bfd5b54fcd9b60f4ea",
+   "size": 14448,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes_interpol.h",
+   "sha256": "4e9e0f2422a6748768235d024e15e446e0e38a63b7baad58bc922ee19a1609fd",
+   "size": 17398,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes_proto.h",
+   "sha256": "1f0b8c04850dc4c084f74981863570cefc550e4c9a5b855169cb1314a097ede8",
+   "size": 50844,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/chimes_vars.h",
+   "sha256": "3dde8776dbf1b3ae25a158420b4c92f81507be22bf583fb82589d049528e24c6",
+   "size": 5584,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/init_chimes.cc",
+   "sha256": "cf8921de1dacfc3d6e37dbf61f24af1075226e14fea6dac850c5a5c1704f9866",
+   "size": 214815,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/params_chimes.txt",
+   "sha256": "74e3e68d93a6807720bb8bb97a6ade175eb0e13d2b81a2d57b83d1ac2cb04195",
+   "size": 2975,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/rate_equations.cc",
+   "sha256": "f0a1c75ca626177598e54923db35b47df05e501cd80895f422e4441a86828422",
+   "size": 25333,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/chimes/update_rates.cc",
+   "sha256": "694f4ffe073f9c6319f2f29da9c1b5a25f16a236806adb61c30a4c8d131547dc",
+   "size": 80928,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling.cc",
+   "sha256": "409cecf7c9e847987fb852fefc052de669bf705b61c542233432498fff5d868d",
+   "size": 190782,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling.h",
+   "sha256": "e6fa062a5b9e31c059aa3be33c06fb3a463827993f1b760689b1b345f1c1fc50",
+   "size": 1719,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling_functions.h",
+   "sha256": "5fefa5587027bf515b7a2d236aa2e8470e3d082e89619f6148d208bfb30be7fd",
+   "size": 27540,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/cooling_tables.h",
+   "sha256": "8ada7d1cda4eb182acf61e54463e04abc7dc923fd195dc85be40222d3d3ecf9a",
+   "size": 4745,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/disk_betacool.h",
+   "sha256": "78f394f5490b86d837bab52d6fa5f6765b0bfe9dc86cd2d9fe5c83cbb28b6a4d",
+   "size": 3190,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/grackle.cc",
+   "sha256": "29f4d2c3da3c83fa6a832656e3a4eb9d95f125abf0e28d2d63bc6e8c082a7e10",
+   "size": 26069,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/planet_heating.h",
+   "sha256": "2c0aaf8729abc351e0b0053ebf260fe4665578451a77ba63fc85d6e70b7ad27f",
+   "size": 2665,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/simple_chemistry.cc",
+   "sha256": "a9263b387e32d31e703cf3fd17f89f3bced364c2e6f229f59c3814919ddaadd4",
+   "size": 2203,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/simple_chemistry.h",
+   "sha256": "9e486bc113683b845684f10228f33f45253f709100aa077c88d29f6ab4b19329",
+   "size": 6916,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/cooling/two_temperature_functions.h",
+   "sha256": "266a67a1d7fb17602bdd55e477eaf7de70cb714518118485d10e4c2a38d77b6c",
+   "size": 7242,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/accel.cc",
+   "sha256": "cef190629671879286dd0cfa845b152e35cbc27048b786cca92a9ac12ff7e79d",
+   "size": 12971,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/begrun.cc",
+   "sha256": "3b705bb3033a1cf10f1c2ce465fb2d52b1501da0bd2f70dca1a10294b87fa2ec",
+   "size": 181213,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/drift_particle_functions.h",
+   "sha256": "8909e4a20e805fe349b25e9011825a73cffe114bbc3ed2e1e04c0222eac79187",
+   "size": 10150,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/driftfac.cc",
+   "sha256": "b8cd00656acd89efa5b27011a39a567807a3373fc755bd3ccb1306475d18efd5",
+   "size": 3423,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/gizmo_fatal.cc",
+   "sha256": "890e785fc61360f2ff4a2541b1e9653543a60099ae1d08f99def6ad49e55bb24",
+   "size": 8060,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/gizmo_fatal.h",
+   "sha256": "46100062a0905209bd8aed54abc715cf7945602d8cc1a1a71f7008c73800fb14",
+   "size": 2748,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/gpu_drift.cc",
+   "sha256": "11220c9afeb115922970764d5024042669be6b8c7809254ec24cb602916c15f7",
+   "size": 14381,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/init.cc",
+   "sha256": "9d86d8b7fdf8b2d0d0ec74ce80373d6d1647ac3c4e8ce783ca854bffe4af4d57",
+   "size": 65906,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/kicks.cc",
+   "sha256": "e17f603a6558efb0a16a97eff847d0f73e8648150b260947a0e187b0ace6e7ca",
+   "size": 34288,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/main.cc",
+   "sha256": "e4e07a328aa01805b1f563db19c39ed2a359216391d0af2707885e1e212f8c86",
+   "size": 10257,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/predict.cc",
+   "sha256": "b30a271dfaf40a2f1bc78ac7787c6af276a9958391909136373afe99cd269e15",
+   "size": 16389,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/predict_functions.h",
+   "sha256": "dc6e9b76a4c007b0a2ed762697525727233bf700b0fe5d166b8fb851857def90",
+   "size": 8590,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/proto.h",
+   "sha256": "984a6355c92973790a4fe92abb525480172d81ca6dc0bb874ada924c15396456",
+   "size": 89105,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/run.cc",
+   "sha256": "e15a40b3b6eade4af519264eac2a9090e02dc70062251a817441c61c541da1e3",
+   "size": 74799,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/timestep.cc",
+   "sha256": "978c691788253d55aacfde44a6f229f7dfc1e7d1e4557688d24cbb9c73a537b3",
+   "size": 98677,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/timestep_functions.h",
+   "sha256": "9811e115687ba86fea26172e77f3cb8d896fb101968ed6c0b6f04a4600897bac",
+   "size": 59294,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/transport_subcycle.cc",
+   "sha256": "5a4bae98151416d1b4b11817d98969111fd9633b0e29794c03e96ff4b316edc0",
+   "size": 16181,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/transport_subcycle.h",
+   "sha256": "c28be115ce84b300b86aa0cc955e880d8a57103b22fdd0be6c1c3b689699a447",
+   "size": 858,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/core/wakeup_sidecar.h",
+   "sha256": "570452fa9af0b26968636e858967478546420d370611e1b4e213f9376e09d1d6",
+   "size": 1388,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/allvars.cc",
+   "sha256": "eeb8ec597255c4642ac2c1b4a0fec6bdc7a2921015e3a8a1887f62394632d985",
+   "size": 15302,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/allvars.h",
+   "sha256": "3dd9cd39d50a5533f68455571eb6457217ac4f04aca9ef152f5ca8fa8f6f47eb",
+   "size": 36766,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/allvars_gpu.cu",
+   "sha256": "0ac11d4599e6803f0ec429437f257dde1fd88e79f6a84cc9aa0057d92652943b",
+   "size": 929,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/box_distance.h",
+   "sha256": "d5ebbf65a2b9133c8ee558e527be0aab6c5136cceace6573462fe2944602ff0e",
+   "size": 2581,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/cell_data.h",
+   "sha256": "1270f0f8f1212571fd21925d34fd69f07265b08559999b7e3b4e294f16e6041c",
+   "size": 42348,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/constants.h",
+   "sha256": "6944fc5981b5ecc6bc60b6bd8c9ebfeeca661bc484d73899bb7860555ce39138",
+   "size": 28500,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gizmo_quadrature.h",
+   "sha256": "47a348830b2491b35ea310657c372f68c7ae7d30686409f9de7f022b1b3ffdf5",
+   "size": 2600,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gizmo_rng.h",
+   "sha256": "76b71c15689c22ed9609dbfb7dc5ef6a48474ead335620a1c0531f7d4f2d004b",
+   "size": 4120,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/global.cc",
+   "sha256": "56c8064eabb0f47983238c331a2a20229619f64d9a3d71351bf48fc31a032375",
+   "size": 9969,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/global_data_all_struct.h",
+   "sha256": "d88f16fb29f4e1bf4fc2b593e31ca578850ce66b6336c7477a1ebfdb009e04ed",
+   "size": 44415,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_all_mirror.h",
+   "sha256": "430bc76ead48e84bf25fb20271bc2a4d0b7d832ab8c1b3891bbef7ff54a342aa",
+   "size": 7046,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_device_error_sentinel.h",
+   "sha256": "22b2b63e131d9ba18453c6e9c62603060404494a38c4743a29eff3f65e916cd1",
+   "size": 2997,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_dispatch_templates.h",
+   "sha256": "29ced51f45a4bef86bd9e02059ce5d86829457a0161147df05e7009b27208602",
+   "size": 5643,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_error_check.h",
+   "sha256": "27cb15a7445421f1c02d431b95376812690032290b4e369242c9669b7bfd98ec",
+   "size": 3103,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_numeric_macros.h",
+   "sha256": "a57ecf01e02208a05a21ed2289c537c95dcd7c8bd337f24bb7f6e4750772c260",
+   "size": 866,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_recorder_claim.h",
+   "sha256": "a268eca8f4e797066c46eae2ee71a01e1fa60b0939e2ca026eea52b27cc63b0a",
+   "size": 4974,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/gpu_rng.h",
+   "sha256": "eebcd786f0cd7fbb5cb2bf30cd856b0d882a404a8883d35353a115ab8174cc76",
+   "size": 7485,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/lifecycle_counters.cc",
+   "sha256": "2d3d07ca57fe2316dc03f7da1af48b460f3544affdb3474f906a1a3932d55078",
+   "size": 470,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/lifecycle_counters.h",
+   "sha256": "d793cb8269dbd6674719a2d725631adcc378654c4b7f4256106b169c1dc691b2",
+   "size": 1535,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/macros.h",
+   "sha256": "530b30f97e8716ae5e775b89f5faa65e35c689f672aef18041e1a1f062cf57eb",
+   "size": 17606,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/multifluid_helpers.h",
+   "sha256": "ae75b778273b85dd156ad447936a97359f56bb421bf67634f631847574021411",
+   "size": 1178,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/particle_data.h",
+   "sha256": "cdc3e58938e93d8a80a0d91bf31c28a07c7915bdcb6ee1b5cf2a2b14d057129c",
+   "size": 25727,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/precompiler_logic.h",
+   "sha256": "fbb7624037a99cf36c1918176aad69b796d55be9db71315ff5eedc0ab020db0d",
+   "size": 92642,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/declarations/typedefs.h",
+   "sha256": "49b74a6647196f4437ae555e2b68cb0a8d7681973003b7ed825411742c37e3ad",
+   "size": 3179,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/domain/domain.cc",
+   "sha256": "8972eaf412a3a38960978b25ac2f4bf38a1f71dd804cfdc055d41e8f6dab6ce9",
+   "size": 185492,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/domain/domain.h",
+   "sha256": "41ccdf886ca37d9cd58e787678b144447440221f2ff946dfcb804d730e191b5f",
+   "size": 1997,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/aneos.cc",
+   "sha256": "2528c746db07be70ca341f5326768b3b794a635f622f68315679238f91d986f2",
+   "size": 9273,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/aneos.h",
+   "sha256": "f9aae96d9b2b3710600faaeeaa8cb91aba7b46391a551b5e0eeb3dc267d0531a",
+   "size": 15818,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/composition_registry.h",
+   "sha256": "23ae7c31a101eba19f384ebcc168f479e36275b11fb08ea47f1476ee8a49c7a8",
+   "size": 4759,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/cosmic_ray_fluid/cosmic_ray_diffusion_functions.h",
+   "sha256": "73d27c193d6c54490b8f5d21fef940c5acc1f60bf803a6dcef91c73e2ce7d4a0",
+   "size": 11678,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/cosmic_ray_fluid/cosmic_ray_functions.h",
+   "sha256": "c20c55deeb9dc2ab9f27a0230a277ed031cd7e3298a09e342ac8ca2a7640f3b8",
+   "size": 150820,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/cosmic_ray_fluid/cosmic_ray_utilities.cc",
+   "sha256": "0f1f63f397b39a23c2cec9b6ba43af7eaca0931258beb805b7c948e806c14aff",
+   "size": 64027,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/eos.cc",
+   "sha256": "3c55a537993c3b8d0946d5957ddb491a6ad51ffa5229c797c52aa6eef4224200",
+   "size": 26593,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/eos.h",
+   "sha256": "c1d9797e5028147384822aa26ff782c1e3a0269eb95fd04531727cbf0c4edce8",
+   "size": 1793,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/eos_functions.h",
+   "sha256": "74b82300e864fc17aa832cce2eee626711b01df710ef5dc287720655af8a287a",
+   "size": 64409,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/eos_interface.cc",
+   "sha256": "7a7466e4c2211ca702975551a2f66ef2e25f71c51926704f9ca996cc4088397a",
+   "size": 2418,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/helmholtz/helmholtz.cc",
+   "sha256": "24c63ea62d9fd91fae71131694f35f3f8a32fcaf7b4a18011a2da3d611142e71",
+   "size": 4324,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/helmholtz/helmholtz.h",
+   "sha256": "dd635a8d4598455dc9547c9052f19c26616e0a2c52107b9631b7db1ffdcd3b51",
+   "size": 27955,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/hydrogen_molecule.cc",
+   "sha256": "75d3c8aa620634c6b093961f25149e398edcbd65ed1e59501c4833d04ed07459",
+   "size": 752,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/eos/hydrogen_molecule_functions.h",
+   "sha256": "997f630c169e65318bd455dd15993a0fe0fb0c46666c6363dc71450a78c3d98c",
+   "size": 4494,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/file_io/hdf5_deflate_filter.cc",
+   "sha256": "29fd88d1d0d69458c33ad3055d2ae2118def5660fa39f2133638a8f5ac55778f",
+   "size": 5030,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/file_io/io.cc",
+   "sha256": "e0c5f2931a33be33329e8c08fd959fbf7585829966fcc8478a302adc55c99b7e",
+   "size": 214814,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/file_io/prepare-config.perl",
+   "sha256": "8f6de21af117d5368b13a28142a7d63111020d1eba089334a7069186d884ef69",
+   "size": 3767,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/file_io/read_ic.cc",
+   "sha256": "315bd2bc3390e8ab8d60980d65549b8d460aa83faa7a0eea2869cf306a283ce1",
+   "size": 96570,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/file_io/restart.cc",
+   "sha256": "d182bb33c16305ef0da41a23f8e57d79d685b4a767135afe65be34e48030c3b8",
+   "size": 31755,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/dm_dispersion.cc",
+   "sha256": "a67618da11f027fdff1547626f2fe353db2b1da591ebb867eae7808948ea3ca0",
+   "size": 4891,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/dm_dispersion_loop.cc",
+   "sha256": "06e35d7e9becb5ad7feddb91f776564cb762f8b53772126560986e11bc613c93",
+   "size": 13250,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/dm_dispersion_loop.h",
+   "sha256": "8229e5e26fa1dd1743c926067741465017fff1d696aa12240b099732a4ba3b26",
+   "size": 12617,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/dm_heating.cc",
+   "sha256": "50e3e568b63802f426f078fce3c305574c9376c181cd6820b4cd5db06ab8d0de",
+   "size": 3588,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/galsf_gpu_decls.h",
+   "sha256": "f7d8017b3e20bf3b15df641c97e80cae158ab5cb06d08a03dd919c08190313e9",
+   "size": 2957,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/mechanical_fb.cc",
+   "sha256": "ef94b45d6628657e45b466a40d2b50ed20c9e36e77902e8747239f2342635791",
+   "size": 18894,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/mechanical_fb_functions.h",
+   "sha256": "b0a0654b66b361ae5e74caaf577681852321a43ce49f88d6f73688b1b01ebbbd",
+   "size": 28790,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/mechanical_fb_types.h",
+   "sha256": "3b21df984ede75a7ac78018e0f991eb0cd479215253abe1a61b60a1018aa8e99",
+   "size": 2236,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/mechfb_loop.cc",
+   "sha256": "596b968ebcf557a588523c1a8b8ab4ea8b747fa9c44ff1a93e3b18a7b437309b",
+   "size": 40023,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/mechfb_loop.h",
+   "sha256": "839be9e22b4a94b3cdfe4c927a63f0b067377e2f29f93c4e02651ff13dd29c44",
+   "size": 28921,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/radfb_local.cc",
+   "sha256": "19cc4de67b6477f4e127d3fc23d57fecffbd661cdf5ad407e4daeac30311ad30",
+   "size": 31238,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/radfb_rp_loop.cc",
+   "sha256": "3e8af5ccd4b6d6e87d46e01c2e7979c0fb4c266abd980bf934acdefbdedfc0f9",
+   "size": 34355,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/radfb_rp_loop.h",
+   "sha256": "c4fe8c1649950a2a74e567996a875080176b431e8ad92440d7bd070945d60312",
+   "size": 33656,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/sfr_eff.cc",
+   "sha256": "1d585d69c70b766d94d07f87a75b0bf36a72d609d8ad77a9345cbff591913ed9",
+   "size": 64689,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/stellar_evolution.cc",
+   "sha256": "1b3c77a84e9ee10c82ca94fc2691f045f4b2babb9731edc5c3185a42afc74f77",
+   "size": 96616,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/stellar_evolution_functions.h",
+   "sha256": "f84507e0c8681db52c30d9fc1620b20fce76adc71cab5f3cbed69f07418be0bd",
+   "size": 10245,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/thermal_fb.cc",
+   "sha256": "c0709f36998a674b5a86ec532c51992e0f60687afc40bc4759d0ae4f6f449adb",
+   "size": 6398,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/thermal_fb_loop.cc",
+   "sha256": "c1fbaa1138af82e14b4dfadde1d26a46da66ee706fafccb3621bd17244ed6054",
+   "size": 15270,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/galaxy_sf/thermal_fb_loop.h",
+   "sha256": "1a22f69ea95206221d6d8d3b6e65c0b136acaeb2ecccba39fee2b50da6f1854d",
+   "size": 21681,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_density_loop.cc",
+   "sha256": "0af2ee00c68e747f9e06c6aa5baf87316d90d545927e0990e44c94e2cc0c30fb",
+   "size": 42099,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_density_loop.h",
+   "sha256": "d79752ea7628c344177cd35c60ad45336f6a24da30e50c9025e007de04724315",
+   "size": 29334,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_force_loop.cc",
+   "sha256": "bde962c73d7ade845b778fe426192b5d17f1d0092d975e26e6b57a2316c6f30b",
+   "size": 19568,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_force_loop.h",
+   "sha256": "402d3c45533e0df37fc6b0bfccb2a769f847bce9a0455f855c1cc899a448520e",
+   "size": 36298,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_functions.h",
+   "sha256": "8ac8c91d3e17ca349dd63a8a4d1850d5e7a5253c6d544187b32f2c8c78e4804b",
+   "size": 9926,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/ags_rkern.cc",
+   "sha256": "1a4ec2d686496f703e3d3c8d844ce9a74f48029a0d1acc2ecc651a07bfc96319",
+   "size": 8822,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/analytic_gravity.h",
+   "sha256": "3e2cedd31f5e4ca580360ca4d6cbb3ea110556299330d76e6e7c8e2ca0cc581f",
+   "size": 25363,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/binary_functions.h",
+   "sha256": "0dc0bb155a71967da42f04c1d3ee485ef13e8a7dfd314d7665d76023a754a0e1",
+   "size": 11248,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/cosmology.cc",
+   "sha256": "c1a4f34ae939922a356ce54c8ea5da559a1f6bf208eeca20816edb37677ad620",
+   "size": 12190,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/cosmology_functions.h",
+   "sha256": "a812cede5c5dd3b5f2ffce41d14f2f78ee00355086daf9f22a37c8ddca2840e5",
+   "size": 3976,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/force_node_drift_sync.h",
+   "sha256": "071441c8ad71db20932fb93474a21c3f27d9608961d38c4b54688d9371b99b43",
+   "size": 1564,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/forcetree.cc",
+   "sha256": "98703b34cae98acf1493492c12c4e43e8ae518e3dda8f3eba5d8f112b99901ec",
+   "size": 230166,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/forcetree.h",
+   "sha256": "fd876a657753817436b090e9b0f5f891f3dd2ff17ac01d8611d6906f94a9fc27",
+   "size": 15585,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/forcetree_update.cc",
+   "sha256": "7c5e8e620d166344ff115c91179932431a395e56458f80f28f014f967e4357fd",
+   "size": 41448,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_force_drift.cc",
+   "sha256": "79d75cb009ddc8b05dac8fbb15d83cfccbd9f94770a66182afa9529cf997074f",
+   "size": 28392,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_force_update.cc",
+   "sha256": "c78bab5d47150f0d13fe2c67a8250e973107d3e8995d635487f6b9ff50358065",
+   "size": 24052,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_gravity_tree.cc",
+   "sha256": "eeaf624c2958b392af4c3519f703a8f278617590554133c24d9de9bfab99a5c7",
+   "size": 41997,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_gravity_tree.h",
+   "sha256": "e9da1076e3471236265036b933f3cfe040a427228901952f9ccefbaedfb01dc9",
+   "size": 20360,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_gravtree.cc",
+   "sha256": "d627c7411caad64b381a55e4c43737f5d327a278e5894f15dcd94f92d6519286",
+   "size": 191618,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_gravtree.h",
+   "sha256": "ff8e58eba6aa1a329315999fe2c6bdddcaf3972f5d1109f0884f2e5e625ca9a9",
+   "size": 5626,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_moment_refresh.cc",
+   "sha256": "1ef7c11b26731378d580b0f6d630cdcad0bd7d3ea48434549e7eaa2ce51dab24",
+   "size": 52077,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_morton.cc",
+   "sha256": "c237017e3e4d93915eb9b1179876c60551e72302e5b0275b89ea8e03250b988c",
+   "size": 6581,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_morton.h",
+   "sha256": "0d2da8558d62929475ee7d645ea755807ccd6eda22a6cff621a547447f85f878",
+   "size": 3640,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_morton_functions.h",
+   "sha256": "92b30b2a9b4e8ccdb169e01ea5447e8e17e106904e1fc0fa231c7443fd9543c4",
+   "size": 16952,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_nextnode_thread.cc",
+   "sha256": "7bf925ceded680464a98d79c7324aa3f50dec8e41e5ee1a1a2205b5ef2f92111",
+   "size": 8548,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_peano_walk.cc",
+   "sha256": "c4e52729850faeeac19e2268e2778b3b09f0c705e38c9b5fe4d1d76731546deb",
+   "size": 5240,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_peano_walk.h",
+   "sha256": "483e369525fa3e676f1bf0a38089daa722c0e0c4b881cb539a1247cb5b6be2a4",
+   "size": 1798,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_peano_walk_functions.h",
+   "sha256": "ac747c01846b8738960b84c5f72674764844fe489520160eac9a839183608c66",
+   "size": 9580,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_pseudo_update.cc",
+   "sha256": "4c667eb0c0c73837b708f6d62ce890d6e166fd9759d21e74c486e4aa44bd88b0",
+   "size": 33735,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_pseudo_update.h",
+   "sha256": "4a9e64576f840099f7de1e6bcbf53b1c1d31d305588a9c2ffef5fe1cd0dfdd05",
+   "size": 3316,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_topology_build.cc",
+   "sha256": "dc46d562c43d936c14fc462e73c02bcdcf5c8323c5197495cd5d2065fd5ac2dd",
+   "size": 68252,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_topology_build.h",
+   "sha256": "8608d065e1f81987d782ebbf44b51bc7822d6cc6fdfdd1dd2af0922f92ae1a19",
+   "size": 7634,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_topology_finalize.cc",
+   "sha256": "3b9a73386a9f158ea02ca9fe3c53b3627efae70fc1fe1f16de56a642853e49ec",
+   "size": 22634,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gpu_topology_finalize.h",
+   "sha256": "d2a993124edb8ad8307ba5b394a902a74c1d5c7218d8f61218c87cb073729629",
+   "size": 4807,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravity_box_distance.h",
+   "sha256": "e5f2ee86880fcb2533644a991e7a136af1db7d32861d0e2dc33162d8edbce103",
+   "size": 2248,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree.cc",
+   "sha256": "1c1192a369c5706eb0e48d830e23fba5a450b13fc5dc6b5731d3dae67127ede8",
+   "size": 70454,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree_ewald.h",
+   "sha256": "e09d1455021ab0af77ed88b1d28e440f957d05d2e6992312f494bcc259e4bd93",
+   "size": 3505,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree_force_kernel.h",
+   "sha256": "346233be5d618e43712b9fd423c6e12ca4c8c64ede103f50d9aaa9777876c010",
+   "size": 69909,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree_moment_kernel.h",
+   "sha256": "d6cc26f8a8ad9c948506cd4d804f1babeedc0cbfb7ea33936aeced204c60e0e9",
+   "size": 40590,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree_moment_sources.h",
+   "sha256": "a7aaade2f4da27713d6e8d2c4c6d07781c4825b99c00c58184c0ce6639bdeaef",
+   "size": 7741,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/gravtree_opening.h",
+   "sha256": "94ab4daffa2f3bcd3b3ca03b9538f5d5a3b1b4b01391886b0b6d0208a3de06aa",
+   "size": 10034,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/let_data.h",
+   "sha256": "cffab84c31a6786f4f7ce3fff8e516671a590e0ce50ec2e808f414c831ff810d",
+   "size": 32400,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/let_pack.cc",
+   "sha256": "0d578ef6c40ed6bce81f588b151f871502e63aec6aeece12d0b6fe5c1c739c33",
+   "size": 180615,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/longrange.cc",
+   "sha256": "0c5e17447136010a4df5319e42eeeb81acaaa3c87914bba85d39cd91ea81309d",
+   "size": 7462,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/myfftw3.h",
+   "sha256": "1746d05e59d7cd30b703fa422f7b94a9b2c1132cb4d48c112bdfd755f17d6915",
+   "size": 827,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/pm_highres_region.h",
+   "sha256": "e5aaa85716df79f730e0d8ee71d074a33ae2b9a4936cddfce0212c74f076d5d3",
+   "size": 1451,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/pm_nonperiodic.cc",
+   "sha256": "b5856910539cedd4a3ebac6fc17d49ac9ab0e7569e355585ca7bc8bc8175fff9",
+   "size": 109115,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/pm_periodic.cc",
+   "sha256": "b32067facace23c13db5e9a872a483ff0e7a72b934e4d657e3c48daf66ee1508",
+   "size": 108184,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/gravity/star_direct_gravity.cc",
+   "sha256": "412a316fb9ea6c3d552002c5479e6d5f229e590a602c2ec516122728b3fbf1aa",
+   "size": 11698,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/battery_alpha_coeffs.h",
+   "sha256": "2ba90eceb2cd63a24ab5aee65c6b00b84cdf07b38c88f0768552caeefe58307b",
+   "size": 4750,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/cellcorrections_loop.cc",
+   "sha256": "eb3cd5b965ed7193d080868ef7d95891f40d0ab3c2381b32dc149fc7cd3a795a",
+   "size": 5724,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/cellcorrections_loop.h",
+   "sha256": "a273cab3eb99aebc7be4d7f95efeaa365e050dec19f8b57a3910abcdab804b67",
+   "size": 12357,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/compute_finitevol_faces_functions.h",
+   "sha256": "6ebb37cad5336e091be1e459ffca50996dc3d8181a2a0a2572cdd663abcd3d49",
+   "size": 5886,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/conduction_functions.h",
+   "sha256": "41088d20ba5c9bd859ad6fa4adec90f50fd650aa96521adcc62a31f6afde43a5",
+   "size": 4629,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/density.cc",
+   "sha256": "5b5c84864686967f1d2697e637a862f2f51e0ec2bedea3c16e32410878327110",
+   "size": 3046,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/density_gpu.cc",
+   "sha256": "1cddee22571be166b900ea5b2a2ed23b3c9dc33877c3593072bd516e7f8dd74d",
+   "size": 21356,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/density_loop.cc",
+   "sha256": "4ecbd316924ce4eafefd5462ff402e419ee8428a50ff470f3a69741fc9695810",
+   "size": 63469,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/density_loop.h",
+   "sha256": "9cb6f9772f0eb203445a502e174407f70a54f2970879c413fc25be8ae23cbea8",
+   "size": 40251,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/gradient_functions.h",
+   "sha256": "935ec875e5d0a10ce8527908d78fb516cbb18224fac1d33d4bf48a3b5f14f89a",
+   "size": 30084,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/gradients.cc",
+   "sha256": "48990904acc0bf74f09578c135cbf9e2c97b93c613b7b554d538a77d1eb7fdd6",
+   "size": 761,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/gradients_loop.cc",
+   "sha256": "34e5b42a729b49520c6f6cfd13321186219724295d22c7ea396d8ac6e5415db7",
+   "size": 61127,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/gradients_loop.h",
+   "sha256": "5c1a33ee0d1b365b50a5de3bd0fb026a01310aa3f36cbd9353a1813cf66ff032",
+   "size": 30772,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_core_meshless_functions.h",
+   "sha256": "9021d3ef5b6b2dacce866f5955d96410ae8d6657412a2e35a66938a9cd5c5094",
+   "size": 24025,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_core_sph_functions.h",
+   "sha256": "58d7104adc60f9c2549613d39dafd283826804bb1e6539219c6fe7bca7f853a9",
+   "size": 8721,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_corridor.cc",
+   "sha256": "1462d2f3714fa8bbde0cb4c80dd837f513ad69f2adcc805226abd2ae066af319",
+   "size": 16926,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_corridor.h",
+   "sha256": "d4b0ab43bf8e72128f42dfd1bb19f05890b0d25f749bb59656b029cac9291b12",
+   "size": 11837,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_force_loop.cc",
+   "sha256": "07141d382c50c34a3bc576dbfa2933666bf9e9fb9151f3235021a305ddc8b291",
+   "size": 22943,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_force_loop.h",
+   "sha256": "ff4f9d49795a3c15979fa24c9a89096f5bb2381c96a5fb2349c24af4c01b5256",
+   "size": 27060,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_functions.h",
+   "sha256": "e512d1ee8f7e38dd69386f517ebfecf61aeb5ee53a3124b9a716dc35f81df828",
+   "size": 22458,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_pair_types.h",
+   "sha256": "8fb6f56bb10e1109a7345db83bb5ff46a7807c2a3c1102c1ee1ee09170255f53",
+   "size": 1578,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_structs.h",
+   "sha256": "70c99bf04339cbe6db306ecf685cd5827400be88cc7df6fc5d2851f815b7408f",
+   "size": 7656,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/hydro_toplevel.cc",
+   "sha256": "40dacce5c26cafa356f2165ec46e30911afbf659caba84d1896c2365257e207a",
+   "size": 34182,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/mg_gradient_correction.cc",
+   "sha256": "093b1e2a649165ac88a4c5de73c6d87bb60695b244317f4ee5447b0868974284",
+   "size": 85757,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/nonideal_mhd_functions.h",
+   "sha256": "65606e910c1cae843a008f21cc9aa4f76dab6a2698a7a85c5b977dfe37448e3c",
+   "size": 9337,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/reimann.h",
+   "sha256": "76a365ebf50a6d19fc8777bdebde28a3228100b0587104c252b81de3f45c6970",
+   "size": 85752,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/hydro/viscosity_functions.h",
+   "sha256": "190563e1112795489adae62396a4a73431a742cb67f54be43f4a0a141e879549",
+   "size": 8964,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/math_types/mat3.h",
+   "sha256": "b5005541da174d916a946144372c74909cca358cf5480ebe0d6a743efdf091d7",
+   "size": 4383,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/math_types/symmetric_tensor2.h",
+   "sha256": "38fb19fe70b8bf584ed446ecf34fecc6eefbfcceafbda19a3e4356e56ae4fa50",
+   "size": 5051,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/math_types/vec3.h",
+   "sha256": "9810b65d3cfb4f9147e303db4881a33985cb0765bd0ba7e6fcb1dd8f3cf37a4a",
+   "size": 3031,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/device_packet_walk.h",
+   "sha256": "18328d40460686029dcc07bd17e12b7ccddca0d8611c0852a5f9cb06bc59c8af",
+   "size": 22590,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/device_tree_walk.h",
+   "sha256": "3a86e03add100f7277fca7d3adc415d10e9b3ff718cadc4682aa0ed76b2578cf",
+   "size": 17304,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_exchange.cc",
+   "sha256": "fcd265483d554070c9db6f7e943cd6a5f51640375864c45073ea955f0955a0f3",
+   "size": 104093,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_exchange_functions.h",
+   "sha256": "bc053de71be73a471a4feed2f04a3eff764a53b96ec99d3089e913c673d03ab4",
+   "size": 10287,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_exchange_spec.h",
+   "sha256": "da41261652df8e4954c99de43d28afea5cd3b8efa7f5e6ed33bf7d16c6a7b513",
+   "size": 3709,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_exchange_typed.h",
+   "sha256": "cbc8192c2d7f174c4f79173e6bc0d2f0c42c73b359911278d2eaf9bf063d50bd",
+   "size": 5948,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_symlist_lifecycle.h",
+   "sha256": "7d590995c95a562906fc53f7c0a9da3c6ebf2e0845a0e69ae2bd4a6ab621a0ca",
+   "size": 18561,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_writeback.cc",
+   "sha256": "bf1769804ed35c12e0262df0c2ea93b9845350058bc8b1c2791cbef7674b0e8a",
+   "size": 22722,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_writeback.h",
+   "sha256": "3706600c130ca2eb5b8a469ca550c74c0d1bc5f1a405f99f58f3d35057d59ba7",
+   "size": 10246,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/ghost_writeback_ops.h",
+   "sha256": "7a9a19da444bfd4a7bbb838f9617d6d87e30ff8aa5b6d4a3dc0afcf2ed034d13",
+   "size": 47351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/gpu_dirty_tracker.cc",
+   "sha256": "bf939c78dca36c2ff0a15638c2acf2d4de65b918c51465bb46ece5d735c3310a",
+   "size": 7691,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/gpu_dirty_tracker.h",
+   "sha256": "ee9e9e26fae4a9077976805d50ac46d5464b647eb3508a7af1f059eeaa16b240",
+   "size": 4685,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/gpu_neighbor_list.cc",
+   "sha256": "194e68c69bfe62dd81f5ff3cdccb65319d2ae86770e2f75f2871dcb5f7bc9b43",
+   "size": 218534,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/gpu_neighbor_list.h",
+   "sha256": "998155f9bb21cba16ab01b873e5bcd330fe59dc8b50f45ac67ec02205dd46dae",
+   "size": 29968,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/kernel.h",
+   "sha256": "85f02060ccd3a39b97f46feb0f64bad3a277864be58e80ced608874a8f39077d",
+   "size": 23705,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/merge_split.cc",
+   "sha256": "be4634f63112c9e9e2ac8474405762d14468478d745e475237eacf23d751ce03",
+   "size": 110176,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/mesh_motion.h",
+   "sha256": "6d1ce4844ec374cbae808c99da113cdb8a57dfa7c773e232f46ff58ff09f2a83",
+   "size": 7105,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/mode_b_local_walker.cc",
+   "sha256": "bbe6f2fdefec1d3f1656b3b4b2ba1c8ee2cb5c25f2004dff6e326236293b5642",
+   "size": 26853,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/mode_b_local_walker.h",
+   "sha256": "a17ee5a1b90dc5cf0dd587266bd2c582c83d0a7dc57242f9d3b58c19c58b21e7",
+   "size": 10555,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/mode_b_p2p_transport.cc",
+   "sha256": "6412cfbf626361f7585ed46d7c936a4b260329dea41251615643a19559553325",
+   "size": 502,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/mode_b_p2p_transport.h",
+   "sha256": "f8db4a3672562a945b82b07c5f70e1faa4ba3a062a190a57b7e78ca9acb8a290",
+   "size": 17196,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/neighbor_list.cc",
+   "sha256": "464b3059f73f74c7e294a96cca26311da3330236e85a149bb438114634876119",
+   "size": 14891,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/neighbor_list.h",
+   "sha256": "a436d2571f08b778154a7f3e81dab186da3fc9aff0f3c3409b7c66f2911ec71f",
+   "size": 14881,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/neighbor_loop_runner.cc",
+   "sha256": "e6dc5dc7cece3169c30470691999606a829ab02ac61101414a0209f35fede036",
+   "size": 359751,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/neighbor_loop_runner.h",
+   "sha256": "fa7e950be1e08a1e9377efc30ac5e445bb495cf22098cdb5fa437297b5a6e404",
+   "size": 119289,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/nlr_radius_policy.h",
+   "sha256": "33f84564f8ecc33ae38bf11bb9cd5dc075a6ab3a5962943b681a485c2c2152c6",
+   "size": 14498,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/sfc_tiles.cc",
+   "sha256": "991eb3c412add641b1287ded52347997b0993fd3f9ad2a2c97d05189af264cd7",
+   "size": 1109,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/sfc_tiles.h",
+   "sha256": "42295dcd6ce543d4edbd0a2df2c5069d20c55063c6c47fcefab61ee35af10928",
+   "size": 8244,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/mesh/sfc_tiles_functions.h",
+   "sha256": "6dffc0999fffe27da387ab901be05c3eb21887a682b46aed70af40960b9e2369",
+   "size": 16548,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/nuclear/nuclear.cc",
+   "sha256": "333152455287cab284ae2ea91729ecd121deb89f23fb35a919511cfb0d3d6586",
+   "size": 12185,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/nuclear/nuclear.h",
+   "sha256": "989a03debfd70c40ca57ab6a2bde897f7aa861024bc016bd098c36dd6d301815",
+   "size": 7332,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/nuclear/nuclear_physics_functions.h",
+   "sha256": "d7c7a9a7a31751d49acbecce3c16e6a4a34c027051fc53d6d039b146e49a2602",
+   "size": 42424,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/nuclear/nuclear_skynet.cc",
+   "sha256": "7f38cd85ff18e6a66fa2ba7c282dfaa416d514c8a285b3635c7329bc1cb930cd",
+   "size": 5829,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/nuclear/nuclear_torch.cc",
+   "sha256": "40b6e57154fa0fa4c43915c0a125043475e7c4d77340d705ce4f00c76e984c4e",
+   "size": 3810,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_chem.cc",
+   "sha256": "eb3d2e6af83e735c84b9ad47af8a5ff29b4446c78fc9a9b6217d50f8a461c767",
+   "size": 18512,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_diffusion_explicit_functions.h",
+   "sha256": "d31ce5168e065223b06eb7932826a1ce400a3522ff24815a0db47548f6ddc2fc",
+   "size": 18454,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_direct_ray_transport_functions.h",
+   "sha256": "ff64b30b975f1b9ee0bbc3ab7b33efd0b855013a48c5fff56c7eba0d8d9834e8",
+   "size": 3659,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_dust_opacity.cc",
+   "sha256": "8622580070a9427fa0e556658607d5bb698ef92bea97ca3c446e1d0445707d1e",
+   "size": 414,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_functions.h",
+   "sha256": "f3961de16bbaea374b30d08779cdaf9d49dd3e39e8f2cd0b7964434952d8a033",
+   "size": 126970,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_source_injection.cc",
+   "sha256": "159542ccab2365d6be1909564c3d81b4541715917a1b9e3bc7f74d95fc3a9d31",
+   "size": 9107,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_source_injection_local_in.h",
+   "sha256": "21b8a6707009ffb078d8fc53d15ec17384052b94732f4c7d5e675b90613daf61",
+   "size": 1394,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_source_injection_loop.cc",
+   "sha256": "bf49475ca69cb7a5f9154fc2b1eecebab1246096dd6e0dc96c581ed67539a33c",
+   "size": 13727,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_source_injection_loop.h",
+   "sha256": "847ea1c2f1b26f00a68434539fd17ad82fc14092c7ceb71ea6cb248eab579bda",
+   "size": 21866,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_source_injection_loop_api.h",
+   "sha256": "7865a601b674f68b981e079f9460fff48eccc6c4e95f936505b572cc46ec2604",
+   "size": 1910,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/radiation/rt_utilities.cc",
+   "sha256": "e68fc89eb698f53f49d832ad2bc83e95598dc68a6d994fbaaa6424b989c7c641",
+   "size": 21533,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_collisions.cc",
+   "sha256": "1f51b8e5bba9ad5195c54e7c428c85743a024a4f9c1f45c20fc751c1fc9200f0",
+   "size": 2050,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_collisions_functions.h",
+   "sha256": "3269c3ec1d94e4c267d89db9fffaea88dd55be1487c7111bbd4e5a119af7f80a",
+   "size": 7291,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator.cc",
+   "sha256": "018b35917eac9261fc839306a546a8fcce141dcbe6ced52da2a7d78383fa2a5a",
+   "size": 27351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator_flux_functions.h",
+   "sha256": "bb8c07b162b36110bce7e223d4ed43b5ebfd6edf8dbe60b517d9667d4ae46562",
+   "size": 32737,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator_functions.h",
+   "sha256": "590510f8a77779611ac9ef0b210adc5583cd0fa78bf46af740568561e2b69a59",
+   "size": 141522,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator_gpu.cc",
+   "sha256": "d00837771ebf43a46ba3ddb36b31197872762e309534122ada4461aa1527a22a",
+   "size": 12330,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator_gradients.cc",
+   "sha256": "cfa25d6a5be5b3d00358c531d4bb26f52801cbd5f3c6207ebf7202a2218d5731",
+   "size": 23888,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/cbe_integrator_gradients.h",
+   "sha256": "68501633306e8f1d62a89bedbfbb23e6491e2ef26d52eb6b238ed2b77c1b3a50",
+   "size": 41943,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_cooling_functions.h",
+   "sha256": "0c6516d151ec130baf0d62af1eeb837fba4c95c2b32a80aaa90cb8eed90f0883",
+   "size": 23352,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_cooling_tables.h",
+   "sha256": "bfe37e25425ac76495190f2ef1c9a87aa5f126ee7cc1f2208b8c23e7d3bfd056",
+   "size": 2198,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fluid_functions.h",
+   "sha256": "91c7a72975c1c16e856d3cca59aa8dd1e9e7ce5c993077aa262d487d2683a336",
+   "size": 3001,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fuzzy.cc",
+   "sha256": "553fd3fe3bd3a429296d844192ebea869791014132b0997998173d3b18a78c2a",
+   "size": 2070,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fuzzy_flux_functions.h",
+   "sha256": "73b57ee016102db6cd8c4a401e944a0c47a5aec33088b9d62a0d4d9555dfddaf",
+   "size": 7272,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fuzzy_functions.h",
+   "sha256": "97ef4931756bb080ff660b01a6dcac1154fdb833593b4a8777a9884dcf2c17b0",
+   "size": 9709,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fuzzy_loop.cc",
+   "sha256": "2dc32f28bb5fa361cf7acc59ca413b5d9f855fb182111266b7ba875876affdc3",
+   "size": 11977,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/dm_fuzzy_loop.h",
+   "sha256": "d6823c35ca11d8880d5192ebfa386d9c7b53c54ee6b623179dc28719867419c0",
+   "size": 12870,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/sidm_core.cc",
+   "sha256": "96b4a9d1b4c657267d4121f674486517ebf87c397ce7a578eb199e8362c46d62",
+   "size": 1477,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/sidm_core_flux_functions.h",
+   "sha256": "9505c56fd35480dcdeb78ff7b15c06e08cac583ac9a6f88d6dd6c1a692df55c4",
+   "size": 7592,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/sidm_gpu_decls.h",
+   "sha256": "1185abee559c6aebd84693317892f1ab432d3f3025210d3c31acfd547407d485",
+   "size": 782,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sidm/sidm_helper_functions.h",
+   "sha256": "03c8f84439b57d9137f5f0ce2f7910264db6588836a7eddf39a67d2f065fd8d4",
+   "size": 5111,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink.cc",
+   "sha256": "29cc80792ad8ae9927f458d21dac077b6dd5d5a4e9bddb6885d4e2260367016e",
+   "size": 63756,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink.h",
+   "sha256": "f594cffbba057a8d4683dcba9d26b1530bd519af1e93eff5e4bb28f0aabdba10",
+   "size": 4396,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_env1_loop.cc",
+   "sha256": "aa4cfb9639ea7fec5cff68ea0e3bb64bd9d42d21164fdfa547e1d74279b0210f",
+   "size": 6351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_env1_loop.h",
+   "sha256": "29165f465cdc76582348f792c8bb3db7899226b32beee9060a03933fbb9c8c82",
+   "size": 29216,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_env2_loop.cc",
+   "sha256": "8655d779fc0eced62332d0be527db70202109d5b4b8f0d1159aed02f00ac647f",
+   "size": 4062,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_env2_loop.h",
+   "sha256": "4fae855179c60cb86ae7c4642963baad90175d30a6a181931fc646ba30285ed3",
+   "size": 14149,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_environment.cc",
+   "sha256": "a299d4308e19ea08215cfd85603f236d8df39013fb3f8ca6bb78d331216cc62c",
+   "size": 10162,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_feed.cc",
+   "sha256": "a7c4c5d3452bc40849000d520577d4a3e4597123ffee450fbde1d5c29a31dd03",
+   "size": 8631,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_feed_loop.cc",
+   "sha256": "f825835f8d6621967b2aec94aa5d2d6472ea23e247c729efa296fbbc13f727a1",
+   "size": 10631,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_feed_loop.h",
+   "sha256": "2bb9fe7469a97bc731ba7cfcd7c0670ba98455334764aad5262b56fefabe947a",
+   "size": 38565,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_functions.h",
+   "sha256": "7444d642ee1618daaa83c962a294402f983c91ad2985da3aa0730f52acf97ff2",
+   "size": 11120,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_swallow_and_kick.cc",
+   "sha256": "8167f09e61c7984652de9ac17fe145304cbc62f8b81d2e1ba7cc4dae0c080c14",
+   "size": 67872,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_swk_loop.cc",
+   "sha256": "6498a44efc4aa7568cc52eadc3b23e295b008d50db6140994be233c4c830c7f6",
+   "size": 16951,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_swk_loop.h",
+   "sha256": "edb8ee53627df052500b8b2bebeca97f5a772daf930bf29ea88380d39c813e39",
+   "size": 40789,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sink_util.cc",
+   "sha256": "507a0a741b25e8cae1497fc3784dacd4412884b653e0e961e5b40564d4ee9ade",
+   "size": 7539,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/sinks/sinks_gpu_decls.h",
+   "sha256": "4d5ab02651d9b3bd5551bef22f471506266b3b6455021dc18a46e2f194492b5b",
+   "size": 3432,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/damage_porosity_functions.h",
+   "sha256": "b2aaa9c8927f01259cdfb6b2ba45356f77ac435e29b8a795e386cd65b40f45a1",
+   "size": 6415,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/dust_battery_functions.h",
+   "sha256": "0553448966a2fabeb303c88cfbec0bbd0620e9ccea32589242ace2f1b113fa3c",
+   "size": 17938,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/elastic_physics.cc",
+   "sha256": "b12813065c3891382f062913541ac8aeace31210686abb37a9f6c783fdc26621",
+   "size": 4044,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/elastic_physics_functions.h",
+   "sha256": "9618050da72bc2b844b26c32f00868be715fa855eba382d0c6741603432843d6",
+   "size": 6686,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/elastic_stress_tensor_force_functions.h",
+   "sha256": "93821c79e108512abbf936e28d03d76897335e933346cbb05437505bc2f34a42",
+   "size": 5463,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_charge_functions.h",
+   "sha256": "6e72808a07fb04b3a9df4dfc995ccaa94c77fb3753a8673a8fb3f18dd93f5b22",
+   "size": 4656,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_collisional_outcomes.h",
+   "sha256": "197f5007a55a1d77092d611d3dec5acc79375182fc5350705beff0548b8d1c1a",
+   "size": 9922,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_drag.cc",
+   "sha256": "85bcf7ef789952481ccabd4dda45370cd7b5c24297a3cdabbae5e8b89005e6d6",
+   "size": 18767,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_evolution_functions.h",
+   "sha256": "e26d64d50ca8c339eedc21ffe90c7614ee3e32fcc471ae7499fbb82aeabe3d9d",
+   "size": 24339,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_helper_functions.h",
+   "sha256": "d18b64568860ae9b065d0b7e3651f492ebe488f737bf0b37a96e1f4070043109",
+   "size": 4351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_physics.cc",
+   "sha256": "37625439abbbb7a9454b017dd73a1d594e2451c7271a2781836a1e37a7b47d74",
+   "size": 6744,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_physics_functions.h",
+   "sha256": "11bdcecf47f6be304e6774753ee53d451e6f091866aa2764b295266676153961",
+   "size": 16297,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_physics_loop.cc",
+   "sha256": "e10b4283ee77fa083000964cea63899fd395e814f33eeab37f4b46dd651dd6fd",
+   "size": 11555,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_physics_loop.h",
+   "sha256": "91e24a13c5425b6bc98c786902755e3124d15887582cc0cca22b80d87ce52dae",
+   "size": 23234,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_physics_loop_api.h",
+   "sha256": "2a7e2ea7a198de1236c3cd2972a06ba21d2c36b5cc4b8dc744598e13783cb518",
+   "size": 1697,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_promotion.cc",
+   "sha256": "29ecc76878202fb85ec37ee0eb8cfd38d8f4ef5d2abd43b9ddb1bd305d7e5046",
+   "size": 2651,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/grain_promotion.h",
+   "sha256": "4211323296e9bfe920ca8ffbee216c08e414ddb0bc012d577a187e561634a86a",
+   "size": 2951,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/ism_dust_chemistry.cc",
+   "sha256": "72b24631db43fc9fa0d42421de6c7d33e9bd91e4e7512700c061cc8210f03a30",
+   "size": 68606,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/ism_dust_chemistry_functions.h",
+   "sha256": "3f86c6ac438b38d19f9c7ce8daa0c7fd29b9bc46600cea013ea5be613d45bc62",
+   "size": 85133,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/solids/jutzi_crush_curve.h",
+   "sha256": "43c81e0792c8514ef41193c5795b366bc17dfa729af4e4f870adfa92080951b0",
+   "size": 2351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/fof.cc",
+   "sha256": "ec1932621d6af7a40853a13a6ac7e7500380cccec02e682d432d7826e62b0e15",
+   "size": 79567,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/fof.h",
+   "sha256": "8cdac5d9ce641e761293b0c29338e8808d4d53132d89c2df298b3613c1c99afb",
+   "size": 2402,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/group_search.cc",
+   "sha256": "58f8381116d7bc95582a8d8d7d9beb62d88afc3cdc2c5ca43235f3f43141ec5c",
+   "size": 23058,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/group_search.h",
+   "sha256": "bf0927be56b241068fbcafcefb04c7a1045b4a04ac99e54474124a94eaf84d56",
+   "size": 1402,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind.cc",
+   "sha256": "65a03a9420d3ef8b14beb376a9316fee0aa918b4c6ca100645ac86823c32b9fb",
+   "size": 44833,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind.h",
+   "sha256": "64e52238c41e96a92b09285568b9e836d576477997121f6818ec119e3d671b85",
+   "size": 9407,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_collective.cc",
+   "sha256": "32ea2f10e9f9c02611139cdc259322525f9b14f8071b4a1532a8339b809dc0b7",
+   "size": 66211,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_cont.cc",
+   "sha256": "2a2715b7efd3192d8da229fa6fc76bf37becc9b3bf0501d06fb0648a0a4643dd",
+   "size": 2723,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_density.cc",
+   "sha256": "14f0a7fdbc2894a9a3c45c962ff1dd2d95c7e6f5716dc4f9701b227835e1319b",
+   "size": 6898,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_distribute.cc",
+   "sha256": "8427a20dc8866cf01dd2d7e92e3a2743fdc9e82ad04fef263c2c85d17dba971e",
+   "size": 12026,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_findlinkngb.cc",
+   "sha256": "4ca473809198afbeda734c24bcfa5e8d5069b314f5d97a45aada00e88a1cd5bf",
+   "size": 862,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_loctree.cc",
+   "sha256": "c84cd66e599974dc7f636a30beade81f119ab1712664ee7171200b3981a90c7b",
+   "size": 14978,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_modern_search.cc",
+   "sha256": "4c3044b529e5da2925e682bb4bfc9b8673a5b73c02461991cc21c480f84eb896",
+   "size": 13326,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_nearesttwo.cc",
+   "sha256": "bbd4960857133efa293dda0c64c71228c0de08cd27e17c2fedc0cc9e5f4254a5",
+   "size": 655,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_potential.cc",
+   "sha256": "5dc8b14bea251d0f865817e7cd9c3fa43164853b642f8c605d50d31abe7c9198",
+   "size": 2227,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_serial.cc",
+   "sha256": "8805961d2234b98eee33e7da09978cfa2093139ed16356d7c66e5054a89b354c",
+   "size": 32879,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_so.cc",
+   "sha256": "fddbbc15a702850c55778b769c433f7d55f1255c33bbb0e1ebb049bfb546f551",
+   "size": 13234,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/subfind/subfind_vars.cc",
+   "sha256": "00648b2e8c8f28a9d60f2660a9c0b7e032abe71d40df5ae1f7cdfec188611373",
+   "size": 717,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/structure/twopoint.cc",
+   "sha256": "92be6c0fe93b04d31a7d700231eafe150bd1454b6d6441329dd4320b2ec177d0",
+   "size": 9992,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/allocate.cc",
+   "sha256": "947d818ea1389d67e319d580715f74d51301657bf483cc7c1823051e5d639e8b",
+   "size": 26418,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/bracketed_rootfind_functions.h",
+   "sha256": "48340883e8c0dfe36dc5b8fd94f9e272e504c02ce286a2258f5eb46f9e697b74",
+   "size": 5571,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/eigen_symmetric.h",
+   "sha256": "81d36f97951cfef32bf105ee4b93d3189927589046a6e308169a1fe0a4b16a4a",
+   "size": 7484,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/gpu_particles_arena.cc",
+   "sha256": "5bf7a19cea4f239af2031d4031dd2fae4744bae79921d311d44396faebc6076e",
+   "size": 31286,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/gpu_particles_arena.h",
+   "sha256": "8455889e58264fc5a77976f6ec660908f364dbb81431e447fe9b2e57012b312b",
+   "size": 12207,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/kokkos_mem_telemetry.cc",
+   "sha256": "56ea7fe495ebd8b9ff615aeb159a2dad88b66441d2b45a846f4454f105d0d237",
+   "size": 9090,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/memory_ledger.cc",
+   "sha256": "8a39d70e0d979263d9275753b92bc2d4a3228d42e50655ed1a7767ca2e942902",
+   "size": 49683,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/mpi_alltoallv_typed.h",
+   "sha256": "bfa6bee5f18f4fc5e833884d377c4cf904836135d4df8a547dc92a93328f1e65",
+   "size": 3534,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/mpi_util.cc",
+   "sha256": "a5dc883d34cd4ce6eed66459c5b567b50dcf70277c96f20a219b4b2fae2f1b89",
+   "size": 8884,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/mymalloc.cc",
+   "sha256": "db5dda71109a3c3d7684ade71c93ec285d5b542fe68c341d5a3219f166139835",
+   "size": 18196,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/myqsort.h",
+   "sha256": "59c2c02e132b02c01717a09d179948c2ce1a2379b15c47baa0f8c3569cf76141",
+   "size": 1000,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/parallel_sort.cc",
+   "sha256": "b55fa9914b1294f5d94a8753b7865f2d9ce5f665f0b1dd30b78813af9a21334c",
+   "size": 15505,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/parallel_sort_special.cc",
+   "sha256": "feb457703078d8a1f0ec2eb5c405ea3831130c2f52141648cdb1f34fa62a356d",
+   "size": 4346,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/peano.cc",
+   "sha256": "33bc2bd84761ddd2c00b3a90c2bde16f1b47d5c4df990969a9c5e10815febf8d",
+   "size": 28323,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/pinning.cc",
+   "sha256": "60aac96882bf800d951118c1653629eba78348f3c5e2be97c461312cf7105da2",
+   "size": 2174,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/system.cc",
+   "sha256": "a05dfd3e9d8ff10f25e5477473134ac8819710c4ea495b9d21b5813db05a99d9",
+   "size": 13990,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/system/tags.h",
+   "sha256": "2c7e2fd0e685f013b8255ef18afe12a5d15b7944d742087fc890c320b36ff74a",
+   "size": 3606,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/chimes_turbulent_ion_diffusion_functions.h",
+   "sha256": "ad5a86abb8c84378b6a0feb6fff0d1bfd3d8a00da5cee02cfdcbcab69345f04e",
+   "size": 4225,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/difffilter_loop.cc",
+   "sha256": "b6f1f4a0a524f15fcd7fec29f05def8020534cefe90cc6b6d8f7e872e52798e0",
+   "size": 14578,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/difffilter_loop.h",
+   "sha256": "105b60ab31409611f98d3f61722bd5b216a59c06d473761bc2e6fda8f6a71740",
+   "size": 25240,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/difffilter_loop_api.h",
+   "sha256": "9db62acddfed65d898c04fb3326fb97c1d270d87df0e405bb2cd9af4db20d619",
+   "size": 2697,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/dynamic_diffusion.cc",
+   "sha256": "ef1bdd48b7cb8dbaf3a658ba7ffb88548d05f741db2522bd5ec95cdf5bc0e535",
+   "size": 17874,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/dynamic_diffusion_velocities.cc",
+   "sha256": "109abba6c6a2d6cfb88d99a4d1d8266ae5215729efb5f63244aae4d4f7e6219b",
+   "size": 3026,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/turb_driving.cc",
+   "sha256": "36661641d41ee0dab7035f8297816058609f3c779a6e4ebab78ce4bd987b2cea",
+   "size": 26517,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/turb_powerspectra.cc",
+   "sha256": "dd79de6f9f87999d6dedcb6b2ac25d03a418673f25e0b2ca919028677b04ef02",
+   "size": 45878,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/src/turb/turbulent_diffusion_functions.h",
+   "sha256": "102b0e3f5358c63cdbf2470bd41a26d760af0cb7a1b6bf433abeba9789cac0ca",
+   "size": 3904,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/HII_region/Config.sh",
+   "sha256": "e36d6750fd02da162c3a18c9a6f78f51191e78f91cd1549b9f0fad15e14f2ae8",
+   "size": 309,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/HII_region/HII_region.params",
+   "sha256": "93a47bf07f16734330d0e6d64dbc5f245337834e1bd457cd411775adeae70583",
+   "size": 2802,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/HII_region/make_HII_region_ics.py",
+   "sha256": "60eb04a008801ad2b791b74d26e045b3da12c0df0cffe1f2d1463fe44e0e2e78",
+   "size": 4634,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/HII_region/test_HII_region.py",
+   "sha256": "c4dca802183ae874b802a1f58b33289b90da34ec413cfb4ac80fe505a009ffad",
+   "size": 9413,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/README.md",
+   "sha256": "31e6942c8386bd02fe5f96ba6a4ce06ea31d6f94cbd8a454ec7c6d02e008d43e",
+   "size": 139,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/SN_singlestar/Config.sh",
+   "sha256": "307e425cf0aeb68c7e0c9240f978e3305f207f7b0c929647fc66629eab153f30",
+   "size": 164,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/SN_singlestar/SN_singlestar.params",
+   "sha256": "5343ac19df3214f0b5cc82186d8507cf896f0d361eff94a655375c93088c5ef7",
+   "size": 3085,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/SN_singlestar/make_SN_singlestar_ics.py",
+   "sha256": "bded10fd82657e9ddcba927c4b79540ff00fd1ed7885c3c7a5ea65fa3c0d3ebe",
+   "size": 5803,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/SN_singlestar/test_SN_singlestar.py",
+   "sha256": "06de04289cd4bc2b157fa4ed97052235dbe0384154ef678f28cc592909ab8fc9",
+   "size": 11452,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/Config.sh",
+   "sha256": "bbc9e8a7bb84338a7b3bc760fc5965440c08b5150c05cbe7287f1ae7baa5403e",
+   "size": 147,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/Config_selfgrav.sh",
+   "sha256": "7e4a25a6f4bb20394702b9cc87a96cb1732a93a6660670d6510eb84014ff5d51",
+   "size": 190,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/aneos_giant_impact.params",
+   "sha256": "b74a62dca5b161972a3db996dae9dac5261a87c18425fa2d6d32d531658e32fe",
+   "size": 1827,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/aneos_giant_impact_selfgrav.params",
+   "sha256": "c840d76f49238a2e89dc3c8b157053ec7c08ff3cfff831f96347065edd408e37",
+   "size": 1655,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/convert_stewart_table.py",
+   "sha256": "51fe3800d66c0fe9d6b010e8f13af6a4d8ad56938817d9058aa3f878974a1eac",
+   "size": 4107,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/generate_ics.py",
+   "sha256": "692c753f0f5098827b585460d5a4e6c9a5458422a64aedce16341cb7dae565f1",
+   "size": 4488,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_giant_impact/test_aneos_giant_impact.py",
+   "sha256": "4ae0131b37ccd1a4f94fb37018ad8833c95f16541df4ca1eb4481d0d98983893",
+   "size": 4308,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_shocktube/Config.sh",
+   "sha256": "d8b5eddcbcc92afd8860ebfbba3b04f038df78c5074b1c994181d07d55b548ab",
+   "size": 156,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_shocktube/aneos_shocktube.params",
+   "sha256": "40c10f7c185c92faa6add45a17e0ad17f13d9c8a3ad55fdcf84c29b53fff36e7",
+   "size": 957,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_shocktube/generate_table.py",
+   "sha256": "e5c4916ee59a80d6f91fee5c100342e09bbe286a5a43d6fb2a0090ba5a795fd7",
+   "size": 1894,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_shocktube/test_aneos_shocktube.py",
+   "sha256": "084b56ebea10cee11483e449aa657f979f81f66c135e65ffa46c8c84ea684b54",
+   "size": 4680,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_unit/test_aneos_unit.cc",
+   "sha256": "34d5f84edf7cfc99b5e3d05b13b90c9f055ab63ccf45c66a05934a8793f4b455",
+   "size": 12233,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/aneos_unit/test_aneos_unit.py",
+   "sha256": "dd4e7a17540bdc05fa4376c9ab3ad482904addfef99de8babb5d893deaa905b3",
+   "size": 1455,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/biermann_growth/Config.sh",
+   "sha256": "091e24f75820e590bffc3cafc5f52444ea0190edaa4effb37a206a2df28356d2",
+   "size": 220,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/biermann_growth/biermann_growth.params",
+   "sha256": "eafb3ca4adbf89df91270238aa11758adecfe9c65b47fe1b0e27a3f8bb7102a9",
+   "size": 2724,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/biermann_growth/make_biermann_growth_ics.py",
+   "sha256": "3bfc26a8b454d9f53ddd8b04feba7b66b1c0ae9ba0cd7cec7e48381cbb7685c4",
+   "size": 6085,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/biermann_growth/test_biermann_growth.py",
+   "sha256": "8bd6d421040b7a511e1dab77da2e5726af09b51c4702604122930148b2566409",
+   "size": 4935,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/blob/Config.sh",
+   "sha256": "e2cb863bd4cf4731b5621bb7e244b45d52fbeb587c580a8298487e3037442cde",
+   "size": 156,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/blob/blob.params",
+   "sha256": "74a4dc55e74a8b5a5e642f41e1d8425f6a02cb302a4eb9f7f9c548a5e9003de4",
+   "size": 1002,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/blob/test_blob.py",
+   "sha256": "03a8ef025fdc47f3e96e536cc6e9444dd42d5464d971f5c3580d24bb24cdab4f",
+   "size": 2900,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/briowu/Config.sh",
+   "sha256": "1f5d34a8b04de1ea8dcc0b3635e82fdb9610041d8ff1be288d5423b844ba8af3",
+   "size": 186,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/briowu/briowu.params",
+   "sha256": "b83c3848fdab0203421a4b762e1c3db96f6e53ead0dd8ac0099587d0b632eedd",
+   "size": 1001,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/briowu/test_briowu.py",
+   "sha256": "d59fd5543e1aeae3d43247796763201b5fa2aa4ca094c965bd5fadf6276e4037",
+   "size": 1975,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/build_gizmo_for_test.sh",
+   "sha256": "81dd5fc282581eef48cb19324b738c50ac2e1ebc8a8191cdbc8b87f8e629db52",
+   "size": 158,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/c_shock/Config.sh",
+   "sha256": "493e43293369517311033a5f400fb6b49fc9b2da6a3044c0cf69a1745307ac95",
+   "size": 174,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/c_shock/README.md",
+   "sha256": "ad0b47546b296861fee36c3cdb1c43b8ded2ad9b4204ca172430ee957aaa5c04",
+   "size": 1016,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/c_shock/c_shock.params",
+   "sha256": "6e5352cf06a75f084f51bd4c55dbcb965180affac1b9b128c0a774665c716119",
+   "size": 950,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/c_shock/test_c_shock.py",
+   "sha256": "17a71b5371ad1f498abdb2c67269e5212755b953c35da954b2b6bae88397483c",
+   "size": 6432,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_density_wave/Config.sh",
+   "sha256": "d933420f6781245a28c04adfe901d77f877041c7b26961f68a67de93651b6424",
+   "size": 800,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_density_wave/cbe_density_wave.params",
+   "sha256": "5888a17da1edb13f4cbf62232c096aaf7d43f510d4d06af67b16810219d097f2",
+   "size": 1611,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_density_wave/make_ic.py",
+   "sha256": "0e5cbee5b24e71bd9858708f59a8f6cab3b3c040a6808f1907575c01635c9db5",
+   "size": 7408,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_density_wave/test_cbe_density_wave.py",
+   "sha256": "cceca6fd222f0a0f7d99b5bd8f337485c4249fce8e51e88d4c9df372fa6f474b",
+   "size": 10411,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_1d/Config.sh",
+   "sha256": "b98f37f22bc7fad624da12f7955028dfb5da48d3eb04e2ddc9e8b179d1824b65",
+   "size": 868,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_1d/cbe_free_slot_1d.params",
+   "sha256": "5c8946f6e03331ba9e07f661fda2778ae0ba67b5b498f178e53f6f70cbdb7be3",
+   "size": 1630,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_1d/make_ic.py",
+   "sha256": "2b9d8b50fff73537a005de10e2a37e249ec0767fa71184ca6274a91c56e63fb4",
+   "size": 8179,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_1d/test_cbe_free_slot_1d.py",
+   "sha256": "03c6b2fea4245fd4c912c6e11ebd92895e028d12dcd78b01dfd58e1c8300152a",
+   "size": 10641,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_3d/Config.sh",
+   "sha256": "16b97e96f7dfde83e35d2c9adad0f4578c57b0f08dec38b8456371ce4f6d8382",
+   "size": 1088,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_3d/cbe_free_slot_3d.params",
+   "sha256": "60be4a8b7b14402210a2b8294939be2e9bbc9b2bf1e35ae4bea31ec3369389ff",
+   "size": 1816,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_3d/make_ic.py",
+   "sha256": "b25124286ff29ffbe1d424499879d3eb007dac87838adc942288ac6305c04f77",
+   "size": 7863,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_free_slot_3d/test_cbe_free_slot_3d.py",
+   "sha256": "32959bd7c34bf7cfaf7bd4cd679b362572c61a0cb9d98fede15b48ca4aa1beba",
+   "size": 10321,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_harmonic_1d/Config.sh",
+   "sha256": "33e7b737d24930194f5632c0b720238b91f1334620ea6eb337c7a60c15d65f88",
+   "size": 1124,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_harmonic_1d/cbe_harmonic_1d.params",
+   "sha256": "fd248fb5284cf0b24e52b222ded3a1ec0346954ff121dced5e2ab29b98f7ffcb",
+   "size": 1921,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_harmonic_1d/cbe_harmonic_1d_long.params",
+   "sha256": "d955078690bdd05c296fff6916b6acd0aca6e28f2a775d7380605ec56dc5459d",
+   "size": 1927,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_harmonic_1d/make_ic.py",
+   "sha256": "43ccdbc3e867ed861b7d24d67c417bdc14fdb0c6e5cc73c784ed290dfc665611",
+   "size": 7245,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_harmonic_1d/test_cbe_harmonic_1d.py",
+   "sha256": "761adbd00b2373b4cff4a9736f4b1862876392567262f3ed0e4865685447e37f",
+   "size": 11057,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_two_stream/Config.sh",
+   "sha256": "3f57b8e1152073c90dde2ebcc0cf099fc67f74889c1d5f6c4f9d985bc483cfb2",
+   "size": 944,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_two_stream/cbe_two_stream.params",
+   "sha256": "a4f0285ef058bf8708057c176ebd6484f779ee906ecc7404ccf1d02dbb5eab6a",
+   "size": 2121,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_two_stream/make_ic.py",
+   "sha256": "5ef5a1fe38be79603484a9186ca90523c31242c7689581cb3e36d879ef11413d",
+   "size": 6776,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cbe_two_stream/test_cbe_two_stream.py",
+   "sha256": "64566f966db996645583517478c4c336f0b90c8ef8b2d4bb456bc4764d7393e5",
+   "size": 9618,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cd21_hhe_compression/Config.sh",
+   "sha256": "172144fb6b2864bc2d1a958ad08d9b8c928325a062f3042e31261cfab2d2d056",
+   "size": 184,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cd21_hhe_compression/README.md",
+   "sha256": "6d92dbc8ecd19a5aae906ba9b032c318db99a987b95deba08d6783fb78696cd2",
+   "size": 1926,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cd21_hhe_compression/cd21_hhe_compression.params",
+   "sha256": "3adeb407716f7c858a236cce5c8d81966132b6a7e0dcbba2d603a7da5f6d3fa7",
+   "size": 2888,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cd21_hhe_compression/make_ics.py",
+   "sha256": "097079e36f74d4a2d35f1491451c01cda8b5de8f24bd9df7ce386147312d839c",
+   "size": 4317,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/cd21_hhe_compression/test_cd21_hhe_compression.py",
+   "sha256": "7cf3f90f3ade11dc241f2a0bd5b07e5cd38b2bdac7ab1db9305f6474bcb4f50c",
+   "size": 3317,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/test/compile_suite/run_compile_suite.sh",
+   "sha256": "cbb1a0d1b54dea26db1c03e60d066ec0679162652fc4e20f848ab753218cde11",
+   "size": 24891,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/compile_suite/test_compile_suite.py",
+   "sha256": "fa8ca3d7e26904096ee27fc4fcf8f03ec1b650a06428daf671e68c37591a7b81",
+   "size": 18351,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/conftest.py",
+   "sha256": "3057ea26bf41583dce1899d0c1499ebb17eb08a73e5d7430a42f1a04cb8c2d63",
+   "size": 4381,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/core/Config.sh",
+   "sha256": "ac65c84960cfa81b34d70291b9e3af1c7692c2ff457f1d805c1054f7369ccb8d",
+   "size": 464,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/core/core.params",
+   "sha256": "63c37d9a0df3ee455f77cbf503ea9b7d62f73c622c451308a67db9efe3bd2993",
+   "size": 1817,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/core/core_analysis.py",
+   "sha256": "a397af28ffcd6f92068a1096722591b88e04fadaa07557ad4518bdded4236c1f",
+   "size": 26745,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/core/test_core.py",
+   "sha256": "32ec985e0dd03814b8e21f54e90d8df2ad6f585546dc5ea945016422cee692d1",
+   "size": 3310,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/currentsheet/Config.sh",
+   "sha256": "a9c8fe626e80db8573c5522d44280aa7eab2fc4df7e68488aa33d6fb756a57c7",
+   "size": 130,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/currentsheet/currentsheet.params",
+   "sha256": "d5386e4c30c872acddad52ba8a03569198585960d250967b9667050b9a3c664a",
+   "size": 928,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/currentsheet/test_currentsheet.py",
+   "sha256": "f29caf29da27a50a34974add705893c29c321a9b993eba2c0a1932ff949a6317",
+   "size": 1954,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/dustywave/Config.sh",
+   "sha256": "da87d073bcfadbf35cdacc1e8bbcd8a85966af4bd635e918ad1807fe37bd529e",
+   "size": 208,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/dustywave/dustwave_exact.txt",
+   "sha256": "0dacdd96653013f8d019f973aec4f709561c6dcdc12fd3612ef2c4106e4fc96a",
+   "size": 31000,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/dustywave/dustywave.params",
+   "sha256": "4ef1c97b089abebf75b51ad9a7b6e5d7f7bf5cbceed84289e2ef04872d25d36f",
+   "size": 1071,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/dustywave/test_dustywave.py",
+   "sha256": "be14b750d1275d5b4a396d6cba4501097e13f0fd907873b2b67bb0a369f4640d",
+   "size": 3745,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/Config.sh",
+   "sha256": "04beef034908ef5491a703755842fd183547eb92e50867e74e76dee074d02203",
+   "size": 113,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/Config_forall.sh",
+   "sha256": "a5b16382b84d87f087580d558c93acf0f8a3a3e241bcea607a9f59574b2fd95f",
+   "size": 115,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/README.md",
+   "sha256": "db37943653b9ee17668421d15717b6a99716c7c2813cb2dc29534f8cdb5278ca",
+   "size": 2238,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/evrard.params",
+   "sha256": "5b250bffdd8838a8c02631730d2d7b57874574a59168636ca3e9a1cde0f95993",
+   "size": 1032,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/evrard_agswalk.params",
+   "sha256": "58803401614fab7653b6977424782a6cda11cc60989a7ac472664d103bbee2aa",
+   "size": 1002,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/evrard_exact.txt",
+   "sha256": "a70fddd9bed6506b7c79b8d141ed050a04288700b8f21e0c4253b49db5ec1574",
+   "size": 7830,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/evrard_starved.params",
+   "sha256": "196cddcc96a44389600447ff62f5eb6e915ab74f66b00e8b0c333a2192a2329c",
+   "size": 1053,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/evrard/test_evrard.py",
+   "sha256": "1cd7a68a71ec63c242b41eb7e93b8f086a0d64174e68bc652edb63b94d6253ae",
+   "size": 5117,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/Config.sh",
+   "sha256": "73a2f86fbbc61931aa0cee827c2d4406e8126bac69d5a7866bbfec096b9008c5",
+   "size": 2478,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/README_triple.md",
+   "sha256": "4476b178f0358fde3c479a1fe6ba59b2b662e09e63a7a2fc467f47550a5941ec",
+   "size": 6011,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/binary.params",
+   "sha256": "b4bff9c243d394c1a7ed4dc5a20fa37e5c12e75a57121614c0ca009e73c783a4",
+   "size": 3018,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/make_binary_ics.py",
+   "sha256": "3cf5f00f9b1ac4d27d8d199df9576c653e85c21910231f037b665a5e0fa148d0",
+   "size": 5283,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/make_triple_ics.py",
+   "sha256": "7b4a0e56ce8f5d21845d6050a53e2034d828928ae346ad9c201170a00019e150",
+   "size": 11228,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/test_binary.py",
+   "sha256": "398afada00036aa7cde9b60eaf1b87e4577a8cf5627d320a33dc0070f7ea0821",
+   "size": 23950,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/test_triple.py",
+   "sha256": "98107792119da89542a651d5f635106194eff50ffd3605143465110758c052a8",
+   "size": 12008,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fewbody/triple.params",
+   "sha256": "fe32a4f3bbe13c693751d4d4486dd6146abac45c2df091821c9a7bc68c0278a9",
+   "size": 3134,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/Config.sh",
+   "sha256": "9daf880f7cb41f3ddcfa8781c36c68c342a3994aa3af1544f9f9f94805f3b3b8",
+   "size": 205,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/field_loop.params",
+   "sha256": "aa4be2884f4e1f72f98452e50f6d417d647d0456ccdd09916e0fc928aa5a3bc2",
+   "size": 948,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/field_loop_Base.params",
+   "sha256": "bef3426d5526fade64d86301a26e3c4c780f9e7b7396acd07c901dab8a566804",
+   "size": 1083,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/field_loop_CG.params",
+   "sha256": "c9ffec95e64d9b4555a23c98ed2f936b0aa6f1ebec021661a6f0e2ce64adc36b",
+   "size": 1117,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/field_loop_MG.params",
+   "sha256": "5a09d5ba168d57d2b4d9b683472254395b0b54be1cc311d86233c68db97707e5",
+   "size": 1228,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/field_loop/test_field_loop.py",
+   "sha256": "5aaad5b6b275c14d707b523437b73178f7995c37687d6749be55e8617019d05a",
+   "size": 6512,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire/Config.sh",
+   "sha256": "645bfbe2de381425b4230d65ba4b53f44a1d5c48458adfb47192df60b67799c9",
+   "size": 90,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire/README.md",
+   "sha256": "edcde3cb08aa9221e39a650015d6ed136d17efb17a0157a5839169dc104cbabf",
+   "size": 855,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire/fire.params",
+   "sha256": "e93efb8a07812bcd531962b64e7fe6d7bf25033ce3db298b3aa06f9762e92072",
+   "size": 1460,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire/test_fire.py",
+   "sha256": "549828c3a56831c588985f4550f04ee9716a630395ba2960f7f59ba5477885f0",
+   "size": 7514,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire_rtsources/Config.sh",
+   "sha256": "4461385be41f8c95ff5ba48507545816a86e42dc87c5845f1a3f40b65c644f75",
+   "size": 252,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire_rtsources/fire_rtsources.params",
+   "sha256": "e634f9c16414eb2e82df404203a374921055b30ab915b3ba121917b8a3f84f98",
+   "size": 2083,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fire_rtsources/test_fire_rtsources.py",
+   "sha256": "3eb83a752f5aa3f0b072a81845c8be8ad9e51ee6e538098013f049c4f909b97e",
+   "size": 3733,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fof_subfind/Config.sh",
+   "sha256": "d7a6f1308a809a3655037c2bb009186d18bbbe61a0349971ec7c264df5685021",
+   "size": 165,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fof_subfind/fof_subfind.params",
+   "sha256": "a7aaf09e8cab23af400bc3940512b1f8bc935beaefcf925f9335610c2a4543c6",
+   "size": 2089,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fof_subfind/make_fof_subfind_ics.py",
+   "sha256": "3c4cbc3c83af8e41f4fb795f34137e17efbe2c53aa161d92e910632efadfb5cc",
+   "size": 2885,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/fof_subfind/test_fof_subfind.py",
+   "sha256": "d8bde8a13da4e2a1696277e7cbd34110df6379db6e88d8268b58fc858968d1f7",
+   "size": 3647,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/forgedinfire/Config.sh",
+   "sha256": "2cb9f130b925a864c0b191bc6aae9d2fc341d8040fc806f6133dea72abdc76c5",
+   "size": 284,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/forgedinfire/README.md",
+   "sha256": "921395a040bad4c72612baf018fa79be1caa431513ab88ac22233b93fc2a5246",
+   "size": 920,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/forgedinfire/forgedinfire.params",
+   "sha256": "72e3dd87a7f52582e4d5e5241e77c92d932f49ff596a9f739bf7e0d4cf416612",
+   "size": 1627,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/forgedinfire/test_forgedinfire.py",
+   "sha256": "4b72a4bcada9aa65bad3bc36879845ac398def1696025d430cfb1699401accce",
+   "size": 9577,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/Config.sh",
+   "sha256": "ec52d78c05a7361475e4d8f7dfd6ac12a8604ecd4fcca28536d6f45877bd415f",
+   "size": 150,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/Config_pmgrid.sh",
+   "sha256": "4459debe5b669ca7dabf99d6ac3c68cd06e2d465d471a13a60904525afa213c9",
+   "size": 137,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/README.md",
+   "sha256": "96b0e01679cc3b19e977679dda8ba4a810fa7eae59610c483effcda790ca0408",
+   "size": 1693,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/gmc_cooling.params",
+   "sha256": "48c6a6486b6ce3a069b2050cbb8308bc931b939ced14897881ab8c83bb06daba",
+   "size": 7054,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/gmc_cooling_pmgrid.params",
+   "sha256": "3e9066949cc0e411bfddd223e75d5f85a624779f2017e2ea552f66f3e7daf512",
+   "size": 6976,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/gmc_cooling_quick.params",
+   "sha256": "b71f504bcb6616937eb5e508471f8d72bfa0f0830c99eb83ecbe2fa61d29949d",
+   "size": 7025,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling/test_gmc_cooling.py",
+   "sha256": "d7ae085b72bcd31aff6b1e842fcbc9e9f008c84ec7857ad304b754436b9cbcb5",
+   "size": 3379,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling_rt/Config.sh",
+   "sha256": "d5b9a18b93847f5be150a29032a994cd48949c3a350e37e864be0d495220da53",
+   "size": 202,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling_rt/README.md",
+   "sha256": "d7ef79563eeb0b7dc00d8fe224b68075e6568251f9397d51012022d6edc87437",
+   "size": 737,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling_rt/gmc_cooling_rt.params",
+   "sha256": "5cf00674caf93d71ba94f69a7d8fd543f4d1ccc715f9b6dba3e9f29bdfbe191c",
+   "size": 7046,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gmc_cooling_rt/test_gmc_cooling_rt.py",
+   "sha256": "d639da31fb32dc11b5681eeaa10111fe0ab2b886994de3866ff2fc26a8dc9cf5",
+   "size": 6779,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/grain_promotion/Config.sh",
+   "sha256": "1a5e8b903e912476a85638d5a3d2b7967a18b559302b70326a1d2ef3113715b5",
+   "size": 242,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/grain_promotion/grain_promotion.params",
+   "sha256": "2b9bb9db858090e1ac67cbd54a5a2fe3fc6a20dd192e31e4b14d0c4898dbd4d4",
+   "size": 1904,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/grain_promotion/make_ics.py",
+   "sha256": "47da6e208f5570a50cbf86d742eff47da96ab65d42b9168e4cd7cc21aec72b7f",
+   "size": 4862,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/grain_promotion/test_grain_promotion.py",
+   "sha256": "a952de44d83629654b3a17316dfd401bead5ce4c8305da4c2b356a206ac88222",
+   "size": 3563,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/Config.sh",
+   "sha256": "379cced87bc6d3265fce87ebfede3534daf04f25c2fc6e11140625598c2c5157",
+   "size": 294,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/README.md",
+   "sha256": "43e6338a0e09301c79b223686a42f0271d0e793182bb57e5af3bc2bdd5a7cdf0",
+   "size": 4507,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/gravtree.params",
+   "sha256": "cb9f862278634726ad2b92e591deb673d54d520833bf6650dae8b4558aa9fd50",
+   "size": 1306,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/gravtree_evalpotential.params",
+   "sha256": "ddb24f69a324893fb25db9d8163211e8ae5af87eb4ddbb1afdd69f3924befd9f",
+   "size": 1326,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/gravtree_pmgrid.params",
+   "sha256": "3c647ec40c9fc021454a8234cf8896af39fbec60a85c1ef3145be51818004312",
+   "size": 1449,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/gravtree_rt.params",
+   "sha256": "4018d0a1f4d2122adbd210765216a8ba6f4b29fcec41283505fee08d06281e87",
+   "size": 2031,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/gravtree_sinks.params",
+   "sha256": "d07487f37e99c6d790f3638d3ddfb3fdee4b48d62c085bfca7f90d811dd260a4",
+   "size": 2341,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gravtree/test_gravtree.py",
+   "sha256": "ef96d7dc61c49b3ae3034228a3130cdca1f2bdc4393050c3938ce0d685429ec6",
+   "size": 8067,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gresho/Config.sh",
+   "sha256": "0cb1a7854a3d66a6013c70f6ea6b1792e5947518e40dbb39e163c62c0657ddc1",
+   "size": 137,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gresho/gresho.params",
+   "sha256": "971e1e9232cf214b07ae19bad0443e0326663d02476c2e1489cef94e7d03939c",
+   "size": 816,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/gresho/test_gresho.py",
+   "sha256": "7c2b756fb80cb1bfaffddac927d3162f9f9239aa1e90e7ada8b7af2bc614e4a2",
+   "size": 2291,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hall_wave/Config.sh",
+   "sha256": "cbc1f0d950f8904780e3a8a6638e66e8ee8ea767a97bf6653e0b7a65d52c10f0",
+   "size": 174,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hall_wave/README.md",
+   "sha256": "c4d3ef9d70e6732e58635cf5be226af5627dbb6cd927624ca1fed9bbd528ef73",
+   "size": 993,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hall_wave/hall_IC_analysis.py",
+   "sha256": "e91d2780014f5eb6b1a70d28ce6acf1161d3236ac643b9fe0ec841dfb2359156",
+   "size": 14541,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hall_wave/hall_wave.params",
+   "sha256": "402b98c0b71a92eb7a36ce95de1b6e5e8a317aa050fff1ac111a070dc51e741d",
+   "size": 903,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hall_wave/test_hall_wave.py",
+   "sha256": "9050870c4b1082eab733c1b37148d70e97b7c03130ca835831c4060dba7dc6d4",
+   "size": 7959,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/harness/gizmo/test.py",
+   "sha256": "822f162fe5c18b5d3e5e8f4bc834e90afaa22df65335866a3debdf49e8786e12",
+   "size": 30182,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/harness/gizmo/units.py",
+   "sha256": "e6b86cc120d391d230aad7adf6dc259726a30b671260de91b58dc989d46d03d2",
+   "size": 2741,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/helmholtz_unit/test_helmholtz.cc",
+   "sha256": "2b27bad13fefea01dbb359599b87003ca6bc5024da954518ca87545fd9314dfc",
+   "size": 15473,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/helmholtz_unit/test_helmholtz_unit.py",
+   "sha256": "2796950edf71421f549608f43bde420d3295a6a7ac8e1687d30ae4f2021cc65e",
+   "size": 1940,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/Config.sh",
+   "sha256": "fb08f628fff6218994c83f651791c5cb3cc72c77168a2d789d796d1f8d1300c2",
+   "size": 344,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/Config_cbe.sh",
+   "sha256": "5e9e166f31a8c5a82b254998896a1f339a59cf0de486dc1d6c760fd631ba7eca",
+   "size": 593,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/Config_dmfuzzy.sh",
+   "sha256": "a205f6de0052d64c5c4b1b926e1177d78b869d088ad7c8ff1aee24cd90c51d07",
+   "size": 404,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/Config_sidm.sh",
+   "sha256": "8142a3f3e4fb4ecaeaea73048f0b6fc97684dd10162bcb5011f84a90d8a46c33",
+   "size": 337,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/README_convergence.md",
+   "sha256": "c502b5b985bfa24a656a643c2eb03a880dc565c560d4734944aee9cd94f7b94e",
+   "size": 5664,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/README_dm_physics.md",
+   "sha256": "5229da8e6ef2bcb4e96995e4a87a584022a82843c0e2da4ddf90970a5eb66c8a",
+   "size": 1910,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist.params",
+   "sha256": "6297b7c3cd815d873c8356159a510682b8be5a5230190d50d43f1c7995318087",
+   "size": 2542,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist.py",
+   "sha256": "d2b51dd16aa48c8d96dcb21f5c48f68ba8b40397048c5ad7ae62fbf6c97468bd",
+   "size": 2636,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist_cbe.params",
+   "sha256": "5f274872dc214707da0169b327260cd2dddabadef1986dee59d3bb7522ecfc85",
+   "size": 1900,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist_convergence.params",
+   "sha256": "14ce5562f013c63bd76758c71e5c2fc5204f31e2538fc886cfb8f277677605a1",
+   "size": 1971,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist_dmfuzzy.params",
+   "sha256": "52edb63c6cffe723cac182c0433e36b675977c2822ffd89244d995040a3729b8",
+   "size": 1994,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/hernquist_sidm.params",
+   "sha256": "12dca3dd5e315a98f936c385c07235c4680a1bb26fba3ce4130825fe2f84e478",
+   "size": 2163,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/make_hernquist_ics.py",
+   "sha256": "5fb60a5b698a3d5365e66cd647916c981c2f24e4b17237e5aa988144c6886fb7",
+   "size": 4743,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_ags.npz",
+   "sha256": "3e207d24d40959147fcf71bedd76f81c93e7f223a4f72a83cd3691f2b86d5971",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_baseline.npz",
+   "sha256": "2cade5b669625b2811c6af02a61dc235180915c16492f78a4f91e844680b34da",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_ewald.npz",
+   "sha256": "ab16c9b922570d6e74c32dfe59ee2ebbfd87cb2899c0c34df5215ffb528fc673",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_pmgrid.npz",
+   "sha256": "9cca073490b7b80d486bfb2f4a94ff48b50d2ff29e1ce8d59b10b5f2d9048a5b",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_randomize.npz",
+   "sha256": "71016a5d1d2980c6ef20757e92b32d4c1d8a8ab3544b12d188c69a55b8aad50b",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_randomize_pmgrid.npz",
+   "sha256": "bb32cad2da0177fcb21e04fdaf01a20c18b98330f1a0e04af817621bae1c1aeb",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_tidal.npz",
+   "sha256": "76793e87120e330318569c011e77238b6e8c3e7cc08a9fca00f2be43751966d9",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/momentum_tidal_ags.npz",
+   "sha256": "47d63b7abe38127a34ff2c4f663ef84217c8944fe0c16c91df10b66c9e6c5a7c",
+   "size": 3118,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_ags.npz",
+   "sha256": "cbafc144743ce24ea1af64dde31ae6e513597512183cb1314df541db5af1e8b5",
+   "size": 6402,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_baseline.npz",
+   "sha256": "7e3b236023517f8aa889013e6965c42e7e113afe4383073cc0c8945e05672844",
+   "size": 6422,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_ewald.npz",
+   "sha256": "26ec00dadb83d4390250cab1c8922e450695cbd52dab6fa98fc7ab6415015413",
+   "size": 6410,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_pmgrid.npz",
+   "sha256": "0628dd2ae254bf75870d46fff2b5439c78d148f8e92440f32f23e59946ae54ba",
+   "size": 6414,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_randomize.npz",
+   "sha256": "66f1f1b92d7777c992f35505c125c7c4902316d41889b1a29228d0d49e17816f",
+   "size": 6426,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_randomize_pmgrid.npz",
+   "sha256": "443d3b21a2fe2de1708edceb5dce2764470a6049818cc4c87b34ec9d481f1ab2",
+   "size": 6454,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_tidal.npz",
+   "sha256": "59ecf0a5bb14921d05760cbaa9bc92b6e7a8f7248cc300dccf7fbb3bb0c7931d",
+   "size": 6410,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/summary_tidal_ags.npz",
+   "sha256": "cba2c9ae831039cc9229d32a0863aa84d687b545939e485feae7d6781fd4ace4",
+   "size": 6426,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/test_hernquist.py",
+   "sha256": "4ae8fe3cac45a4132418c25844da28604c49709998a1f1d2ef0e3d9e339f437e",
+   "size": 21841,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/test_hernquist_convergence.py",
+   "sha256": "0b13e615759cca8f361f2215e24c1653de0cc7ad5dcf3b43960dbf2816b19e92",
+   "size": 12183,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hernquist/validate_snapshot_vs_ic.py",
+   "sha256": "94861054e53499e1b33fa71e105a8e6434c483d23fc27e4a9170c879dde6e746",
+   "size": 10528,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/how_to_add_new_tests.md",
+   "sha256": "f19d4afe91c879ae10c2d6e5efb7f4a052bcd39ebe5567bf3eaf1544e411b772",
+   "size": 7757,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/how_to_run_tests.md",
+   "sha256": "088c4e4ca3d375f11bdebf93737289f4ec3f0129f23437e90977e99bb3cb7000",
+   "size": 2777,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/.gitignore",
+   "sha256": "5bfbd7eb79898503311b7de98b11e0990f3b33611ec0280127c542ad240a44d5",
+   "size": 158,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/Config.sh",
+   "sha256": "d1721cf8b399a8995dbe3efb5f9dd6d31fa07e665d74fb57cf05ecf9068ca4f8",
+   "size": 132,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/Config_hguess.sh",
+   "sha256": "073a3c653bd295df57c8a3df10b54c9f66c852cbed2ca116fd79361b5dc3d63d",
+   "size": 156,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/Config_nograv.sh",
+   "sha256": "58d98fac6649c46d9d3b9aa89f58ca40b9899b0b0760ca54a34b702eba37c975",
+   "size": 123,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/README.md",
+   "sha256": "91c19c015ace33d19ebce81aa8143dd7627825771281430ced3e87de17d8df1c",
+   "size": 3011,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/analyze_hse.py",
+   "sha256": "130383010e0dd108a7e9a42e17a7f93fadb7192a37cff18fb27c80385d5f587f",
+   "size": 3501,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/hse_basalt.params",
+   "sha256": "73a4f74867747bb02b1967b66581bba78a0498a4d3f97baa6bf9ad343fb5674a",
+   "size": 2119,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/hse_earth_fibo.params",
+   "sha256": "a7dd029d2f1abd66c0c3b4b65ef4a629a27cc843d103ef696047e8a44607b091",
+   "size": 2117,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/hse_earth_hguess.params",
+   "sha256": "951ea08771f2638e57646fc9cf1f12ba4b7f35a809ca29784e592a9de582ae1f",
+   "size": 2121,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/hse_earth_smoke.params",
+   "sha256": "340317aa0f2429ce9dc2d8027aafbf76ca5c720800ddf3ef06e8f2be6d20e585",
+   "size": 2113,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/make_ics.py",
+   "sha256": "2420de26fef9a9c762bc9462521b8d96b092ed1362a0cefce0341524aae388b2",
+   "size": 1962,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/make_ics_basalt.py",
+   "sha256": "80a8e120744a3f083874a6791256a33d90893e600cece61c8579642fa8040ebe",
+   "size": 1233,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/make_ics_fibo.py",
+   "sha256": "d4790e178a49452c1d1fe96ed4788fe71739937850deb7fec2f7a716b19cd7b0",
+   "size": 1096,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/hse_earth_smoke/make_ics_fibo_hguess.py",
+   "sha256": "a346357143fe66a9806397d1bf69b408569618eb9b97e920c9f1842034fc5f1c",
+   "size": 2279,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/interactblast/Config.sh",
+   "sha256": "0160f6fd5eec63689acbd45edc149c3f93b34ff7f95f7cd4271a7af814264d3f",
+   "size": 181,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/interactblast/interactblast.params",
+   "sha256": "9f2365135b03df1903bf8a492e627c88527a10392f05562d1ad82439d77566a7",
+   "size": 933,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/interactblast/test_interactblast.py",
+   "sha256": "bf9608482b5a40812bd04dda5dfebd7fabb4f473f7b4ee8aa4ddfc287d0b7e26",
+   "size": 2800,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ionneutral_drag/Config.sh",
+   "sha256": "638c7ef4ec52aa02a50228882b28beeb63871a9004a602815b87d9c5cf358145",
+   "size": 255,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ionneutral_drag/ionneutral_drag.params",
+   "sha256": "ea9a4ba7add48ca8ed763907993e4b7bfdfe08eecc87b0a142227423dae3d07d",
+   "size": 2004,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ionneutral_drag/make_ionneutral_drag_ics.py",
+   "sha256": "a40490b28d20ccd91cbef9bc9a03f0f2db64b1fdfa64a895cc2c19167b4c3641",
+   "size": 3774,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ionneutral_drag/test_ionneutral_drag.py",
+   "sha256": "5dfd51538bf3c6eccc2afad689df2466b364b05c895f50ed891ae6911dd063f2",
+   "size": 4528,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk/Config.sh",
+   "sha256": "49805d328a600269b09fa4470a55f4b90dc57b8a7d1dbbf3f2f603a8bce96463",
+   "size": 156,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk/isodisk.params",
+   "sha256": "405f6537e4d0351664a1a293b085aee6b1cc0bc6555b2d88ae990b4b58072250",
+   "size": 6692,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk/test_isodisk.py",
+   "sha256": "cca6991f9f9a6cc98fbdf02bc59e95fb103d437eb197b87a83581bdf486fa971",
+   "size": 3695,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/Config.sh",
+   "sha256": "2f9598ee99d04d38ef5f31ae18c03743e738dd07c22436af3612cc872a863aff",
+   "size": 205,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/Config_dm_heating.sh",
+   "sha256": "3b946716fb1511da20a06d9591110a1fa72230474711f4fa43df80978627face",
+   "size": 167,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/Config_dm_heating_with_winds.sh",
+   "sha256": "937e68f028e38d1f0a482f1d5074e8bec907e459619866d3d08c319d1ea00080",
+   "size": 216,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/isodisk_dmdispersion.params",
+   "sha256": "4df5c57b0e452aeec53b59c564a778833df940535be884504b12d0fb47d8fa1d",
+   "size": 3157,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/isodisk_dmdispersion_dmheating_ann.params",
+   "sha256": "6ef389d6c4487d7ed2ef64fbbff9d9494a7a7adf1e1637fbc8b0a5e06d2a4d7e",
+   "size": 3906,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/isodisk_dmdispersion_dmheating_both.params",
+   "sha256": "18549f2c76481b2f57daffe213db26ee6eb2b74f19790cd8ddb7c9142f5b74f1",
+   "size": 3788,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/isodisk_dmdispersion_dmheating_dec.params",
+   "sha256": "d59d3df56beba489600a1933292ef34a74e12893d1fad3dd471d242a6b9dd01c",
+   "size": 3812,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/isodisk_dmdispersion_dmheating_inert.params",
+   "sha256": "05269024e8d8769a1567086efd47ced731fc7a528da9bae025c10520c2bcc147",
+   "size": 3607,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_dmdispersion/test_isodisk_dmdispersion.py",
+   "sha256": "7861ca6633373985daa4a95e211b81997b0786ec25eda3a2bcf72d9ca630657d",
+   "size": 4555,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/Config.sh",
+   "sha256": "03a96949b32b92d8fe126184d52399b4498058cbe481e5cc5e6a243a0c058a0c",
+   "size": 172,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/Config_cr.sh",
+   "sha256": "faa1825c344fa6722c062b4b7834a54e1b351515a4aa00b892f52351b3f59904",
+   "size": 141,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/Config_cr0.sh",
+   "sha256": "915bceae883055cc3ea3b136393510b48c1c3482b39f6c65f799315aff3c4692",
+   "size": 137,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/Config_rt.sh",
+   "sha256": "cb9c886179d50b9a8b6b57a77ffda9848414f9f7818f507f100b1cec3b239e9d",
+   "size": 480,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/README.md",
+   "sha256": "7be36fe1db6d89456994e5360edf9c17a4ca5d8c4c50d513e30e5f13fc87dd90",
+   "size": 1851,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/isodisk_mechfb.params",
+   "sha256": "53ee21db17cd68941450c9a8a3961cb49dfeccaabafff64d816c1f2c839e3b32",
+   "size": 1849,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/isodisk_mechfb_cr.params",
+   "sha256": "6212de72e1e661a9f036264663efa434c98598dd82c2eee9cd2c8ad53b9fef19",
+   "size": 993,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/isodisk_mechfb_cr0.params",
+   "sha256": "882496450e4e5dd6c25840350dc0e27d4c0c5e22642ee497d87b29d4c37ee6c6",
+   "size": 1011,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/isodisk_mechfb_rt.params",
+   "sha256": "768d8079565d5a5aa311e22d603d3b9e93088e14dc5faccb783d0f5b40e8f28e",
+   "size": 1980,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb/test_isodisk_mechfb.py",
+   "sha256": "088463e9c6844108c7d2304a2b2977051737ae27bd8cd5390a49635bdeffb389",
+   "size": 3070,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb_sinks/Config.sh",
+   "sha256": "50830e3bb920189ea0d5e08b0afa2d4c2a19a61b07035b53cf756b49b2fbcc59",
+   "size": 120,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb_sinks/Config_reference.sh",
+   "sha256": "540def8c2a4ccfbbb2b8d24141fabe1c2b64fc807d4a83151278cfc7d8f628a4",
+   "size": 334,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb_sinks/isodisk_mechfb_sinks.params",
+   "sha256": "c5e39042c50dc2905a4c6711e9a72cddf9592198ab1f73c55593dd2f4fdaf705",
+   "size": 1699,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_mechfb_sinks/test_isodisk_mechfb_sinks.py",
+   "sha256": "d7e007ce4a3468b986d1e2c7a58dd539120888a5a633e5b1360db6f13be06db1",
+   "size": 4962,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_thermalfb/Config.sh",
+   "sha256": "62cbf260b144af9f9d195853ad6952529ef2b8ee6f2d8763593e020b23641451",
+   "size": 169,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_thermalfb/isodisk_thermalfb.params",
+   "sha256": "95cba6ddc26003cd88348f7f3071087f41b093a8968804af118fa95c6b45a9e8",
+   "size": 1851,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/isodisk_thermalfb/test_isodisk_thermalfb.py",
+   "sha256": "b69daff9896c2311aca0407fa3224153487c6f16bd95357d09683a69c65a3b99",
+   "size": 3863,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crater/Config.sh",
+   "sha256": "d285abe09ce05bdd1c88b6ba4dc3dc781c8ff8e678c1d7e13ba669b08474ab77",
+   "size": 202,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crater/jutzi_crater.params",
+   "sha256": "b135fe9550743006a1cbb70e137c3bdde21be6704bcc153f80c1e2b1646f5a49",
+   "size": 1923,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crater/make_ics.py",
+   "sha256": "210a78f4ca1dc2db2ff8287f9bf0ba7683a06c91c413d2faebad61fce2340861",
+   "size": 5325,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crater/test_jutzi_crater.py",
+   "sha256": "7b8b7cc1dc20064f6901b049adfe3f0c8ce899fb2a94a38bce150804228193ce",
+   "size": 3368,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crush_unit/jutzi_crush_unit_harness.cc",
+   "sha256": "2b45fdab14f0657dbe126abedda68d32ffa2112528d414198d4fa6b946846a4c",
+   "size": 743,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/jutzi_crush_unit/test_jutzi_crush.py",
+   "sha256": "8fbeaf5725d50b5fef1f29861a55e295163d4c328907665f6806182f4e8ee043",
+   "size": 4942,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/keplerian/Config.sh",
+   "sha256": "dfceef711ad45f54b39f17a24a954cf3f526428ac4b1718c1ad2862651493e64",
+   "size": 207,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/keplerian/keplerian.params",
+   "sha256": "fd1ebf16ab8a8cfaa98e08754cc0154a919efd6c76bc215715756999270cc219",
+   "size": 910,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/keplerian/test_keplerian.py",
+   "sha256": "96bcb8799958440f95bd61e47f3aed94a66639ab1ebcc7650e6c99379952e8eb",
+   "size": 3343,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_mcnally_2d/Config.sh",
+   "sha256": "36cd705ba6801af2293d8514ed37ea2b13c1b81a9b97ff636e1dd8420b265370",
+   "size": 159,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_mcnally_2d/kh_mcnally_2d.params",
+   "sha256": "9df3f57416706a97862a0c194be173387b24c2bcc11698260d2872139813d965",
+   "size": 1090,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_mcnally_2d/test_kh_mcnally_2d.py",
+   "sha256": "f1151d723eb6cc95f9778de49a1317774f88e6ce8b042e41317c858b2f263ecd",
+   "size": 3327,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_wengen/Config.sh",
+   "sha256": "c8743df06206aa821ff52683db7a210daafab44ad069b896602a3e70c637266d",
+   "size": 158,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_wengen/kh_wengen.params",
+   "sha256": "0a47f21954c1e2c4402fb3108cbf93d19f6cea115295579ecc038392779218b2",
+   "size": 1013,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/kh_wengen/test_kh_wengen.py",
+   "sha256": "240315094037f457d0ae1409630acd19eca586e6bb14d0c58695c3be315a7944",
+   "size": 2391,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_blast/Config.sh",
+   "sha256": "c55c330d4ec5dc23e4147064952ba59c0ee2fc149d52720e37f90897d20b1c5d",
+   "size": 203,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_blast/mhd_blast.params",
+   "sha256": "b744c83397644fa35e041bbf008217403d2d11d9494688496c68353fe1f95b92",
+   "size": 1087,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_blast/test_mhd_blast.py",
+   "sha256": "44d346957856386e6752f2be2009f6214da7c8b4588ca2d871b82b1e01932f4a",
+   "size": 8466,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_wave/Config.sh",
+   "sha256": "0f316cf1da105ba09d4e64eca26fba4eccc9ec098fe4587209e0306c13708b01",
+   "size": 175,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_wave/mhd_wave.params",
+   "sha256": "e507c0a7fd5ce212788f82ad0bd6144e511dec917fe12ba0b369b1abf7c22ab3",
+   "size": 1067,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mhd_wave/test_mhd_wave.py",
+   "sha256": "dd3e7be3d88e151532b8823d426d2d3f0588f289c03ba925becd3e157d7aeea4",
+   "size": 1020,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/momentum_drift_common.py",
+   "sha256": "d8c8d7e0640bb0198ae075eb2920ed8bd94dfe6a31f9c471950bf4e01a92a7ae",
+   "size": 16922,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mri/Config.sh",
+   "sha256": "e329bbfca1d7544822fb4096d124775ed4e1c9d470ab0ce7d9143f1742b94960",
+   "size": 214,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mri/mri.params",
+   "sha256": "4167b317fef91c15880ce3cf2c59e23eca84e19f70d0621a6cdee4ca49a1148c",
+   "size": 1688,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/mri/test_mri.py",
+   "sha256": "3fd99c0317d3d2064507b73b1de1140b12481de498d3ce1f8118b5e262fa939e",
+   "size": 2786,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/noh/Config.sh",
+   "sha256": "5adde1e2a99d255288fca14565e3eb7db083f6746d043dc0bef6d7da0c77878d",
+   "size": 117,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/noh/noh.params",
+   "sha256": "24ebb59cfb076f3da897b36e2474b3791ea883bc307f0e4e593cf57ecc2f9691",
+   "size": 820,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/noh/test_noh.py",
+   "sha256": "4b70d63c0ff290efba8e4f7aa7e92f5d4c53d8cff734f12994d5f160c2a09882",
+   "size": 3212,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_detonation/Config.sh",
+   "sha256": "34d2a88bf3c3262cffbb9b2e9119e356b18463d7b89294eaa9d807367c1e6b90",
+   "size": 246,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_detonation/Config_noburn.sh",
+   "sha256": "0a3b7c0fc7c0ee68416f2f2a8dc9f231edf771c972ffff4af15f996279fc7074",
+   "size": 236,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_detonation/make_detonation_ics.py",
+   "sha256": "74af9704d72bae19460d3a20da32d3f59b110363fe5d414dca2b065c0110c3be",
+   "size": 5026,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_detonation/nuclear_detonation.params",
+   "sha256": "bb40894b820c1a1f7d2db9f9ac56cb750e6548d5d42cf7e5f7b240a7be903c4d",
+   "size": 1446,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_detonation/test_nuclear_detonation.py",
+   "sha256": "34d53d265f15851ea2751283a4f1bec3d6249f99b964eb093e14ce361fb4977a",
+   "size": 2995,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_unit/test_nuclear.cc",
+   "sha256": "0e5aeeceeafe13b2f9c3eb18c495e09074408193abb55290e067b699e1a34009",
+   "size": 7211,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_unit/test_nuclear_unit.py",
+   "sha256": "6f35ae96b96c0b27d88972b10d7d2b879d372f88e1efe820ce558db6e3a5d3b2",
+   "size": 2436,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_xrb/Config.sh",
+   "sha256": "e06feee0ee9fb3bed83adeb3c6b6dafa73bc94124d5f63512aee50f918ef04a4",
+   "size": 188,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_xrb/make_xrb_ics.py",
+   "sha256": "6e532e3c7161073b997903561614ee2c3ae08982c58f322dc72cad38cc656766",
+   "size": 4624,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_xrb/nuclear_xrb.params",
+   "sha256": "4860fc7116fdb5e5f1d7f010bb11340b60370ee1832b91d9d7bd94c0826f52a5",
+   "size": 1095,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/nuclear_xrb/test_nuclear_xrb.py",
+   "sha256": "de89c7f96c8c40dc62fcc993948b1f99a12068ee4490219bbe44987c9e23e776",
+   "size": 4124,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/orszag_tang/Config.sh",
+   "sha256": "fffeeb0e1ff14a7f905a0f3cc4d3199188ea168a4d3c98001b99bd2cae6b5e16",
+   "size": 158,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/orszag_tang/orszag_tang.params",
+   "sha256": "4a31d8f6a2ef28d5c6ab1ee9bcc676e1921a1ac51815725f7e76b84bc23b2a25",
+   "size": 1066,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/orszag_tang/test_orszag_tang.py",
+   "sha256": "f9765295812c152655531df2404076c5a68309949cba918df5e3c3aa64b8db31",
+   "size": 8229,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/Config.sh",
+   "sha256": "77fc450b7277842c0785ec50f2ce7c8417b8ab24eb424e31531734929a3496df",
+   "size": 340,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/README_plummer_binaries_realistic.md",
+   "sha256": "d1ae7c07d29f1be0f4ce549223a439ac2c9d2fdf58cf72d91a00660b25129adb",
+   "size": 9127,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/make_plummer_binaries_ics.py",
+   "sha256": "2972661b463f8d2c7e79b742afcf1637f9c13779bd1da27b7e0b9604bf3a9e0c",
+   "size": 6447,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/make_plummer_binaries_realistic_ics.py",
+   "sha256": "a790720878b5e02ae6e2e1df43fe18f1158d3d099b5ec3a70e59740f4ed630d4",
+   "size": 16040,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/make_plummer_ics.py",
+   "sha256": "322da70758578daa1d7307239d1a7695fe3dc248fa76f278b10f79a3bc588557",
+   "size": 3621,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/plummer.params",
+   "sha256": "c6500027aa933e71c401c96c1e26553289a65359903fbb073eb76de3a84f279c",
+   "size": 1926,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/plummer_binaries.params",
+   "sha256": "c78a4eb3d97a331fef768ffe7f4141b50f3a42d587771773251b70cecd2a7b9a",
+   "size": 2228,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/plummer_binaries_realistic.params",
+   "sha256": "2ae561bfb3690cee59048fac016b3f42fd9a0ee5dc1e812a093aaac94cc497b0",
+   "size": 3070,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/test_plummer.py",
+   "sha256": "0c344a909f8e96644c14d91cbd3b65941c731aa893d91772ef5fe9b312172b5b",
+   "size": 16502,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/test_plummer_binaries.py",
+   "sha256": "2d3b74d834a3d30b0e533966245cb98b6b07261886cd88ec0f9f1cb6713adfd1",
+   "size": 22511,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/plummer/test_plummer_binaries_realistic.py",
+   "sha256": "b2d049732b9839c4933031b852bb042246e069cf681cd52b7217915b194f7fd1",
+   "size": 15324,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/poisson_box/Config.sh",
+   "sha256": "5b1ce58e6a6722dc9a148b20b39302ef8d2c9e26d6691f87868053dcb495126f",
+   "size": 138,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/poisson_box/README.md",
+   "sha256": "b4a6d50027ffa92e269e7cbbaa53b5c767b98405fd26bd77e9e15728283f8c48",
+   "size": 1967,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/poisson_box/make_poisson_box_ics.py",
+   "sha256": "27d384290280fdd554a256206f8b250b7e39a16aad457a2b4b56db5af4ec7fc3",
+   "size": 5475,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/poisson_box/poisson_box.params",
+   "sha256": "49a7933e8b9e2884a396cf3632d1c33e37f96c90c9beeb81d547dc7195096e0b",
+   "size": 3150,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/poisson_box/test_poisson_box.py",
+   "sha256": "b0f1195eb2a81d6ba7189de2cbde3fda4c3e88e31aa1b07a5273b26857c127dc",
+   "size": 4189,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/read_ic_binary/Config.sh",
+   "sha256": "7721fc65ae004b8934f1a74315cc5f803fa299ea589cca3ed67d1400f7eac148",
+   "size": 136,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/read_ic_binary/make_binary_ic.py",
+   "sha256": "6274298424f2d5ef50b5de3352214ceb72621308d56bc80bd5e7c7a301410080",
+   "size": 3177,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/read_ic_binary/read_ic_binary.params",
+   "sha256": "f822de781c404aa8225105b120cf3a20912e1100332490f73bcfd46201cd3175",
+   "size": 818,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/read_ic_binary/test_read_ic_binary.py",
+   "sha256": "a4141781cfcb6d1aec4bdef37a6a13e9ee295f488630ec64c4a87ee77abeae02",
+   "size": 6250,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ring_collision/Config.sh",
+   "sha256": "437fac9cdcab1266cb240977462728e1f6fd268f847c1f1094f9ac5ba3e40d28",
+   "size": 152,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ring_collision/ring_collision.params",
+   "sha256": "f712809b639c4f4cb05183bd0d1d72caec852acaa3d751f20718a41bb3863c4b",
+   "size": 1403,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/ring_collision/test_ring_collision.py",
+   "sha256": "1c24784ec951553843758586bebc8c2f8fdba968f4bfe5e561d9ad5d20d1b622",
+   "size": 3078,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rotor/Config.sh",
+   "sha256": "626631dc3d47b4a2c751a59ea01bac6c4861246141dc74eba52fd89a01de32ad",
+   "size": 174,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rotor/rotor.params",
+   "sha256": "aaa9bc6e8f0d504497054a23b8a6ababda65e558f02e760f1cba00c2ae0d05ea",
+   "size": 921,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rotor/test_rotor.py",
+   "sha256": "9fe9ecbab53df57be715093a1ff62c850607ec46cf96638bc80b551d673506f7",
+   "size": 3116,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rt/Config.sh",
+   "sha256": "05526208497a50f02af093b41f04dd721aed14f6f26eab17155ce8a3df1e16a7",
+   "size": 221,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rt/rt.params",
+   "sha256": "ad13614e5bc6be79e551d852dd0a57be9e480369de218ccf04f3bbf9e4e34799",
+   "size": 1110,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/rt/test_rt.py",
+   "sha256": "eb32bb5345ec90ffe6b190af43389ca49b0a8b7433bc046c48ffd30a9a012ea7",
+   "size": 4053,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sbcluster/Config.sh",
+   "sha256": "f4415a37b4af39a55823dc538ffe14da46902a8eb6f48caf2a6b3873ae447798",
+   "size": 146,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sbcluster/sbcluster.params",
+   "sha256": "fb736201a46ea1d06270829742d9bdcada2d38a9c0cbf1a3e5f39b0ea46f0dbb",
+   "size": 1830,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sbcluster/test_sbcluster.py",
+   "sha256": "25fc575450bf496cc818c6cedb007650d62f3dd689a00dacbeda0f1f927b4bc6",
+   "size": 4059,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sedov/Config.sh",
+   "sha256": "5adde1e2a99d255288fca14565e3eb7db083f6746d043dc0bef6d7da0c77878d",
+   "size": 117,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sedov/sedov.params",
+   "sha256": "85d5a09e9705ac2a1cd1d5c5891372a08605c9c284a4ea4e318991ba0285aeb4",
+   "size": 1016,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/sedov/test_sedov.py",
+   "sha256": "4c268d0ecd0e089313ef03dcc6f56ca6add9627d214d7b00e861faee5eef836e",
+   "size": 3868,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shocktube/Config.sh",
+   "sha256": "81df3f9f4aa082b052792a898b591c62b52cb0f720c46bdf72e2231b368202d7",
+   "size": 162,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shocktube/shocktube.params",
+   "sha256": "3fca1eeb6cc7c1013f95613743562be74d94f1fae086f13df686ee8186756936",
+   "size": 830,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shocktube/test_shocktube.py",
+   "sha256": "52ea66cdb83f15e39f4499d8f610d56ffd1b148fdbae01852633264e2e99e9d4",
+   "size": 3450,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu1977/Config.sh",
+   "sha256": "e79b0e07a03f03a06114dcb0291702290f92162b21db7a5dfc6c338a7370c1d6",
+   "size": 88,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu1977/README.md",
+   "sha256": "1451145dff95b59b98274c74c5095d96d795cf632e22f377387bf54c27a77593",
+   "size": 442,
+   "type": "F"
+  },
+  {
+   "exec": true,
+   "path": "src/test/shu1977/shu1977.params",
+   "sha256": "79e07a51e46560a0d00033f5ea5041c496fb52495a048ac49b04fefcd63828a5",
+   "size": 5741,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu1977/test_shu1977.py",
+   "sha256": "58dfb335ae1d6428c88977d1a895c1cf6880b4001eb61febf0ccef10253e33e7",
+   "size": 1910,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_M120/Config.sh",
+   "sha256": "4115906314f4f61db5708ad9f26c79eaaade9a0e8646337f2f998225e3a90734",
+   "size": 123,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_M120/README.md",
+   "sha256": "855a9c85bf08fcedf145ba5bfdc78329fd7a20f564cac5604826bb9a112fa724",
+   "size": 924,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_M120/convergence_test.py",
+   "sha256": "b74e51fbd894bb797dafb31ca3c871174e998a18b24cec0ed81eb538c1d1e7c9",
+   "size": 2018,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_M120/shu_M120.params",
+   "sha256": "d0f69ae186a263ed9ac61755c692360140f995f2c1969dc9e7a6c62ee549cbde",
+   "size": 6204,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_M120/test_shu_M120.py",
+   "sha256": "0d234bd12bb2c1a63e3c275b8eef0efd131a22fb0170c03ea9a9882f3ecdcd30",
+   "size": 5921,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_jets/Config.sh",
+   "sha256": "9a4cefc7117b69882fecd52e6106401cabe09bd58762887eb3fe2ad9a26ff03c",
+   "size": 31,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_jets/README.md",
+   "sha256": "37dd00eb8c79168efa16d2872b0de28976bf4c47174e796142f1130d8a333e86",
+   "size": 4224,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_jets/make_shu_jets_ics.py",
+   "sha256": "4fbf824588afcc962253f1d9eff8b8f7a0dd8a8eaa921c2231ced4b611872dfc",
+   "size": 4572,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_jets/shu_jets.params",
+   "sha256": "a5fd49c9061341b2c7dd833f5ea00fb1439a14f9278cba14e9da258cc5836f2d",
+   "size": 7045,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/shu_jets/test_shu_jets.py",
+   "sha256": "4291a9d20377ec63b5850df602f3fac8f0a46073bb7cd64ab609143cc7809ce9",
+   "size": 22079,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/soundwave/Config.sh",
+   "sha256": "61ad4af03c19cd2e685ccc3cb4796b7889b9126c201bf88aa2b5e009e10f1e32",
+   "size": 199,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/soundwave/soundwave.params",
+   "sha256": "388bba4a1420bb413999cc511eec58fc641d251dca371c22858b933b73fb11df",
+   "size": 881,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/soundwave/test_soundwave.py",
+   "sha256": "9d15c232e106fdab84de1906f37ab86e896fccf5232129b3257a6140218f7598",
+   "size": 828,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/square/Config.sh",
+   "sha256": "65ffc9e87bb3d54eda413addab2cff29c6fe62de6f6354104bee68e1d1e62a73",
+   "size": 137,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/square/square.params",
+   "sha256": "fb6091cbf93abb08a474f5263519999b1bb9b7d262e4eba0e0e44bc838878747",
+   "size": 817,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/square/test_square.py",
+   "sha256": "8d326ec7aab0aeddcc1f9232eefb23ebc7412cc2e95fd1759c0c882c200a66fb",
+   "size": 2687,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/toth/Config.sh",
+   "sha256": "db5fe27290aba92167467aaf4bdaa9e2aeb1b8c5ed0707ce65472360198d2e98",
+   "size": 190,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/toth/test_toth.py",
+   "sha256": "87bc6fc4946dbfc80315039cc78cb95d91f75b6311d6b97ec298f5ebcf476ec9",
+   "size": 1704,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/toth/toth.params",
+   "sha256": "90447ca91d700b9ed5f4ba1b3328794266bfc2cfa08d5d10c709281217f84f13",
+   "size": 960,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/trivial/test_trivial.py",
+   "sha256": "3f2674f47195d1b79712e091778abcf8c77433a3c58bc79a59c3e909caa251a3",
+   "size": 68,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/two_temperature/Config.sh",
+   "sha256": "6d27ee336f7491f88a0232089948195c33b7e2f02bd9e6806f92195b1fe4c08f",
+   "size": 175,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/two_temperature/test_two_temperature.py",
+   "sha256": "eb7f8a227804ed16a87c1f2fc5f7f3a3bb2768524a8adc5d94fde0c74bdd5a12",
+   "size": 5607,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/two_temperature/two_temperature.params",
+   "sha256": "a21b91c2636a49b683eab728687982e681d004f4f85e3159be36ed5b65fbd0f6",
+   "size": 7203,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/unit/test_harness.h",
+   "sha256": "9ef4b1f3e7a20e0d7252582827529e5789f833198b83cfc18ff1e8cd74b211ff",
+   "size": 2569,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/unit/test_math_types.cc",
+   "sha256": "ab56c1499c2ebfd2ca9dfee35fab13d83756eae66b83cdb28263298104776a1a",
+   "size": 18400,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/unit/test_unit.py",
+   "sha256": "b610e4639feaf37bf90e6441cf2a1b97cd5cb8ba7b50ed18912f98f820b6dab9",
+   "size": 1288,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/wind_singlestar/Config.sh",
+   "sha256": "5229843d70a4dd52cbd05993690706de5cdcf0b8c93ebaaee64239a58cb42017",
+   "size": 476,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/wind_singlestar/README.md",
+   "sha256": "1092d92c29eed56f18c0f9fe6847f5c03ecef84d8b7733b64f8c749ab02fa21c",
+   "size": 3342,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/wind_singlestar/make_wind_singlestar_ics.py",
+   "sha256": "07b2164b3960e494cd1e8a1d21f00fcc9c9f58da4840ab0bee9154109ae148de",
+   "size": 5036,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/wind_singlestar/test_wind_singlestar.py",
+   "sha256": "f16d4118dd53c3e6ae0f83ae76deb5ee7fbff92cdff932f80ac3f37b4ac3ead2",
+   "size": 26391,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/wind_singlestar/wind_singlestar.params",
+   "sha256": "2319fe8f781ae8da44fe62db12b304d26333deba848b41572f02ec039021951b",
+   "size": 3122,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich/Config.sh",
+   "sha256": "e257f86a699bbd4bf58494491a8e49111a9bb60bbecac5af91f4c94490724afd",
+   "size": 137,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich/test_zeldovich.py",
+   "sha256": "81d26ff88b5e01f830e730ae32c402f0a4f6a81c70a23ef7dbd1ec24f7c3f03a",
+   "size": 4892,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich/zeldovich.params",
+   "sha256": "72b137a12055891f1a6a56694576f6020c34393947bf42edd8a09fa034535f8e",
+   "size": 1776,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich/zeldovich_exact.txt",
+   "sha256": "0bb86be52d20b30b5c04df713c30435104098895041ca9482c781ed3d7e44f3a",
+   "size": 112640,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich_mhd/Config.sh",
+   "sha256": "af7d2c08d34f14f410b18d83a87c3c052af41e51efdd329b65cbf31932f909a5",
+   "size": 146,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich_mhd/test_zeldovich_mhd.py",
+   "sha256": "786fa6f26ea5a7153db617399d6fbebf088f7f71c14bc9e3e88d8ff70ce8ff31",
+   "size": 2813,
+   "type": "F"
+  },
+  {
+   "exec": false,
+   "path": "src/test/zeldovich_mhd/zeldovich_mhd.params",
+   "sha256": "523e16d34864c15983837d0115f418786e92d42ce533dbac04b1ba6f8d5ae51d",
+   "size": 2103,
+   "type": "F"
+  }
+ ],
+ "name": "gizmo",
+ "schema": "hpcperf-source-manifest-1",
+ "source_tree_sha256": "27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912",
+ "symlinks": 0,
+ "uncompressed_size": 620943529,
+ "variant": null
+}

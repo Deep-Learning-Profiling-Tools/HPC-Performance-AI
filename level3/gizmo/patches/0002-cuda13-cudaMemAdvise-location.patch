@@ -1,0 +1,20 @@
+--- a/src/system/gpu_particles_arena.cc
++++ b/src/system/gpu_particles_arena.cc
+@@ -377,8 +377,17 @@
+     if(!std::is_same<GIZMO_KOKKOS_SHARED_SPACE, Kokkos::CudaUVMSpace>::value) {return -1;}
+     int dev = 0;
+     if(cudaGetDevice(&dev) != cudaSuccess) {return -1;}   /* nothing was asked of the driver */
++#if CUDART_VERSION >= 13000
++    /* HPC-Performance-AI: CUDA 13 removed the int-device form of cudaMemAdvise; the location struct form has the same meaning */
++    cudaMemLocation loc_pref, loc_acc;
++    loc_pref.type = on_device ? cudaMemLocationTypeDevice : cudaMemLocationTypeHost; loc_pref.id = on_device ? dev : 0;
++    loc_acc.type  = on_device ? cudaMemLocationTypeHost : cudaMemLocationTypeDevice; loc_acc.id  = on_device ? 0 : dev;
++    cudaError_t rc_pref = cudaMemAdvise(p, nbytes, cudaMemAdviseSetPreferredLocation, loc_pref);
++    cudaError_t rc_acc  = cudaMemAdvise(p, nbytes, cudaMemAdviseSetAccessedBy, loc_acc);
++#else
+     cudaError_t rc_pref = cudaMemAdvise(p, nbytes, cudaMemAdviseSetPreferredLocation, on_device ? dev : cudaCpuDeviceId);
+     cudaError_t rc_acc  = cudaMemAdvise(p, nbytes, cudaMemAdviseSetAccessedBy, on_device ? cudaCpuDeviceId : dev);
++#endif
+     *pref_result = cudaGetErrorString(rc_pref); *access_result = cudaGetErrorString(rc_acc);
+     return (rc_pref == cudaSuccess && rc_acc == cudaSuccess);
+ #else

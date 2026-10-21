@@ -1,0 +1,66 @@
+{
+ "benchmark": "gizmo",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912",
+ "test_code_loc": {
+  "code": 18186,
+  "files": 239,
+  "languages": {
+   "Python": 11956,
+   "Text": 3263,
+   "Bourne Shell": 1048,
+   "C++": 1000,
+   "Markdown": 851,
+   "C/C++ Header": 68
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 122320,
+  "files": 331,
+  "languages": {
+   "C++": 83147,
+   "C/C++ Header": 38177,
+   "make": 689,
+   "Text": 136,
+   "Perl": 87,
+   "Markdown": 80,
+   "CUDA": 3,
+   "Bourne Shell": 1
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 3003,
+  "files": 1,
+  "languages": {
+   "Text": 3003
+  },
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 72,
+  "files": 5,
+  "languages": {
+   "YAML": 31,
+   "TOML": 20,
+   "Markdown": 9,
+   "JSON": 7,
+   "make": 5
+  }
+ },
+ "total_materialized_code_loc": 143581,
+ "summary": {
+  "application_owned_code_loc": 122320,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 3003,
+  "test_code_loc": 18186,
+  "total_materialized_code_loc": 143581,
+  "unclassified_code_loc": 72
+ }
+}

@@ -1,0 +1,123 @@
+schema: hpcperf-freeze-spec-1
+name: gizmo
+level: 3
+application: GIZMO (gpu_kokkos_unified branch)
+benchmark_source_version: hpcperf-l3-v1
+components:
+- dest: src
+  category: application
+  kind: git
+  checkout: _upstream/level3/gizmo
+  url: https://github.com/pfhopkins/gizmo.git
+  ref: gpu_kokkos_unified
+  commit: e9d2d0bea23b08872f747b780cdcedb5847a2bff
+  note: the maintainer's Kokkos CPU/GPU branch (no release tags; the identity is this commit of 2026-10-20)
+  submodules: []
+  exclude:
+  - path: docs
+    reason: documentation (images, manual); not built
+  - path: analysis
+    reason: post-processing scripts; not built, not run
+  patches:
+  - path: patches/0001-proto-h-glibc-cmath-pow.patch
+    upstream_source: 'local 7-line fix: <cmath> + using std::isfinite/isnan/isinf (glibc 2.39 + C++17 keep them in std::), and the DEC-Alpha pow() prototype guarded against glibc (declared noexcept there; a second plain prototype is an error with GCC 13)'
+    category: D
+  - path: patches/0002-cuda13-cudaMemAdvise-location.patch
+    upstream_source: 'local 9-line fix: CUDA 13 removed the int-device form of cudaMemAdvise; the cudaMemLocation form (same meaning) under CUDART_VERSION >= 13000'
+    category: D
+  license:
+    spdx: GPL-2.0-or-later
+    files:
+    - README.md
+  bundled: []
+- dest: deps/ics/evrard_ics.hdf5
+  category: benchmark_specific
+  kind: file
+  url: http://www.tapir.caltech.edu/~phopkins/sims/evrard_ics.hdf5
+  sha256: 0b3f63ce6927705a6769d54503899f5f57f38b415e6f599448ee2d6a9a70ab71
+  project: GIZMO test initial conditions (Evrard collapse, 27,001 gas particles)
+  note: the file upstream's test harness downloads for test/evrard (test/harness/gizmo/test.py)
+- dest: deps/ics/sedov_ics.hdf5
+  category: benchmark_specific
+  kind: file
+  url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_ics.hdf5
+  sha256: f2aedf59b8d44eb652728f7d2527751031d1778d29baf7861433070d646fdb03
+  project: GIZMO test initial conditions (Sedov-Taylor blast, 2,097,152 gas particles, box 6)
+- dest: deps/ics/noh_ics.hdf5
+  category: benchmark_specific
+  kind: file
+  url: http://www.tapir.caltech.edu/~phopkins/sims/noh_ics.hdf5
+  sha256: 3df4f0e5c44b9dbfd649c15e89a0b664e395b54f14b230efc4379544696e29a1
+  project: GIZMO test initial conditions (Noh implosion, 2,097,152 gas particles, box 6)
+- dest: deps/ics/blob_ics.hdf5
+  category: benchmark_specific
+  kind: file
+  url: http://www.tapir.caltech.edu/~phopkins/sims/blob_ics.hdf5
+  sha256: 7ede6d0b05f832a4d93bc7b8d0b380ce04cec0f1fd5d113ddddbfd3294fb41fe
+  project: GIZMO test initial conditions (blob test, 9,641,651 gas particles, box 2000 x 2000 x 6000)
+- dest: deps/exact/sedov_exact.txt
+  category: benchmark_specific
+  kind: file
+  url: http://www.tapir.caltech.edu/~phopkins/sims/sedov_exact.txt
+  sha256: 3b9063434370fbc946aa1c1e211f7f2515a0bb96cf868c79fb2a24845a439cfb
+  project: GIZMO test reference solution (Sedov-Taylor blast at TimeMax 0.03; columns radius, temperature, density, radial velocity)
+  note: the file upstream's test harness downloads next to sedov_ics for test/sedov (test/harness/gizmo/test.py; the evrard reference is in the tree, the Noh and blob tests use analytic / conservation criteria)
+environment_provided:
+- name: CUDA Toolkit
+  version: 13.2.78
+- name: GCC (nvcc_wrapper host compiler)
+  version: 13.3.0
+  provided_by: .conda_env
+- name: Open MPI
+  version: 5.0.10
+  provided_by: .conda_env
+- name: Kokkos
+  version: 5.2.1 (CUDA + OpenMP)
+  provided_by: .deps/install/kokkos (the repository's Level 2 Kokkos install)
+- name: HDF5, FFTW (single precision, MPI)
+  provided_by: .conda_env
+- name: zlib
+  provided_by: system (/usr/include/zlib.h, -idirafter)
+- name: perl
+  provided_by: system (/usr/bin/perl; the conda environment ships none)
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/gizmo
+  ignore:
+  - .git/*
+  - '*/.git'
+  - '*/.git/*'
+  excluded:
+  - docs/*
+  - analysis/*
+licenses:
+- path: src
+  project: GIZMO
+  license: GPL-2.0-or-later (README.md section 2 "free software, distributed under the GNU General Public License"; the repository ships no separate license file)
+  url: https://github.com/pfhopkins/gizmo
+  commit: e9d2d0bea23b08872f747b780cdcedb5847a2bff
+- path: deps/ics
+  project: GIZMO test initial conditions (P. F. Hopkins, tapir.caltech.edu/~phopkins/sims)
+  license: distributed with the GIZMO test suite (the files its harness downloads); redistributed unchanged
+- path: deps/exact
+  project: GIZMO test reference solution (sedov_exact.txt, same site)
+  license: distributed with the GIZMO test suite (the file its harness downloads); redistributed unchanged
+license_notes:
+- GIZMO is GPL (README.md); the patched source is redistributed as a source bundle with the two local patches stated in patch_series.txt, as the license requires modifications to be indicated.
+- The initial-condition files are the ones upstream's own tests download; they are bundled unchanged so that the benchmark's workloads are reproducible without network access.
+redistribution_status: cleared
+source_scope:
+  application_owned:
+  - src/src/*
+  bundled: []
+  benchmark_specific:
+  - deps/*
+  test:
+  - src/test/*
+  exclude:
+  - src/docs/*
+  - src/analysis/*
+  - src/scripts/*
+  - src/data/*
+  - src/initial_conditions/*
+  - src/dev/*

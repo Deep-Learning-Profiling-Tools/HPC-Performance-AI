@@ -231,6 +231,20 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
       par_file_sha256: ['^[0-9a-f]{64}$']
     output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
     timer_steps: 'nstep'
+  gizmo:                        # run.sh: the registered Config.sh is compiled into bin/GIZMO-<config> (build.sh; the manifest records
+                                # its hash), the registered parameter file is copied into the run directory with InitCondFile and
+                                # OutputDir rewritten (generated: the manifest hashes both), the frozen initial conditions
+                                # (deps/ics/<name>_ics.hdf5 of the source bundle) are named by the program when it reads them
+    manifest:
+      input_id: ['^{input_id}$']
+      config: ['^{config}$']
+      params: ['^{params}$']
+      ic: ['^{ic}$']
+      time_max: ['^{time_max}$']
+      particles: ['^{particles}$']
+    source_files: ['{config}', '{ic}']
+    generated: {input: input_sha256}
+    output: ["^Reading file `\\S*{ic_name}\\.hdf5' on task=0 \\(contains {particles} particles\\.\\)", '^Reading done\\. Total number of particles :\\s+0*{particles}$', '^TimeMax\\s+{time_max}$']
   vpic:                         # run.sh: the registered deck is a compiled executable (build.sh, decks/<id>.Linux) whose source
                                 # hash the manifest records; the binary prints the Run Details banner (num_step, grid, particles)
     manifest:

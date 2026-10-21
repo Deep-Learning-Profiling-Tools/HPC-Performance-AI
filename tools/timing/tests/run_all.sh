@@ -1751,6 +1751,22 @@ w("vpic", "run.log", """# VPIC CUDA profile=cuda: input=harris-256sq deck=decks/
 *** Cleaning up
 normal exit
 """)
+w("gizmo", "run.log", "This is GIZMO, version 2026\nFinal time=0.8 reached. Simulation ends.\n")
+w("gizmo", "app/evrard.np1/output/cpu.txt", """Step 0, Time: 0, CPUs: 1
+Nactive=27001, Imbal(Max/Mean)=1 
+total               1.07  100.0%
+tree+gravity        0.32   30.0%
+
+Step 640, Time: 0.5, CPUs: 1
+Nactive=27001, Imbal(Max/Mean)=1 
+total             400.00  100.0%
+tree+gravity      100.00   25.0%
+
+Step 1240, Time: 0.8, CPUs: 1
+Nactive=27001, Imbal(Max/Mean)=1 
+total             877.65  100.0%
+tree+gravity      202.86   23.1%
+""")
 w("warpx", "run.log", """STEP 1 ends. TIME = 1.7e-15 DT = 1.7e-15
 Evolve time = 0.01901006 s; This step = 0.01901006 s; Avg. per step = 0.01901006 s
 STEP 2 ends. TIME = 3.4e-15 DT = 1.7e-15
@@ -1831,7 +1847,7 @@ want = {"lammps": (0.0709434, 100), "sparta": (0.0411685, 100), "warpx": (0.0242
         "nyx": (0.044260893 + 0.035151909, 2), "nekrs": (0.817425 - 0.00804749, 30),
         "specfem3d": (0.560349008, 5000), "exaca": (1.6139, None), "cp2k": (2.260197 + 2.291654, 2),
         "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2),
-        "vpic": (4.85707, 1939)}
+        "vpic": (4.85707, 1939), "gizmo": (877.65 - 1.07, 1240)}
 bad = []
 for app, (wall, steps) in want.items():
     try:

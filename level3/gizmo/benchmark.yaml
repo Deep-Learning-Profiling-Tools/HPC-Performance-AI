@@ -1,0 +1,53 @@
+name: gizmo
+level: 3
+application: GIZMO (gpu_kokkos_unified branch)
+description: Lagrangian meshless finite-mass hydrodynamics + gravity tree (Hopkins 2015) with the gravity tree, density, gradient,
+  hydro and cooling loops offloaded through Kokkos (CUDA); registered inputs (inputs.yaml) are upstream's own test problems
+  with their initial conditions (Evrard collapse, Sedov-Taylor blast, Noh implosion, the blob test), one MPI rank on one GPU
+  each, each a compile-time Config.sh build
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI domain decomposition, one rank per GPU (Kokkos CUDA, particle arena in CUDA unified memory); the registered
+  workloads are the one-rank runs
+default_scale_mode: smoke
+scale_modes:
+  smoke: the registered problems (inputs.yaml); no strong/weak derivation -- HPCPERF_GPUS=N runs the same problem on N ranks
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: not applicable (one-rank workloads)
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 through mpicc/mpicxx, nvcc_wrapper of the repository Kokkos 5.2.1 install,
+  CUDA 13.2.78, Open MPI 5.0.10, conda HDF5/FFTW, system zlib and perl; site profile gmu-hopper)
+install_root: .deps/level3/gizmo/cuda
+profile_scheme: <backend> (cuda only; no HIP recipe validated here); override HPCPERF_GIZMO_PROFILE must name the backend;
+  generated state .deps/level3/gizmo/<profile>/ (bin/GIZMO-<config>) and build/level3/gizmo/<profile>/<config>/src
+dependency_installs: []
+inputs:
+- inputs/evrard/Config.sh
+- inputs/sedov/Config.sh
+- inputs/noh/Config.sh
+- inputs/blob/Config.sh
+registered_inputs: inputs.yaml
+references:
+- src/test/evrard/evrard_exact.txt
+- src/test/sedov/test_sedov.py (analytic Sedov solution)
+- src/test/noh/test_noh.py (post-shock density 64)
+- src/test/blob/test_blob.py
+upstream_version: gpu_kokkos_unified
+redistribution_status: cleared
+suite_status: candidate
+source_version: hpcperf-l3-v1
+source_tree_sha256: 27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912
+source_artifact:
+  filename: gizmo-hpcperf-l3-v1.tar.zst
+  archive_sha256: db789253b08349d429e7b77c9f1b0f98a73a9a1d1fb85106e6a1c923ead15444
+  source_tree_sha256: 27a5059a503d034fe458730e610d01613280d28b4204dbc889cb88c7f241b912
+  size: 189117163
+  uncompressed_size: 620943529
+  file_count: 724
+  source_version: hpcperf-l3-v1
+  primary_url: null
+  publish_status: unpublished

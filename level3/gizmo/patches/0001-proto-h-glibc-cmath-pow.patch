@@ -1,0 +1,15 @@
+--- a/src/core/proto.h
++++ b/src/core/proto.h
+@@ -1280,7 +1280,11 @@
+ 
+ /* on some DEC Alphas, the correct prototype for pow() is missing,
+    even when math.h is included ! */
+-#ifndef __NVCOMPILER
++#include <cmath>   /* HPC-Performance-AI: glibc 2.39 (EL10) + C++17 put isfinite/isnan/isinf in std:: only */
++#if defined(__cplusplus) && !defined(__CUDA_ARCH__)
++using std::isfinite; using std::isnan; using std::isinf;
++#endif
++#if !defined(__NVCOMPILER) && !defined(__GLIBC__)   /* HPC-Performance-AI: glibc declares pow() noexcept; a second plain prototype is an error with GCC 13 */
+ double pow(double, double);
+ #endif
+ 
