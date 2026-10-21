@@ -54,4 +54,26 @@ applications:
          evidence: "level3/exaca/references/upstream_unit_test_matrix.json, level3/exaca/patches/upstream-tests/README.json"}
     release_acceptance_conditions: "unmodified upstream tests under CTest's own launcher still reproduce the failures in this environment; the PASS results require test-side fixture patches (not in the artifact) and per-rank GPU binding"
     variants: [null]
+  vpic:
+    application: VPIC (vpic-kokkos)
+    suite_status: candidate                   # suite extension round 2026-10-20/21 (PR #22); artifact published in round ext1
+    admission: admitted
+    admitted_on: 2026-10-21
+    validation_kind: upstream's integrated analytic tests on the GPU build (validate.sh) + frozen energies references of five decks (three from the CPU Kokkos build of the same source), level3/vpic/README.md
+    variants: [null]
+  picongpu:
+    application: PIConGPU
+    suite_status: candidate                   # suite extension round 2026-10-20/21 (PR #25); artifact published in round ext1
+    admission: admitted
+    admitted_on: 2026-10-21
+    validation_kind: upstream's analytic KHI growth-rate test on three grid sizes + a frozen self-baseline of the LaserWakefield example, level3/picongpu/README.md
+    variants: [null]
+  cholla:
+    application: Cholla
+    suite_status: candidate                   # suite extension round 2026-10-20/21 (PR #26); artifact published in round ext1
+    admission: admitted
+    admitted_on: 2026-10-21
+    validation_kind: upstream's analytic SoundWave3D test (validate.sh) + exact Riemann / analytic sound-wave / analytic Noh / conservation criteria and frozen digests of five inputs, level3/cholla/README.md
+    variants: [null]
 default_suite_order: [lammps, sparta, warpx, specfem3d, nekrs, nyx, cp2k, qmcpack, dftfe, exaca]
+extension_round_ext1: [vpic, picongpu, cholla]   # published 2026-10-21 as release level3-source-hpcperf-l3-v1-ext1 (same source_version, own tag)
