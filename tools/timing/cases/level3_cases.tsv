@@ -30,5 +30,6 @@ qmcpack	diamond2	2	HPCPERF_QMCPACK_CASE=diamond2;HPCPERF_SCALE_MODE=smoke	-	3600
 sparta	strong.s300	2	HPCPERF_SCALE_MODE=strong;HPCPERF_SPARTA_STRONG=300	-	1800	-	-	collide benchmark 300^3 cells = 270M particles; the timed run is the deck's second (100-step) run
 specfem3d	weak.f2	2	HPCPERF_SCALE_MODE=weak;HPCPERF_SPECFEM_LOCAL=2;HPCPERF_SPECFEM_STEPS=20000	-	1800	-	-	homogeneous half-space, 144x72x32 elements (165,888 per rank), 20000 steps
 warpx	strong.g256	2	HPCPERF_SCALE_MODE=strong;HPCPERF_WARPX_GLOBAL=256;HPCPERF_WARPX_STEPS=1000;HPCPERF_WARPX_GPU_AWARE=0	-	1800	-	-	uniform plasma 256^3 (33.6M particles), 1000 steps, host-staged MPI (GPU-aware smcuda is 3x slower for WarpX here)
+picongpu	default	1	-	-	3600	-	-	run.sh's default: the registry's default_input (khi-384x1024: the KHI growth-rate test input set on 384 x 1024 x 12 cells, 3000 steps); every registered input is measured through --registry
 gizmo	default	1	-	-	7200	-	-	run.sh's default: the registry's default_input (sedov: Sedov-Taylor blast, 2.1 M particles, TimeMax 0.03); every registered problem is measured through --registry
 vpic	default	1	-	-	1800	-	-	run.sh's default: the registry's default_input (harris-512sq: Harris-sheet reconnection 512 x 512, 16.8 M particles, 3878 steps); every registered deck is measured through --registry

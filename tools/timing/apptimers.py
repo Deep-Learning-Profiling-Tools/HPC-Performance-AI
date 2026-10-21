@@ -373,7 +373,31 @@ def gizmo(d):
             "parts": {"final_time": float(last[1])}, "files": ["output/cpu.txt"]}
 
 
+def picongpu(d):
+    """PIConGPU: the time-step loop's own wall clock.
+
+    include/pmacc/simulationControl/SimulationHelper.cpp:231 prints, after the step loop (SimulationHelper::startSimulation: particle push, current deposition, field solve, boundaries, the plugins at their
+    periods) and prints 'calculation  simulation time: <h/min/sec/msec> = <seconds>' after it; the
+    following 'full simulation time' line includes initialization and shut-down and is not used.
+    The step count comes from the last progress line ('100 % = <step> | ...')."""
+    t = _stdout(d)
+    m = re.findall(r"^calculation\s+simulation time:.*= " + NUM + r"\s*(?:sec)?\s*$", t, re.M)
+    if not m:
+        raise TimerMissing("no 'calculation  simulation time: ... = <s>' line in run.log (the step loop did not finish)")
+    s = re.findall(r"^\s*100 % =\s+(\d+) \|", t, re.M)
+    return {"wall_s": float(m[-1]), "steps": int(s[-1]) if s else None, "excluded_s": None, "setup_s": None,
+            "parts": {}, "files": ["run.log"]}
+
+
 TIMERS = {
+    "picongpu": Timer(
+        picongpu, [],
+        "'calculation  simulation time' = the time-step loop (particle push, current deposition, field solve, "
+        "boundaries, plugin notifications); initialization and shut-down are outside (they are in 'full "
+        "simulation time').",
+        ["include/pmacc/simulationControl/SimulationHelper.cpp:231"],
+        "rank 0's clock (one rank per registered input)",
+        "effectively: alpaka's CUDA queues are synchronized at every step's end before the next step's communication"),
     "gizmo": Timer(
         gizmo, ["output/cpu.txt"],
         "cpu.txt `total` of the final step block minus the Step 0 block: every time-integration step (domain "

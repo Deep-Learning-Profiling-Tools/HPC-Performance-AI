@@ -1767,6 +1767,12 @@ Nactive=27001, Imbal(Max/Mean)=1
 total             877.65  100.0%
 tree+gravity      202.86   23.1%
 """)
+w("picongpu", "run.log", """PIConGPU: 0.9.0-dev
+  5 % =      150 | time elapsed:              4sec 400msec | avg time per step:  29msec
+100 % =     3000 | time elapsed:       1min 27sec 543msec | avg time per step:  27msec
+calculation  simulation time:  1min 27sec 543msec = 87.543 sec
+full simulation time:  1min 36sec 177msec = 96.177 sec
+""")
 w("warpx", "run.log", """STEP 1 ends. TIME = 1.7e-15 DT = 1.7e-15
 Evolve time = 0.01901006 s; This step = 0.01901006 s; Avg. per step = 0.01901006 s
 STEP 2 ends. TIME = 3.4e-15 DT = 1.7e-15
@@ -1847,7 +1853,7 @@ want = {"lammps": (0.0709434, 100), "sparta": (0.0411685, 100), "warpx": (0.0242
         "nyx": (0.044260893 + 0.035151909, 2), "nekrs": (0.817425 - 0.00804749, 30),
         "specfem3d": (0.560349008, 5000), "exaca": (1.6139, None), "cp2k": (2.260197 + 2.291654, 2),
         "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2),
-        "vpic": (4.85707, 1939), "gizmo": (877.65 - 1.07, 1240)}
+        "vpic": (4.85707, 1939), "gizmo": (877.65 - 1.07, 1240), "picongpu": (87.543, 3000)}
 bad = []
 for app, (wall, steps) in want.items():
     try:
