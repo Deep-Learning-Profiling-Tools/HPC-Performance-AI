@@ -28,10 +28,12 @@ dependency_installs:
 - cuda/install/boost
 - cuda/install/gsl
 inputs:
-- inputs/khi-192x512/
+- inputs/khi/cmakeFlags
+- inputs/lwfa/cmakeFlags
 registered_inputs: inputs.yaml
 references:
-- src/lib/python/test/setups/ESKHI (the KHI growth-rate test's theory and acceptance)
+- src/share/picongpu/tests/KHI_growthRate
+- reference/lwfa-192x1024x192.json
 upstream_version: dev
 redistribution_status: cleared
 suite_status: candidate
