@@ -38,7 +38,7 @@ GPU; the registered inputs run one rank).
 | `src/makenek.inc` | the debug test `echo $G \| grep '\-g'` became a whole-word test for `-g` | the substring test also matched the SDK's target option `-gpu=cc100` and silently rebuilt **every** object with `-O0` ("Activate DEBUG mode") |
 | `src/jl/gs_defs.h` | `GS_DO_bpr` written as a structured `while` loop (same operation) | nvc 25.7 rejects the upstream `break`-out-of-`do{}while(0)` / `for(;;)` form inside the OpenACC regions of `gs_local.c` ("bad single-entry/single-exit region nesting"); the `bpr` operation is not used by the CG, the file must merely compile |
 | `src/driver.f` | `use hpcperf_roi`; `call hpcperf_roi_begin_sync()` / `end_sync()` immediately around the timed `cg_acc` (and `cg`) call; after the timed solve: `!$ACC UPDATE HOST(x(1:n))` and a print of `sqrt(x^T C x)` and `x^T C f` (`HPCPERF solution:` line, host arithmetic, outside the timed region) | ROI markers (tools/timing/roi); a solution functional for the correctness check -- upstream prints only residual norms, which a consistently wrong operator still drives to zero |
-| `src/driver.f` (`set_multiplicity`, `set_f`) | the `!$ACC UPDATE DEVICE` / `UPDATE HOST` pairs upstream puts around the two host-side gather-scatter calls of the set-up **only under `GPUDIRECT`** are enabled for every OpenACC build (`#if defined(GPUDIRECT) \|\| defined(_OPENACC)`) | an upstream defect of the non-GPUDIRECT path: the jl library executes a gather-scatter on the device copy of any array that is present on the device (`gs.c gs_aux`: `acc_is_present`), and the driver's `ACC DATA CREATE` makes `f` and `c` present for the whole run -- so `dssum(c)` and `dssum(f)` summed never-uploaded device copies and left the host `c` at 1 and `f` unassembled. The GPU then solved a different system from the CPU path (r0 = the raw 2-norm of `sin(cos(i*i))`, 13 % off, solution 3 x off, residual reduction 1e3 worse); with the updates both paths start from the same assembled right-hand side and weights, as upstream's own harness asserts (RESULTS). The timed solve is untouched |
+| `src/driver.f` (`set_multiplicity`, `set_f`) | the `!$ACC UPDATE DEVICE` / `UPDATE HOST` pairs upstream puts around the two host-side gather-scatter calls of the set-up **only under `GPUDIRECT`** are enabled for every OpenACC build (`#if defined(GPUDIRECT) \|\| defined(_OPENACC)`) | an upstream defect of the non-GPUDIRECT path: the jl library executes a gather-scatter on the device copy of any array that is present on the device (`gs.c gs_aux`: `acc_is_present`), and the driver's `ACC DATA CREATE` makes `f` and `c` present for the whole run -- so `dssum(c)` and `dssum(f)` summed never-uploaded device copies and left the host `c` at 1 and `f` unassembled. The GPU then solved a different system from the CPU path (r0 = the raw 2-norm of `sin(cos(i*i))`, 13 % off, solution 3 x off, residual reduction 1e3 worse); with the updates both paths start from the same assembled right-hand side and weights, as upstream's own harness asserts (`validate.sh`: the CUDA and CPU builds agree to 1.2e-16 on `test/nek_gpu1`; every registered input's check passes to round-off, Results). The timed solve is untouched |
 
 The algorithms, the problem set-up (`set_f` right-hand side, mask, multiplicity, geometric factors) and the
 100-iteration CG are upstream's. Build flags are upstream's `makenek.cuda` with the 2018 PGI spellings
@@ -69,16 +69,16 @@ convention; this program does not read it.
 
 | id | order `lx1` | elements / rank | points | timed solve | note |
 |---|---|---|---|---|---|
-| n16-e8192 | 16 | 8,192 | 33.6 M | RESULTS | element-count series at order 16 |
-| n16-e16384 | 16 | 16,384 | 67.1 M | RESULTS | |
-| n16-e32768 (default) | 16 | 32,768 | 134.2 M | RESULTS | the largest per-rank size upstream's gather-scatter set-up handles (Limitations) |
-| n8-e262144 | 8 | 262,144 | 134.2 M | RESULTS | the default's point count (the same 512^3 global grid) at order 8 |
-| n12-e78125 | 12 | 78,125 | 135.0 M | RESULTS | 135 M points at order 12 (5^7 elements, a 125 x 25 x 25 brick) |
+| n16-e8192 | 16 | 8,192 | 33.6 M | 0.453 s | element-count series at order 16 |
+| n16-e16384 | 16 | 16,384 | 67.1 M | 0.860 s | |
+| n16-e32768 (default) | 16 | 32,768 | 134.2 M | 1.681 s | the largest per-rank size upstream's gather-scatter set-up handles (Limitations) |
+| n8-e262144 | 8 | 262,144 | 134.2 M | 1.596 s | the default's point count (the same 512^3 global grid) at order 8 |
+| n12-e78125 | 12 | 78,125 | 135.0 M | 1.732 s | 135 M points at order 12 (5^7 elements, a 125 x 25 x 25 brick) |
 
 Every pair `SIZE` + `data.rea` is upstream's `test/nek_gpu1` with `lx1` / `lelt` and the matching
 `nx0..nxN` / `iel0..ielN` changed (one order, one element count per input; brick geometry, no multigrid,
 automatic decomposition). `test/nek_gpu1` as shipped (256 elements of order 16, 1.0 M points) is the case
-`validate.sh` runs; its timed solve takes RESULTS on the B200 -- too short to time.
+`validate.sh` runs; its timed solve takes 0.037 s on the B200 -- too short to time.
 
 ## Timed region (ROI)
 
@@ -148,7 +148,30 @@ master-branch run was assembled is not established here.
 
 ## Results on dgx003 (B200, CUDA 13.2.78, NVIDIA HPC SDK 25.7)
 
-RESULTS_PLACEHOLDER
+Campaign `l2-ext-2026-10-20` (2026-10-21 05:50-06:31 UTC, Slurm job 2732030, GPU `0000:9D:00.0` by UUID, final
+Level 2 protocol: 1 discarded warm-up + 3 clean + 1 nsys-profiled run per input, headline = median of the ROI,
+spread = (max - min) / median with 10 % as the UNSTABLE threshold, no clock locking, strictly serial;
+`docs/timing/index.html` has the current rows):
+
+| input | ROI median (s) | min / max (s) | spread | stable | warm-up (s) | profiled run (s) | wall per run (s) | run verification | correctness |
+|---|---|---|---|---|---|---|---|---|---|
+| n16-e8192 | 0.4528 | 0.4527 / 0.4530 | 0.1 % | yes | 0.4527 | 0.4552 | 31-36 | PASS | PASS |
+| n16-e16384 | 0.8601 | 0.8599 / 0.8604 | 0.1 % | yes | 0.8602 | 0.8720 | 62-64 | PASS | PASS |
+| n16-e32768 (default) | 1.6808 | 1.6791 / 1.6870 | 0.5 % | yes | 1.6790 | 1.6856 | 126-129 | PASS | PASS |
+| n8-e262144 | 1.5960 | 1.5938 / 1.5973 | 0.2 % | yes | 1.5937 | 1.6040 | 127-129 | PASS | PASS |
+| n12-e78125 | 1.7323 | 1.7290 / 1.7351 | 0.4 % | yes | 1.7306 | 1.7401 | 125-130 | PASS | PASS |
+
+- Timing SUCCESS for all five (the ROI markers around the timed `cg_acc` solve of every run; `verify_registry_runs.py`
+  PASS 5/5: the executable built from the registered `SIZE`, the registered `data.rea` read in place, the
+  `nelt = ..., np = 1, nx1 = ...` banner, the launcher audit). The wall time per run is the single-threaded host set-up
+  (gather-scatter handles, geometry, right-hand side) plus the solve; on this quiet node it took 0.5-2 min per run.
+  The nsys trace shows the device busy 89-92 % of the ROI (a kernel-bound solve; the rest is the 100 global
+  reductions' host round trips).
+- Correctness (`check_cg.py` against the frozen CPU-build references, `run_checks.sh nekbone` = one fresh run of
+  every input, then `hpcperf_inputs.py verdict`): all five PASS. `r0` equal to all five printed digits, the solution
+  norm `xnorm` within 1.9e-16 and the functional `xf` within 5.6e-16 relative of the CPU build (the rule allows
+  1e-4 / 1e-10 / 1e-10), the residual reduction within the rule's factor 10 of the reference -- the GPU solve is the
+  CPU solve to round-off, which is what the set-up fix (Changes from upstream) restored.
 
 ## Limitations
 
@@ -160,8 +183,8 @@ RESULTS_PLACEHOLDER
   (`gs_setup` -> `get_topology` -> `jl_sortp_ui`, 32-bit sort / index arithmetic) in both builds: 134 M
   points per rank is the largest registered size; larger problems need more ranks.
 - The host-side set-up (gather-scatter handles for 134 M points, geometric factors, the right-hand side) is
-  single-threaded upstream code and takes 4-9 minutes per run at the registered sizes -- outside the ROI,
-  but it sets the wall time of a measurement.
+  single-threaded upstream code and takes 0.5-2 minutes per run at the registered sizes on a quiet node (4-9
+  minutes while other jobs loaded the node's cores) -- outside the ROI, but it sets the wall time of a measurement.
 - The NVIDIA HPC SDK is site-provided (not in the conda environment); the CUDA runtime the binary uses is
   the SDK's bundled 12.9 under the system 13.2 driver.
 
@@ -175,4 +198,7 @@ the unused Blue Gene assembly and CUDA kernel variants (`nek_kernel*.cuf`, not b
 
 ## Status
 
-RESULTS_STATUS
+- Timing SUCCESS 5/5 (ROI = the timed CG solve), stable 5/5 (spread <= 0.5 %), run verification PASS 5/5, scientific
+  correctness PASS 5/5 against frozen CPU-build references; `validate.sh` PASS (CUDA build = CPU build on
+  `test/nek_gpu1` to 1.2e-16). Page rows published 2026-10-21 (`docs/timing/`).
+- Not done: multi-GPU validation, multi-node (site), the multigrid preconditioner (no OpenACC path upstream).
