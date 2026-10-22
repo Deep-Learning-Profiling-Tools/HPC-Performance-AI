@@ -30,3 +30,4 @@ qmcpack	cuda	3600	-	-	-	-	-	-	-	no (the profiled run of the timing input is too 
 sparta	cuda	1800	Performance	Mparticle-step/s	higher	stdout	^Performance: .*?([0-9.eE+-]+) Mparticle-step/s	-	-	yes	also prints timesteps/s
 specfem3d	cuda	1800	-	-	-	-	-	-	-	yes	output_solver.txt: elapsed time and mean time per step at every stability report
 warpx	cuda	1800	-	-	-	-	-	-	WarpX::Evolve()	yes	AMReX TinyProfiler is compiled in and device-synchronized; it also pushes one NVTX range per region
+vpic	cuda,hip	1800	-	-	-	-	-	-	-	yes	prints '*** Done (<s>s ... elapsed)' after the step loop and a Run Details banner (ranks, num_step, grid, particles per species) before it; the per-phase profile table appears only with status_interval > 0 (off in the registered decks)

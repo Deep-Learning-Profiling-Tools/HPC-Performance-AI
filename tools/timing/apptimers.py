@@ -325,6 +325,26 @@ class Timer:
         self.caveat = caveat
 
 
+def vpic(d):
+    """VPIC (vpic-kokkos): the step loop's own wall clock.
+
+    deck/main.cc takes wallclock() immediately before `while( simulation->advance() );` and
+    immediately after it (lines 123-127) and prints `*** Done (<s>s / <w>w:<d>d:<h>h:<m>m:<s>s
+    elapsed)` (line 137). advance() returns 0 without doing anything once step() >= num_step
+    (src/vpic/advance.cc:17), so the loop holds exactly num_step steps: particle sort / push /
+    boundary handling, current accumulation, the field advance and the deck's user_diagnostics
+    (advance.cc:365-366; the registered decks write only the energies row there). Initialization,
+    particle loading, the Run Details banner and the clean-up are outside. num_step comes from the
+    Run Details banner (`# Num Step N`, src/vpic/vpic.cc:134, printed before `*** Advancing`)."""
+    t = _stdout(d)
+    m = re.findall(r"\*\*\* Done \(" + NUM + r"s / ", t)
+    if not m:
+        raise TimerMissing("no '*** Done (<s>s / ... elapsed)' line in run.log (the step loop did not finish)")
+    s = re.findall(r"^\s*# Num Step (\d+)\s*$", t, re.M)
+    return {"wall_s": float(m[-1]), "steps": int(s[-1]) if s else None, "excluded_s": None, "setup_s": None,
+            "parts": {}, "files": ["run.log"]}
+
+
 TIMERS = {
     "lammps": Timer(
         lammps, ["log.*.lammps"],
@@ -346,6 +366,16 @@ TIMERS = {
         "average over ranks, barriers at start and end",
         "total: yes (the last step's statistics output syncs particles to the host); sections: "
         "probably close (per-step blocking read-backs) but the timer does not fence the device"),
+    "vpic": Timer(
+        vpic, [],
+        "'*** Done (<s>s ... elapsed)': the wall clock around `while( simulation->advance() )` -- all "
+        "num_step steps (sort, push, boundaries, current accumulation, field advance, the deck's "
+        "user_diagnostics = the energies row); without initialization, particle loading, the Run "
+        "Details banner and the clean-up.",
+        ["deck/main.cc:123-127,137", "src/vpic/advance.cc:17,365-366", "src/vpic/vpic.cc:134"],
+        "rank 0's clock (one rank per registered deck)",
+        "effectively: every phase of advance() ends in a KOKKOS_TOC with a Kokkos::fence "
+        "(src/util/profile/profile.h:102-108) and the energies diagnostic reduces on the device"),
     "warpx": Timer(
         warpx, [],
         "final 'Evolve time': the whole WarpX::Evolve step loop, including in-loop diagnostics; "

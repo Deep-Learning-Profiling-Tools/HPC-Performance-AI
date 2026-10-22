@@ -224,6 +224,17 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
       par_file_sha256: ['^[0-9a-f]{64}$']
     output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
     timer_steps: 'nstep'
+  vpic:                         # run.sh: the registered deck is a compiled executable (build.sh, decks/<id>.Linux) whose source
+                                # hash the manifest records; the binary prints the Run Details banner (num_step, grid, particles)
+    manifest:
+      input_id: ['^{input_id}$']
+      deck: ['^{deck}$']
+      num_step: ['^{num_step}$']
+      grid: ['^{grid}$']
+      particles: ['^{particles}$']
+    source_deck: {deck: '{deck}'}
+    output: ['^# VPIC .* input={input_id} deck={deck} ranks=\d+ grid={grid} particles={particles} num_step={num_step} ', '^\s*# Num Step {num_step}$']
+    timer_steps: 'num_step'
   warpx:                        # run.sh: the case deck derived from upstream with the grid and step count of the mode / knobs
     covers: [HPCPERF_SCALE_MODE, HPCPERF_WARPX_CASE, HPCPERF_WARPX_LOCAL, HPCPERF_WARPX_GLOBAL, HPCPERF_WARPX_STEPS]
     # run.sh runs the langmuir case as upstream's test as shipped (64^3, 40 steps) and labels it mode=validate whatever

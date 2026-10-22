@@ -1,0 +1,2 @@
+src	https://github.com/lanl/vpic-kokkos.git	devel	7eb2947e12741df4931088a3ae6175adb21a6535
+src/kokkos	https://github.com/kokkos/kokkos.git	6d4434baacc86ec428b5300ebe853a085760d9af	6d4434baacc86ec428b5300ebe853a085760d9af

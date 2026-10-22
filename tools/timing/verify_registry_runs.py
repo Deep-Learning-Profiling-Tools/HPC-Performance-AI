@@ -534,7 +534,9 @@ def verify_level3(c, repo, ident, rec, runs, rule, entry):
             path = os.path.join(bdir, rel)
             if not v:
                 c.gap(f"{r['dir']}: the manifest has no '{key}' naming the source deck")
-            elif os.path.realpath(v) != os.path.realpath(path) and not v.endswith("/" + rel):
+            elif v != rel and os.path.realpath(v) != os.path.realpath(path) and not v.endswith("/" + rel):
+                # the manifest may name the deck as the registry does (benchmark-relative), absolutely, or by a
+                # longer path ending in the registered one; the identity is the sha256 compared below
                 c.fail(f"{r['dir']}: manifest {key}={v} is not the registered deck level3/{app}/{rel}")
             elif not os.path.isfile(path):
                 c.gap(f"{r['dir']}: registered deck level3/{app}/{rel} missing now (sha256 recorded {str(m.get(key + '_sha256'))[:12]})")
