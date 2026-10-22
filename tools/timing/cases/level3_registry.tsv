@@ -3,6 +3,11 @@
 # (run by `cases.py check` and the tests) fails when this file and the registry disagree.
 # One row per registered input; case == input_id. {REPO} is the repository root. "-" = empty.
 #app	case	input_id	materialized	selector	registry_knobs	gpus	timeout_s	env
+cholla	sod-256	sod-256	1	HPCPERF_CHOLLA_INPUT	-	1	1800	-
+cholla	sod-512	sod-512	1	HPCPERF_CHOLLA_INPUT	-	1	1800	-
+cholla	sound-wave-512	sound-wave-512	1	HPCPERF_CHOLLA_INPUT	-	1	1800	-
+cholla	noh-200	noh-200	1	HPCPERF_CHOLLA_INPUT	-	1	1800	-
+cholla	blast-256	blast-256	1	HPCPERF_CHOLLA_INPUT	-	1	1800	-
 cp2k	h2o-64	h2o-64	1	HPCPERF_CP2K_INPUT	HPCPERF_CP2K_CASE,HPCPERF_CP2K_REGTEST,HPCPERF_CP2K_SYSTEM,HPCPERF_SCALE_MODE	1	3600	-
 cp2k	h2o-32	h2o-32	1	HPCPERF_CP2K_INPUT	HPCPERF_CP2K_CASE,HPCPERF_CP2K_REGTEST,HPCPERF_CP2K_SYSTEM,HPCPERF_SCALE_MODE	1	3600	-
 cp2k	h2o-128	h2o-128	1	HPCPERF_CP2K_INPUT	HPCPERF_CP2K_CASE,HPCPERF_CP2K_REGTEST,HPCPERF_CP2K_SYSTEM,HPCPERF_SCALE_MODE	1	3600	-

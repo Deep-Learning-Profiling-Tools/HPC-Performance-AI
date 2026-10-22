@@ -1,0 +1,59 @@
+name: cholla
+level: 3
+application: Cholla (v3.0.0)
+description: GPU finite-volume hydrodynamics (PLMC reconstruction, HLLC Riemann solver, Van Leer integrator; the upstream
+  `hydro` build type); registered inputs (inputs.yaml) are parameter files derived from upstream's examples/3D -- the Sod
+  shock tube at 256^3 and 512^3, a 512^3 sound wave over one period, the 200^3 Noh implosion and a 256^3 spherical over-pressure
+  blast -- one MPI rank on one GPU each
+supported_backends:
+- cuda
+- hip
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (MPI_CHOLLA build, domain decomposition over ranks); the registered workloads are
+  the one-rank runs (run.sh refuses HPCPERF_GPUS other than 1); host-staged MPI exchanges (MPI_GPU not set, upstream default)
+default_scale_mode: smoke
+scale_modes:
+  smoke: the registered parameter files (inputs.yaml); no strong/weak derivation -- every grid size is its own registered
+    input
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: not applicable (one-rank inputs)
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 through mpicxx as the nvcc host compiler, CUDA 13.2.78, Open MPI 5.0.10,
+  conda HDF5 2.2.0, site profile gmu-hopper)
+install_root: .deps/level3/cholla/cuda
+profile_scheme: '<backend> (cuda validated; hip: upstream''s Frontier recipe, untested -- no ROCm on the validation node);
+  override HPCPERF_CHOLLA_PROFILE must name the backend; generated state .deps/level3/cholla/<profile>/ (install/bin/cholla)
+  and build/level3/cholla/<profile>/ (the build copy of src/ with the generated host file, the run directories)'
+dependency_installs: []
+inputs:
+- inputs/sod-256.txt
+- inputs/sod-512.txt
+- inputs/sound-wave-512.txt
+- inputs/noh-200.txt
+- inputs/blast-256.txt
+registered_inputs: inputs.yaml
+references:
+- src/src/system_tests/input_files/tHYDROtMHDSYSTEMSoundWave3D_CorrectInputExpectCorrectOutput.txt
+- reference/sod-256.json
+- reference/sod-512.json
+- reference/sound-wave-512.json
+- reference/noh-200.json
+- reference/blast-256.json
+upstream_version: v3.0.0
+redistribution_status: cleared
+suite_status: retained
+source_version: hpcperf-l3-v1
+source_tree_sha256: 44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450
+source_artifact:
+  filename: cholla-hpcperf-l3-v1.tar.zst
+  archive_sha256: bdc734e8674b9bc2764078e25128a9dc8aa06dcbd18e278bcb5145812d155506
+  source_tree_sha256: 44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450
+  size: 356496
+  uncompressed_size: 2825391
+  file_count: 356
+  source_version: hpcperf-l3-v1
+  primary_url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/cholla-hpcperf-l3-v1.tar.zst
+  publish_status: published

@@ -231,6 +231,17 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
       par_file_sha256: ['^[0-9a-f]{64}$']
     output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
     timer_steps: 'nstep'
+  cholla:                       # run.sh: the registered parameter file is read in place (source_files), outdir is the only
+                                # command-line override; the manifest records the file's hash, the problem (init), grid and
+                                # tout; the parameter banner, the step count and the final snapshot evidence the workload
+    manifest:
+      input_id: ['^{input_id}$']
+      params: ['^{params}$']
+      init: ['^{init}$']
+      grid: ['^{grid}$']
+      tout: ['^{tout}$']
+    source_files: ['{params}']
+    output: ['^Parameter values:\s+nx = {nx}, ny = {ny}, nz = {nz}, tout = {tout_printed}, init = {init},', '^n_step:\s+{steps}\s+sim time:', '^Saving Snapshot:\s+{final_snapshot}\s*$']
   picongpu:                     # run.sh: the registered input set (inputs/<set>/) is compiled into install/<set>/bin/picongpu (build.sh;
                                 # the manifest records the set's hash), the registered args ARE the program's command line (argv
                                 # evidence), and the progress line evidences the step count the program ran

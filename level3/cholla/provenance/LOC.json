@@ -1,0 +1,58 @@
+{
+ "benchmark": "cholla",
+ "variant": null,
+ "cloc": "2.06",
+ "categories_source": "provenance/source.lock.yaml (source_scope; descriptive source ownership, not an optimization policy)",
+ "source_tree_sha256": "44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450",
+ "test_code_loc": {
+  "code": 2549,
+  "files": 29,
+  "languages": {
+   "C++": 1347,
+   "Text": 1129,
+   "C/C++ Header": 73
+  }
+ },
+ "bundled_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {}
+ },
+ "application_owned_code_loc": {
+  "code": 49984,
+  "files": 205,
+  "languages": {
+   "C++": 17509,
+   "CUDA": 15900,
+   "Text": 11010,
+   "C/C++ Header": 4965,
+   "Bourne Shell": 386,
+   "make": 172,
+   "Markdown": 42
+  }
+ },
+ "benchmark_specific_dependency_code_loc": {
+  "code": 0,
+  "files": 0,
+  "languages": {},
+  "tarballs": {}
+ },
+ "unclassified": {
+  "code": 529,
+  "files": 6,
+  "languages": {
+   "YAML": 478,
+   "Markdown": 34,
+   "Text": 17
+  }
+ },
+ "total_materialized_code_loc": 53062,
+ "summary": {
+  "application_owned_code_loc": 49984,
+  "bundled_dependency_code_loc": 0,
+  "benchmark_specific_dependency_code_loc": 0,
+  "test_code_loc": 2549,
+  "total_materialized_code_loc": 53062,
+  "unclassified_code_loc": 529
+ }
+}

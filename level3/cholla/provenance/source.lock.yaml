@@ -1,0 +1,144 @@
+schema: hpcperf-source-lock-2
+schema_version: 2
+benchmark:
+  name: cholla
+  level: 3
+  application: Cholla (GPU hydrodynamics)
+  variant: null
+  source_version: hpcperf-l3-v1
+upstream:
+  repository: https://github.com/cholla-hydro/cholla.git
+  tag: v3.0.0
+  commit: 8478c9ede8a5e2cb72d6481a50023666d489a763
+artifact:
+  filename: cholla-hpcperf-l3-v1.tar.zst
+  format: tar.zst
+  layout:
+  - src/
+  size: 356496
+  sha256: bdc734e8674b9bc2764078e25128a9dc8aa06dcbd18e278bcb5145812d155506
+  source_tree_sha256: 44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450
+  tree_algorithm: hpcperf-tree-1
+  tar_format: hpcperf-tar-1
+  compression:
+    tool: zstd
+    level: 19
+    single_thread: true
+    version: 1.5.7
+  uncompressed_size: 2825391
+  tar_entries: 390
+  file_count: 356
+  symlink_count: 0
+  immutable: true
+  primary:
+    url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/cholla-hpcperf-l3-v1.tar.zst
+    status: published
+  mirrors: []
+cache:
+  content_addressed: true
+  layout: sha256/<archive_sha256>.tar.zst
+  env: HPCPERF_ARTIFACT_CACHE
+  default: $HPC_PERFORMANCE_AI_ROOT/.artifacts
+materialized_tree:
+  sha256: 44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450
+  algorithm: hpcperf-tree-1
+  entries: 356
+  layout:
+  - src/
+patches:
+- path: patches/0001-makefile-git-hash-from-make-variable.patch
+  sha256: 37921368a75e258d90dcbe83a56c8dc5dd24c8b9e2561a6ba4f174a6e0bf5435
+  category: D
+  upstream_reference: 'local 3-line Makefile change: GIT_HASH ?= $(shell git rev-parse --verify HEAD) so that build.sh can
+    pass the frozen commit (the bundle is not a git checkout; upstream static_asserts a 40-character GIT_HASH, error_handling.cpp:41)'
+  component: src
+  files:
+  - src/Makefile
+dependencies:
+  bundled: []
+  benchmark_specific: []
+  environment_provided:
+  - name: CUDA Toolkit
+    version: 13.2.78
+  - name: GCC (nvcc host compiler through mpicxx)
+    version: 13.3.0
+    provided_by: .conda_env
+  - name: Open MPI
+    version: 5.0.10
+    provided_by: .conda_env
+  - name: HDF5
+    version: 2.2.0 (mpi_openmpi build)
+    provided_by: .conda_env
+components:
+- dest: src
+  kind: git
+  category: application
+  url: https://github.com/cholla-hydro/cholla.git
+  ref: v3.0.0
+  commit: 8478c9ede8a5e2cb72d6481a50023666d489a763
+  sha256: null
+  checkout: _upstream/level3/cholla
+  submodules: []
+  excluded:
+  - path: docs
+    reason: documentation (doxygen sources); not built
+  - path: docker
+    reason: container recipes; not built, not run
+  - path: python_scripts
+    reason: post-processing / plotting scripts; not run
+  - path: scale_output_files
+    reason: cosmology output-time tables for the FOM scaling runs; not used by any registered input
+  license:
+    spdx: MIT
+    files:
+    - LICENSE.txt
+equivalence:
+- archive_path: src
+  validated_tree: _upstream/level3/cholla
+  status: EQUIVALENT
+  summary:
+    identical: 355
+    expected_patch_difference: 1
+    expected_generated_difference: 0
+    expected_normalization_excluded: 0
+    expected_build_artifact: 0
+    expected_added: 0
+    missing_source: 0
+    extra_source: 0
+    unexpected_content_difference: 0
+    unexpected_total: 0
+    frozen_entries: 356
+    validated_entries_considered: 356
+licenses:
+- path: src
+  project: Cholla
+  license: MIT (LICENSE.txt, Copyright (c) 2018 Evan E. Schneider)
+  url: https://github.com/cholla-hydro/cholla
+  commit: 8478c9ede8a5e2cb72d6481a50023666d489a763
+license_notes:
+- Cholla is MIT-licensed; the unmodified source with its LICENSE.txt and the one class-D Makefile patch (patch_series.txt)
+  is redistributed as a source bundle.
+- The registered parameter files under level3/cholla/inputs/ are this benchmark's files, derived from upstream's examples/
+  as documented in inputs.yaml; they are not part of the frozen artifact.
+redistribution_status: cleared
+redistribution_notes: []
+source_scope:
+  application_owned:
+  - src/src/*
+  - src/Makefile
+  - src/builds/*
+  bundled: []
+  benchmark_specific:
+  - inputs/*
+  test:
+  - src/src/system_tests/*
+  exclude:
+  - src/examples/*
+  - src/tools/*
+  - src/Jenkinsfile
+scan_allow: []
+freeze:
+  tool_version: freeze-2.0
+  timestamp: '2026-10-21T14:19:29Z'
+  note: freeze timestamp and archive metadata are not part of source_tree_sha256; a re-freeze of identical content reproduces
+    the tree hash (and, with the same zstd, the archive sha256)
