@@ -95,4 +95,5 @@ One defect found: the first ordinary-user run failed `check_workspace` check 10 
 their `benchmark.yaml` `inputs` / `references` lists held globs and descriptions instead of literal paths (the check
 tests each entry with `os.path.exists`). Fixed in the descriptors (literal paths; one commit per application); no
 artifact, hash, lock or release asset changed. The download and hash verification had already passed before the
-failing check in every case.
+failing check in every case. The code of this round (the three applications, their locks and records) is in `main`
+since 2026-10-22 (PRs #22 / #25 / #26 merged through the stacked branches and brought to `main` together).
