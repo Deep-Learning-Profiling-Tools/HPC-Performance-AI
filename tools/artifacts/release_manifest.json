@@ -1,6 +1,6 @@
 {
  "schema": "hpcperf-release-manifest-1",
- "generated": "2026-09-14T03:34:48Z",
+ "generated": "2026-10-21T19:43:08Z",
  "suite": "level3-default",
  "source_version": "hpcperf-l3-v1",
  "release": {
@@ -301,7 +301,7 @@
     "unclassified_code_loc": 899
    },
    "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
-   "cache_hit": true,
+   "cache_hit": false,
    "materialized_here": false,
    "check_workspace": "PASS"
   },
@@ -534,7 +534,7 @@
    },
    "local_staging": "not staged",
    "cache_hit": false,
-   "materialized_here": true,
+   "materialized_here": false,
    "check_workspace": "PASS"
   },
   {
@@ -582,6 +582,144 @@
    "cache_hit": true,
    "materialized_here": true,
    "check_workspace": "PASS"
+  },
+  {
+   "app": "vpic",
+   "application": "VPIC (vpic-kokkos)",
+   "variant": null,
+   "suite_status": "candidate",
+   "statuses": [
+    "CANDIDATE(admitted)",
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "REMOTE_FETCH_VERIFIED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "vpic-hpcperf-l3-v1.tar.zst",
+   "size": 1937373,
+   "uncompressed_size": 17019061,
+   "sha256": "ac0aec44f3245b6078021ba1cea0ba9b3e604b3d8ac2489f7807cb3c2d177950",
+   "source_tree_sha256": "464de895194405663afeff1d0bb76b6beae1f300f4a3d848507f73cc837d3e7c",
+   "entries": 1786,
+   "upstream": {
+    "repository": "https://github.com/lanl/vpic-kokkos.git",
+    "tag": "devel",
+    "commit": "7eb2947e12741df4931088a3ae6175adb21a6535"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/vpic-hpcperf-l3-v1.tar.zst",
+    "status": "published"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 24310,
+    "bundled_dependency_code_loc": 242145,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 15282,
+    "total_materialized_code_loc": 282328,
+    "unclassified_code_loc": 591
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "-"
+  },
+  {
+   "app": "picongpu",
+   "application": "PIConGPU",
+   "variant": null,
+   "suite_status": "candidate",
+   "statuses": [
+    "CANDIDATE(admitted)",
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "REMOTE_FETCH_VERIFIED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "picongpu-hpcperf-l3-v1.tar.zst",
+   "size": 160232498,
+   "uncompressed_size": 185825989,
+   "sha256": "d243d831a44ec7c845464839594de73d6eeb55e7c5b63080a00ae0c74a03d91f",
+   "source_tree_sha256": "70d87f93d3a6fd7bf5625a3dbea3dd301e0a4572fcf2e8f5d4328575eab7454a",
+   "entries": 3634,
+   "upstream": {
+    "repository": "https://github.com/ComputationalRadiationPhysics/picongpu.git",
+    "tag": "dev",
+    "commit": "93cba5b61b628659a6ec8181f5e2dd28b8006f29"
+   },
+   "patches": 0,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/picongpu-hpcperf-l3-v1.tar.zst",
+    "status": "published"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 107810,
+    "bundled_dependency_code_loc": 287081,
+    "benchmark_specific_dependency_code_loc": 9589824,
+    "test_code_loc": 3594,
+    "total_materialized_code_loc": 9997087,
+    "unclassified_code_loc": 8778
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "-"
+  },
+  {
+   "app": "cholla",
+   "application": "Cholla",
+   "variant": null,
+   "suite_status": "candidate",
+   "statuses": [
+    "CANDIDATE(admitted)",
+    "FROZEN",
+    "LOCAL_ARTIFACT_VERIFIED",
+    "REMOTE_FETCH_VERIFIED"
+   ],
+   "notes": [],
+   "source_version": "hpcperf-l3-v1",
+   "filename": "cholla-hpcperf-l3-v1.tar.zst",
+   "size": 356496,
+   "uncompressed_size": 2825391,
+   "sha256": "bdc734e8674b9bc2764078e25128a9dc8aa06dcbd18e278bcb5145812d155506",
+   "source_tree_sha256": "44537e4f47e9a1c7f005561de3064b400560508f30bcd477db875b75d4527450",
+   "entries": 356,
+   "upstream": {
+    "repository": "https://github.com/cholla-hydro/cholla.git",
+    "tag": "v3.0.0",
+    "commit": "8478c9ede8a5e2cb72d6481a50023666d489a763"
+   },
+   "patches": 1,
+   "redistribution_status": "cleared",
+   "primary": {
+    "url": "https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/cholla-hpcperf-l3-v1.tar.zst",
+    "status": "published"
+   },
+   "mirrors": [],
+   "lock_problems": [],
+   "equivalence": "EQUIVALENT",
+   "loc": {
+    "application_owned_code_loc": 49984,
+    "bundled_dependency_code_loc": 0,
+    "benchmark_specific_dependency_code_loc": 0,
+    "test_code_loc": 2549,
+    "total_materialized_code_loc": 53062,
+    "unclassified_code_loc": 529
+   },
+   "local_staging": "LOCAL_ARTIFACT_VERIFIED (re-hashed)",
+   "cache_hit": true,
+   "materialized_here": true,
+   "check_workspace": "-"
   }
  ]
 }

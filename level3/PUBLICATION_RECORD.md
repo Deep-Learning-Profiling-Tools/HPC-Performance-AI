@@ -69,3 +69,31 @@ The upload used the GitHub token present in the agent environment. That token is
 and authorized this specific publication anyway on 2026-09-12. No credential value was printed, copied into any
 file, or placed on a command line, and the anonymous verification steps ran with the token removed from the
 environment. Rotation remains the maintainer's action and is **not** claimed here.
+
+## Extension round ext1 (2026-10-21): VPIC, PIConGPU, Cholla
+
+| | |
+|---|---|
+| Tag | `level3-source-hpcperf-l3-v1-ext1`, lightweight, resolved through `/git/ref/tags` to the plan target |
+| Release | id 419976733, **prerelease**, public (the rc1 release and its 24 assets are untouched) |
+| Target commit | `7e2a220b5682b4562e066d77e4feea51b80803ba` (branch `level3/cholla`: the three applications' provenance with `unpublished` locks) |
+| Release plan | `level3/RELEASE_PLAN.json` at commit `7d485b0`, sha256 `8fd5ba642341d24224ba7ec4863727c2d936f4cfbe38747f114421d084f9bde7` (generated with the new `--app vpic,picongpu,cholla` filter of `release_plan.py`: the ten rc1 artifacts are listed as `NOT_IN_THIS_ROUND`) |
+| Assets | 8: 3 source archives, `SHA256SUMS`, 3 `SOURCE_MANIFEST.<artifact>.json`, `RELEASE_PLAN.json` |
+| Archive bytes | 162,526,367 (vpic 1,937,373; picongpu 160,232,498; cholla 356,496) |
+| Draft uploaded and verified | 2026-10-21 (every asset re-downloaded with credentials and compared) |
+| Published as prerelease | 2026-10-21, re-verified by API digest and `--verify --redownload` (3/3 archives sha256 ok) |
+
+Checks that ran, in order: the three staging archives verified against their locks (`verify_artifact.py` PASS 3/3) and
+re-extracted for the plan (`--full`); the publisher's mock suite (45/45); preflight; draft upload with authenticated
+re-download; publication; anonymous plan-URL verification 3/3 (`provenance/remote_artifact_verification.yaml`); the
+lock update commits (one per application branch: `level3/vpic` 9f5e0b7, `level3/picongpu-rebased` 8b22efa,
+`level3/cholla` 2938e9c), merged forward through the stacked branches; the ordinary-user verification
+(`remote_fetch_check.sh --mode lock-entry`: clean clone, empty cache, no credential, plain `prepare_benchmark.sh`)
+3/3 `REMOTE_FETCH_VERIFIED` with `check_workspace` 15/15 (`provenance/remote_fetch_verification.yaml`).
+
+One defect found: the first ordinary-user run failed `check_workspace` check 10 for all three applications because
+their `benchmark.yaml` `inputs` / `references` lists held globs and descriptions instead of literal paths (the check
+tests each entry with `os.path.exists`). Fixed in the descriptors (literal paths; one commit per application); no
+artifact, hash, lock or release asset changed. The download and hash verification had already passed before the
+failing check in every case. The code of this round (the three applications, their locks and records) is in `main`
+since 2026-10-22 (PRs #22 / #25 / #26 merged through the stacked branches and brought to `main` together).

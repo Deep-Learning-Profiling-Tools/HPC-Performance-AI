@@ -279,8 +279,8 @@ hardware; the page then shows the platform as a column and its device values as 
 * **UNVERIFIED**: HIP/ROCm builds and the AMD collector (no ROCm on the node); TPU
   (interface only, by decision); the multi-process ROI (implemented; the allocation
   exposes one GPU, so Level 2 ran at one rank); hardware counters (`ncu`) are not
-  collected. Level 3 is measured with the applications' own timers (the 43 registered inputs at
-  1 GPU, 2026-10-02; the earlier hand-written 2-GPU sweep is history); its device picture is
+  collected. Level 3 is measured with the applications' own timers (every registered input at
+  1 GPU: 43 inputs on 2026-10-02, 57 since VPIC, PIConGPU and Cholla were added on 2026-10-21; the earlier hand-written 2-GPU sweep is history); its device picture is
   whole-process except for WarpX, three clean runs per input since 2026-10-03 (spread <= 10 % or
   UNSTABLE, no adaptive extension; the 2026-10-02 campaign had one), and the scientific
   correctness of each input is the registry's own check (PASS / INCOMPLETE / none per input, no

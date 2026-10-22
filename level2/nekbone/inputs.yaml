@@ -1,0 +1,158 @@
+# Registered inputs of Nekbone (schema hpcperf-inputs-1), selected through HPCPERF_NEKBONE_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh runs the default input (or the ID given as its argument).
+# An input is a directory inputs/<id>/ holding the two files Nekbone reads: SIZE (compile-time maxima: polynomial
+# order lx1 and elements per rank lelt -- build.sh compiles one executable per input, input_form compile-time)
+# and data.rea (the runtime problem: elements per rank, polynomial order, decomposition; one combination each).
+# Every registered pair is derived from upstream's test/nek_gpu1 (the example the cuda-openacc branch was
+# developed and tested with) by changing only lx1 / lelt in SIZE and the matching iel0..ielN / nx0..nxN in
+# data.rea; brick geometry, no multigrid (PPLIST empty), automatic decomposition as upstream.
+schema: hpcperf-inputs-1
+benchmark: nekbone
+level: 2
+selector: HPCPERF_NEKBONE_INPUT
+default_input: n16-e32768
+entry:
+  kind: run.sh
+  path: level2/nekbone/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    Nekbone's own "Solve Time" (src/driver.f set_timer_flop_cnt: dnekclock() before and after the second,
+    timed call of cg_acc -- 100 conjugate-gradient iterations of the spectral-element Poisson operator on the
+    device: preconditioner copy, inner products, axpys, the ax_acc matrix-vector product (CUDA Fortran kernel)
+    and the OpenACC gather-scatter dssum_acc). The first (warm-up) solve, mesh and gather-scatter set-up,
+    the geometric factors and the flop/rate summary are outside. The ROI markers sit immediately around the
+    same call (tools/timing/roi, level2/nekbone/README.md), so the ROI and this timer are the same region.
+  kind: total
+  unit: s
+  regex: '^Solve Time =\s*(?P<value>[0-9.eE+-]+)\s*$'
+  select: only
+baseline:
+  method: >-
+    The scientific result of a run is the solution of the timed solve: driver.f (this benchmark's
+    instrumentation, outside the timed region) prints its weighted norm sqrt(x^T C x) and the functional
+    x^T C f to 16 digits, and cg.f prints the masked right-hand-side norm before and the residual norm,
+    alpha, beta and p^T A p after the 100 iterations (5 digits). check_cg.py (the `check` block) compares
+    the timed solve with a frozen reference run of the SAME input (SIZE + data.rea) with the CPU build of the
+    same source (build.sh CPU = upstream's makenek.mpi code path: cg / ax / dssum on the host), made once with
+    check_cg.py --make-reference (reference/<id>.json, provenance and rule inside). The registry additionally
+    keeps from stdout the element count and order the program read (exact), the rank count, the iteration
+    count of the timed solve (exact: 100 fixed iterations, no early exit in cg_acc) and the program's normal
+    end ('Avg MFlops'; a run that stopped earlier is no result).
+  reference: >-
+    frozen CPU-build references reference/<id>.json through the `check` block; stdout quantities against
+    the input's data.rea (nelt, nx1) and the program's fixed iteration count
+  quantities:
+    - name: nelt_np_nx1
+      role: required
+      regex: '^nelt =\s+(?P<value>\d+), np =\s+1, nx1 =\s+\d+, elements =\s+\d+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: order
+      role: required
+      regex: '^nelt =\s+\d+, np =\s+1, nx1 =\s+(?P<value>\d+), elements =\s+\d+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: timed_iterations
+      role: required
+      regex: '^cg:\s+(?P<value>\d+)\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s+[0-9.eE+-]+\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: normal_end
+      role: required
+      regex: '^Avg MFlops ='
+      compare: {rule: present}
+check:
+  # The run's stdout is compared with the input's frozen CPU-build reference by check_cg.py: timed solve r0 within
+  # r0_tol, solution norm and functional within x_tol, residual reduction within reduction_factor x the reference's,
+  # nelt / nx1 / iteration count equal. The tolerances are recorded in each reference from the basis the README
+  # states (the CPU-vs-CUDA agreement of two correct realisations measured before any optimized candidate existed).
+  kind: post_run
+  command: [python3, '{bench_dir}/check_cg.py', --run, '{log}', --reference, '{bench_dir}/{param:reference}', --label, '{param:id}']
+  pass_regex: '^PASS: Nekbone CG check'
+  fail_regex: '^FAIL: Nekbone CG check'
+  basis: >-
+    the timed solve against a frozen run of the same SIZE + data.rea with the CPU build of the same source
+    (reference/<id>.json): right-hand-side norm, solution norm and functional, residual reduction (README)
+  covers: all
+  timeout: 1800
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream's nek_gpu1 problem family (brick geometry, no multigrid) at benchmark sizes: an element-count series at
+    order 16 (8192, 16384, 32768 elements per rank = 33.6 M .. 134 M points) and two other polynomial orders (8, 12)
+    at the default's point count (134 M)
+  upstream_inputs_not_added:
+    - "test/nek_gpu1 as shipped (256 elements of order 16 = 1.0 M points): validate.sh runs it on both builds as upstream's test harness does; the timed solve takes ~0.1 s on a B200, too short to time"
+    - "65536 elements of order 16 (268 M points per rank): upstream's jl gather-scatter set-up (gs_setup -> get_topology -> jl_sortp_ui, 32-bit sort/index arithmetic) segfaults at this per-rank size in both builds, so 134 M points per rank (32768 elements of order 16) is the largest registered size; larger problems would need more ranks"
+    - "2048 elements of order 16 (8.4 M points, timed solve 0.27 s on the B200) and the order-8 / order-12 variants at 33.6 M points (0.83 s / 0.86 s): run once at bring-up, not registered -- the registered series starts at 0.8 s and the order variants are taken at the 134 M-point size"
+    - "test/example1 .. example3, nek_comm, nek_mgrid, nek_delay: CPU-only examples (element / order ranges, the multigrid preconditioner, communication tests) of the Nek5000 master line; the cuda-openacc branch's GPU path was developed with nek_gpu1 and the multigrid path has no ACC implementation"
+inputs:
+  - id: n16-e8192
+    case: poisson-cg
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: Nek5000/Nekbone, version: cuda-openacc 7fd43bcdc036a1092f03762e9cc5b21f04b7b3c2, path: test/nek_gpu1/SIZE + data.rea}
+      derivation: lelt 8192 (upstream 256); data.rea iel0 = ielN = 8192
+    params: {id: n16-e8192, nx1: 16, nelt: 8192, points: 33554432, niter: 100, lp: 10, size: inputs/n16-e8192/SIZE, rea: inputs/n16-e8192/data.rea, reference: reference/n16-e8192.json}
+    files: [inputs/n16-e8192/data.rea]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {SIZE: inputs/n16-e8192/SIZE}
+    input_form: compile-time
+    backends_validated: [cuda]
+  - id: n16-e16384
+    case: poisson-cg
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: Nek5000/Nekbone, version: cuda-openacc 7fd43bcdc036a1092f03762e9cc5b21f04b7b3c2, path: test/nek_gpu1/SIZE + data.rea}
+      derivation: lelt 16384 (upstream 256); data.rea iel0 = ielN = 16384
+    params: {id: n16-e16384, nx1: 16, nelt: 16384, points: 67108864, niter: 100, lp: 10, size: inputs/n16-e16384/SIZE, rea: inputs/n16-e16384/data.rea, reference: reference/n16-e16384.json}
+    files: [inputs/n16-e16384/data.rea]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {SIZE: inputs/n16-e16384/SIZE}
+    input_form: compile-time
+    backends_validated: [cuda]
+  - id: n16-e32768
+    case: poisson-cg
+    variant: default
+    source:
+      kind: derived
+      upstream: {repo: Nek5000/Nekbone, version: cuda-openacc 7fd43bcdc036a1092f03762e9cc5b21f04b7b3c2, path: test/nek_gpu1/SIZE + data.rea}
+      derivation: lelt 32768 (upstream 256); data.rea iel0 = ielN = 32768
+    params: {id: n16-e32768, nx1: 16, nelt: 32768, points: 134217728, niter: 100, lp: 10, size: inputs/n16-e32768/SIZE, rea: inputs/n16-e32768/data.rea, reference: reference/n16-e32768.json}
+    files: [inputs/n16-e32768/data.rea]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {SIZE: inputs/n16-e32768/SIZE}
+    input_form: compile-time
+    backends_validated: [cuda]
+    notes: the run.sh default
+  - id: n8-e262144
+    case: poisson-cg
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: Nek5000/Nekbone, version: cuda-openacc 7fd43bcdc036a1092f03762e9cc5b21f04b7b3c2, path: test/nek_gpu1/SIZE + data.rea}
+      derivation: >-
+        lx1 8, lelt 262144 (upstream 16, 256); data.rea nx0 = nxN = 8, iel0 = ielN = 262144 -- the default's point count at order 8 (the same 512^3 global point grid)
+    params: {id: n8-e262144, nx1: 8, nelt: 262144, points: 134217728, niter: 100, lp: 10, size: inputs/n8-e262144/SIZE, rea: inputs/n8-e262144/data.rea, reference: reference/n8-e262144.json}
+    files: [inputs/n8-e262144/data.rea]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {SIZE: inputs/n8-e262144/SIZE}
+    input_form: compile-time
+    backends_validated: [cuda]
+  - id: n12-e78125
+    case: poisson-cg
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: Nek5000/Nekbone, version: cuda-openacc 7fd43bcdc036a1092f03762e9cc5b21f04b7b3c2, path: test/nek_gpu1/SIZE + data.rea}
+      derivation: >-
+        lx1 12, lelt 78125 (upstream 16, 256); data.rea nx0 = nxN = 12, iel0 = ielN = 78125 -- 135 M points at order 12 (5^7 elements: a 125 x 25 x 25 brick)
+    params: {id: n12-e78125, nx1: 12, nelt: 78125, points: 135000000, niter: 100, lp: 10, size: inputs/n12-e78125/SIZE, rea: inputs/n12-e78125/data.rea, reference: reference/n12-e78125.json}
+    files: [inputs/n12-e78125/data.rea]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {SIZE: inputs/n12-e78125/SIZE}
+    input_form: compile-time
+    backends_validated: [cuda]

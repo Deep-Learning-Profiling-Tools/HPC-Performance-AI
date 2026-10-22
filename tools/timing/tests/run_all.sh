@@ -783,7 +783,7 @@ for run in sorted(glob.glob(os.path.join(repo, "level2", "*", "run.sh"))):
     for p in glob.glob(os.path.join(app, "**", "*"), recursive=True):
         if "/build/" in p or not os.path.isfile(p):
             continue
-        if not p.endswith((".c", ".cc", ".cpp", ".cxx", ".C", ".cu", ".h", ".hpp", ".f90", ".F90")):
+        if not p.endswith((".c", ".cc", ".cpp", ".cxx", ".C", ".cu", ".h", ".hpp", ".f90", ".F90", ".f", ".F")):   # .f: fixed-form Fortran (Nekbone)
             continue
         for m in rx.finditer(open(p, errors="replace").read()):
             kinds.add("begin" if "begin" in m.group(0).lower() else "end")
@@ -1732,6 +1732,41 @@ Loop time of 0.0411685 on 2 procs for 100 steps with 10000 particles
 
 Performance: 2429.041 timesteps/s, 24.290 Mparticle-step/s
 """)
+w("vpic", "run.log", """# VPIC CUDA profile=cuda: input=harris-256sq deck=decks/harris-256sq.cxx ranks=1 grid=256x256x1 particles=4194304 num_step=1939 run_dir=x
+*** Initializing
+######### Run Details ##########
+# MPI Ranks: 1
+# Threads: 1
+## Global:
+  # Num Step 1939
+  # px 1 py 1 pz 1
+  # gnx 256 gny 256 gnz 1
+## Local Particle Species: 2
+  # ion np 2097152 max_np 3145728
+  # electron np 2097152 max_np 3145728
+######### End Run Details ######
+
+*** Advancing
+*** Done (4.85707s / 0w:0d:0h:0m:4s elapsed)
+*** Cleaning up
+normal exit
+""")
+w("cholla", "run.log", """Parameter values:  nx = 256, ny = 256, nz = 256, tout = 0.200000, init = Riemann, boundaries = 3 3 3 3 3 3
+Starting calculations.
+n_step: 1   sim time:  0.0025355   sim timestep: 2.5355e-03  timestep time =     7.616 ms   total time =    6.0364 s
+
+n_step: 2   sim time:  0.0042665   sim timestep: 1.7310e-03  timestep time =     1.430 ms   total time =    6.0378 s
+
+n_step: 3   sim time:  0.2000000   sim timestep: 9.2435e-04  timestep time =     1.398 ms   total time =    6.2561 s
+
+Saving Snapshot: 1 
+""")
+w("picongpu", "run.log", """PIConGPU: 0.9.0-dev
+  5 % =      150 | time elapsed:              4sec 400msec | avg time per step:  29msec
+100 % =     3000 | time elapsed:       1min 27sec 543msec | avg time per step:  27msec
+calculation  simulation time:  1min 27sec 543msec = 87.543 sec
+full simulation time:  1min 36sec 177msec = 96.177 sec
+""")
 w("warpx", "run.log", """STEP 1 ends. TIME = 1.7e-15 DT = 1.7e-15
 Evolve time = 0.01901006 s; This step = 0.01901006 s; Avg. per step = 0.01901006 s
 STEP 2 ends. TIME = 3.4e-15 DT = 1.7e-15
@@ -1811,7 +1846,8 @@ T = os.environ["TMP"] + "/l3"
 want = {"lammps": (0.0709434, 100), "sparta": (0.0411685, 100), "warpx": (0.0242073, 2),
         "nyx": (0.044260893 + 0.035151909, 2), "nekrs": (0.817425 - 0.00804749, 30),
         "specfem3d": (0.560349008, 5000), "exaca": (1.6139, None), "cp2k": (2.260197 + 2.291654, 2),
-        "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2)}
+        "qmcpack": (270.0, 2500), "dftfe": (17.94307 + 17.75514 + 0.38868 + 0.25 + 0.3, 2),
+        "vpic": (4.85707, 1939), "picongpu": (87.543, 3000), "cholla": ((7.616 + 1.430 + 1.398) / 1000.0, 3)}
 bad = []
 for app, (wall, steps) in want.items():
     try:
@@ -2111,6 +2147,53 @@ expect("25n app_timer_missing without a manifest is NOT_RUN", record(status="app
 print("ALLOK" if not bad else "\n".join(bad))
 PY
 
+# ---- 25v. Level 3 source_deck evidence with the benchmark-relative deck spelling (vpic: the manifest names the deck as the registry does); another deck or a changed hash is a contradiction (registered vpic/harris-256sq, synthetic raw) ----
+pycheck "25v: source_deck accepts the benchmark-relative spelling of the registered deck (the manifest template fixes it) and FAILs on another deck / a deck whose hash changed" <<'PY'
+import json, os, sys
+sys.path.insert(0, os.environ["TOOLS"]); sys.path.insert(0, os.path.join(os.environ["REPO"], "tools", "inputs"))
+import verify_registry_runs as V, hpcperf_inputs as hi
+R = os.environ["REPO"]; T = os.path.join(os.environ["TMP"], "vr3v")
+doc = hi.load(os.path.join(R, "level3", "vpic")); inp = hi.get_input(doc, "harris-256sq"); ident = hi.registry_identity(doc, inp)
+exe = os.path.join(R, "build", "level3", "vpic", "cuda", "decks", "harris-256sq.Linux"); deck = os.path.join(R, "level3", "vpic", "decks", "harris-256sq.cxx")
+if not os.path.isfile(exe) or not os.path.isfile(deck):
+    print("ALLOK"); sys.exit()                       # VPIC not built here: nothing to hash / verify
+exe_sha = V.sha(exe); deck_sha = V.sha(deck); rules = V.load_rules(V.DEFAULT_RULES)
+n = [0]
+def w(p, s):
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, "w").write(s)
+def record(manifest=None):
+    n[0] += 1; raw = f"{T}/raw/{n[0]}"; run = f"{raw}/clean.0"
+    energies = f"{raw}/energies"; w(energies, "% step ex\n0 1.0\n")
+    m = {"run_id": "r", "app": "vpic", "backend": "CUDA", "profile": "cuda", "mode": "smoke", "input_id": "harris-256sq",
+         "deck": "decks/harris-256sq.cxx", "deck_sha256": deck_sha, "num_step": "1939", "grid": "256x256x1", "particles": "4194304",
+         "ranks": "1", "exit_code": "0", "binary": exe, "binary_sha256": exe_sha, "energies": energies, "energies_sha256": V.sha(energies),
+         "fingerprint": "x", "fingerprint_sha256": "f" * 64, "utc": "t"}
+    m.update(manifest or {})
+    w(f"{run}/app/harris-256sq.np1/run_manifest.txt", "".join(f"{k}={v}\n" for k, v in m.items()))
+    w(f"{run}/run.log", "# VPIC CUDA profile=cuda: input=harris-256sq deck=decks/harris-256sq.cxx ranks=1 grid=256x256x1 particles=4194304 num_step=1939 run_dir=x\n"
+                        "hpcperf-launch: launch:    backend=CUDA site=x launcher=mpirun ranks=1 (one per GPU) on 1 node(s) [h], ranks/node=1\n"
+                        "  # Num Step 1939\n*** Done (5.0s / 0w:0d:0h:0m:5s elapsed)\n"
+                        "hpcperf-launch: audit summary: 1 verified, 0 mismatch, 0 unverified (of 1 ranks)\n")
+    w(f"{run}/bind.1", "# hpcperf-bind-log 1\npid 1\nexe " + exe + "\nhost h\ngpu minor 1 bus 0000:43:00.0\n")
+    w(f"{raw}/workload_identity.json", json.dumps(ident))
+    rec = {"schema": "hpcperf-timing-2", "level": 3, "app": "vpic", "case": "harris-256sq", "status": "ok", "run_id": f"r{n[0]}",
+           "registry": {"input_id": "harris-256sq", "identity": ident, "identity_complete": True},
+           "inputs": {"declared_env": {"HPCPERF_VPIC_INPUT": "harris-256sq"}, "processes": [], "exe_sha256": exe_sha},
+           "measurement": {"gpus": "1", "protocol": {"warmup_runs": 0, "clean_runs": 1, "profiled_runs": 0}},
+           "roi": {"runs_s": [5.0], "wall_s": 5.0, "steps": 1939, "source": "app_timer"},
+           "provenance": {"raw_dir": raw, "git_commit": "t"}}
+    p = f"{T}/rec/{n[0]}.json"; w(p, json.dumps(rec)); return p
+bad = []
+def expect(label, path, verdict, needle=""):
+    r = V.verify_record(path, R, rules); txt = " | ".join(r["problems"] + r["gaps"])
+    if r["verdict"] != verdict or needle not in txt:
+        bad.append(f"{label}: got {r['verdict']} ({txt[:160]}), want {verdict} /{needle}/")
+expect("25v-a benchmark-relative deck spelling (as the registry and run.sh write it)", record(), "PASS")
+expect("25v-c another registered deck", record({"deck": "decks/harris-512sq.cxx"}), "FAIL", "deck=")
+expect("25v-d deck hash differs from the registered file", record({"deck_sha256": "0" * 64}), "FAIL", "does not hash")
+print("ALLOK" if not bad else "\n".join(bad))
+PY
+
 # ---- 26. the registered Level 3 inputs on the page, in the Markdown twin and in registry_current.csv; an embedded page level as history ----
 pycheck "26: a Level 3 registry record is a SUCCESS row with run verification, the page/README show it with the application-timer columns, registry_current.csv lists it, --page-level PATH:3:history is an earlier campaign, a NO_TIMED_REGION input is neither SUCCESS nor run failed" <<'PY'
 import csv, json, os, sys
@@ -2176,10 +2259,11 @@ h2 = next((s for s in row["history_sets"] if s["run_ids"] == ["run02"]), None) i
 if not h2 or len(h2["samples"]) != 3 or abs(h2["median"] - 0.028) > 1e-12 or abs(h2["spread"] - (0.029 - 0.027) / 0.028) > 1e-9 or not h2["stable"]:
     bad.append(f"26s: the stable 3-clean set (spread 7.1 %) is not in the history with its statistics: {h2 and (h2['median'], h2['spread'], h2['stable'])}")
 k = RV.counts(rows, recs, orph)
-if k["roi_success"].get("level3") != 1 or k["registered_inputs"]["level3"] != 43 or "roi_not_supported_level3" in k:
+N3 = sum(1 for i in RV.registered_inputs(R) if i["level"] == 3)   # the registry's own count (43 before VPIC, 48 with it)
+if k["roi_success"].get("level3") != 1 or k["registered_inputs"]["level3"] != N3 or "roi_not_supported_level3" in k:
     bad.append(f"26b: counts {k['roi_success']} {k['registered_inputs']}")
-if k["unstable"] != ["L3 lammps/lj-32k"] or sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != 41:
-    bad.append(f"26c: unstable {k['unstable']} / the other 41 Level 3 inputs are not NOT_MEASURED")
+if k["unstable"] != ["L3 lammps/lj-32k"] or sum(1 for r in rows if r["level"] == 3 and r["status"] == "NOT_MEASURED") != N3 - 2:
+    bad.append(f"26c: unstable {k['unstable']} / the other {N3 - 2} Level 3 inputs are not NOT_MEASURED")
 if k.get("no_timed_region") != ["cp2k/regtest-gpw-h2o-geoopt"] or k["run_failed"] != []:
     bad.append(f"26o: counts no_timed_region {k.get('no_timed_region')} run_failed {k['run_failed']}")
 if "no timed region by construction 1" not in report.md_status_line({"counts": k}):
@@ -2211,7 +2295,7 @@ if "registered Level 1 / 2 / 3 inputs" not in md or 'data-level="3"' not in html
     bad.append("26f: status line / page level 3 tab")
 summarize.write_registry_current(root)
 rows_csv = [r for r in csv.DictReader(open(os.path.join(root, "registry_current.csv"))) if r["level"] == "3"]
-if len(rows_csv) != 43 or not any(r["input_id"] == "lj-32k" and r["status"] == "SUCCESS" and r["run_verification"] == "PASS" for r in rows_csv):
+if len(rows_csv) != N3 or not any(r["input_id"] == "lj-32k" and r["status"] == "SUCCESS" and r["run_verification"] == "PASS" for r in rows_csv):
     bad.append(f"26g: registry_current.csv level 3 rows {len(rows_csv)}")
 if not any(r["input_id"] == "regtest-gpw-h2o-geoopt" and r["status"] == "NO_TIMED_REGION" for r in rows_csv):
     bad.append("26q: registry_current.csv does not carry NO_TIMED_REGION")

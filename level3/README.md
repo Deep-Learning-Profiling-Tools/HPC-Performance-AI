@@ -15,12 +15,12 @@ source artifact (upstream commit, patch series, archive SHA-256, source-tree has
 `tools/prepare_benchmark.sh` restores the complete `src/` and `deps/` trees before any build or LLM
 optimization run begins.
 
-## Current availability (2026-09-15)
+## Current availability (2026-10-22)
 
 | | state |
 |---|---|
-| Source artifacts | **Published** on 2026-09-12 as the prerelease [`level3-source-hpcperf-l3-v1-rc1`](https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/tag/level3-source-hpcperf-l3-v1-rc1): 11 archives, `SHA256SUMS`, one `SOURCE_MANIFEST` per artifact and the release plan. Every archive was downloaded anonymously, with no credentials, and verified against the hashes the locks already carried. `prepare_benchmark.sh` now downloads without `--artifact`. |
-| Code | In `main` (PR #5, source freeze, merged 2026-09-14; PR #8, backend/profile isolation of generated state, merged 2026-09-15). A normal clone of `main` contains the harness, the locks and the tools; the application source trees are **external** GitHub Release assets that `tools/prepare_benchmark.sh level3 <app>` downloads, verifies against the lock and unpacks into `level3/<app>/{src,deps}`. The release tag `level3-source-hpcperf-l3-v1-rc1` is the artifacts' identity (the commit they were cut from, whose locks still say unpublished), **not** the recommended code checkout -- use `main`. Generated build/install/run state is isolated per backend/profile ([PROFILE_ISOLATION.md](PROFILE_ISOLATION.md)). |
+| Source artifacts | **Published** on 2026-09-12 as the prerelease [`level3-source-hpcperf-l3-v1-rc1`](https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/tag/level3-source-hpcperf-l3-v1-rc1): 11 archives, `SHA256SUMS`, one `SOURCE_MANIFEST` per artifact and the release plan. Every archive was downloaded anonymously, with no credentials, and verified against the hashes the locks already carried. `prepare_benchmark.sh` now downloads without `--artifact`. The three applications added on 2026-10-21 (VPIC, PIConGPU, Cholla) were published on 2026-10-21 as the prerelease [`level3-source-hpcperf-l3-v1-ext1`](https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/tag/level3-source-hpcperf-l3-v1-ext1) (same source version, its own tag; 3 archives, `SHA256SUMS`, their `SOURCE_MANIFEST`s and the release plan), verified the same way; the rc1 release is unchanged. |
+| Code | In `main` (PR #5, source freeze, merged 2026-09-14; PR #8, backend/profile isolation of generated state, merged 2026-09-15; VPIC, PIConGPU and Cholla, PRs #22 / #25 / #26, merged 2026-10-22). A normal clone of `main` contains the harness, the locks and the tools; the application source trees are **external** GitHub Release assets that `tools/prepare_benchmark.sh level3 <app>` downloads, verifies against the lock and unpacks into `level3/<app>/{src,deps}`. The release tags `level3-source-hpcperf-l3-v1-rc1` and `-ext1` are the artifacts' identity (the commit they were cut from, whose locks still say unpublished), **not** the recommended code checkout -- use `main`. Generated build/install/run state is isolated per backend/profile ([PROFILE_ISOLATION.md](PROFILE_ISOLATION.md)). |
 | Validated hardware | One node, 4 × NVIDIA B200 (CUDA 13.2.78, driver 595.58.03), conda GCC 13.3.0, Open MPI 5.0.10. **CUDA backend only.** |
 | Scale | Single node, 1/2/4 GPUs. 8/40/80 GPUs exist as dry-run plans only. Multi-node is **unverified/blocked** on this site. |
 | HIP / ROCm | Build path present in the scripts, **never executed** (no ROCm here). |
@@ -37,7 +37,7 @@ chosen, per-application dependency isolation, the launcher contract and the dire
 
 ## Application catalog
 
-Ten applications, eleven source artifacts (nekRS ships two variants). The workload column names the **case that
+Thirteen applications, fourteen source artifacts (nekRS ships two variants); VPIC, PIConGPU and Cholla were added on 2026-10-21. The workload column names the **case that
 is actually run and validated**, which is a small part of what each application can do.
 
 | Application | Frozen version | Selected workload / motif | App-owned code LOC | Details |
@@ -45,6 +45,9 @@ is actually run and validated**, which is a small part of what each application 
 | [LAMMPS](lammps/) | `stable_22Jul2025_update6` | Lennard-Jones molecular dynamics (`bench/in.lj`), KOKKOS/CUDA package. No long-range electrostatics (PPPM) is exercised. | 852,527 | [README](lammps/README.md) |
 | [SPARTA](sparta/) | `27Aug2026` | Direct simulation Monte Carlo: collisional flow (`bench/in.collide`), particle move/collide/sort. | 131,181 | [README](sparta/README.md) |
 | [WarpX](warpx/) | `26.09` (+ AMReX 26.09) | Electromagnetic particle-in-cell, Yee FDTD solver: `uniform_plasma` + the analytic `langmuir_multi` case. The FFT/PSATD solver path is not exercised. | 112,459 | [README](warpx/README.md) |
+| [VPIC (vpic-kokkos)](vpic/) | `devel` 7eb2947e (2026-10-13, no release tags) + Kokkos 5.2.2 submodule | Relativistic electromagnetic particle-in-cell (Kokkos/CUDA): Harris-sheet reconnection at three resolutions, a 1-D Weibel instability and a 2-D laser-plasma short pulse -- derived, dump-free decks compiled against libvpic (compile-time inputs), one GPU each. No multi-rank deck is registered. | 24,310 | [README](vpic/README.md) |
+| [PIConGPU](picongpu/) | `dev` 93cba5b6 (0.9.0-dev, 2026-10-20) + bundled alpaka/mallocMC; Boost 1.86 + GSL 2.8 built from bundled tarballs | Relativistic electromagnetic particle-in-cell (alpaka/CUDA): upstream's KHI growth-rate test input set at three grid sizes (analytic growth rate) and the 3-D laser-wakefield example, one rank on one GPU each | 107,810 | [README](picongpu/README.md) |
+| [Cholla](cholla/) | `v3.0.0` 8478c9ed (2024-02-02, the latest release tag) | GPU finite-volume hydrodynamics (PLMC + HLLC + Van Leer, the upstream hydro build type): upstream's 3-D Sod shock tube at 256^3 and 512^3, a 512^3 sound wave over one period, the 200^3 Noh implosion and a 256^3 spherical blast, one rank on one GPU each; 1 compatibility patch (Makefile: GIT_HASH as a make variable, the bundle is not a git checkout) | 49,984 | [README](cholla/README.md) |
 | [SPECFEM3D Cartesian](specfem3d/) | `v4.1.1` | Spectral-element seismic wave propagation, `homogeneous_halfspace` mesher → database → solver workflow. No full-waveform inversion. | 142,516 | [README](specfem3d/README.md) |
 | [nekRS](nekrs/) | `v26.0` (2 variants) | Spectral-element CFD, `ethier` case with upstream `--cimode` checks. Variants: `hypregpu` (GPU coarse solver, 3 HYPRE CUDA-13 patches) and `cpucoarse` (exact upstream). | 53,131 | [README](nekrs/README.md) |
 | [Nyx](nyx/) | `26.09` (+ AMReX) | Cosmological N-body + hydrodynamics: `MiniSB` and `LyA-adiabatic` decks. The `LyA` heat/cool deck is **PENDING**, not a pass. | 32,330 | [README](nyx/README.md) |
@@ -281,13 +284,13 @@ It is not evidence for the other applications.
 
 | Evidence | Where it stands |
 |---|---|
-| Source equivalence + materialization | All 11 artifacts: verified (extracted tree hash equals the frozen hash; 15/15 contract checks, re-run 2026-09-13 after the scope-file removal). |
+| Source equivalence + materialization | All 14 artifacts: verified (VPIC, PIConGPU, Cholla on 2026-10-21, 15/15 contract checks from a clean clone) (extracted tree hash equals the frozen hash; 15/15 contract checks, re-run 2026-09-13 after the scope-file removal). |
 | Current workspace build | LAMMPS: verified. ExaCA: canonical build from the artifact verified. All others: historical builds only. |
 | Agent edit takes effect | LAMMPS: verified (changed binary hash, rebuilt and revalidated). All others: not run. |
 | Scientific validation | See the per-application README for the criterion and the date; several results are historical runs on trees proven content-equivalent to the artifacts. |
 | Workspace multi-GPU | LAMMPS: 1 and 2 GPUs inside a workspace. Others: not run in a workspace. |
 | GPU binding | Recorded per run from the launcher audit (`N verified, 0 mismatch`); short runs can end before the sampler observes them and are reported as `unverified`, which is an observation gap, not a mismatch. |
-| Remote fetch by an ordinary user | **VERIFIED** on 2026-09-12 for all 11 artifacts, twice: an anonymous download from the release URL checked against the locks' own hashes, then a clean clone of the lock-update commit with an empty cache and an ordinary `prepare_benchmark.sh`. No credential was present in either check. |
+| Remote fetch by an ordinary user | **VERIFIED** on 2026-09-12 for the 11 rc1 artifacts and on 2026-10-21 for the 3 ext1 artifacts, twice each: an anonymous download from the release URL checked against the locks' own hashes, then a clean clone of the lock-update commit with an empty cache and an ordinary `prepare_benchmark.sh`. No credential was present in either check. |
 
 Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
 
@@ -344,7 +347,7 @@ passes and never enter a performance summary.
 
 ## Runtime measurement
 
-`tools/timing/measure_level3.sh all` times the ten applications on 2 GPUs in the same record
+`tools/timing/measure_level3.sh all` times the applications on 2 GPUs in the same record
 format as Level 1 and Level 2 ([tools/timing/README.md](../tools/timing/README.md)). Level 3
 carries **no ROI markers**: the measured region of each application is the timer it prints for
 its own loop, chosen by the markers' placement rule (loop in; start-up, set-up, the

@@ -14,7 +14,7 @@ with the front-ends' defaults:
 ```bash
 tools/timing/measure_level1.sh --build-root build/gcc13 all      # Level 1: 1 warm-up + 5 clean + 1 profiled run per case
 tools/timing/measure_level2.sh all                               # Level 2: 1 discarded warm-up + 3 clean + 1 profiled run per case, ranks bound explicitly
-tools/timing/measure_level3.sh all                               # Level 3: 10 applications, 2 GPUs each (own loop timers)
+tools/timing/measure_level3.sh all                               # Level 3: 13 applications, 2 GPUs each (own loop timers)
 python3 tools/timing/report.py --publish                         # results/timing -> docs/timing/
 # --page-level PAGE.html:3 carries one level of an already published page (e.g. the Level 3 sweep of
 # another checkout) into the page as a current campaign of its own; --history-page embeds an old page as history
@@ -66,7 +66,7 @@ one-time upload, warm-up, verification, bulk output. The markers are a no-op
 unless measuring, so builds, ctest and `validate.sh` are unchanged. The API
 (C/C++, Fortran, Python), the placement rule and how to onboard an application:
 [roi/README.md](roi/README.md). All 50 Level 1 benchmarks (CUDA and HIP sources)
-and all 24 Level 2 applications carry markers; where each ROI sits is recorded at
+and all 26 Level 2 applications carry markers; where each ROI sits is recorded at
 the markers, in each Level 2 README and in `cases/level*_apps.tsv`.
 
 One set of markers serves two measurements:
@@ -305,7 +305,7 @@ tools/timing/measure_level2.sh --registry --no-profile --clean-runs 3 kripke/z64
   `cases/level3_registry.tsv` are generated from it by `gen_registry_cases.py` (one case per input, case = input
   id) and never edited; `cases.py check` (and the tests) fail when they drift from `inputs.yaml`.
 * **Level 3** cases (since 2026-10-02) run the application's `run.sh` with the registry selector set to the
-  input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 43 registered
+  input id and `HPCPERF_GPUS` = the input's `runtime_config.gpus` (one MPI rank per GPU; all 57 registered
   inputs declare 1 GPU / 1 rank), plus the build-variant variable when the input's `params.variant` names one
   (LAMMPS ReaxFF: `HPCPERF_LAMMPS_VARIANT=reaxff`, the `reaxff` build profile; run.sh refuses any other); the region is the application's own timer (section "Level 3" above), the
   FOM pattern, NVTX range and profile default come from `cases/level3_apps.tsv`; the protocol is the final
