@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """release_plan -- the publication plan of the Level 3 source artifacts for one release (nothing is uploaded).
 
-    release_plan.py --tag level3-source-hpcperf-l3-v1-rc1 --commit <sha> [--staging DIR] [--catalog FILE]
+    release_plan.py --tag level3-source-hpcperf-l3-v1-rc1 --commit <sha> [--staging DIR] [--catalog FILE] [--app a,b]
                     [--json level3/RELEASE_PLAN.json] [--md level3/RELEASE_PLAN.md] [--full]
 
 Provider: GitHub Release assets of this repository (decision 2026-09-11). Planned asset URLs follow
@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--staging", default=os.environ.get(hs.STAGING_ENV)); ap.add_argument("--catalog", default=os.path.join(HERE, "artifact_catalog.yaml"))
     ap.add_argument("--json", default=os.path.join(R, "level3", "RELEASE_PLAN.json")); ap.add_argument("--md", default=os.path.join(R, "level3", "RELEASE_PLAN.md"))
     ap.add_argument("--full", action="store_true", help="re-extract every artifact (tree hash + scan)")
+    ap.add_argument("--app", help="comma-separated application names: plan only these catalog entries (a later publication round that adds applications to an existing source_version; the others are listed as excluded NOT_IN_THIS_ROUND)")
     a = ap.parse_args()
     if not a.staging:
         sys.exit("release_plan: --staging or HPCPERF_ARTIFACT_STAGING required (maintainer-side)")
@@ -51,8 +52,15 @@ def main():
     except OSError:
         imm = {"enabled": None, "note": "not probed"}
     assets, excluded = [], []
+    only = set(x.strip() for x in a.app.split(",") if x.strip()) if a.app else None
+    if only:
+        unknown = only - set(cat["applications"])
+        if unknown:
+            sys.exit(f"release_plan: --app names not in the catalog: {sorted(unknown)}")
     for app, ent in cat["applications"].items():
         d = os.path.join(R, "level3", app)
+        if only and app not in only:
+            excluded.append({"artifact": app, "reason": "NOT_IN_THIS_ROUND (--app): not part of this publication round; its artifact keeps its own release"}); continue
         by = hs.load_yaml(os.path.join(d, "benchmark.yaml")) if os.path.isfile(os.path.join(d, "benchmark.yaml")) else {}
         for v in ent.get("variants") or [None]:
             lp = hl.lock_path(d, v)

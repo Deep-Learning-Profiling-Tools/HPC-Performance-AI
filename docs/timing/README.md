@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs: Level 1 campaign 2026-09-23..28, Level 2 final protocol 2026-09-30, Level 3 final protocol 2026-10-03
 
-Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 43 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 94 + 40 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 271; UNSTABLE 17.
+Measured 2026-09-26T19:11:40Z .. 2026-10-21T14:44:15Z (290 records). 134 + 99 + 57 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 99 + 54 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 290; UNSTABLE 18.
 
 - Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5, 2026-09-26/27, GPU 0000:52:00.0); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median); channel_shuffle g2-w255-h255 in phase 7 (2026-09-28)
 - Level 2 protocol: FINAL PROTOCOL (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application (cases/level2_binding.tsv through the launcher's HPCPERF_CPUS_PER_RANK; hipBone PE=4 with pinned OpenMP threads, the other mpirun-launched applications PE=1, direct-exec unbound), 1 whole-process warm-up run discarded from every statistic (its ROI kept as roi.warmup_runs_s), 3 measured clean runs (headline = median), 1 nsys profiled run; no adaptive extension; one input at a time.
@@ -18,8 +18,8 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
-| 2 | 94 | 0 | 0 | 0 |
-| 3 | 35 | 6 | 0 | 2 |
+| 2 | 99 | 0 | 0 | 0 |
+| 3 | 49 | 6 | 0 | 2 |
 
 - Level 2: every registered input measured under the final protocol (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application, 1 discarded whole-process warm-up + 3 clean runs (headline = median) + 1 nsys-profiled run, one input at a time.
 - CPU binding (2026-09-30 A/B, 3 sessions): the explicit policy changes only hipBone's thread placement (four OpenMP threads on four cores of the allocation -- GPU-local on the current machine, verified; the policy itself names no socket -- instead of five threads on one core) and leaves its ROI unchanged; gamess benz-kern, miniem darcy-hex, remhos periodic-square-p5 and tealeaf bm4 show per-invocation discrete ROI levels with identical placement. Cause UNKNOWN.
@@ -29,6 +29,14 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 
 - Level 3 correctness (2026-10-06): 35 PASS / 6 INCOMPLETE / 0 FAIL / 2 none -- executable checks per input with the basis stated; still open with the missing criterion named: CP2K h2o-32 / 128 / 256, nekRS ethier x3 (no tolerance for the plain configuration), Nyx lya-heatcool-32cubed (I_R), SPARTA sphere-1m. No tolerance was invented.
 - PENNANT (Level 2, 2026-10-21): five registered inputs measured under the final protocol on GPU 0000:9D:00.0 (NUMA node 1, cpuset 56-87 of Slurm job 2732030). The first measurements of sedovbig-540sq and sedovflatx4-1920x2160 overlapped with a 32-thread CPU job of the operator in the same cpuset and were set aside (raw-perturbed/, results-perturbed/, logs/campaign.log); both inputs were re-measured in the quiet state. PENNANT's cycle loop is host-latency bound (five kernel launches, five device synchronisations and three symbol copies per cycle), so CPU contention doubles its cycle time.
 - PENNANT correctness: the per-zone profile of every input against a frozen run of upstream's CPU implementation at the same code version (reference/&lt;id&gt;.json, rule 1e-5 relative in populated zones = 30 x the measured CPU/GPU roundoff), plus the stdout quantities; see level2/pennant/README.md.
+- Nekbone (Level 2, 2026-10-21): five registered inputs (orders 16 / 8 / 12, 33.6 M - 135 M points per rank, one executable per compile-time SIZE) measured under the final protocol on GPU 0000:9D:00.0; ROI = the timed 100-iteration CG solve.
+- Nekbone correctness: r0, the solution norm and the functional of a fresh run of every input against frozen references from the CPU build of the same source (the GPU solve equals the CPU solve to round-off after the upstream set-up fix); see level2/nekbone/README.md.
+- VPIC (Level 3, 2026-10-21): five registered deck executables (Harris reconnection 256/512/1024, Weibel 1-D 131072, 2-D short pulse) measured under the final Level 3 protocol on GPU 0000:9D:00.0 (one rank per deck; the step loop's own '*** Done' clock).
+- VPIC correctness: the energies history of a fresh run of each deck against a frozen reference (CPU Kokkos-OpenMP run of the same deck for the sizes where one exists, the unmodified build's own run for harris-1024sq) plus total-energy conservation for the four closed-system decks (the short pulse, an open system with laser injection, is reproducible only statistically and is checked by its group rule); see level3/vpic/README.md.
+- PIConGPU (Level 3, 2026-10-21): four registered inputs (the KHI growth-rate test at three grid sizes, the LaserWakefield example at upstream's 1-GPU size), one executable per .param set, measured under the final Level 3 protocol on GPU 0000:9D:00.0 (the program's own 'calculation simulation time' = the time-step loop).
+- PIConGPU correctness: the KHI inputs by upstream's analytic growth-rate test (max growth rate of the Bx energy within 20 % of 1/(sqrt(8) gamma)); the LWFA input by its charge-conservation and energy histories against a frozen self-baseline of the unmodified build (no analytic reference exists for the example); see level3/picongpu/README.md.
+- Cholla (Level 3, 2026-10-21): five registered inputs (the 3-D Sod shock tube at 256^3 and 512^3, a 512^3 sound wave over one period, the 200^3 Noh implosion, a 256^3 spherical blast; parameter files derived from upstream's examples/3D), one rank on GPU 0000:9D:00.0 each, measured under the final Level 3 protocol (the program's own per-step 'timestep time' summed over the loop).
+- Cholla correctness: the exact Riemann solution (Sod), the analytic sound wave (upstream's one-period linear-wave criterion), the analytic Noh post-shock density, conservation (blast), and for every input a frozen self-baseline digest of the final fields at upstream's fixed epsilon 5e-12 (the code is deterministic); see level3/cholla/README.md.
 
 ### Level 1
 
@@ -236,6 +244,11 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T00:35:55Z (271 records). 134 + 94 + 
 | miniweather | collision-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 32.2 s | 3 | 0.0% | 0.0% | yes | 100% | 737,280 | 1.00 | PASS | PASS | dd4040b831 |
 | miniweather | gravity-waves-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 36.8 s | 3 | 0.0% | 0.0% | yes | 100% | 737,280 | 1.00 | PASS | PASS | dd4040b831 |
 | miniweather | thermal-1024x512-1000s | SUCCESS | nvidia-b200.cuda13.2 | 4.32 s | 3 | 0.0% | 0.0% | yes | 97% | 368,664 | 0.99 | PASS | PASS | dd4040b831 |
+| nekbone | n16-e8192 | SUCCESS | nvidia-b200.cuda13.2 | 453 ms | 3 | 0.1% | 0.0% | yes | 89% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n16-e16384 | SUCCESS | nvidia-b200.cuda13.2 | 860 ms | 3 | 0.1% | 0.0% | yes | 92% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n16-e32768 | SUCCESS | nvidia-b200.cuda13.2 | 1.68 s | 3 | 0.5% | 0.2% | yes | 92% | 1,503 | 1.00 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n8-e262144 | SUCCESS | nvidia-b200.cuda13.2 | 1.6 s | 3 | 0.2% | 0.1% | yes | 90% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n12-e78125 | SUCCESS | nvidia-b200.cuda13.2 | 1.73 s | 3 | 0.4% | 0.2% | yes | 92% | 1,503 | 1.00 | PASS | PASS | 9cf80e0e71 |
 | p3_heat3d | n512-1000 | SUCCESS | nvidia-b200.cuda13.2 | 1.59 s | 3 | 0.0% | 0.0% | yes | 99% | 1,000 | 1.00 | PASS | PASS | dd4040b831 |
 | p3_heat3d | n256-1000 | SUCCESS | nvidia-b200.cuda13.2 | 214 ms | 3 | 0.0% | 0.0% | yes | 96% | 1,000 | 1.01 | PASS | PASS | dd4040b831 |
 | p3_heat3d | n1024-200 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 0.0% | 0.0% | yes | 100% | 200 | 1.00 | PASS | PASS | dd4040b831 |
@@ -274,6 +287,11 @@ No markers: the timed region is the application's own timer for its time-step lo
 
 | application | input | status | platform | timed region (median) | runs | min | max | spread | CV | stable | steps | per step | process wall | region share | device busy | profiler x | FOM | GPUs | run verification | correctness | source |
 |---|---|---|---|--:|--:|--:|--:|--:|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|---|---|---|
+| cholla | sod-256 | SUCCESS | nvidia-b200.cuda13.2 | 7.32 s | 3 | 7.32 s | 7.32 s | 0.0% | 0.0% | yes | 402 | 18.2 ms | 20.4 s | 35.9% | null | 1.00 | none printed | 1 | PASS | PASS | dede6d06df |
+| cholla | sod-512 | SUCCESS | nvidia-b200.cuda13.2 | 111.9 s | 3 | 111.9 s | 111.9 s | 0.0% | 0.0% | yes | 806 | 139 ms | 154.5 s | 72.4% | null | 1.00 | none printed | 1 | PASS | PASS | dede6d06df |
+| cholla | sound-wave-512 | SUCCESS | nvidia-b200.cuda13.2 | 46.1 s | 3 | 46.1 s | 46.1 s | 0.0% | 0.0% | yes | 427 | 108 ms | 93 s | 49.6% | null | 1.00 | none printed | 1 | PASS | PASS | dede6d06df |
+| cholla | noh-200 | SUCCESS | nvidia-b200.cuda13.2 | 11 s | 3 | 11 s | 11 s | 0.0% | 0.0% | yes | 1,709 | 6.41 ms | 22.5 s | 48.7% | null | 1.01 | none printed | 1 | PASS | PASS | dede6d06df |
+| cholla | blast-256 | SUCCESS | nvidia-b200.cuda13.2 | 9.68 s | 3 | 9.68 s | 9.68 s | 0.0% | 0.0% | yes | 570 | 17 ms | 23.3 s | 41.5% | null | 1.00 | none printed | 1 | PASS | PASS | dede6d06df |
 | cp2k | h2o-64 | SUCCESS | nvidia-b200.cuda13.2 | 27.4 s | 3 | 27.2 s | 27.4 s | 0.9% | 0.5% | yes | 9 | 3.04 s | 56.5 s | 48.5% | null | 1.02 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | cp2k | h2o-32 | SUCCESS | nvidia-b200.cuda13.2 | 9.93 s | 3 | 9.92 s | 10 s | 1.2% | 0.7% | yes | 9 | 1.1 s | 26.3 s | 37.7% | null | 1.05 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
 | cp2k | h2o-128 | SUCCESS | nvidia-b200.cuda13.2 | 82.6 s | 3 | 82.5 s | 82.7 s | 0.3% | 0.1% | yes | 9 | 9.18 s | 144.3 s | 57.3% | null | 1.02 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
@@ -300,6 +318,10 @@ No markers: the timed region is the application's own timer for its time-step lo
 | nyx | lya-adiabatic-32cubed-10 | SUCCESS | nvidia-b200.cuda13.2 | 219 ms | 3 | 219 ms | 258 ms | 17.7% | 10.2% | UNSTABLE | 10 | 21.9 ms | 9.13 s | 2.4% | null | 1.83 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-adiabatic-64cubed | SUCCESS | nvidia-b200.cuda13.2 | 881 ms | 3 | 874 ms | 995 ms | 13.7% | 7.7% | UNSTABLE | 10 | 88.1 ms | 10.6 s | 8.3% | null | 1.38 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-heatcool-32cubed | SUCCESS | nvidia-b200.cuda13.2 | 307 ms | 3 | 254 ms | 360 ms | 34.5% | 17.2% | UNSTABLE | 10 | 30.7 ms | 8.89 s | 3.4% | null | 1.13 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
+| picongpu | khi-192x512 | SUCCESS | nvidia-b200.cuda13.2 | 76.4 s | 3 | 75.9 s | 77.1 s | 1.6% | 0.8% | yes | 3,000 | 25.5 ms | 87.5 s | 87.3% | null | 1.15 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | khi-384x1024 | SUCCESS | nvidia-b200.cuda13.2 | 173.0 s | 3 | 172.9 s | 173.3 s | 0.2% | 0.1% | yes | 3,000 | 57.7 ms | 185.1 s | 93.5% | null | 1.13 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | khi-768x2048 | SUCCESS | nvidia-b200.cuda13.2 | 611.3 s | 3 | 607.4 s | 613.5 s | 1.0% | 0.5% | yes | 3,000 | 204 ms | 626.1 s | 97.6% | null | 1.03 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | lwfa-192x1024x192 | SUCCESS | nvidia-b200.cuda13.2 | 53.8 s | 3 | 53.8 s | 54.1 s | 0.5% | 0.3% | yes | 2,000 | 26.9 ms | 67.7 s | 79.5% | null | 1.27 | none printed | 1 | PASS | PASS | cce07fd54f |
 | qmcpack | diamond2-256w | SUCCESS | nvidia-b200.cuda13.2 | 553.9 s | 3 | 509.5 s | 559.8 s | 9.1% | 5.0% | yes | 2,500 | 222 ms | 586.0 s | 94.5% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | qmcpack | diamond2-128w | SUCCESS | nvidia-b200.cuda13.2 | 263.0 s | 3 | 240.2 s | 276.6 s | 13.8% | 7.0% | UNSTABLE | 2,500 | 105 ms | 282.5 s | 93.1% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | qmcpack | diamond2-64w | SUCCESS | nvidia-b200.cuda13.2 | 148.1 s | 3 | 141.5 s | 152.9 s | 7.7% | 3.9% | yes | 2,500 | 59.2 ms | 162.3 s | 91.2% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
@@ -312,6 +334,11 @@ No markers: the timed region is the application's own timer for its time-step lo
 | specfem3d | homogeneous-halfspace-mesh-default-5000 | SUCCESS | nvidia-b200.cuda13.2 | 711 ms | 3 | 710 ms | 722 ms | 1.8% | 1.0% | yes | 5,000 | 142 us | 27.2 s | 2.6% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | specfem3d | homogeneous-halfspace-refine2-1000 | SUCCESS | nvidia-b200.cuda13.2 | 885 ms | 3 | 885 ms | 887 ms | 0.2% | 0.1% | yes | 1,000 | 885 us | 257.8 s | 0.3% | null | 1.00 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | specfem3d | homogeneous-halfspace-refine2-5000 | SUCCESS | nvidia-b200.cuda13.2 | 4.44 s | 3 | 4.44 s | 4.45 s | 0.4% | 0.2% | yes | 5,000 | 888 us | 261.7 s | 1.7% | null | 1.01 | none printed | 1 | PASS | PASS | 04f66c6f5e |
+| vpic | harris-256sq | SUCCESS | nvidia-b200.cuda13.2 | 5.36 s | 3 | 5.33 s | 6.13 s | 14.9% | 8.5% | UNSTABLE | 1,939 | 2.76 ms | 15.2 s | 35.3% | null | 1.19 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | harris-512sq | SUCCESS | nvidia-b200.cuda13.2 | 28.2 s | 3 | 28.2 s | 28.4 s | 0.8% | 0.5% | yes | 3,878 | 7.27 ms | 39.7 s | 71.1% | null | 1.08 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | harris-1024sq | SUCCESS | nvidia-b200.cuda13.2 | 190.8 s | 3 | 190.7 s | 191.0 s | 0.1% | 0.1% | yes | 7,757 | 24.6 ms | 209.4 s | 91.1% | null | 1.02 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | weibel-1d-131072 | SUCCESS | nvidia-b200.cuda13.2 | 10.4 s | 3 | 10.4 s | 10.4 s | 0.4% | 0.2% | yes | 700 | 14.9 ms | 25.6 s | 40.7% | null | 1.03 | none printed | 1 | PASS | PASS | 148f236fd9 |
+| vpic | shortpulse-2d-500sq | SUCCESS | nvidia-b200.cuda13.2 | 60.9 s | 3 | 60.9 s | 60.9 s | 0.0% | 0.0% | yes | 8,652 | 7.04 ms | 73.7 s | 82.7% | null | 1.09 | none printed | 1 | PASS | PASS | 148f236fd9 |
 | warpx | uniform-plasma-64x32x32-10 | SUCCESS | nvidia-b200.cuda13.2 | 110 ms | 3 | 79 ms | 237 ms | 144.0% | 76.4% | UNSTABLE | 10 | 11 ms | 7.7 s | 1.4% | 3% (NVTX range) | 0.72 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | uniform-plasma-128cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 181 ms | 3 | 175 ms | 195 ms | 11.1% | 5.7% | UNSTABLE | 20 | 9.03 ms | 7.8 s | 2.3% | 33% (NVTX range) | 1.06 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | warpx | uniform-plasma-256cubed-20 | SUCCESS | nvidia-b200.cuda13.2 | 579 ms | 3 | 572 ms | 601 ms | 5.0% | 2.6% | yes | 20 | 29 ms | 8.66 s | 6.7% | 72% (NVTX range) | 1.07 | none printed | 1 | PASS | PASS | 04f66c6f5e |

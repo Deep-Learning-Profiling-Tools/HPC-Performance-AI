@@ -1,0 +1,211 @@
+# Registered inputs of VPIC (vpic-kokkos; schema hpcperf-inputs-1), selected through HPCPERF_VPIC_INPUT=<id> in run.sh.
+# A VPIC input is a deck: a C++ file compiled against libvpic into its own executable (compile-time input,
+# build.sh compiles every registered deck into build/level3/vpic/<profile>/decks/<id>.Linux). The decks under
+# decks/ are derived from upstream's sample / test decks: the physics, units, boundary conditions, particle
+# loading and step-count rules are upstream's; what changes is stated per input (resolution / cell count, and the
+# diagnostic dump intervals -- the field, hydro, particle and restart dumps upstream enables at every
+# status_interval are switched off so that the step loop holds only the computation plus the small energies row;
+# the energies diagnostic itself stays on, it is the correctness quantity).
+schema: hpcperf-inputs-1
+benchmark: vpic
+level: 3
+selector: HPCPERF_VPIC_INPUT
+default_input: harris-512sq
+entry:
+  kind: run.sh
+  path: level3/vpic/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    VPIC's own wall clock around the step loop (deck/main.cc:123-127: wallclock() before and after
+    `while( simulation->advance() )`, printed as '*** Done (<s>s / ... elapsed)', main.cc:137): all num_step
+    steps -- particle sort / push / boundary handling, current accumulation, the field advance and the deck's
+    user_diagnostics (the energies row every energies_interval steps). Initialization, particle loading, the Run
+    Details banner and the clean-up are outside. The same line is the headline timer of tools/timing
+    (apptimers.py: vpic).
+  kind: app_timer
+  app_timer:
+    source: tools/timing/apptimers.py:vpic
+    region: "'*** Done' elapsed = the whole step loop (deck/main.cc:123-137; src/vpic/advance.cc:17 ends the loop at num_step)"
+    relation: identical
+baseline:
+  method: >-
+    The scientific record of every input is its energies history (the deck's energies diagnostic, src/vpic/dump.cc
+    dump_energies: field energies per component and the kinetic energy of every species at every energies_interval
+    steps). It is checked by check_energies.py (the `check` block) against a frozen reference and for total-energy
+    conservation; the registry keeps from stdout the step count the Run Details banner announces (exact), the
+    completion line and the absence of VPIC's own error markers.
+  reference: >-
+    frozen energies references reference/<id>.json (check_energies.py --make-reference, provenance and the rule
+    inside) through the `check` block; stdout quantities against this build's first measured run
+  quantities:
+    - name: num_step
+      role: required
+      regex: '^\s*# Num Step (?P<value>\d+)\s*$'
+      select: last
+      compare: {rule: exact}
+    - name: done_line
+      role: required
+      regex: '^\*\*\* Done \('
+      compare: {rule: present}
+    - name: error_marker
+      role: required
+      regex: '(^|\s)Error at |Bad domain|FATAL|ERROR\('
+      compare: {rule: absent}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    three physical problems of upstream's sample / test decks (Harris-sheet magnetic reconnection at three
+    resolutions, the 1-D Weibel instability of the energy_comparison test, the 2-D laser-plasma short pulse), one
+    rank each
+  upstream_inputs_not_added:
+    - "sample/harris, test/integrated/energy_comparison/weibel.deck and test/integrated/to_completion/*.deck as shipped: 32^2 / 16 cells, 242-700 steps with dumps every status_interval -- too small to time (seconds of I/O); validate.sh runs the to_completion/simple deck and the legacy analytic decks as shipped"
+    - "sample/short_pulse.cxx with RUN3D=1 (500^3 cells, 60 ppc per species): ~7.5e9 particles, beyond one GPU; the 2-D RUN3D=0 configuration upstream also ships is registered"
+    - "sample/lpi_2d_F6_test, sample/reconnection/*, sample/beam_plas, sample/cygnus, sample/dipole, sample/force_free, sample/waveguide: legacy-VPIC decks the Kokkos branch's documentation says have not been updated (docs/source/comp.rst), not attempted"
+    - "multi-rank topologies (short_pulse's 2 x 1 x 2, lpi_2d's 64 x 4 x 8): the registered decks fix one rank per deck; a multi-GPU deck would be another registered input"
+inputs:
+  - id: harris-256sq
+    case: harris-reconnection-2d
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: sample/harris}
+      derivation: >-
+        sample/harris with nx = ny = 256 (upstream 32) and the field / hydro / particle / restart dumps off
+        (intervals 0 instead of status_interval); energies every 100 steps (upstream: every status_interval).
+        Everything else (units, Harris-sheet parameters, taui = 100 -> num_step = 0.2 taui / (wci dt), nppc = 64,
+        boundaries, loading) is upstream's. Only the 18 lines named here differ (diff against sample/harris).
+    params: {deck: decks/harris-256sq.cxx, nx: 256, ny: 256, nz: 1, grid: 256x256x1, nppc: 64, particles: 4194304, num_step: 1939, energies_interval: 100, energies_file: energies, reference: reference/harris-256sq.json}
+    files: [decks/harris-256sq.cxx]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {deck: decks/harris-256sq.cxx}
+    input_form: compile-time
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.harris-256sq}
+      command: [python3, '{bench_dir}/check_energies.py', --run, '{repo}/build/level3/vpic/cuda/run.check.harris-256sq/harris-256sq.np1/energies', --reference, '{bench_dir}/reference/harris-256sq.json', --label, harris-256sq]
+      pass_regex: '^PASS: VPIC energies check'
+      fail_regex: '^FAIL: VPIC energies check'
+      basis: >-
+        the run's energies history against a frozen run of the SAME deck with the Kokkos OpenMP (CPU) build of the
+        same source (reference/harris-256sq.json, provenance inside): every column at every sampled step within
+        max(1e-5 relative, 1e-6 of the row's total energy), total energy drift <= 1e-3 -- the two correct
+        realisations (CPU vs this CUDA build) agree to 5.4e-7 in the dominant columns and to 4e-8 of the total in the
+        small growing field components, and both drift by 3.4e-5 (README); a wrong field evolution exceeds the
+        1e-6-of-total bound by two orders of magnitude at the end state (ey reaches 1.1e-4 of the total)
+      covers: all
+      timeout: 1800
+    notes: the smallest Harris reconnection size (4.2 M particles, 1939 steps); the CPU-reference anchor of the series.
+  - id: harris-512sq
+    case: harris-reconnection-2d
+    variant: default
+    source:
+      kind: derived
+      upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: sample/harris}
+      derivation: as harris-256sq with nx = ny = 512 (16.8 M particles, 3878 steps).
+    params: {deck: decks/harris-512sq.cxx, nx: 512, ny: 512, nz: 1, grid: 512x512x1, nppc: 64, particles: 16777216, num_step: 3878, energies_interval: 100, energies_file: energies, reference: reference/harris-512sq.json}
+    files: [decks/harris-512sq.cxx]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {deck: decks/harris-512sq.cxx}
+    input_form: compile-time
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.harris-512sq}
+      command: [python3, '{bench_dir}/check_energies.py', --run, '{repo}/build/level3/vpic/cuda/run.check.harris-512sq/harris-512sq.np1/energies', --reference, '{bench_dir}/reference/harris-512sq.json', --label, harris-512sq]
+      pass_regex: '^PASS: VPIC energies check'
+      fail_regex: '^FAIL: VPIC energies check'
+      basis: >-
+        as harris-256sq: the energies history against a frozen CPU (Kokkos OpenMP) run of the same deck,
+        max(1e-5 relative, 1e-6 of the row total) per column and step, drift <= 1e-3 (reference/harris-512sq.json)
+      covers: all
+      timeout: 1800
+  - id: harris-1024sq
+    case: harris-reconnection-2d
+    variant: size
+    source:
+      kind: derived
+      upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: sample/harris}
+      derivation: as harris-256sq with nx = ny = 1024 (67 M particles, 7757 steps).
+    params: {deck: decks/harris-1024sq.cxx, nx: 1024, ny: 1024, nz: 1, grid: 1024x1024x1, nppc: 64, particles: 67108864, num_step: 7757, energies_interval: 100, energies_file: energies, reference: reference/harris-1024sq.json}
+    files: [decks/harris-1024sq.cxx]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {deck: decks/harris-1024sq.cxx}
+    input_form: compile-time
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.harris-1024sq}
+      command: [python3, '{bench_dir}/check_energies.py', --run, '{repo}/build/level3/vpic/cuda/run.check.harris-1024sq/harris-1024sq.np1/energies', --reference, '{bench_dir}/reference/harris-1024sq.json', --label, harris-1024sq]
+      pass_regex: '^PASS: VPIC energies check'
+      fail_regex: '^FAIL: VPIC energies check'
+      basis: >-
+        the energies history against a frozen run of the SAME deck with this unmodified CUDA build (no CPU run of
+        this size: 67 M particles x 7757 steps is ~10 h on 16 cores), with the rule of the CPU-anchored sizes
+        (max(1e-5 relative, 1e-6 of the row total) per column and step, drift <= 1e-3); a self-baseline of the
+        unoptimized implementation (reference/harris-1024sq.json)
+      covers: all
+      timeout: 3600
+  - id: weibel-1d-131072
+    case: weibel-instability-1d
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: test/integrated/energy_comparison/weibel.deck}
+      derivation: >-
+        the energy_comparison test deck with nx = 131072 cells (upstream 16) and the box length scaled with the
+        cell count (Lx = 2.0944 de x 131072/16, so the cell size 0.131 de, the Courant time step and the physical
+        duration of the 700 steps are upstream's -- with upstream's fixed box the cells would be 1e-4 Debye lengths
+        and the 700 steps 0.01 plasma periods, nothing evolving); 200 macro-particles per cell of each species,
+        counter-streaming drift, no dumps, energies every 10 steps (upstream: every step). 3 lines differ from the
+        upstream deck.
+    params: {deck: decks/weibel-1d-131072.cxx, nx: 131072, ny: 1, nz: 1, grid: 131072x1x1, nppc: 200, particles: 52428800, num_step: 700, energies_interval: 10, energies_file: energies, reference: reference/weibel-1d-131072.json}
+    files: [decks/weibel-1d-131072.cxx]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {deck: decks/weibel-1d-131072.cxx}
+    input_form: compile-time
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.weibel-1d-131072}
+      command: [python3, '{bench_dir}/check_energies.py', --run, '{repo}/build/level3/vpic/cuda/run.check.weibel-1d-131072/weibel-1d-131072.np1/energies', --reference, '{bench_dir}/reference/weibel-1d-131072.json', --label, weibel-1d-131072]
+      pass_regex: '^PASS: VPIC energies check'
+      fail_regex: '^FAIL: VPIC energies check'
+      basis: >-
+        the energies history against a frozen CPU (Kokkos OpenMP) run of the same deck (reference/weibel-1d-131072.json),
+        max(1e-5 relative, 1e-6 of the row total) per column and step, drift <= 1e-3
+      covers: all
+      timeout: 1800
+  - id: shortpulse-2d-500sq
+    case: laser-plasma-short-pulse-2d
+    variant: case
+    source:
+      kind: derived
+      upstream: {repo: lanl/vpic-kokkos, version: devel 7eb2947e12741df4931088a3ae6175adb21a6535, path: sample/short_pulse.cxx}
+      derivation: >-
+        sample/short_pulse.cxx in its RUN3D = 0 configuration as shipped (500 x 1 x 500 cells, 60 particles per cell
+        of each species in the slab, laser injected from the boundary, t_stop = 1.2 ps -> 8652 steps) with the
+        rank topology 1 x 1 x 1 (upstream 2 x 1 x 2) and the field / hydro / particle / restart dumps off (intervals
+        0; energies every 50 steps as upstream). 5 lines differ from the upstream deck.
+    params: {deck: decks/shortpulse-2d-500sq.cxx, nx: 500, ny: 1, nz: 500, grid: 500x1x500, nppc: 60, particles: 6667646, num_step: 8652, energies_interval: 50, energies_file: rundata/energies, reference: reference/shortpulse-2d-500sq.json}
+    files: [decks/shortpulse-2d-500sq.cxx]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {deck: decks/shortpulse-2d-500sq.cxx}
+    input_form: compile-time
+    backends_validated: [cuda]
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.shortpulse-2d-500sq}
+      command: [python3, '{bench_dir}/check_energies.py', --run, '{repo}/build/level3/vpic/cuda/run.check.shortpulse-2d-500sq/shortpulse-2d-500sq.np1/rundata/energies', --reference, '{bench_dir}/reference/shortpulse-2d-500sq.json', --label, shortpulse-2d-500sq]
+      pass_regex: '^PASS: VPIC energies check'
+      fail_regex: '^FAIL: VPIC energies check'
+      basis: >-
+        the energies history against a frozen CPU (Kokkos OpenMP) run of the same deck
+        (reference/shortpulse-2d-500sq.json) in the checker's statistical `groups` mode: the sums total / particles /
+        fields at every sampled step within 0.35 relative = 3 x the largest deviation observed among five realisations
+        of the unmodified source (CPU + 4 CUDA runs: 10 % total, 11 % particles, 12 % fields; per column up to 15 %),
+        no per-column and no conservation bound (open system: the laser injects energy) -- a coarse check (README)
+      covers: all
+      timeout: 3600
+    notes: particles = the two species' initial counts (3,333,823 each, the slab); the laser enters through the -x boundary.

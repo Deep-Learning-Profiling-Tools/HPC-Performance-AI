@@ -91,6 +91,13 @@ level2:
     output: ['^\(nx, ny, nz\) = {nx}, {ny}, {nz}$']
   p3_vlp4d:
     search_dirs: [wk]             # run.sh: a deck argument is taken from the caller's cwd, else from wk/
+  nekbone:                        # run.sh runs the program with the registered input directory (inputs/<id>/) as its working
+                                  # directory; src/driver.f read_param opens 'data.rea' there by name (no copy, nothing written);
+                                  # SIZE (lx1 = order, lelt = elements) is compiled into build/level2/nekbone/cuda/<id>/nekbone
+                                  # (build_config); the program prints the element count and order it read from data.rea
+    cwd_files: [inputs/n16-e8192/data.rea, inputs/n16-e16384/data.rea, inputs/n16-e32768/data.rea, inputs/n8-e262144/data.rea, inputs/n12-e78125/data.rea]
+    exe: ['/build/level2/nekbone/cuda/{id}/nekbone$']
+    output: ['^nelt =\s+{nelt}, np =\s+1, nx1 =\s+{nx1}, elements =\s+{nelt}$']
   pennant:                        # run.sh copies the registered deck byte-identically into build/level2/pennant/cuda/run/<name>/
                                   # (PENNANT writes its outputs next to the deck) and passes the copy's absolute path; the program
                                   # prints the zone count of the mesh it generated from the deck
@@ -224,6 +231,39 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
       par_file_sha256: ['^[0-9a-f]{64}$']
     output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
     timer_steps: 'nstep'
+  cholla:                       # run.sh: the registered parameter file is read in place (source_files), outdir is the only
+                                # command-line override; the manifest records the file's hash, the problem (init), grid and
+                                # tout; the parameter banner, the step count and the final snapshot evidence the workload
+    manifest:
+      input_id: ['^{input_id}$']
+      params: ['^{params}$']
+      init: ['^{init}$']
+      grid: ['^{grid}$']
+      tout: ['^{tout}$']
+    source_files: ['{params}']
+    output: ['^Parameter values:\s+nx = {nx}, ny = {ny}, nz = {nz}, tout = {tout_printed}, init = {init},', '^n_step:\s+{steps}\s+sim time:', '^Saving Snapshot:\s+{final_snapshot}\s*$']
+  picongpu:                     # run.sh: the registered input set (inputs/<set>/) is compiled into install/<set>/bin/picongpu (build.sh;
+                                # the manifest records the set's hash), the registered args ARE the program's command line (argv
+                                # evidence), and the progress line evidences the step count the program ran
+    manifest:
+      input_id: ['^{input_id}$']
+      paramset: ['^inputs/{paramset}$']
+      grid: ['^{grid}$']
+      steps: ['^{steps}$']
+    source_files: ['inputs/{paramset}/cmakeFlags']
+    argv: ['-d 1 1 1 ', '-g {nx} {ny} {nz} ', '-s {steps} ']
+    output: ['^\\s*100 % =\\s+{steps} \\|']
+  vpic:                         # run.sh: the registered deck is a compiled executable (build.sh, decks/<id>.Linux) whose source
+                                # hash the manifest records; the binary prints the Run Details banner (num_step, grid, particles)
+    manifest:
+      input_id: ['^{input_id}$']
+      deck: ['^{deck}$']
+      num_step: ['^{num_step}$']
+      grid: ['^{grid}$']
+      particles: ['^{particles}$']
+    source_deck: {deck: '{deck}'}
+    output: ['^# VPIC .* input={input_id} deck={deck} ranks=\d+ grid={grid} particles={particles} num_step={num_step} ', '^\s*# Num Step {num_step}$']
+    timer_steps: 'num_step'
   warpx:                        # run.sh: the case deck derived from upstream with the grid and step count of the mode / knobs
     covers: [HPCPERF_SCALE_MODE, HPCPERF_WARPX_CASE, HPCPERF_WARPX_LOCAL, HPCPERF_WARPX_GLOBAL, HPCPERF_WARPX_STEPS]
     # run.sh runs the langmuir case as upstream's test as shipped (64^3, 40 steps) and labels it mode=validate whatever

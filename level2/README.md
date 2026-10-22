@@ -1,6 +1,6 @@
 # Level 2: Proxy Applications / Mini-Apps
 
-25 selected GPU mini-apps / proxy applications, each copied from its upstream
+26 selected GPU mini-apps / proxy applications, each copied from its upstream
 repository into `level2/<name>/` together with the input decks it needs and
 made to build and run with the pinned Level 1 toolchain (conda GCC 13.3.0,
 CMake 3.28.4, system CUDA 13.2) plus the Level 2 additions below. Unlike
@@ -45,7 +45,7 @@ Everything below is installed inside the clone, next to the Level 1 toolchain
 | FFTW (openmpi) | 3.3.11 | conda |
 | HDF5 (parallel, openmpi) | 2.2.0 | conda |
 | PnetCDF (openmpi) | 1.15.0 | conda |
-| NVIDIA HPC SDK Fortran (GAMESS RI-MP2 CUDA) | 25.9 (contributor); 25.7 validated on dgx003 | environment-provided, not in the conda env: `NVFORTRAN=<sdk>/compilers/bin/nvfortran`; on dgx003 `/opt/sw/other/apps/nvidia/hpc_sdk/Linux_x86_64/25.7` whose shipped `localrc` targets a GCC 8 that the RHEL 10 node no longer has -- generate a per-user one (`makelocalrc -gcc /usr/bin/gcc -gpp /usr/bin/g++ -g77 /usr/bin/gfortran -x -d <dir>`, `NVLOCALRC=<dir>/localrc`); the CUDA arch is detected with nvidia-smi (cc100 on B200; `HPCPERF_CUDA_ARCH` is an optional override) |
+| NVIDIA HPC SDK Fortran (GAMESS RI-MP2 CUDA, Nekbone) | 25.9 (contributor); 25.7 validated on dgx003 | environment-provided, not in the conda env: `NVFORTRAN=<sdk>/compilers/bin/nvfortran`; on dgx003 `/opt/sw/other/apps/nvidia/hpc_sdk/Linux_x86_64/25.7` whose shipped `localrc` targets a GCC 8 that the RHEL 10 node no longer has -- generate a per-user one (`makelocalrc -gcc /usr/bin/gcc -gpp /usr/bin/g++ -g77 /usr/bin/gfortran -x -d <dir>`, `NVLOCALRC=<dir>/localrc`); the CUDA arch is detected with nvidia-smi (cc100 on B200; `HPCPERF_CUDA_ARCH` is an optional override) |
 | Kokkos / Kokkos Kernels | 5.2.1 | `setup_level2_deps.sh` -> `.deps/install/kokkos{,-kernels}` |
 | Cabana | 0.8.0 | `setup_level2_deps.sh` -> `.deps/install/cabana` |
 | heFFTe | 2.4.1 | `setup_level2_deps.sh` -> `.deps/install/heffte` |
@@ -74,7 +74,7 @@ reversible).
 The status table below is a correctness statement; it says nothing about speed.
 Runtime is measured over each application's **region of interest (ROI)** -- its
 time loop or solve, without start-up, set-up, warm-up, verification and bulk
-output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 25
+output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 26
 applications; pure insertions, a no-op unless measuring, recorded in each
 README's `## Changes from upstream`; `build.sh` puts the header on `CPATH`):
 
@@ -86,7 +86,7 @@ python3 tools/timing/summarize.py        # JSON per run + summary_level2.csv
 `validate.sh` is never called and validation is unchanged. The headline
 `roi_wall_s` comes from the clean run (no profiler); the profiled run only adds
 the device picture, clipped to the same markers, and the application's own figure
-of merit is read from the clean run (16 of 25 print one; the other 9 are left
+of merit is read from the clean run (16 of 26 print one; the other 10 are left
 blank, never filled with a derived number). Read `tools/timing/README.md` before
 using the numbers.
 
@@ -276,6 +276,7 @@ constraints: legal rank counts.
 | exacmech | PASS | PASS | sharded-EP possible (split points + Allreduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | minibude | PASS | PASS | sharded-EP possible (split poses + reduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | xsbench | PASS | PASS | sharded-EP possible (split lookups + reduce), not implemented; upstream MPI mode = full-input replicas | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
+| nekbone | PASS | PASS | native-mpi (elements per rank fixed by data.rea: weak scaling, rank maximum lp of SIZE) | yes (launcher; no scale modes) | not yet (1-GPU validation only) | BLOCKED (site) | n/a (per-rank size) | native (data.rea per rank) | PASS | n/a (OpenACC + CUDA Fortran, NVIDIA HPC SDK) | N <= lp (SIZE) | multi-GPU weak scaling untested |
 | pennant | PASS | PASS | single process (the cuda branch has no MPI; upstream master is the MPI version) | n/a | n/a | n/a | n/a | n/a | PASS | not vendored (upstream `hip` branch) | n/a | 2026-10-20: 5 registered inputs with frozen CPU v0.6 references |
 | miniem | PASS | PASS | native-mpi (Tpetra/Kokkos; inline mesh decomposed by the mesh factory) | yes (launcher; smoke/strong/weak) | validated (1, 2, 4: analytic L2 error consistent) | BLOCKED (site) | yes (fixed global elements, `HPCPERF_MINIEM_GLOBAL`) | yes (fixed elements/rank, `HPCPERF_MINIEM_N` x topology) | PASS | untested | any N | Trilinos develop efbab105 dependency (Kokkos 5.2.1); needs binding wrapper |
 
@@ -303,6 +304,7 @@ honour is an error (exit 2), never a silent 1-rank run.
 | gamess_ri_mp2 | yes | rejected | wrapper | -- | positive NQVV; N <= input active orbitals |
 | hipbone | yes (also `HIPBONE_NP`) | rejected | app (own local rank) | -- | N > 1 needs `-px -py -pz` (product N) or a cube N |
 | miniweather | yes | rejected | wrapper | any argument | -- |
+| nekbone | yes | rejected | wrapper | -- | N <= lp of the input's SIZE |
 | cabanapic, exacmech, minibude, p3_heat3d, p3_vlp4d, shaw, xsbench, pennant | n/a (single process) | n/a | -- | -- | -- |
 
 ## Catalog (provenance and modifications)
@@ -332,6 +334,7 @@ honour is an error (exit 2), never a silent 1-rank run.
 | [sw4lite](sw4lite/) | geodynamics/sw4lite + AMD/ECP HIP port | native CUDA / HIP + MPI | yes | archived HIP revision; build-path fixes |
 | [tealeaf](tealeaf/) | UoB-HPC/TeaLeaf | C++ + cuda/hip | yes | no upstream LICENSE; binding wrapper |
 | [xsbench](xsbench/) | ANL-CESAR/XSBench | CUDA / HIP | yes | -std=c++17 (CCCL) |
+| [nekbone](nekbone/) | Nek5000/Nekbone (branch `cuda-openacc`) | OpenACC + CUDA Fortran (NVIDIA HPC SDK nvfortran) + MPI | yes | makenek.inc: nvfortran in the compiler list, `-g` debug test as a whole word (`-gpu=` triggered it); gs_defs.h GS_DO_bpr structured (nvc 25.7); driver.f ROI markers + solution functionals print |
 | [pennant](pennant/) | lanl/PENNANT (branch `cuda`) | native CUDA (single GPU) | yes | cudaThreadSynchronize -> cudaDeviceSynchronize (CUDA 13); compiler/arch overrides on the make command line |
 | [miniem](miniem/) | trilinos/Trilinos (packages/panzer/mini-em) | Kokkos / Tpetra (Panzer, MueLu RefMaxwell) | yes | Trilinos built as a Level 2 dependency (develop commit, Kokkos 5.2.1); stand-alone CMake for the driver; netCDF + gtest TPLs from conda |
 

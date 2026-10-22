@@ -325,7 +325,81 @@ class Timer:
         self.caveat = caveat
 
 
+def vpic(d):
+    """VPIC (vpic-kokkos): the step loop's own wall clock.
+
+    deck/main.cc takes wallclock() immediately before `while( simulation->advance() );` and
+    immediately after it (lines 123-127) and prints `*** Done (<s>s / <w>w:<d>d:<h>h:<m>m:<s>s
+    elapsed)` (line 137). advance() returns 0 without doing anything once step() >= num_step
+    (src/vpic/advance.cc:17), so the loop holds exactly num_step steps: particle sort / push /
+    boundary handling, current accumulation, the field advance and the deck's user_diagnostics
+    (advance.cc:365-366; the registered decks write only the energies row there). Initialization,
+    particle loading, the Run Details banner and the clean-up are outside. num_step comes from the
+    Run Details banner (`# Num Step N`, src/vpic/vpic.cc:134, printed before `*** Advancing`)."""
+    t = _stdout(d)
+    m = re.findall(r"\*\*\* Done \(" + NUM + r"s / ", t)
+    if not m:
+        raise TimerMissing("no '*** Done (<s>s / ... elapsed)' line in run.log (the step loop did not finish)")
+    s = re.findall(r"^\s*# Num Step (\d+)\s*$", t, re.M)
+    return {"wall_s": float(m[-1]), "steps": int(s[-1]) if s else None, "excluded_s": None, "setup_s": None,
+            "parts": {}, "files": ["run.log"]}
+
+
+def picongpu(d):
+    """PIConGPU: the time-step loop's own wall clock.
+
+    include/pmacc/simulationControl/SimulationHelper.cpp:231 prints, after the step loop (SimulationHelper::startSimulation: particle push, current deposition, field solve, boundaries, the plugins at their
+    periods) and prints 'calculation  simulation time: <h/min/sec/msec> = <seconds>' after it; the
+    following 'full simulation time' line includes initialization and shut-down and is not used.
+    The step count comes from the last progress line ('100 % = <step> | ...')."""
+    t = _stdout(d)
+    m = re.findall(r"^calculation\s+simulation time:.*= " + NUM + r"\s*(?:sec)?\s*$", t, re.M)
+    if not m:
+        raise TimerMissing("no 'calculation  simulation time: ... = <s>' line in run.log (the step loop did not finish)")
+    s = re.findall(r"^\s*100 % =\s+(\d+) \|", t, re.M)
+    return {"wall_s": float(m[-1]), "steps": int(s[-1]) if s else None, "excluded_s": None, "setup_s": None,
+            "parts": {}, "files": ["run.log"]}
+
+
+def cholla(d):
+    """Cholla: the sum of the application's own per-step timer over the time-step loop.
+
+    src/main.cpp:247-325: inside `while (G.H.t < P.tout)` the program takes start_step = Get_Time() (line 252)
+    before the step (set_dt, the hydro update, Update_Time, boundary conditions) and stop_step = Get_Time()
+    (line 316) after it, and prints 'n_step: N   sim time: t   sim timestep: dt  timestep time = <ms> ms
+    total time = <s> s' (lines 322-325); the HDF5 output of the step (Write_Data, line 344) comes after the
+    print. The timed region is the sum of the 'timestep time' values of all steps = the whole hydrodynamics
+    loop without initialization (grid set-up, initial conditions, the initial snapshot: all before 'Starting
+    calculations.') and without the output writes; steps = the last n_step. 'total time' (wall since program
+    start, initialization included) is recorded as the set-up estimate: the first line's total minus its step."""
+    t = _stdout(d)
+    rows = re.findall(r"^n_step:\s+(\d+)\s+sim time:\s+" + NUM + r"\s+sim timestep:\s+" + NUM + r"\s+timestep time =\s+" + NUM + r" ms\s+total time =\s+" + NUM + r" s\s*$", t, re.M)
+    if not rows:
+        raise TimerMissing("no 'n_step: ... timestep time = <ms> ms' line in run.log (the time-step loop did not run)")
+    wall = sum(float(r[3]) for r in rows) / 1000.0
+    setup = float(rows[0][4]) - float(rows[0][3]) / 1000.0
+    return {"wall_s": wall, "steps": int(rows[-1][0]), "excluded_s": None, "setup_s": setup,
+            "parts": {"final_time": float(rows[-1][1])}, "files": ["run.log"]}
+
+
 TIMERS = {
+    "cholla": Timer(
+        cholla, [],
+        "sum of the per-step 'timestep time' of every step of the time-step loop (src/main.cpp:247-325: set_dt, "
+        "the hydro update, Update_Time, boundaries); initialization, the initial snapshot and the output writes "
+        "are outside.",
+        ["src/main.cpp:247-252", "src/main.cpp:316-325", "src/main.cpp:344"],
+        "rank 0's clock (one rank per registered input)",
+        "effectively: Calc_Inverse_Timestep / set_dt copy the time-step reduction from the device at every step"),
+    "picongpu": Timer(
+        picongpu, [],
+        "'calculation  simulation time' = the time-step loop (particle push, current deposition, field solve, "
+        "boundaries, plugin notifications); initialization and shut-down are outside (they are in 'full "
+        "simulation time').",
+        ["include/pmacc/simulationControl/SimulationHelper.cpp:231"],
+        "rank 0's clock (one rank per registered input)",
+        "effectively: alpaka's CUDA queues are synchronized at every step's end before the next step's communication"),
+
     "lammps": Timer(
         lammps, ["log.*.lammps"],
         "'Loop time' of the last `run` command: all timesteps, without integrate->setup and the "
@@ -346,6 +420,16 @@ TIMERS = {
         "average over ranks, barriers at start and end",
         "total: yes (the last step's statistics output syncs particles to the host); sections: "
         "probably close (per-step blocking read-backs) but the timer does not fence the device"),
+    "vpic": Timer(
+        vpic, [],
+        "'*** Done (<s>s ... elapsed)': the wall clock around `while( simulation->advance() )` -- all "
+        "num_step steps (sort, push, boundaries, current accumulation, field advance, the deck's "
+        "user_diagnostics = the energies row); without initialization, particle loading, the Run "
+        "Details banner and the clean-up.",
+        ["deck/main.cc:123-127,137", "src/vpic/advance.cc:17,365-366", "src/vpic/vpic.cc:134"],
+        "rank 0's clock (one rank per registered deck)",
+        "effectively: every phase of advance() ends in a KOKKOS_TOC with a Kokkos::fence "
+        "(src/util/profile/profile.h:102-108) and the energies diagnostic reduces on the device"),
     "warpx": Timer(
         warpx, [],
         "final 'Evolve time': the whole WarpX::Evolve step loop, including in-loop diagnostics; "
