@@ -783,7 +783,7 @@ for run in sorted(glob.glob(os.path.join(repo, "level2", "*", "run.sh"))):
     for p in glob.glob(os.path.join(app, "**", "*"), recursive=True):
         if "/build/" in p or not os.path.isfile(p):
             continue
-        if not p.endswith((".c", ".cc", ".cpp", ".cxx", ".C", ".cu", ".h", ".hpp", ".f90", ".F90")):
+        if not p.endswith((".c", ".cc", ".cpp", ".cxx", ".C", ".cu", ".h", ".hpp", ".f90", ".F90", ".f", ".F")):   # .f: fixed-form Fortran (Nekbone)
             continue
         for m in rx.finditer(open(p, errors="replace").read()):
             kinds.add("begin" if "begin" in m.group(0).lower() else "end")

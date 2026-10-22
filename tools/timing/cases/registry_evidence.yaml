@@ -91,6 +91,13 @@ level2:
     output: ['^\(nx, ny, nz\) = {nx}, {ny}, {nz}$']
   p3_vlp4d:
     search_dirs: [wk]             # run.sh: a deck argument is taken from the caller's cwd, else from wk/
+  nekbone:                        # run.sh runs the program with the registered input directory (inputs/<id>/) as its working
+                                  # directory; src/driver.f read_param opens 'data.rea' there by name (no copy, nothing written);
+                                  # SIZE (lx1 = order, lelt = elements) is compiled into build/level2/nekbone/cuda/<id>/nekbone
+                                  # (build_config); the program prints the element count and order it read from data.rea
+    cwd_files: [inputs/n16-e8192/data.rea, inputs/n16-e16384/data.rea, inputs/n16-e32768/data.rea, inputs/n8-e262144/data.rea, inputs/n12-e78125/data.rea]
+    exe: ['/build/level2/nekbone/cuda/{id}/nekbone$']
+    output: ['^nelt =\s+{nelt}, np =\s+1, nx1 =\s+{nx1}, elements =\s+{nelt}$']
   pennant:                        # run.sh copies the registered deck byte-identically into build/level2/pennant/cuda/run/<name>/
                                   # (PENNANT writes its outputs next to the deck) and passes the copy's absolute path; the program
                                   # prints the zone count of the mesh it generated from the deck

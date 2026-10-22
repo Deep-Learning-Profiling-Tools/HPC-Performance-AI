@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs: Level 1 campaign 2026-09-23..28, Level 2 final protocol 2026-09-30, Level 3 final protocol 2026-10-03
 
-Measured 2026-09-26T19:11:40Z .. 2026-10-21T05:37:17Z (276 records). 134 + 94 + 48 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 94 + 45 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 276; UNSTABLE 18.
+Measured 2026-09-26T19:11:40Z .. 2026-10-21T06:20:22Z (281 records). 134 + 99 + 48 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 99 + 45 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 281; UNSTABLE 18.
 
 - Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5, 2026-09-26/27, GPU 0000:52:00.0); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median); channel_shuffle g2-w255-h255 in phase 7 (2026-09-28)
 - Level 2 protocol: FINAL PROTOCOL (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application (cases/level2_binding.tsv through the launcher's HPCPERF_CPUS_PER_RANK; hipBone PE=4 with pinned OpenMP threads, the other mpirun-launched applications PE=1, direct-exec unbound), 1 whole-process warm-up run discarded from every statistic (its ROI kept as roi.warmup_runs_s), 3 measured clean runs (headline = median), 1 nsys profiled run; no adaptive extension; one input at a time.
@@ -18,7 +18,7 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T05:37:17Z (276 records). 134 + 94 + 
 | level | correctness PASS | INCOMPLETE | FAIL | none |
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
-| 2 | 94 | 0 | 0 | 0 |
+| 2 | 99 | 0 | 0 | 0 |
 | 3 | 40 | 6 | 0 | 2 |
 
 - Level 2: every registered input measured under the final protocol (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application, 1 discarded whole-process warm-up + 3 clean runs (headline = median) + 1 nsys-profiled run, one input at a time.
@@ -29,6 +29,8 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T05:37:17Z (276 records). 134 + 94 + 
 - Level 3 correctness (2026-10-06): 35 PASS / 6 INCOMPLETE / 0 FAIL / 2 none -- executable checks per input with the basis stated; still open with the missing criterion named: CP2K h2o-32 / 128 / 256, nekRS ethier x3 (no tolerance for the plain configuration), Nyx lya-heatcool-32cubed (I_R), SPARTA sphere-1m. No tolerance was invented.
 - PENNANT (Level 2, 2026-10-21): five registered inputs measured under the final protocol on GPU 0000:9D:00.0 (NUMA node 1, cpuset 56-87 of Slurm job 2732030). The first measurements of sedovbig-540sq and sedovflatx4-1920x2160 overlapped with a 32-thread CPU job of the operator in the same cpuset and were set aside (raw-perturbed/, results-perturbed/, logs/campaign.log); both inputs were re-measured in the quiet state. PENNANT's cycle loop is host-latency bound (five kernel launches, five device synchronisations and three symbol copies per cycle), so CPU contention doubles its cycle time.
 - PENNANT correctness: the per-zone profile of every input against a frozen run of upstream's CPU implementation at the same code version (reference/&lt;id&gt;.json, rule 1e-5 relative in populated zones = 30 x the measured CPU/GPU roundoff), plus the stdout quantities; see level2/pennant/README.md.
+- Nekbone (Level 2, 2026-10-21): five registered inputs (orders 16 / 8 / 12, 33.6 M - 135 M points per rank, one executable per compile-time SIZE) measured under the final protocol on GPU 0000:9D:00.0; ROI = the timed 100-iteration CG solve.
+- Nekbone correctness: r0, the solution norm and the functional of a fresh run of every input against frozen references from the CPU build of the same source (the GPU solve equals the CPU solve to round-off after the upstream set-up fix); see level2/nekbone/README.md.
 - VPIC (Level 3, 2026-10-21): five registered deck executables (Harris reconnection 256/512/1024, Weibel 1-D 131072, 2-D short pulse) measured under the final Level 3 protocol on GPU 0000:9D:00.0 (one rank per deck; the step loop's own '*** Done' clock).
 - VPIC correctness: the energies history of a fresh run of each deck against a frozen reference (CPU Kokkos-OpenMP run of the same deck for the sizes where one exists, the unmodified build's own run for harris-1024sq) plus total-energy conservation; see level3/vpic/README.md.
 
@@ -238,6 +240,11 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T05:37:17Z (276 records). 134 + 94 + 
 | miniweather | collision-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 32.2 s | 3 | 0.0% | 0.0% | yes | 100% | 737,280 | 1.00 | PASS | PASS | dd4040b831 |
 | miniweather | gravity-waves-2048x1024-1000s | SUCCESS | nvidia-b200.cuda13.2 | 36.8 s | 3 | 0.0% | 0.0% | yes | 100% | 737,280 | 1.00 | PASS | PASS | dd4040b831 |
 | miniweather | thermal-1024x512-1000s | SUCCESS | nvidia-b200.cuda13.2 | 4.32 s | 3 | 0.0% | 0.0% | yes | 97% | 368,664 | 0.99 | PASS | PASS | dd4040b831 |
+| nekbone | n16-e8192 | SUCCESS | nvidia-b200.cuda13.2 | 453 ms | 3 | 0.1% | 0.0% | yes | 89% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n16-e16384 | SUCCESS | nvidia-b200.cuda13.2 | 860 ms | 3 | 0.1% | 0.0% | yes | 92% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n16-e32768 | SUCCESS | nvidia-b200.cuda13.2 | 1.68 s | 3 | 0.5% | 0.2% | yes | 92% | 1,503 | 1.00 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n8-e262144 | SUCCESS | nvidia-b200.cuda13.2 | 1.6 s | 3 | 0.2% | 0.1% | yes | 90% | 1,503 | 1.01 | PASS | PASS | 9cf80e0e71 |
+| nekbone | n12-e78125 | SUCCESS | nvidia-b200.cuda13.2 | 1.73 s | 3 | 0.4% | 0.2% | yes | 92% | 1,503 | 1.00 | PASS | PASS | 9cf80e0e71 |
 | p3_heat3d | n512-1000 | SUCCESS | nvidia-b200.cuda13.2 | 1.59 s | 3 | 0.0% | 0.0% | yes | 99% | 1,000 | 1.00 | PASS | PASS | dd4040b831 |
 | p3_heat3d | n256-1000 | SUCCESS | nvidia-b200.cuda13.2 | 214 ms | 3 | 0.0% | 0.0% | yes | 96% | 1,000 | 1.01 | PASS | PASS | dd4040b831 |
 | p3_heat3d | n1024-200 | SUCCESS | nvidia-b200.cuda13.2 | 2.54 s | 3 | 0.0% | 0.0% | yes | 100% | 200 | 1.00 | PASS | PASS | dd4040b831 |
