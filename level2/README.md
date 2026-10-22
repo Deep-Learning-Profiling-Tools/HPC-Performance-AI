@@ -1,6 +1,6 @@
 # Level 2: Proxy Applications / Mini-Apps
 
-24 selected GPU mini-apps / proxy applications, each copied from its upstream
+25 selected GPU mini-apps / proxy applications, each copied from its upstream
 repository into `level2/<name>/` together with the input decks it needs and
 made to build and run with the pinned Level 1 toolchain (conda GCC 13.3.0,
 CMake 3.28.4, system CUDA 13.2) plus the Level 2 additions below. Unlike
@@ -74,7 +74,7 @@ reversible).
 The status table below is a correctness statement; it says nothing about speed.
 Runtime is measured over each application's **region of interest (ROI)** -- its
 time loop or solve, without start-up, set-up, warm-up, verification and bulk
-output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 24
+output -- which the sources mark with `tools/timing/roi/hpcperf_roi.h` (all 25
 applications; pure insertions, a no-op unless measuring, recorded in each
 README's `## Changes from upstream`; `build.sh` puts the header on `CPATH`):
 
@@ -86,7 +86,7 @@ python3 tools/timing/summarize.py        # JSON per run + summary_level2.csv
 `validate.sh` is never called and validation is unchanged. The headline
 `roi_wall_s` comes from the clean run (no profiler); the profiled run only adds
 the device picture, clipped to the same markers, and the application's own figure
-of merit is read from the clean run (16 of 24 print one; the other 8 are left
+of merit is read from the clean run (16 of 25 print one; the other 9 are left
 blank, never filled with a derived number). Read `tools/timing/README.md` before
 using the numbers.
 
@@ -276,6 +276,7 @@ constraints: legal rank counts.
 | exacmech | PASS | PASS | sharded-EP possible (split points + Allreduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | minibude | PASS | PASS | sharded-EP possible (split poses + reduce), not implemented; replica-only as shipped | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
 | xsbench | PASS | PASS | sharded-EP possible (split lookups + reduce), not implemented; upstream MPI mode = full-input replicas | n/a | n/a | n/a | n/a | n/a | PASS | untested | n/a | supplemental |
+| pennant | PASS | PASS | single process (the cuda branch has no MPI; upstream master is the MPI version) | n/a | n/a | n/a | n/a | n/a | PASS | not vendored (upstream `hip` branch) | n/a | 2026-10-20: 5 registered inputs with frozen CPU v0.6 references |
 | miniem | PASS | PASS | native-mpi (Tpetra/Kokkos; inline mesh decomposed by the mesh factory) | yes (launcher; smoke/strong/weak) | validated (1, 2, 4: analytic L2 error consistent) | BLOCKED (site) | yes (fixed global elements, `HPCPERF_MINIEM_GLOBAL`) | yes (fixed elements/rank, `HPCPERF_MINIEM_N` x topology) | PASS | untested | any N | Trilinos develop efbab105 dependency (Kokkos 5.2.1); needs binding wrapper |
 
 ### Per-app interface support
@@ -302,7 +303,7 @@ honour is an error (exit 2), never a silent 1-rank run.
 | gamess_ri_mp2 | yes | rejected | wrapper | -- | positive NQVV; N <= input active orbitals |
 | hipbone | yes (also `HIPBONE_NP`) | rejected | app (own local rank) | -- | N > 1 needs `-px -py -pz` (product N) or a cube N |
 | miniweather | yes | rejected | wrapper | any argument | -- |
-| cabanapic, exacmech, minibude, p3_heat3d, p3_vlp4d, shaw, xsbench | n/a (single process) | n/a | -- | -- | -- |
+| cabanapic, exacmech, minibude, p3_heat3d, p3_vlp4d, shaw, xsbench, pennant | n/a (single process) | n/a | -- | -- | -- |
 
 ## Catalog (provenance and modifications)
 
@@ -331,9 +332,10 @@ honour is an error (exit 2), never a silent 1-rank run.
 | [sw4lite](sw4lite/) | geodynamics/sw4lite + AMD/ECP HIP port | native CUDA / HIP + MPI | yes | archived HIP revision; build-path fixes |
 | [tealeaf](tealeaf/) | UoB-HPC/TeaLeaf | C++ + cuda/hip | yes | no upstream LICENSE; binding wrapper |
 | [xsbench](xsbench/) | ANL-CESAR/XSBench | CUDA / HIP | yes | -std=c++17 (CCCL) |
+| [pennant](pennant/) | lanl/PENNANT (branch `cuda`) | native CUDA (single GPU) | yes | cudaThreadSynchronize -> cudaDeviceSynchronize (CUDA 13); compiler/arch overrides on the make command line |
 | [miniem](miniem/) | trilinos/Trilinos (packages/panzer/mini-em) | Kokkos / Tpetra (Panzer, MueLu RefMaxwell) | yes | Trilinos built as a Level 2 dependency (develop commit, Kokkos 5.2.1); stand-alone CMake for the driver; netCDF + gtest TPLs from conda |
 
-Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **comb** native-GPU structured-grid halo packing and GPU-aware MPI; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **gamess_ri_mp2** RI-MP2 energy evaluation with distributed orbital-pair work and vendor BLAS; **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **quicksilver** dynamic Monte Carlo particle transport with divergent native GPU kernels; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **sw4lite** MPI-decomposed seismic finite differences with an analytical point-source check; **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup. MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app.
+Brief descriptions (motif) per app: **amg2023** boomeramg algebraic-multigrid solve of a 3d 27-point laplace system; device kernels all from hypre; **branson** implicit monte carlo thermal radiative transfer (photon transport); **cabanapic** relativistic em particle-in-cell (weibel / two-stream); **cloverleaf** compressible euler hydrodynamics, structured staggered grid; **comb** native-GPU structured-grid halo packing and GPU-aware MPI; **exacmech** crystal-plasticity constitutive update at 1e6 material points; **examinimd** lennard-jones md with neighbour lists and mpi halos; **exampm** material point method (dam break / free fall); **gamess_ri_mp2** RI-MP2 energy evaluation with distributed orbital-pair work and vendor BLAS; **haccabanapm** hacc cosmological particle-mesh n-body (cic, fft poisson, kick/drift); **hipbone** nekbone-style high-order spectral-element poisson cg; **kripke** deterministic sn neutron-transport sweeps; **laghos** high-order lagrangian shock hydrodynamics (sedov, triple point); **minibude** molecular-docking energy evaluation (bude); **miniweather** 2d compressible atmospheric dynamics, finite volume; **p3_heat3d** 3d heat-equation stencil; **p3_vlp4d** 4d vlasov-poisson semi-lagrangian kinetic solver; **quicksilver** dynamic Monte Carlo particle transport with divergent native GPU kernels; **remhos** high-order dg remap / advection with flux-corrected transport; **shaw** elastic shear-wave propagation (seismic, sparse jacobians); **sw4lite** MPI-decomposed seismic finite differences with an analytical point-source check; **tealeaf** implicit linear heat conduction, sparse iterative solvers; **xsbench** monte carlo neutron cross-section lookup; **pennant** staggered-grid Lagrangian hydrodynamics on 2-D unstructured polygonal meshes (Sedov, Noh, Leblanc). MiniEM is a Trilinos/Panzer electromagnetics (Maxwell) FE mini-app.
 
 Notes:
 - Kokkos, RAJA, OCCA and YAKL codes have one source tree for both variants, so
@@ -372,7 +374,7 @@ Notes:
   pending A/B validation`, to be compared against the vanilla build on a
   Hopper/sm_90 (or fixed-CUDA) machine later.
 
-Summary: 24/24 CUDA single-GPU Working (validated on one B200; MiniEM
+Summary: 25/25 CUDA single-GPU Working (validated on one B200; MiniEM
 validated 2026-09-14 on the Trilinos dependency; Comb, Quicksilver, SW4lite and
 GAMESS RI-MP2 re-validated from a clean clone of main 4604377 on 2026-09-15 --
 GAMESS RI-MP2 with the environment-provided NVIDIA HPC SDK, see the dependency

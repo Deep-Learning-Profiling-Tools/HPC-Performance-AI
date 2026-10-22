@@ -38,6 +38,7 @@ miniem	mpirun	1	1	no	one host thread + CUDA helpers
 miniweather	mpirun	1	1	no	one host thread + CUDA helpers
 p3_heat3d	direct	-	-	no	direct exec, host-light GPU application, unbound
 p3_vlp4d	direct	-	-	no	direct exec, host-light GPU application, unbound
+pennant	direct	-	-	no	direct exec, host-light single-GPU application (one host thread + CUDA helpers), unbound
 quicksilver	mpirun	1	1	no	one host thread + CUDA helpers
 remhos	mpirun	1	1	no	one host thread + CUDA helpers
 shaw	direct	-	-	no	direct exec; Kokkos OpenMP host backend starts one thread per cpuset core, unbound

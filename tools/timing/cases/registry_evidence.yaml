@@ -91,6 +91,13 @@ level2:
     output: ['^\(nx, ny, nz\) = {nx}, {ny}, {nz}$']
   p3_vlp4d:
     search_dirs: [wk]             # run.sh: a deck argument is taken from the caller's cwd, else from wk/
+  pennant:                        # run.sh copies the registered deck byte-identically into build/level2/pennant/cuda/run/<name>/
+                                  # (PENNANT writes its outputs next to the deck) and passes the copy's absolute path; the program
+                                  # prints the zone count of the mesh it generated from the deck
+    copies: {test/sedovbig/sedovbig.pnt: build/level2/pennant/cuda/run/, decks/sedovflatx4.pnt: build/level2/pennant/cuda/run/,
+             test/leblancbig/leblancbig.pnt: build/level2/pennant/cuda/run/, test/nohsquare/nohsquare.pnt: build/level2/pennant/cuda/run/,
+             decks/nohpoly-6000.pnt: build/level2/pennant/cuda/run/}
+    output: ['^Zones:\s+{zones}$']
   quicksilver: {}
   remhos:                         # MFEM echoes the options it parsed
     output: ['^\s+--problem {problem}$', '^\s+--refine-serial {rs}$', '^\s+--time-step {dt}$', '^\s+--mesh \S*/{mesh}$']

@@ -1,0 +1,218 @@
+# Registered inputs of PENNANT (schema hpcperf-inputs-1), selected through HPCPERF_PENNANT_INPUT=<id> in run.sh
+# (tools/inputs/README.md). Without the variable run.sh behaves as before (the default deck, or the deck given as
+# its argument). Every registered deck is an upstream .pnt file used verbatim (the cuda branch's own test decks,
+# the CORAL-2 scaling deck of upstream's master branch) or, for the one derived input, an upstream deck with a
+# cycle limit prepended (decks/nohpoly-6000.pnt, see its entry).
+schema: hpcperf-inputs-1
+benchmark: pennant
+level: 2
+selector: HPCPERF_PENNANT_INPUT
+default_input: sedovbig-540sq
+entry:
+  kind: run.sh
+  path: level2/pennant/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    PENNANT's own "hydro cycle run time" (src/Driver.cc, Driver::run: a gettimeofday timestamp taken just
+    before the first cycle and one just after the last). Every cycle = calcGlobalDt + Hydro::doCycle (the five
+    GPU kernels gpuMain1..5 with their device synchronisations, the bad-side check and the dt read-back) +
+    the "End cycle" progress line every dtreport cycles. Mesh generation, hydroInit (the one-time upload),
+    getData (the final read-back), the end message and the .xy / Ensight Gold output are outside. The ROI
+    markers sit at the same two places (tools/timing/roi, level2/pennant/README.md), so the ROI and this
+    timer are the same region.
+  kind: total
+  unit: s
+  regex: '^hydro cycle run time=\s*(?P<value>[0-9.eE+-]+)\s*$'
+  select: only
+baseline:
+  method: >-
+    PENNANT writes the per-zone density, specific internal energy and pressure of every zone after the last
+    cycle (<name>.xy, 8 significant digits). The scientific result of every registered input is that profile,
+    checked by check_xy.py (the `check` block) against a frozen reference made once from a run of the SAME deck
+    with upstream's own CPU implementation at the same code version (lanl/PENNANT master 617414f = v0.6, the
+    version the cuda branch is a port of): reference/<id>.json keeps, per column, the zone count, scale,
+    sum, min, max and a fixed stride sample of 2048 zones. The registry additionally keeps from stdout the
+    final cycle count (exact: the dt sequence is deterministic -- the CPU reference run and the CUDA build
+    reach the same count on every registered deck; for the CORAL-2 deck upstream's own sample output
+    test/sample_outputs/vulcan/sedovflatx4.out, v0.9, reports the same 12511), the final simulated time (the
+    deck's tstop to the 7 printed digits for the four decks that run to tstop; print-precision 1e-6 relative
+    against this build's first run for the cycle-limited one), the "Run complete" and "Running Hydro on
+    device" markers (a run that did not finish, or did not take the GPU path, is no result) and the absence
+    of PENNANT's own "negative side volumes" error.
+  reference: >-
+    frozen CPU v0.6 references reference/<id>.json (check_xy.py --make-reference, provenance inside) through
+    the `check` block; stdout quantities against the deck (tstop) and this build's first measured run
+  quantities:
+    - name: final_cycle
+      role: required
+      regex: '^cycle =\s+(?P<value>\d+),'
+      select: last
+      compare: {rule: exact}
+    - name: final_time
+      role: required
+      regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop'
+      select: last
+      compare: {rule: rel, tol: 1.0e-6}
+    - name: run_complete
+      role: required
+      regex: '^Run complete'
+      compare: {rule: present}
+    - name: device_banner
+      role: required
+      regex: '^Running Hydro on device'
+      compare: {rule: present}
+    - name: bad_sides
+      role: required
+      regex: 'negative side volumes'
+      compare: {rule: absent}
+check:
+  # The run's <name>.xy is copied out of the run directory and compared with the input's frozen CPU v0.6
+  # reference (reference/<id>.json) by check_xy.py: populated zones (|ref| >= 1e-8 of the column's maximum)
+  # within 1e-5 relative, zones below that floor within 1e-8 of the column's maximum absolute, sum / min / max
+  # of every column under the same rule. Rule basis (check_xy.py docstring, README): the profile carries 8
+  # significant digits; two correct realisations of the arithmetic (CPU v0.6, this CUDA build) agree to
+  # <= 3.3e-7 relative in every populated zone after 3,775 .. 12,511 cycles on the registered decks (measured
+  # 2026-10-20 before any optimized candidate existed); 1e-5 is 30 x that accumulated roundoff and still
+  # 100 x below the 1e-3 .. 1e-2 differences that a changed method or a dropped term produce. The zero floor
+  # excludes the roundoff residues of undisturbed near-vacuum zones (1e-10 .. 1e-50, compiler-dependent).
+  kind: post_run
+  outputs:
+    - {glob: '{repo}/build/level2/pennant/cuda/run/{param:name}/{param:name}.xy', new: true}
+  command: [python3, '{bench_dir}/check_xy.py', --run, '{outputs}/{param:name}.xy', --reference, '{bench_dir}/{param:reference}', --label, '{param:name}']
+  pass_regex: '^PASS: PENNANT xy check'
+  fail_regex: '^FAIL: PENNANT xy check'
+  basis: >-
+    per-zone profile (density, energy, pressure of every zone) against a frozen reference run of the same
+    deck with upstream's CPU implementation at the same version (lanl/PENNANT master v0.6, reference/<id>.json):
+    populated zones within 1e-5 relative, zones below 1e-8 of the column maximum within that floor, column
+    sum / min / max alike -- 30 x the accumulated roundoff between the two correct implementations measured
+    on every registered deck, 100 x inside a method-level change (check_xy.py, README)
+  covers: all
+  timeout: 1800
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    three upstream problems (Sedov blast wave, Noh implosion, Leblanc shock tube) on two mesh types (rectangular,
+    hexagonal/polygonal): the cuda branch's three large decks, the CORAL-2 sedovflatx4 scaling deck and the
+    cycle-limited nohpoly deck
+  upstream_inputs_not_added:
+    - "test/sedovsmall, sedov, nohsmall, noh, leblanc (the five gold-standard decks, 10 cycles each, 1-3 ms on the GPU): validate.sh runs them against upstream's <test>.xy.std; too short to time"
+    - "test/nohpoly/nohpoly.pnt as shipped (hex mesh, 9876 cycles to tstop 0.6): registered only up to cycle 6000 -- beyond ~7000 cycles the CPU v0.6 and CUDA results of this ill-conditioned late phase diverge to 1e-3 .. 4e-2 per zone while agreeing to 5e-7 through cycle 6000 (README), so no per-zone criterion exists for the full run"
+    - "master test/sedovflat (480 x 540): run once (3136 cycles = upstream's sample count, 1.4 s), not registered -- the same problem as sedovbig at a similar size"
+    - "master test/sedovflatx16 / x40 / x120 (66 M .. 6 G zones): beyond one GPU's run time budget / memory"
+    - "master test/leblancx4 (640 x 5760) and the derived 320 x 2880 Leblanc mesh: the CUDA branch aborts at the first cycle (illegal memory access in the GPU kernels, then 'negative side volumes'); 320 x 1440, 160 x 2880 and 240 x 2160 run. Cause not established; leblancx16/x48/x64 not attempted"
+inputs:
+  - id: sedovbig-540sq
+    case: sedov-blast
+    variant: default
+    source:
+      kind: upstream-file
+      upstream: {repo: lanl/PENNANT, version: cuda branch 6c4e0d15a802349c454eeb772d9817630c47d175, path: test/sedovbig/sedovbig.pnt, sha256: 276f77a5478b9b2bc9dc19415c11cd3ff307ca4ced3dbd01ea127a2383a9a555}
+    params: {name: sedovbig, deck: test/sedovbig/sedovbig.pnt, meshtype: rect, nzx: 540, nzy: 540, zones: 291600, tstop: 1.0, cstop: null, cycles: 3882, reference: reference/sedovbig-540sq.json}
+    args: [test/sedovbig/sedovbig.pnt]
+    files: [test/sedovbig/sedovbig.pnt]     # the frozen reference (params.reference) is read by the checker, not by the program
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: final_cycle, role: required, regex: '^cycle =\s+(?P<value>\d+),', select: last, compare: {rule: exact}}
+        - {name: final_time, role: required, regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop', select: last, compare: {rule: near, value: 1.0, tol: 1.0e-6}}
+        - {name: run_complete, role: required, regex: '^Run complete', compare: {rule: present}}
+        - {name: device_banner, role: required, regex: '^Running Hydro on device', compare: {rule: present}}
+        - {name: bad_sides, role: required, regex: 'negative side volumes', compare: {rule: absent}}
+    notes: the run.sh default; the cuda branch's large Sedov deck (doc/pennantdoc.tex table; 540 x 540 since v0.6), run to tstop = 1.0 (3882 cycles).
+  - id: sedovflatx4-1920x2160
+    case: sedov-blast
+    variant: size
+    source:
+      kind: upstream-file
+      upstream: {repo: lanl/PENNANT, version: master d7b770ecd5cc75bbb768554fcd9b2977e65b6e06 (deck added 2018-02-02 in 12c7f7edd05da34f540df8b2a36a26127ef7f9e9, CORAL-2 benchmark series), path: test/sedovflatx4/sedovflatx4.pnt, sha256: d856b6845f796cc42a2966aa3747045b4f915606abadc7d71b1f77bc2f8e106f}
+    params: {name: sedovflatx4, deck: decks/sedovflatx4.pnt, meshtype: rect, nzx: 1920, nzy: 2160, zones: 4147200, tstop: 1.0, cstop: null, cycles: 12511, cycles_upstream_sample: 12511, reference: reference/sedovflatx4-1920x2160.json}
+    args: [decks/sedovflatx4.pnt]
+    files: [decks/sedovflatx4.pnt]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: final_cycle, role: required, regex: '^cycle =\s+(?P<value>\d+),', select: last, compare: {rule: exact}}
+        - {name: final_time, role: required, regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop', select: last, compare: {rule: near, value: 1.0, tol: 1.0e-6}}
+        - {name: run_complete, role: required, regex: '^Run complete', compare: {rule: present}}
+        - {name: device_banner, role: required, regex: '^Running Hydro on device', compare: {rule: present}}
+        - {name: bad_sides, role: required, regex: 'negative side volumes', compare: {rule: absent}}
+    notes: >-
+      the CORAL-2 "sedovflat x4" scaling deck of upstream's master branch (same .pnt keywords as the cuda branch
+      reads; copied verbatim to decks/sedovflatx4.pnt): 1920 x 2160 = 4.1 M zones, 12511 cycles to tstop = 1.0
+      -- the count upstream's own sample output test/sample_outputs/vulcan/sedovflatx4.out (v0.9) reports.
+      Writes a 320 MB .xy profile after the timed loop.
+  - id: leblancbig-160x1440
+    case: leblanc-shock-tube
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: lanl/PENNANT, version: cuda branch 6c4e0d15a802349c454eeb772d9817630c47d175, path: test/leblancbig/leblancbig.pnt, sha256: 1300c201e98671cbb2b5accd3efbe642e783f5dc4b29e71094a1cd4c01b3459b}
+    params: {name: leblancbig, deck: test/leblancbig/leblancbig.pnt, meshtype: rect, nzx: 160, nzy: 1440, zones: 230400, tstop: 6.0, cstop: null, cycles: 3775, reference: reference/leblancbig-160x1440.json}
+    args: [test/leblancbig/leblancbig.pnt]
+    files: [test/leblancbig/leblancbig.pnt]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: final_cycle, role: required, regex: '^cycle =\s+(?P<value>\d+),', select: last, compare: {rule: exact}}
+        - {name: final_time, role: required, regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop', select: last, compare: {rule: near, value: 6.0, tol: 1.0e-6}}
+        - {name: run_complete, role: required, regex: '^Run complete', compare: {rule: present}}
+        - {name: device_banner, role: required, regex: '^Running Hydro on device', compare: {rule: present}}
+        - {name: bad_sides, role: required, regex: 'negative side volumes', compare: {rule: absent}}
+    notes: the cuda branch's large Leblanc shock-tube deck (density ratio 1000, 160 x 1440 zones), run to tstop = 6.0 (3775 cycles).
+  - id: nohsquare-360sq
+    case: noh-implosion
+    variant: case
+    source:
+      kind: upstream-file
+      upstream: {repo: lanl/PENNANT, version: cuda branch 6c4e0d15a802349c454eeb772d9817630c47d175, path: test/nohsquare/nohsquare.pnt, sha256: 885f8d0a742772d1d46eb4c4cdb1ecd31e2f50047189483939a99779eabd214d}
+    params: {name: nohsquare, deck: test/nohsquare/nohsquare.pnt, meshtype: rect, nzx: 360, nzy: 360, zones: 129600, tstop: 0.6, cstop: null, cycles: 7677, reference: reference/nohsquare-360sq.json}
+    args: [test/nohsquare/nohsquare.pnt]
+    files: [test/nohsquare/nohsquare.pnt]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: final_cycle, role: required, regex: '^cycle =\s+(?P<value>\d+),', select: last, compare: {rule: exact}}
+        - {name: final_time, role: required, regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop', select: last, compare: {rule: near, value: 0.6, tol: 1.0e-6}}
+        - {name: run_complete, role: required, regex: '^Run complete', compare: {rule: present}}
+        - {name: device_banner, role: required, regex: '^Running Hydro on device', compare: {rule: present}}
+        - {name: bad_sides, role: required, regex: 'negative side volumes', compare: {rule: absent}}
+    notes: the cuda branch's Noh implosion on the 360 x 360 square mesh (uinitradial -1, alfa 0.1), run to tstop = 0.6 (7677 cycles).
+  - id: nohpoly-hex251-6000cycles
+    case: noh-implosion
+    variant: steps
+    source:
+      kind: derived
+      upstream: {repo: lanl/PENNANT, version: cuda branch 6c4e0d15a802349c454eeb772d9817630c47d175, path: test/nohpoly/nohpoly.pnt, sha256: a961e542bf40dae44af6957a073ab5774f477a47296b2c68128d3d51cc9bacaf}
+      derivation: >-
+        decks/nohpoly-6000.pnt = the upstream deck with one line "cstop 6000" prepended (every other keyword
+        unchanged): the run stops after 6000 of the 9876 cycles upstream's tstop = 0.6 takes. Reason: on this hex
+        mesh the CPU v0.6 reference and the CUDA build agree to 5e-7 per zone through cycle 6000 and then
+        diverge (1e-3 at 8000, 4e-2 at 9000 and at the end) -- the late phase of the implosion on a polygonal
+        mesh amplifies roundoff, so a per-zone criterion exists only for the first 6000 cycles (README).
+    params: {name: nohpoly-6000, deck: decks/nohpoly-6000.pnt, meshtype: hex, nzx: 251, nzy: 251, zones: 63001, tstop: 0.6, cstop: 6000, cycles: 6000, reference: reference/nohpoly-hex251-6000cycles.json}
+    args: [decks/nohpoly-6000.pnt]
+    files: [decks/nohpoly-6000.pnt]
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: null
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: final_cycle, role: required, regex: '^cycle =\s+(?P<value>\d+),', select: last, compare: {rule: near, value: 6000, tol: 0.0}}
+        - {name: final_time, role: required, regex: '^time  =\s+(?P<value>[0-9.eE+-]+), tstop', select: last, compare: {rule: rel, tol: 1.0e-6}}
+        - {name: run_complete, role: required, regex: '^Run complete', compare: {rule: present}}
+        - {name: device_banner, role: required, regex: '^Running Hydro on device', compare: {rule: present}}
+        - {name: bad_sides, role: required, regex: 'negative side volumes', compare: {rule: absent}}
+    notes: >-
+      the only polygonal (hexagonal) mesh of the suite: the upstream nohpoly deck (hex 251, 63,001 six-sided
+      zones) limited to 6000 cycles (t = 0.46 of tstop 0.6); the cycle count is the deck's cstop, the final time
+      is compared with this build's first run at print precision.
