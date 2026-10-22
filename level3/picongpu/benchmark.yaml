@@ -1,0 +1,51 @@
+name: picongpu
+level: 3
+application: PIConGPU
+description: Relativistic 3D3V electromagnetic particle-in-cell on alpaka/CUDA (Helmholtz-Zentrum Dresden-Rossendorf); registered
+  inputs (inputs.yaml) are upstream's own input sets (the electron-scale Kelvin-Helmholtz growth-rate test at several sizes,
+  the transverse Weibel and the laser-wakefield examples), one MPI rank on one GPU each, each a compile-time .param set built
+  with pic-build
+supported_backends:
+- cuda
+validated_backends:
+- cuda
+distributed_model: MPI, one rank per GPU (alpaka CUDA backend, PMacc domain decomposition); the registered workloads are one-rank
+  runs
+default_scale_mode: smoke
+scale_modes:
+  smoke: the registered input sets (inputs.yaml); no strong/weak derivation
+multi_node: BLOCKED/UNVERIFIED on this site
+gpu_40_80: not applicable (one-rank workloads)
+build_entry: ./build.sh
+run_entry: ./run.sh
+validate_entry: ./validate.sh
+environment_profile: hpcperf_env.sh (conda GCC 13.3.0 as CUDA host compiler, CUDA 13.2.78, Open MPI 5.0.10; Boost 1.86 and
+  GSL 2.8 built from the bundled tarballs under .deps/level3/picongpu/<profile>/install; site profile gmu-hopper)
+install_root: .deps/level3/picongpu/cuda
+profile_scheme: <backend> (cuda only); override HPCPERF_PICONGPU_PROFILE must name the backend; generated state .deps/level3/picongpu/<profile>/
+  (install/{boost,gsl}, install/<input>/bin/picongpu) and build/level3/picongpu/<profile>/<input>
+dependency_installs:
+- cuda/install/boost
+- cuda/install/gsl
+inputs:
+- inputs/khi/cmakeFlags
+- inputs/lwfa/cmakeFlags
+registered_inputs: inputs.yaml
+references:
+- src/share/picongpu/tests/KHI_growthRate
+- reference/lwfa-192x1024x192.json
+upstream_version: dev
+redistribution_status: cleared
+suite_status: candidate
+source_version: hpcperf-l3-v1
+source_tree_sha256: 70d87f93d3a6fd7bf5625a3dbea3dd301e0a4572fcf2e8f5d4328575eab7454a
+source_artifact:
+  filename: picongpu-hpcperf-l3-v1.tar.zst
+  archive_sha256: d243d831a44ec7c845464839594de73d6eeb55e7c5b63080a00ae0c74a03d91f
+  source_tree_sha256: 70d87f93d3a6fd7bf5625a3dbea3dd301e0a4572fcf2e8f5d4328575eab7454a
+  size: 160232498
+  uncompressed_size: 185825989
+  file_count: 3634
+  source_version: hpcperf-l3-v1
+  primary_url: https://github.com/Deep-Learning-Profiling-Tools/HPC-Performance-AI/releases/download/level3-source-hpcperf-l3-v1-ext1/picongpu-hpcperf-l3-v1.tar.zst
+  publish_status: published

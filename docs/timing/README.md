@@ -4,7 +4,7 @@ Region-of-interest (ROI) timing of the Level 1 benchmarks and Level 2 mini-appli
 
 ## Registered inputs: Level 1 campaign 2026-09-23..28, Level 2 final protocol 2026-09-30, Level 3 final protocol 2026-10-03
 
-Measured 2026-09-26T19:11:40Z .. 2026-10-21T06:20:22Z (281 records). 134 + 99 + 48 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 99 + 45 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 281; UNSTABLE 18.
+Measured 2026-09-26T19:11:40Z .. 2026-10-21T09:04:11Z (285 records). 134 + 99 + 52 registered Level 1 / 2 / 3 inputs: timing SUCCESS for 134 + 99 + 49 (Level 3: the application's own timer), run failed for 0, not measured 0, no timed region by construction 3; run verification PASS for 285; UNSTABLE 18.
 
 - Level 1 protocol: 1 warm-up + 5 clean runs + 1 nsys profiled run (phase 5, 2026-09-26/27, GPU 0000:52:00.0); the 14 inputs UNSTABLE there were measured again with 1 warm-up + 20 clean + 1 profiled (phase 6, judged by IQR/median); channel_shuffle g2-w255-h255 in phase 7 (2026-09-28)
 - Level 2 protocol: FINAL PROTOCOL (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application (cases/level2_binding.tsv through the launcher's HPCPERF_CPUS_PER_RANK; hipBone PE=4 with pinned OpenMP threads, the other mpirun-launched applications PE=1, direct-exec unbound), 1 whole-process warm-up run discarded from every statistic (its ROI kept as roi.warmup_runs_s), 3 measured clean runs (headline = median), 1 nsys profiled run; no adaptive extension; one input at a time.
@@ -19,7 +19,7 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T06:20:22Z (281 records). 134 + 99 + 
 |---|--:|--:|--:|--:|
 | 1 | 134 | 0 | 0 | 0 |
 | 2 | 99 | 0 | 0 | 0 |
-| 3 | 40 | 6 | 0 | 2 |
+| 3 | 44 | 6 | 0 | 2 |
 
 - Level 2: every registered input measured under the final protocol (2026-09-30, GPU 0000:43:00.0): explicit CPU binding per application, 1 discarded whole-process warm-up + 3 clean runs (headline = median) + 1 nsys-profiled run, one input at a time.
 - CPU binding (2026-09-30 A/B, 3 sessions): the explicit policy changes only hipBone's thread placement (four OpenMP threads on four cores of the allocation -- GPU-local on the current machine, verified; the policy itself names no socket -- instead of five threads on one core) and leaves its ROI unchanged; gamess benz-kern, miniem darcy-hex, remhos periodic-square-p5 and tealeaf bm4 show per-invocation discrete ROI levels with identical placement. Cause UNKNOWN.
@@ -32,7 +32,9 @@ Measured 2026-09-26T19:11:40Z .. 2026-10-21T06:20:22Z (281 records). 134 + 99 + 
 - Nekbone (Level 2, 2026-10-21): five registered inputs (orders 16 / 8 / 12, 33.6 M - 135 M points per rank, one executable per compile-time SIZE) measured under the final protocol on GPU 0000:9D:00.0; ROI = the timed 100-iteration CG solve.
 - Nekbone correctness: r0, the solution norm and the functional of a fresh run of every input against frozen references from the CPU build of the same source (the GPU solve equals the CPU solve to round-off after the upstream set-up fix); see level2/nekbone/README.md.
 - VPIC (Level 3, 2026-10-21): five registered deck executables (Harris reconnection 256/512/1024, Weibel 1-D 131072, 2-D short pulse) measured under the final Level 3 protocol on GPU 0000:9D:00.0 (one rank per deck; the step loop's own '*** Done' clock).
-- VPIC correctness: the energies history of a fresh run of each deck against a frozen reference (CPU Kokkos-OpenMP run of the same deck for the sizes where one exists, the unmodified build's own run for harris-1024sq) plus total-energy conservation; see level3/vpic/README.md.
+- VPIC correctness: the energies history of a fresh run of each deck against a frozen reference (CPU Kokkos-OpenMP run of the same deck for the sizes where one exists, the unmodified build's own run for harris-1024sq) plus total-energy conservation for the four closed-system decks (the short pulse, an open system with laser injection, is reproducible only statistically and is checked by its group rule); see level3/vpic/README.md.
+- PIConGPU (Level 3, 2026-10-21): four registered inputs (the KHI growth-rate test at three grid sizes, the LaserWakefield example at upstream's 1-GPU size), one executable per .param set, measured under the final Level 3 protocol on GPU 0000:9D:00.0 (the program's own 'calculation simulation time' = the time-step loop).
+- PIConGPU correctness: the KHI inputs by upstream's analytic growth-rate test (max growth rate of the Bx energy within 20 % of 1/(sqrt(8) gamma)); the LWFA input by its charge-conservation and energy histories against a frozen self-baseline of the unmodified build (no analytic reference exists for the example); see level3/picongpu/README.md.
 
 ### Level 1
 
@@ -309,6 +311,10 @@ No markers: the timed region is the application's own timer for its time-step lo
 | nyx | lya-adiabatic-32cubed-10 | SUCCESS | nvidia-b200.cuda13.2 | 219 ms | 3 | 219 ms | 258 ms | 17.7% | 10.2% | UNSTABLE | 10 | 21.9 ms | 9.13 s | 2.4% | null | 1.83 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-adiabatic-64cubed | SUCCESS | nvidia-b200.cuda13.2 | 881 ms | 3 | 874 ms | 995 ms | 13.7% | 7.7% | UNSTABLE | 10 | 88.1 ms | 10.6 s | 8.3% | null | 1.38 | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | nyx | lya-heatcool-32cubed | SUCCESS | nvidia-b200.cuda13.2 | 307 ms | 3 | 254 ms | 360 ms | 34.5% | 17.2% | UNSTABLE | 10 | 30.7 ms | 8.89 s | 3.4% | null | 1.13 | none printed | 1 | PASS | INCOMPLETE | 04f66c6f5e |
+| picongpu | khi-192x512 | SUCCESS | nvidia-b200.cuda13.2 | 76.4 s | 3 | 75.9 s | 77.1 s | 1.6% | 0.8% | yes | 3,000 | 25.5 ms | 87.5 s | 87.3% | null | 1.15 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | khi-384x1024 | SUCCESS | nvidia-b200.cuda13.2 | 173.0 s | 3 | 172.9 s | 173.3 s | 0.2% | 0.1% | yes | 3,000 | 57.7 ms | 185.1 s | 93.5% | null | 1.13 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | khi-768x2048 | SUCCESS | nvidia-b200.cuda13.2 | 611.3 s | 3 | 607.4 s | 613.5 s | 1.0% | 0.5% | yes | 3,000 | 204 ms | 626.1 s | 97.6% | null | 1.03 | none printed | 1 | PASS | PASS | cce07fd54f |
+| picongpu | lwfa-192x1024x192 | SUCCESS | nvidia-b200.cuda13.2 | 53.8 s | 3 | 53.8 s | 54.1 s | 0.5% | 0.3% | yes | 2,000 | 26.9 ms | 67.7 s | 79.5% | null | 1.27 | none printed | 1 | PASS | PASS | cce07fd54f |
 | qmcpack | diamond2-256w | SUCCESS | nvidia-b200.cuda13.2 | 553.9 s | 3 | 509.5 s | 559.8 s | 9.1% | 5.0% | yes | 2,500 | 222 ms | 586.0 s | 94.5% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | qmcpack | diamond2-128w | SUCCESS | nvidia-b200.cuda13.2 | 263.0 s | 3 | 240.2 s | 276.6 s | 13.8% | 7.0% | UNSTABLE | 2,500 | 105 ms | 282.5 s | 93.1% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |
 | qmcpack | diamond2-64w | SUCCESS | nvidia-b200.cuda13.2 | 148.1 s | 3 | 141.5 s | 152.9 s | 7.7% | 3.9% | yes | 2,500 | 59.2 ms | 162.3 s | 91.2% | null | null | none printed | 1 | PASS | PASS | 04f66c6f5e |

@@ -231,6 +231,17 @@ level3:                         # Level 3 has no ROI logs: the evidence is the r
       par_file_sha256: ['^[0-9a-f]{64}$']
     output: ['^# SPECFEM3D .* mode={HPCPERF_SCALE_MODE} ranks=\d+ elements={elements} .* NSTEP={nstep} ']
     timer_steps: 'nstep'
+  picongpu:                     # run.sh: the registered input set (inputs/<set>/) is compiled into install/<set>/bin/picongpu (build.sh;
+                                # the manifest records the set's hash), the registered args ARE the program's command line (argv
+                                # evidence), and the progress line evidences the step count the program ran
+    manifest:
+      input_id: ['^{input_id}$']
+      paramset: ['^inputs/{paramset}$']
+      grid: ['^{grid}$']
+      steps: ['^{steps}$']
+    source_files: ['inputs/{paramset}/cmakeFlags']
+    argv: ['-d 1 1 1 ', '-g {nx} {ny} {nz} ', '-s {steps} ']
+    output: ['^\\s*100 % =\\s+{steps} \\|']
   vpic:                         # run.sh: the registered deck is a compiled executable (build.sh, decks/<id>.Linux) whose source
                                 # hash the manifest records; the binary prints the Run Details banner (num_step, grid, particles)
     manifest:

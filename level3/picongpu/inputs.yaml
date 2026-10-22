@@ -1,0 +1,182 @@
+# Registered inputs of PIConGPU (schema hpcperf-inputs-1), selected through HPCPERF_PICONGPU_INPUT=<id> in run.sh
+# (tools/inputs/README.md). An input is an input SET (inputs/<set>/: the compile-time .param files and cmakeFlags
+# of one of upstream's test / example setups, compiled by build.sh with pic-build) plus the runtime command line
+# (device decomposition, grid, step count, periodicity, plugin periods) registered as `args`.
+schema: hpcperf-inputs-1
+benchmark: picongpu
+level: 3
+selector: HPCPERF_PICONGPU_INPUT
+default_input: khi-384x1024
+entry:
+  kind: run.sh
+  path: level3/picongpu/run.sh
+  backend_arg: CUDA
+timing:
+  scope: >-
+    PIConGPU's own 'calculation  simulation time' (include/picongpu/simulation/control/SimulationStarter.hpp:
+    the wall clock of Simulation::startSimulation around the time-step loop, printed at the end as
+    'calculation  simulation time: <h/min/sec> = <seconds>'): all steps -- particle push, current deposition,
+    field solve, boundary / communication, the plugins' notifications at their periods. Initialization (the
+    species' initial loading, memory set-up) and the shut-down are outside; the separate 'full simulation time'
+    includes them. The same line is the headline timer of tools/timing (apptimers.py: picongpu).
+  kind: app_timer
+  app_timer:
+    source: tools/timing/apptimers.py:picongpu
+    region: "'calculation  simulation time' = the time-step loop (SimulationStarter.hpp), without initialization and shut-down"
+    relation: identical
+baseline:
+  method: >-
+    upstream's own acceptance for its KHI growth-rate test (lib/python/test/setups/ESKHI: the growth rate of the Bx
+    field energy in the linear phase, Gamma = 0.5 ln(f(t_{k+1})/f(t_{k-1})) / (t_{k+1} - t_{k-1}) in units of the
+    relativistic plasma frequency, must be within 20 % of the theoretical 1/(sqrt(8) gamma) of the electron-scale
+    Kelvin-Helmholtz instability, Alves 2012 / Grismayer 2013) re-implemented in check_khi_growth.py from
+    fields_energy.dat, applied to the test's input set at three grid sizes (the physics is per cell, so the
+    growth rate is size-independent). The laser-wakefield example has no analytic reference upstream: its check
+    is the charge-conservation plugin (max |div E - rho| deviation per step against the unmodified build's own
+    run, stated as a self-baseline) -- see its entry. The registry keeps from stdout the step count the program
+    ran (exact), the timer line and the clean end of the run.
+  reference: >-
+    analytic growth rate (KHI inputs) through the `check` blocks; the LWFA input's charge-conservation history
+    against this build's frozen first run (self-baseline, stated); stdout quantities against the registered arguments
+  quantities:
+    - name: steps_done
+      role: required
+      regex: '^ *(?P<value>\d+) % = +\d+ \| .*$'
+      select: last
+      compare: {rule: record}
+    - name: calc_time_line
+      role: required
+      regex: '^calculation  simulation time:'
+      compare: {rule: present}
+    - name: full_time_line
+      role: required
+      regex: '^full simulation time:'
+      compare: {rule: present}
+coverage:
+  status: MULTI_INPUT
+  reason: >-
+    upstream's KHI growth-rate test input set (2-D, 12-cell z extent) at its own size and two larger grids (a
+    resolution series with the same per-cell physics and the same analytic criterion), and the 3-D laser-wakefield
+    example at its documented single-GPU size
+  upstream_inputs_not_added:
+    - "share/picongpu/examples (Bunch, FoilLCT, TransitionRadiation, WeibelTransverse, KelvinHelmholtz, BinningExamples, AtomicPhysics, IncidentField): run without a shipped acceptance criterion or need plugins / dependencies absent here (openPMD, PNGwriter, ISAAC); WeibelTransverse would be a growth-rate candidate without an upstream test"
+    - "share/picongpu/tests other than KHI_growthRate (collisions, pusher, current deposition, field absorber, single particle, synchrotron, shadowgraphy): unit-style tests with seconds of run time"
+inputs:
+  - id: khi-192x512
+    case: eskhi-growth-rate
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ComputationalRadiationPhysics/picongpu, version: dev 93cba5b61b628659a6ec8181f5e2dd28b8006f29, path: share/picongpu/tests/KHI_growthRate (input set; bin/ci.sh runs -d 1 1 1 -g 192 512 12 --periodic 1 1 1 -s 3000 --fields_energy.period 10)}
+    params: {id: khi-192x512, paramset: khi, grid: 192x512x12, nx: 192, ny: 512, nz: 12, steps: 3000, energy_period: 10, gamma: 1.021, base_density_si: 1.0e25, delta_t_si: 1.5394e-16}
+    args: [-d, '1', '1', '1', -g, '192', '512', '12', --periodic, '1', '1', '1', -s, '3000', --fields_energy.period, '10']
+    files: []
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {paramset: inputs/khi/cmakeFlags}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: steps_done, role: required, regex: '^ *(?P<value>\d+) % = +\d+ \| .*$', select: last, compare: {rule: record}}
+        - {name: calc_time_line, role: required, regex: '^calculation  simulation time:', compare: {rule: present}}
+        - {name: full_time_line, role: required, regex: '^full simulation time:', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.khi-192x512}
+      command: [python3, '{bench_dir}/check_khi_growth.py', --energy, '{repo}/build/level3/picongpu/cuda/run.check.khi-192x512/khi-192x512.np1/fields_energy.dat', --gamma, '1.021', --density, '1.0e25', --dt, '1.5394e-16', --acceptance, '0.2', --label, khi-192x512]
+      pass_regex: '^PASS: PIConGPU KHI growth-rate check'
+      fail_regex: '^FAIL: PIConGPU KHI growth-rate check'
+      basis: >-
+        upstream lib/python/test/setups/ESKHI (config.py acceptance = 0.2, theory 1/(sqrt(8) gamma), gamma 1.021,
+        BASE_DENSITY_SI 1e25 and DELTA_T_SI 1.79e-16 x 0.86 from the input set's param files): the maximum growth rate
+        of the Bx field energy over the run within 20 % of theory
+      covers: all
+      timeout: 1800
+    notes: upstream's test at its own size (bin/ci.sh); 192 x 512 x 12 cells, 3000 steps
+  - id: khi-384x1024
+    case: eskhi-growth-rate
+    variant: default
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ComputationalRadiationPhysics/picongpu, version: dev 93cba5b61b628659a6ec8181f5e2dd28b8006f29, path: share/picongpu/tests/KHI_growthRate (input set) with -g 384 1024 12}
+    params: {id: khi-384x1024, paramset: khi, grid: 384x1024x12, nx: 384, ny: 1024, nz: 12, steps: 3000, energy_period: 10, gamma: 1.021, base_density_si: 1.0e25, delta_t_si: 1.5394e-16}
+    args: [-d, '1', '1', '1', -g, '384', '1024', '12', --periodic, '1', '1', '1', -s, '3000', --fields_energy.period, '10']
+    files: []
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {paramset: inputs/khi/cmakeFlags}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: steps_done, role: required, regex: '^ *(?P<value>\d+) % = +\d+ \| .*$', select: last, compare: {rule: record}}
+        - {name: calc_time_line, role: required, regex: '^calculation  simulation time:', compare: {rule: present}}
+        - {name: full_time_line, role: required, regex: '^full simulation time:', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.khi-384x1024}
+      command: [python3, '{bench_dir}/check_khi_growth.py', --energy, '{repo}/build/level3/picongpu/cuda/run.check.khi-384x1024/khi-384x1024.np1/fields_energy.dat', --gamma, '1.021', --density, '1.0e25', --dt, '1.5394e-16', --acceptance, '0.2', --label, khi-384x1024]
+      pass_regex: '^PASS: PIConGPU KHI growth-rate check'
+      fail_regex: '^FAIL: PIConGPU KHI growth-rate check'
+      basis: as khi-192x512 (the shear flow and the cell size are the same; the box is 2 x larger in x and y, the fastest-growing mode and its rate unchanged)
+      covers: all
+      timeout: 3600
+    notes: the run.sh default; 4 x the cells of upstream's test
+  - id: khi-768x2048
+    case: eskhi-growth-rate
+    variant: size
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ComputationalRadiationPhysics/picongpu, version: dev 93cba5b61b628659a6ec8181f5e2dd28b8006f29, path: share/picongpu/tests/KHI_growthRate (input set) with -g 768 2048 12}
+    params: {id: khi-768x2048, paramset: khi, grid: 768x2048x12, nx: 768, ny: 2048, nz: 12, steps: 3000, energy_period: 10, gamma: 1.021, base_density_si: 1.0e25, delta_t_si: 1.5394e-16}
+    args: [-d, '1', '1', '1', -g, '768', '2048', '12', --periodic, '1', '1', '1', -s, '3000', --fields_energy.period, '10']
+    files: []
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {paramset: inputs/khi/cmakeFlags}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: steps_done, role: required, regex: '^ *(?P<value>\d+) % = +\d+ \| .*$', select: last, compare: {rule: record}}
+        - {name: calc_time_line, role: required, regex: '^calculation  simulation time:', compare: {rule: present}}
+        - {name: full_time_line, role: required, regex: '^full simulation time:', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.khi-768x2048}
+      command: [python3, '{bench_dir}/check_khi_growth.py', --energy, '{repo}/build/level3/picongpu/cuda/run.check.khi-768x2048/khi-768x2048.np1/fields_energy.dat', --gamma, '1.021', --density, '1.0e25', --dt, '1.5394e-16', --acceptance, '0.2', --label, khi-768x2048]
+      pass_regex: '^PASS: PIConGPU KHI growth-rate check'
+      fail_regex: '^FAIL: PIConGPU KHI growth-rate check'
+      basis: as khi-192x512 (16 x the cells of upstream's test)
+      covers: all
+      timeout: 7200
+  - id: lwfa-192x1024x192
+    case: laser-wakefield-3d
+    variant: case
+    source:
+      kind: upstream-parameterized
+      upstream: {repo: ComputationalRadiationPhysics/picongpu, version: dev 93cba5b61b628659a6ec8181f5e2dd28b8006f29, path: 'share/picongpu/examples/LaserWakefield (input set; etc/picongpu/1.cfg -d 1 1 1 -g 192 1024 192 -s 2000 --periodic 0 0 1, moving window)'}
+    params: {id: lwfa-192x1024x192, paramset: lwfa, grid: 192x1024x192, nx: 192, ny: 1024, nz: 192, steps: 2000, energy_period: 100, charge_period: 100, reference: reference/lwfa-192x1024x192.json}
+    args: [-d, '1', '1', '1', -g, '192', '1024', '192', --periodic, '0', '0', '1', -s, '2000', --fields_energy.period, '100', --chargeConservation.period, '100', --e_energy.period, '100', --e_energy.filter, all]
+    files: []
+    runtime_config: {gpus: 1, ranks: 1}
+    build_config: {paramset: inputs/lwfa/cmakeFlags}
+    input_form: compile-time
+    backends_validated: [cuda]
+    baseline:
+      quantities:
+        - {name: steps_done, role: required, regex: '^ *(?P<value>\d+) % = +\d+ \| .*$', select: last, compare: {rule: record}}
+        - {name: calc_time_line, role: required, regex: '^calculation  simulation time:', compare: {rule: present}}
+        - {name: full_time_line, role: required, regex: '^full simulation time:', compare: {rule: present}}
+    check:
+      kind: post_run
+      run_env: {HPCPERF_L3_RUN_SUBDIR: run.check.lwfa-192x1024x192}
+      command: [python3, '{bench_dir}/check_lwfa.py', --run-dir, '{repo}/build/level3/picongpu/cuda/run.check.lwfa-192x1024x192/lwfa-192x1024x192.np1', --reference, '{bench_dir}/reference/lwfa-192x1024x192.json', --label, lwfa-192x1024x192]
+      pass_regex: '^PASS: PIConGPU LWFA check'
+      fail_regex: '^FAIL: PIConGPU LWFA check'
+      basis: >-
+        no analytic reference upstream (a demonstration setup, README): the charge-conservation plugin's maximal
+        |div E - rho| deviation (in macro-particle charges) at every sampled step and the field / electron energy
+        histories against this unmodified build's frozen first run (reference/lwfa-192x1024x192.json), a self-baseline
+        stated as such, with the rule recorded in the reference from the observed run-to-run spread
+      covers: all
+      timeout: 7200
+    notes: upstream's 1.cfg (one GPU, 'a few minutes in full 3D'); the example's png / openPMD / phase-space plugins are replaced by the energy and charge-conservation plugins (no PNGwriter / openPMD here)
