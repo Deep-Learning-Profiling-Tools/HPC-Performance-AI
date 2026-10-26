@@ -45,7 +45,7 @@ cmake --build build/background_subtraction/hip
 
 ## Validation
 
-Built-in: GPU output compared against the upstream CPU reference (reference.h); prints PASS/FAIL.
+Golden reference (tools/golden): a plain run captures the final `Tn` and `Bn` images (unsigned char, compared exactly), and `tools/golden/hpcperf_golden.py check` compares the capture with the frozen B200 reference `reference/<input_id>.json` (inputs.yaml `golden:` / `check:`). ctest runs the registry's default input this way (`hpcperf_golden.py run`). The upstream CPU reference (`merge_ref` on every frame, max error must be 0) stays in the source and runs only with `HPCPERF_CPU_REFERENCE=1`, which `hpcperf_golden.py make` uses once to validate a new reference.
 
 Run it via:
 
@@ -75,10 +75,12 @@ warm-up). Three different numbers therefore exist for one run and are reported
 separately, never mixed: the per-frame average the benchmark prints, the
 cumulative timed section (average x (repeat - 2) = `main_compute_s`) and the
 process wall (E2E, which includes the host RNG frame generation and the CPU
-reference pass -- neither is ever added to the main compute). Baseline:
-`Max error is 0` + `PASS` (bit-exact against the in-process CPU reference). Note
-that the binary prints `FAIL` but still exits 0 (main.cu line 185), so the exit
-code alone says nothing about correctness; the tool checks the markers.
+reference pass -- neither is ever added to the main compute; the CPU reference
+pass now runs only with `HPCPERF_CPU_REFERENCE=1`, the calibration below predates
+that). Baseline: `Tn`/`Bn` bit-exact against the frozen golden reference (before
+2026-10: `Max error is 0` + `PASS` against the in-process CPU reference). The
+binary exits 0 whatever the result, so the exit code alone says nothing about
+correctness; the golden check decides.
 
 Pilot calibration on dgx003 (1x B200, 1 warm-up + 3 measured runs, medians):
 
@@ -99,7 +101,7 @@ timing protocol, not a deletion gate. Raw runs:
 `HPC-Performance-AI-results/inputs-pilot-2026-09-21/measurements/level1-background_subtraction/`
 (the 5-run re-measurement is `w4096-h2048-merged0-r102.remeasure-5reps/`).
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Measurement switch.** By default the host-side CPU reference is skipped and the benchmark prints `SKIP_VERIFY` (exit 0), so a plain run, ctest, `tools/inputs` and `tools/timing` never execute it; `HPCPERF_CPU_REFERENCE=1` (offline, golden make only) turns it on, `HPCPERF_SKIP_VERIFY=1` keeps it off regardless. Output capture (`HPCPERF_GOLDEN_DUMP`) is outside the timed region. See [tools/golden/hpcperf_golden.h](../../tools/golden/hpcperf_golden.h) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: the frame loop; frame generation and CPU reference excluded. The synthetic frame generation and the CPU reference (`merge_ref`) inside the frame loop are excluded. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 
