@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,6 +116,16 @@ bool ChannelShuffleNHWC (T *X, int N, int C, int G, int numel, T *Y,
   return true;
 }
 
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured outputs (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
+static bool hpcperf_skip_verify() {
+  return !hpcperf_cpu_reference_enabled();
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 5) {
@@ -158,22 +169,42 @@ int main(int argc, char* argv[])
       hipMemcpy(d_X, h_X, data_size_bytes, hipMemcpyHostToDevice);
 
       ChannelShuffleNHWC (d_X, N, C, G, numel, d_Y, time, repeat);
-      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       hipMemcpy(h_Y, d_Y, data_size_bytes, hipMemcpyDeviceToHost);
+      { // tools/golden: the checked output of this (N, C) configuration and layout
+        char hpcperf_name[64];
+        snprintf(hpcperf_name, sizeof(hpcperf_name), "Y.nhwc.N%d.C%d", N, C);
+        hpcperf_golden_output(hpcperf_name, h_Y, (size_t)numel, "f32");
+      }
+      if (hpcperf_skip_verify()) {
+        /* default: the NHWC CPU reference (it re-runs the host kernel `repeat` times) is
+           skipped; correctness = the captured output against the frozen golden reference */
+      } else {
+      ChannelShuffleNHWC_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       error = memcmp(h_Y, h_Y_ref, data_size_bytes);
       if (error)
         printf("Failed to pass channel shuffle (NHWC) check\n");
       else
         printf("Average time of channel shuffle (NHWC): %f (ms)\n", (time * 1e-6f) / repeat);
+      }
 
       ChannelShuffleNCHW (d_X, N, C, G, numel, d_Y, time, repeat);
-      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       hipMemcpy(h_Y, d_Y, data_size_bytes, hipMemcpyDeviceToHost);
+      { // tools/golden: the checked output of this (N, C) configuration and layout
+        char hpcperf_name[64];
+        snprintf(hpcperf_name, sizeof(hpcperf_name), "Y.nchw.N%d.C%d", N, C);
+        hpcperf_golden_output(hpcperf_name, h_Y, (size_t)numel, "f32");
+      }
+      if (hpcperf_skip_verify()) {
+        /* default: the NCHW CPU reference (it re-runs the host kernel `repeat` times) is
+           skipped; correctness = the captured output against the frozen golden reference */
+      } else {
+      ChannelShuffleNCHW_cpu (h_X, N, C, G, numel, h_Y_ref, time, repeat);
       error = memcmp(h_Y, h_Y_ref, data_size_bytes);
       if (error)
         printf("Failed to pass channel shuffle (NCHW) check\n");
       else
         printf("Average time of channel shuffle (NCHW): %f (ms)\n", (time * 1e-6f) / repeat);
+      }
 
       hipFree(d_X);
       hipFree(d_Y);
@@ -183,5 +214,8 @@ int main(int argc, char* argv[])
     }
   }
 
-  end: return 0;
+  end:
+  // the CPU reference of every configuration was skipped (default; tools/golden): say so once
+  if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
+  return 0;
 }
