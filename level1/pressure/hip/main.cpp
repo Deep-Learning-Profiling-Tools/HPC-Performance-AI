@@ -6,6 +6,7 @@
 // Validation: element-wise comparison of GPU vs CPU p_new (and bvc).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream PRESSURE.hpp
@@ -101,29 +102,41 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.p_new, d_p_new, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(g.bvc, d_bvc, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("bvc", g.bvc, size, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("p_new", g.p_new, size, "f64");
   cudaFree(d_compression); cudaFree(d_bvc); cudaFree(d_p_new);
   cudaFree(d_e_old); cudaFree(d_vnewc);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Data c; setUp(c, size);
-  {
-    Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
-    Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;
-    const Real_type cls = c.cls; const Real_type p_cut = c.p_cut;
-    const Real_type pmin = c.pmin; const Real_type eosvmax = c.eosvmax;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type i = ibegin; i < iend; ++i ) {
-        PRESSURE_BODY1;
-      }
-      for (Index_type i = ibegin; i < iend; ++i ) {
-        PRESSURE_BODY2;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Data c; setUp(c, size);
+    {
+      Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
+      Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;
+      const Real_type cls = c.cls; const Real_type p_cut = c.p_cut;
+      const Real_type pmin = c.pmin; const Real_type eosvmax = c.eosvmax;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type i = ibegin; i < iend; ++i ) {
+          PRESSURE_BODY1;
+        }
+        for (Index_type i = ibegin; i < iend; ++i ) {
+          PRESSURE_BODY2;
+        }
       }
     }
-  }
+    hpcperf_golden_output("bvc.cpu", c.bvc, size, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("p_new.cpu", c.p_new, size, "f64");
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("bvc", c.bvc, g.bvc, size, 1.0e-10)
-          & compareArrays("p_new", c.p_new, g.p_new, size, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("bvc", c.bvc, g.bvc, size, 1.0e-10)
+            & compareArrays("p_new", c.p_new, g.p_new, size, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
