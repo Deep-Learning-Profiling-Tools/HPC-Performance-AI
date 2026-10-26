@@ -38,7 +38,7 @@ python3 level1/hotspot_3d/verify.py ./build/hotspot_3d/cuda/hotspot_3d_cuda 64 8
 
 ## Validation
 
-Built-in CPU reference (computeTempCPU) reports an RMSE ('Accuracy'); verify.py enforces Accuracy < 1e-2. Committed input is the upstream 64x8 grid; the canonical 512x8 files (~42 MB) are not committed for repository size reasons and can be taken from upstream data/hotspot3D.
+Golden reference (tools/golden): a plain run captures the GPU temperature field `tempOut` (f32, rows x cols x layers; `HPCPERF_GOLDEN_DUMP`) and `hpcperf_golden.py check` compares it with the frozen B200 reference `reference/<input>.json`: RMSE <= 1e-2 - d0, i.e. the built-in check's threshold (verify.py enforces the CPU-reference RMSE 'Accuracy' <= 1e-2) minus the golden's own RMSE d0 from `computeTempCPU` (measured once when the reference was frozen). The CPU reference runs only on the explicit offline request below; `hpcperf_golden.py make` runs it through verify.py (which then prints PASS/FAIL; without `HPCPERF_CPU_REFERENCE=1` verify.py finds no 'Accuracy' line and reports FAIL). Upstream quirk (kept): `hotspot_opt1` copies back the buffer of iterate numiter-1 (after the last pointer swap); for the registered even iteration counts the CPU reference's buffer holds the same iterate, so both sides compare iterate numiter-1. ctest runs `hpcperf_golden.py run` on the registry's default input (`g64-l8-i100`, the same 64x8 grid, 100 iterations as the former verify.py ctest); the `check:` block of `inputs.yaml` does the same for every registered input. Committed input is the upstream 64x8 grid; the canonical 512x8 files (~42 MB) are not committed for repository size reasons and can be taken from upstream data/hotspot3D.
 
 Run it via:
 
@@ -47,7 +47,7 @@ ctest --test-dir build/hotspot_3d/cuda --output-on-failure
 ```
 
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**CPU reference switch.** By default the host-side CPU check is skipped: the benchmark prints `SKIP_VERIFY` (no 'Accuracy' line) and its correctness is the golden check above. `HPCPERF_CPU_REFERENCE=1` runs the CPU reference (offline only: `hpcperf_golden.py make` uses it once to validate a new golden reference; no measurement, check or ctest path sets it, and nothing falls back to it); `HPCPERF_SKIP_VERIFY=1` (tools/timing) keeps it off as well. See [tools/golden](../../tools/golden/) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/opt1.cu`: the numiter stencil iterations. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

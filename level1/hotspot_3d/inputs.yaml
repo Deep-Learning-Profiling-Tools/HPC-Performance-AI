@@ -16,16 +16,47 @@ timing:
   regex: '^Time: (?P<value>[0-9.]+) \(s\)'
   select: only
 baseline:
-  method: built-in CPU reference RMSE 'Accuracy' (verify.py enforces < 1e-2)
-  reference: this build's first measured run (self baseline); see method
+  method: 'the temperature field tempOut against the frozen B200 golden reference (`check:` / `golden:` below); the
+    built-in CPU reference computeTempCPU (cuda/3D.cu, RMSE ''Accuracy'' enforced <= 1e-2 by verify.py) runs only once,
+    offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: accuracy_rmse
-    role: required
-    regex: '^Accuracy: (?P<value>[0-9.eE+-]+)'
-    select: only
+  # the former quantity accuracy_rmse ('Accuracy:' line) came from the CPU reference and is no longer printed by default.
+  # The registry needs one quantity: the program's own failure line (fatal(), cuda/3D.cu:44 -- e.g. an input file that
+  # cannot be opened or read), diagnostic only.
+  - name: error_marker
+    role: diagnostic
+    regex: '^Error: '
     compare:
-      rule: abs_lt
-      value: 0.01
+      rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 through verify.py and freezes
+  # tempOut only when verify.py printed PASS (RMSE vs the CPU reference <= 1e-2); every later run is compared with that
+  # frozen output instead. Upstream quirk (kept): hotspot_opt1 copies back tOut_d after the final pointer swap, i.e. the
+  # iterate numiter-1; for the registered (even) iteration counts the CPU reference's `answer` buffer also holds iterate
+  # numiter-1, so both sides compare the same iterate and the final one is never checked.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
+    pass_regex: '^PASS: accuracy'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: tempOut
+    dtype: f32
+    rule: {metric: rmse, tol: 1.0e-2}
+    cpu: tempOut.cpu
+    basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144,
+      :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
+      the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'tempOut against the frozen B200 golden reference reference/<input_id>.json (RMSE <= 1e-2 - d0, d0 = the
+    golden''s RMSE from the built-in CPU reference measured when it was frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: the vendored 64x8 grid at three iteration counts is registered; the canonical 512x8 grid is not vendored

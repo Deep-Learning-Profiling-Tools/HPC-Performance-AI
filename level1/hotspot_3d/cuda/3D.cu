@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
@@ -22,13 +23,14 @@
 
 #include "opt1.cu"
 
-/* HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-   HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-   reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-   does. No kernel, data initialization, tolerance or algorithm is touched. */
+/* HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+   explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+   once, through verify.py, to validate the frozen golden reference); by default it is skipped and
+   correctness is judged by comparing the captured output (hpcperf_golden_output,
+   HPCPERF_GOLDEN_DUMP) with the frozen B200 golden reference (tools/golden). No kernel, data
+   initialization, tolerance or algorithm is touched. */
 static int hpcperf_skip_verify(void) {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != NULL && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -203,11 +205,13 @@ int main(int argc, char** argv)
     memcpy(tempCopy,tempIn, size * sizeof(float));
 
     hotspot_opt1(powerIn, tempIn, tempOut, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
+    hpcperf_golden_output("tempOut", tempOut, (size_t)size, "f32");   /* tools/golden: the checked output */
 
     if (hpcperf_skip_verify()) {
-      printf("SKIP_VERIFY\n");   /* measurement mode: no host re-simulation */
+      printf("SKIP_VERIFY\n");   /* default: no host re-simulation; correctness = the golden check */
     } else {
     computeTempCPU(powerIn, tempCopy, answer, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
+    hpcperf_golden_output("tempOut.cpu", answer, (size_t)size, "f32");   /* the CPU reference (golden make only) */
 
     float acc = accuracy(tempOut,answer,numRows*numCols*layers);
     printf("Accuracy: %e\n",acc);
