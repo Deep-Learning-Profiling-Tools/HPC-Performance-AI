@@ -6,8 +6,12 @@ records on the CPU, and checks the reported top-k nearest neighbors.
 
 Usage: verify.py <exe> <filelist> <k> <lat> <lng>
 """
-import subprocess, sys, math
+import os, subprocess, sys, math
 import numpy as np
+# tools/golden: when HPCPERF_GOLDEN_DUMP is set (only `tools/golden/hpcperf_golden.py make`, the one-time
+# validation of a frozen golden reference), the CPU reference array is captured next to the binary's output
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools", "golden"))
+import hpcperf_golden_capture as gc  # noqa: E402
 
 exe, filelist, k, lat, lng = sys.argv[1], sys.argv[2], int(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5])
 r = subprocess.run([exe, filelist, "-r", str(k), "-lat", str(lat), "-lng", str(lng)],
@@ -27,6 +31,7 @@ for db in open(filelist).read().split():
         dists.append(float(d))
 dists.sort()
 expected = dists[:k]
+gc.capture("topk_distances.cpu", np.array(expected, dtype=np.float32), "f32")   # sorted ascending, as compared
 
 got = []
 for line in r.stdout.splitlines():

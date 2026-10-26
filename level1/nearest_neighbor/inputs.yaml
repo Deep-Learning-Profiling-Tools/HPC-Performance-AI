@@ -11,10 +11,11 @@ entry:
 timing:
   kind: none
   status: NEEDS_TIMING_SUPPORT
-  reason: the CUDA port prints no timer (results checked by ctest verify.py)
+  reason: the CUDA port prints no timer (results checked by the golden check)
 baseline:
-  method: no PASS line; ctest's verify.py recomputes the distances on the CPU (not wired into the registry)
-  reference: this build's first measured run (self baseline); see method
+  method: 'no PASS line; the k reported distances against the frozen B200 golden reference (`check:` / `golden:` below);
+    verify.py (CPU distances + sort) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: no_error
     role: required
@@ -63,3 +64,31 @@ inputs:
   - data/cane4_2.db
   - data/cane4_3.db
   input_form: file
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures the k distances it reports, sorted ascending) and recomputes every record's
+  # distance on the CPU (the k smallest captured as topk_distances.cpu); the capture is frozen only when verify.py
+  # printed PASS.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{param:k}', '{param:lat}', '{param:lng}']
+    pass_regex: '^PASS: top-\d+ nearest-neighbor distances match CPU reference'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: topk_distances
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-4}
+    cpu: topk_distances.cpu
+    basis: verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU
+      distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu,
+      records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the k reported distances (sorted ascending) against the frozen B200 golden reference reference/<input_id>.json
+    (max |a - g| / (1 + |g|) <= 1e-4 - d0, d0 = the golden''s deviation from verify.py''s CPU distances measured when it
+    was frozen); no CPU reference is run'
+  covers: all

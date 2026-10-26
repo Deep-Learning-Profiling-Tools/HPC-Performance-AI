@@ -5,10 +5,12 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <sys/time.h>
 #include <float.h>
 #include <vector>
+#include <algorithm>   // std::sort of the captured top-k copy (tools/golden)
 #include "cuda.h"
 
 #define min( a, b )			a > b ? b : a
@@ -156,6 +158,14 @@ int main(int argc, char* argv[])
 	// find the resultsCount least distances
     findLowest(records,distances,numRecords,resultsCount);
     HPCPERF_ROI_END_SYNC();
+    if (hpcperf_golden_active()) {
+      // tools/golden: the checked output = the k reported distances (records[i].distance, printed below),
+      // sorted ascending exactly as verify.py compares them (findLowest already leaves them ascending)
+      std::vector<float> hpcperf_topk(resultsCount);
+      for (int g = 0; g < resultsCount; g++) hpcperf_topk[g] = records[g].distance;
+      std::sort(hpcperf_topk.begin(), hpcperf_topk.end());
+      hpcperf_golden_output("topk_distances", hpcperf_topk.data(), resultsCount, "f32");
+    }
 
     // print out results
     if (!quiet)
