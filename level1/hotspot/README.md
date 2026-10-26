@@ -33,18 +33,19 @@ cmake --build build/hotspot/cuda
 ## Run
 
 ```bash
-python3 level1/hotspot/verify.py ./build/hotspot/cuda/hotspot_cuda 512 2 2 level1/hotspot/data/temp_512 level1/hotspot/data/power_512
+cd <run dir> && ./build/hotspot/cuda/hotspot_cuda 512 2 2 level1/hotspot/data/temp_512 level1/hotspot/data/power_512 output.out
 ```
 
 ## Validation
 
-Added check (verify.py): numpy float32 re-simulation with the upstream constants, compared to output.out (rel tol 1e-3). Uses the upstream canonical 512x512 input.
-
-Run it via:
+Correctness = the float32 temperature field (`MatrixOut` after the final copy-back, captured as `temperature`; output.out holds the same field as `%g` text) within max |a - g| / (1 + |g|) <= 1e-3 - d0 of the frozen B200 golden reference `reference/<input_id>.json` (d0 = the golden's own deviation from the CPU re-simulation; rule in `inputs.yaml` `golden:`). The added check `verify.py` (numpy float32 re-simulation with the upstream constants, compared to output.out, rel tol 1e-3) validated that reference once and runs only on request (below). Uses the upstream canonical 512x512 input.
 
 ```bash
-ctest --test-dir build/hotspot/cuda --output-on-failure
+ctest --test-dir build/hotspot/cuda --output-on-failure   # golden run of the registry's default input
+python3 tools/golden/hpcperf_golden.py run level1/hotspot [<input_id>]   # the same for any registered input
 ```
+
+**Correctness switch.** The binary has no built-in CPU check (nothing to skip, so it prints no `SKIP_VERIFY`); its CPU reference is `verify.py`, which a plain run, ctest, `tools/inputs` and `tools/timing` never run and nothing falls back to. `tools/golden/hpcperf_golden.py make` runs it once, offline (`HPCPERF_CPU_REFERENCE=1`, `HPCPERF_GOLDEN_DUMP`), to validate the golden reference; verify.py then also captures its CPU reference array (`temperature.cpu`, same order) so make can measure d0. `HPCPERF_GOLDEN_DUMP=<dir>` makes the binary capture its output. See [tools/golden/README.md](../../tools/golden/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/hotspot.cu`: compute_tran_temp (all simulation iterations). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -332,6 +333,7 @@ void run(int argc, char** argv)
     HPCPERF_ROI_END_SYNC();
 	printf("Ending simulation\n");
     cudaMemcpy(MatrixOut, MatrixTemp[ret], sizeof(float)*size, cudaMemcpyDeviceToHost);
+    hpcperf_golden_output("temperature", MatrixOut, size, "f32");   // tools/golden: the checked output (the field written to output.out)
 
     writeoutput(MatrixOut,grid_rows, grid_cols, ofile);
 

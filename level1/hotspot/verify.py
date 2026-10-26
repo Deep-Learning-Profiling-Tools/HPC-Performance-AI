@@ -6,8 +6,12 @@ numpy (float32, same constants as hotspot.cu) and compares output.out.
 
 Usage: verify.py <exe> <grid> <pyramid_height> <sim_time> <temp_file> <power_file>
 """
-import subprocess, sys
+import os, subprocess, sys
 import numpy as np
+# tools/golden: when HPCPERF_GOLDEN_DUMP is set (only `tools/golden/hpcperf_golden.py make`, the one-time
+# validation of a frozen golden reference), the CPU reference array is captured next to the binary's output
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools", "golden"))
+import hpcperf_golden_capture as gc  # noqa: E402
 
 exe, grid, pyr, sim = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4])
 tf, pf = sys.argv[5], sys.argv[6]
@@ -43,6 +47,7 @@ for _ in range(sim):
     E = np.hstack([t[:, 1:], t[:, -1:]])
     t = (t + sdc * (power + (S + N - 2*t) * Ry1 +
                     (E + W - 2*t) * Rx1 + (amb_temp - t) * Rz1)).astype(np.float32)
+gc.capture("temperature.cpu", t, "f32")     # same order as the binary's capture (row-major grid x grid)
 
 out = np.loadtxt("output.out", usecols=1, dtype=np.float32).reshape(grid, grid)
 err = np.abs(out - t) / (1.0 + np.abs(t))

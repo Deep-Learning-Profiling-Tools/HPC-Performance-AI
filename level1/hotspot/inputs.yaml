@@ -14,9 +14,9 @@ timing:
   reason: 'the port''s pin_stats timer macro (printf "timer: ...") is compiled out in this build: the binary prints
     only the configuration lines (survey log); the temperature field goes to output.out'
 baseline:
-  method: no PASS line; verify.py re-simulates the transient in numpy float32 and compares output.out (rel 1e-3)
-    -- the registry's correctness check (check:)
-  reference: this build's first measured run (self baseline); see method
+  method: 'no PASS line; the temperature field against the frozen B200 golden reference (`check:` / `golden:` below);
+    verify.py (numpy float32 re-simulation) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: grid_line
     role: diagnostic
@@ -113,13 +113,30 @@ inputs:
   - data/temp_512
   - data/power_512
   input_form: file
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures the float32 field it writes to output.out) and re-simulates the transient in
+  # numpy float32 (captured as temperature.cpu); the capture is frozen only when verify.py printed PASS.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{param:grid}', '{param:pyramid_height}', '{param:sim_time}', '{arg:3}', '{arg:4}']
+    pass_regex: '^PASS: hotspot output matches CPU reference'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: temperature
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-3}
+    cpu: temperature.cpu
+    basis: verify.py's check max |gpu - ref| / (1 + |ref|) <= 1e-3 against its numpy float32 re-simulation
+      (level1/hotspot/verify.py:53-54), here on the binary's float32 MatrixOut (cuda/hotspot.cu, after the final copy-back)
+      instead of output.out's %g text; the check allows 1e-3 minus the B200 field's own deviation from that CPU reference
 check:
-  # verify.py runs the binary (grid, pyramid height, sim_time, temperature and power files -> output.out in the run
-  # directory) and re-simulates the same transient thermal problem in numpy float32 with the program's constants.
-  kind: standalone
-  command: [python3, '{bench_dir}/verify.py', '{exe}', '{param:grid}', '{param:pyramid_height}', '{param:sim_time}', '{arg:3}', '{arg:4}']
-  pass_regex: '^PASS: hotspot output matches CPU reference'
-  fail_regex: '^FAIL'
-  basis: max over the grid of |gpu - ref| / (1 + |ref|) <= 1e-3, verify.py's own float32-stencil tolerance (ctest, 2 steps);
-    whether it holds at 20 and 200 steps is established by running the check, not by adjusting it
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the temperature field against the frozen B200 golden reference reference/<input_id>.json (max |a - g| / (1 + |g|)
+    <= 1e-3 - d0, d0 = the golden''s deviation from verify.py''s CPU re-simulation measured when it was frozen); no CPU
+    reference is run'
   covers: all
