@@ -21,6 +21,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -91,7 +92,14 @@ int main(int argc, char** argv)
     std::cout << "Thread block size: " <<  block_size << ", "; \
     std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl; \
     hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost); \
-    if(sum==checksum) \
+    { /* tools/golden: the checked output (one int per kernel variant and block size) */ \
+      char hpcperf_name[96]; \
+      snprintf(hpcperf_name, sizeof(hpcperf_name), "sum.%s.b%d", #kernel_name, block_size); \
+      hpcperf_golden_output(hpcperf_name, &sum, 1, "i32"); \
+    } \
+    if(!hpcperf_cpu_reference_enabled()) /* default: no host check; golden comparison (tools/golden) */ \
+      std::cout<<"SKIP_VERIFY"<<std::endl<<std::endl; \
+    else if(sum==checksum) \
       std::cout<<"VERIFICATION: PASS"<<std::endl<<std::endl; \
     else \
       std::cout<<"VERIFICATION: FAIL!!"<<std::endl<<std::endl; \
