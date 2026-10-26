@@ -1,0 +1,133 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "backprop",
+  "level": 1,
+  "input_id": "n262144",
+  "frozen": true,
+  "workload": {
+    "input_id": "n262144",
+    "params": {
+      "input_layer_size": 262144
+    },
+    "args": [
+      "262144"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "6b2fa54b722c14cf79c8b40f1c29d5bf7fa1fb02dc0c8e8989b45935dd6a15ff",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "input_weights",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.001
+        },
+        "cpu": "input_weights.cpu",
+        "basis": "the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->input_weights[0..in][0..hid] against the CPU-trained clone (cuda/facetrain.c:63, :102, :113); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "hidden_weights",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.001
+        },
+        "cpu": "hidden_weights.cpu",
+        "basis": "the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->hidden_weights[0..hid][0..out] against the CPU-trained clone (cuda/facetrain.c:63, :107, :113); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "input_weights",
+      "dtype": "f32",
+      "count": 4456465,
+      "bytes": 17825860,
+      "sha256": "8cc7a8daecdf8f73b869aa7a0d04a53e20a00ecfa89b696403023b68e5682ea4",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "input_weights.cpu",
+        "tol_effective": 0.001
+      },
+      "basis": "the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->input_weights[0..in][0..hid] against the CPU-trained clone (cuda/facetrain.c:63, :102, :113); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 1.0849907994270325e-07,
+        "max": 0.9999994039535522,
+        "sum": 2228068.3418049305,
+        "nonfinite": 0
+      },
+      "blob": "sha256/8c/8cc7a8daecdf8f73b869aa7a0d04a53e20a00ecfa89b696403023b68e5682ea4.bin"
+    },
+    {
+      "name": "hidden_weights",
+      "dtype": "f32",
+      "count": 34,
+      "bytes": 136,
+      "sha256": "82dcdb80351106f27b3fb6e10f960efefa69517f8dcd91d3f54f7718333cc5a5",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "hidden_weights.cpu",
+        "tol_effective": 0.001
+      },
+      "basis": "the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->hidden_weights[0..hid][0..out] against the CPU-trained clone (cuda/facetrain.c:63, :107, :113); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.04753626137971878,
+        "max": 0.9921582937240601,
+        "sum": 16.213083758950233,
+        "nonfinite": 0
+      },
+      "blob": "sha256/82/82dcdb80351106f27b3fb6e10f960efefa69517f8dcd91d3f54f7718333cc5a5.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:16:12Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/backprop/cuda/backprop_cuda",
+    "binary_sha256": "dec616ee682d4102347a3ae8ae8e3009c649c51b6752a34ee89ee6e58761d678",
+    "command": [
+      "build/backprop/cuda/backprop_cuda",
+      "262144"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.38,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/backprop/n262144/run/stdout.log",
+      "log_sha256": "c5b5f3b51ea79d90d6661969d5824e1ae473aa008fb3d1363cc16744b943bc48"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

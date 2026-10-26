@@ -1,0 +1,97 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "needleman_wunsch",
+  "level": 1,
+  "input_id": "n8192-p10",
+  "frozen": true,
+  "workload": {
+    "input_id": "n8192-p10",
+    "params": {
+      "max_rows": 8192,
+      "penalty": 10
+    },
+    "args": [
+      "8192",
+      "10"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "d3b81edf3407d56e5c1a38d4ebff51a67f55a343ee671ed6e201f4aa80fe1927",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "traceback",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "verify.py compares exactly the traceback values of result.txt (first element + one per step) with its CPU DP traceback (level1/needleman_wunsch/verify.py:117); the same values in file order (cuda/needle.cu TRACEBACK block), integers -> byte-identical. The DP matrix itself is not compared (neither was it by verify.py)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "traceback",
+      "dtype": "i32",
+      "count": 8498,
+      "bytes": 33992,
+      "sha256": "38b5317d6a341a7b4cb75744433f880132613ca9070faa498bd81feb4341c951",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "verify.py compares exactly the traceback values of result.txt (first element + one per step) with its CPU DP traceback (level1/needleman_wunsch/verify.py:117); the same values in file order (cuda/needle.cu TRACEBACK block), integers -> byte-identical. The DP matrix itself is not compared (neither was it by verify.py)",
+      "stats": {
+        "min": -105.0,
+        "max": 282.0,
+        "sum": 607725.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:37:27Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/needleman_wunsch/cuda/needleman_wunsch_cuda",
+    "binary_sha256": "d4bb91c3e4ebbace27d36725b064f56d99dec46a5782e232d57c56512bcb2a31",
+    "command": [
+      "python3",
+      "level1/needleman_wunsch/verify.py",
+      "build/needleman_wunsch/cuda/needleman_wunsch_cuda",
+      "8192",
+      "10"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 14.837,
+      "pass_line": "PASS: NW traceback (8498 values) matches CPU DP reference",
+      "pass_regex": "^PASS: NW traceback \\(\\d+ values\\) matches CPU DP reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/needleman_wunsch/n8192-p10/run/stdout.log",
+      "log_sha256": "c6e49c00295bb4ba2ea1e45d0d0f626eda8b7dba6e45e233c6fd66b634fc5812"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

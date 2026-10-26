@@ -1,0 +1,96 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "spmv",
+  "level": 1,
+  "input_id": "s110503",
+  "frozen": true,
+  "workload": {
+    "input_id": "s110503",
+    "params": {
+      "rows": 110503,
+      "loop": "default"
+    },
+    "args": [],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "11a031dcb14f9034c8a382c6e2f679ddb10f9a1539ae6baf981e5eb523411868",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "y",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "l2_rel_sq",
+          "tol": 1e-05
+        },
+        "cpu": "y.cpu",
+        "basis": "upstream check_errors fails on sum (gold - y)^2 / sum gold^2 > 1e-5 (cuda/main.cu:249-253); the check allows (sqrt 1e-5 - sqrt d0)^2 with d0 the B200 output's own deviation from the CPU gold standard",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "y",
+      "dtype": "f64",
+      "count": 110503,
+      "bytes": 884024,
+      "sha256": "996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d",
+      "rule": {
+        "metric": "l2_rel_sq",
+        "tol": 1e-05,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "y.cpu",
+        "tol_effective": 1e-05
+      },
+      "basis": "upstream check_errors fails on sum (gold - y)^2 / sum gold^2 > 1e-5 (cuda/main.cu:249-253); the check allows (sqrt 1e-5 - sqrt d0)^2 with d0 the B200 output's own deviation from the CPU gold standard",
+      "stats": {
+        "min": -30423863.0,
+        "max": 30587527.0,
+        "sum": -69032003988.0,
+        "nonfinite": 0
+      },
+      "blob": "sha256/99/996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:39:22Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/spmv/cuda/spmv_cuda",
+    "binary_sha256": "ceda95daf72017173c0b69e6d1c5118875cb7017c429b2004407903acae023e1",
+    "command": [
+      "build/spmv/cuda/spmv_cuda"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.78,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/spmv/s110503/run/stdout.log",
+      "log_sha256": "e854a19f8175f8eddc0d23372c2ecc1270c314e7c004ea0b0997696cd0d5d353"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "bilateral_filter",
+  "level": 1,
+  "input_id": "w5920-h2880",
+  "frozen": true,
+  "workload": {
+    "input_id": "w5920-h2880",
+    "params": {
+      "width": 5920,
+      "height": 2880,
+      "intensity": 0.5,
+      "spatial": 0.5,
+      "repeat": 1000
+    },
+    "args": [
+      "5920",
+      "2880",
+      "0.5",
+      "0.5",
+      "1000"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "802a46dcf65cd61d7a721cb0f8e577a4cdbf71ae37b94cee1460aa5136c696f9",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "dst.r3",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.001
+        },
+        "cpu": "dst.r3.cpu",
+        "basis": "upstream's per-pixel check |r_dst[i] - h_dst[i]| <= 1e-3 of the R=3 filter against reference<3> (cuda/main.cu:153, common/reference.h); the check allows 1e-3 minus the B200 output's own deviation",
+        "log": null
+      },
+      {
+        "name": "dst.r6",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.001
+        },
+        "cpu": "dst.r6.cpu",
+        "basis": "the same per-pixel check of the R=6 filter against reference<6> (cuda/main.cu:181)",
+        "log": null
+      },
+      {
+        "name": "dst.r9",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.001
+        },
+        "cpu": "dst.r9.cpu",
+        "basis": "the same per-pixel check of the R=9 filter against reference<9> (cuda/main.cu:209)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "dst.r3",
+      "dtype": "f32",
+      "count": 17049600,
+      "bytes": 68198400,
+      "sha256": "373e799f6cc5c1c85eb6547c6236f021393689b1550795db09a9716702f115da",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 6.103515625e-05,
+        "d0_source": "dst.r3.cpu",
+        "tol_effective": 0.00093896484375
+      },
+      "basis": "upstream's per-pixel check |r_dst[i] - h_dst[i]| <= 1e-3 of the R=3 filter against reference<3> (cuda/main.cu:153, common/reference.h); the check allows 1e-3 minus the B200 output's own deviation",
+      "stats": {
+        "min": 0.0,
+        "max": 255.00001525878906,
+        "sum": 2173742466.1742315,
+        "nonfinite": 0
+      },
+      "blob": "sha256/37/373e799f6cc5c1c85eb6547c6236f021393689b1550795db09a9716702f115da.bin"
+    },
+    {
+      "name": "dst.r6",
+      "dtype": "f32",
+      "count": 17049600,
+      "bytes": 68198400,
+      "sha256": "4c7288d051a1a3d34a5be4b4a50c537de71b6ea3f0a0e0b0f4994f53626ba1ab",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 6.103515625e-05,
+        "d0_source": "dst.r6.cpu",
+        "tol_effective": 0.00093896484375
+      },
+      "basis": "the same per-pixel check of the R=6 filter against reference<6> (cuda/main.cu:181)",
+      "stats": {
+        "min": 0.0,
+        "max": 255.00001525878906,
+        "sum": 2173742472.495042,
+        "nonfinite": 0
+      },
+      "blob": "sha256/4c/4c7288d051a1a3d34a5be4b4a50c537de71b6ea3f0a0e0b0f4994f53626ba1ab.bin"
+    },
+    {
+      "name": "dst.r9",
+      "dtype": "f32",
+      "count": 17049600,
+      "bytes": 68198400,
+      "sha256": "0aa6323d4d00dc68860082fd9cadc66122dfc741caac6eb3c65d7f5dfbdf9e63",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 6.103515625e-05,
+        "d0_source": "dst.r9.cpu",
+        "tol_effective": 0.00093896484375
+      },
+      "basis": "the same per-pixel check of the R=9 filter against reference<9> (cuda/main.cu:209)",
+      "stats": {
+        "min": 0.0,
+        "max": 255.00003051757812,
+        "sum": 2173742471.5125613,
+        "nonfinite": 0
+      },
+      "blob": "sha256/0a/0aa6323d4d00dc68860082fd9cadc66122dfc741caac6eb3c65d7f5dfbdf9e63.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:18:40Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/bilateral_filter/cuda/bilateral_filter_cuda",
+    "binary_sha256": "908a2d8532e31801fda8f7803cc86b3a0931f79ca8ca768e6e1eb940e2817751",
+    "command": [
+      "build/bilateral_filter/cuda/bilateral_filter_cuda",
+      "5920",
+      "2880",
+      "0.5",
+      "0.5",
+      "1000"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 83.468,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/bilateral_filter/w5920-h2880/run/stdout.log",
+      "log_sha256": "41ffecbc4f0018d49508ec4abf4f1262352641412610b41b64aca99741db8c99"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "background_subtraction",
+  "level": 1,
+  "input_id": "w4096-h2048-merged0-r1002",
+  "frozen": true,
+  "workload": {
+    "input_id": "w4096-h2048-merged0-r1002",
+    "params": {
+      "width": 4096,
+      "height": 2048,
+      "merged": 0,
+      "repeat": 1002,
+      "seed": 123
+    },
+    "args": [
+      "4096",
+      "2048",
+      "0",
+      "1002"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "ea0f9bd4c426fa5fe4f97711d7628ed36bfcff84516c04afc0c37be29fdf7a4e",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "Tn",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's max |Tn[i] - Tn_ref[i]| over all pixels must be 0 (max_error == 0 -> PASS) against the per-frame CPU reference merge_ref (cuda/main.cu:201-212, common/reference.h); unsigned char, exact",
+        "log": null
+      },
+      {
+        "name": "Bn",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's max |Bn[i] - Bn_ref[i]| over all pixels must be 0, same check (cuda/main.cu:206-212); unsigned char, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "Tn",
+      "dtype": "u8",
+      "count": 8388608,
+      "bytes": 8388608,
+      "sha256": "3f6b4e4931edb84c4a5dbd97bbcebf73bcaad1cff1a4cfa534d3269e3a20a0af",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's max |Tn[i] - Tn_ref[i]| over all pixels must be 0 (max_error == 0 -> PASS) against the per-frame CPU reference merge_ref (cuda/main.cu:201-212, common/reference.h); unsigned char, exact",
+      "stats": {
+        "min": 0.0,
+        "max": 161.0,
+        "sum": 236595194.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Bn",
+      "dtype": "u8",
+      "count": 8388608,
+      "bytes": 8388608,
+      "sha256": "48156c1ecf52c28ed4671f0b0bd3e856b5f913fae2f63fcb187d4a8df6ea52a6",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's max |Bn[i] - Bn_ref[i]| over all pixels must be 0, same check (cuda/main.cu:206-212); unsigned char, exact",
+      "stats": {
+        "min": 46.0,
+        "max": 205.0,
+        "sum": 1038297002.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:17:08Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/background_subtraction/cuda/background_subtraction_cuda",
+    "binary_sha256": "2bfad1625972a40f89f7e1c990ad5386fad80c570850d2f63e617dbda65c40ab",
+    "command": [
+      "build/background_subtraction/cuda/background_subtraction_cuda",
+      "4096",
+      "2048",
+      "0",
+      "1002"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 70.491,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/background_subtraction/w4096-h2048-merged0-r1002/run/stdout.log",
+      "log_sha256": "66221fdccdd7e7d7add7ecc003959ceabee6671ec87acc7e6ced86f210d58d3b"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

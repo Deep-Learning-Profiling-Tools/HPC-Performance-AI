@@ -1,0 +1,101 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "nbody",
+  "level": 1,
+  "input_id": "n16000-s10",
+  "frozen": true,
+  "workload": {
+    "input_id": "n16000-s10",
+    "params": {
+      "particles": 16000,
+      "steps": 10
+    },
+    "args": [
+      "16000",
+      "10"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "d8578bb09bd2b6a8b8f2f5ddc66b32c289e580ba42637025e1405f259e8260f4",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "kenergy",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.001
+        },
+        "cpu": "kenergy.cpu",
+        "basis": "upstream's check fabsf(kenergy_ - ref_kenergy_) < 1e-3f of the final kinetic energy against the CPU reference (common/GSimulationReference.hpp:103); the check allows 1e-3 minus the B200 value's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "kenergy",
+      "dtype": "f32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "kenergy.cpu",
+        "tol_effective": 0.001
+      },
+      "basis": "upstream's check fabsf(kenergy_ - ref_kenergy_) < 1e-3f of the final kinetic energy against the CPU reference (common/GSimulationReference.hpp:103); the check allows 1e-3 minus the B200 value's own deviation from the CPU reference",
+      "stats": {
+        "min": 14571.525390625,
+        "max": 14571.525390625,
+        "sum": 14571.525390625,
+        "nonfinite": 0
+      },
+      "blob": "sha256/65/65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:36:11Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/nbody/cuda/nbody_cuda",
+    "binary_sha256": "367a516bb05002ae2ef10f33da0d49f3a2980858044acf179ec1c2b8053cd600",
+    "command": [
+      "build/nbody/cuda/nbody_cuda",
+      "16000",
+      "10"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 14.92,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/nbody/n16000-s10/run/stdout.log",
+      "log_sha256": "616a4594125b537b6a555627d56422d15e6157cdb902e053f1078176e744380f"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

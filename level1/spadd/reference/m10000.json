@@ -1,0 +1,185 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "spadd",
+  "level": 1,
+  "input_id": "m10000",
+  "frozen": true,
+  "workload": {
+    "input_id": "m10000",
+    "params": {
+      "m": 10000,
+      "n": 10000,
+      "nnz_per_row": 30,
+      "repeat": 1
+    },
+    "args": [],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "535d819b91102bfa627066826e53335e3c5813937aafbfedbc0ac97bbe75a615",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "nnzC",
+        "match": null,
+        "count": null,
+        "dtype": "u64",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the check requires Ccol_ref.size() == nnzC (cuda/main.cu:415)",
+        "log": null
+      },
+      {
+        "name": "Crow",
+        "match": null,
+        "count": null,
+        "dtype": "u64",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the check requires Crow_ref == Crow, the full row-pointer array (size_t; cuda/main.cu:415)",
+        "log": null
+      },
+      {
+        "name": "Ccol",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the check requires Ccol[k] == Ccol_ref[k] for every entry (cuda/main.cu:418)",
+        "log": null
+      },
+      {
+        "name": "Cval",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 1e-13
+        },
+        "cpu": "Cval.cpu",
+        "basis": "the check fails on |Cval[k] - Cval_ref[k]| > 1e-13 * (1 + |Cval_ref[k]|) (cuda/main.cu:419); the check allows 1e-13 minus the B200 output's own deviation from the CPU recomputation",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "nnzC",
+      "dtype": "u64",
+      "count": 1,
+      "bytes": 8,
+      "sha256": "254e1ee57ff3ce09d7b3ef85c49e69adb7d882bb09d8ab1dea10a91a25a6490c",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the check requires Ccol_ref.size() == nnzC (cuda/main.cu:415)",
+      "stats": {
+        "min": 300000.0,
+        "max": 300000.0,
+        "sum": 300000.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Crow",
+      "dtype": "u64",
+      "count": 10001,
+      "bytes": 80008,
+      "sha256": "cd95a0dabdb08b1890f88e7cc41a8baa09dd79b0baf669168e7af41ddf3b73d5",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the check requires Crow_ref == Crow, the full row-pointer array (size_t; cuda/main.cu:415)",
+      "stats": {
+        "min": 0.0,
+        "max": 300000.0,
+        "sum": 1500150000.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Ccol",
+      "dtype": "i32",
+      "count": 300000,
+      "bytes": 1200000,
+      "sha256": "0274e840ef4d14890c61a28ed194b8a44f40be859fed61413ef4f5af94d1528e",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the check requires Ccol[k] == Ccol_ref[k] for every entry (cuda/main.cu:418)",
+      "stats": {
+        "min": 0.0,
+        "max": 9999.0,
+        "sum": 1498934445.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Cval",
+      "dtype": "f64",
+      "count": 300000,
+      "bytes": 2400000,
+      "sha256": "98a807e22187e1cfd74ad92218698dd20aff9588b640149415df39f8080ba927",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 1e-13,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "Cval.cpu",
+        "tol_effective": 1e-13
+      },
+      "basis": "the check fails on |Cval[k] - Cval_ref[k]| > 1e-13 * (1 + |Cval_ref[k]|) (cuda/main.cu:419); the check allows 1e-13 minus the B200 output's own deviation from the CPU recomputation",
+      "stats": {
+        "min": -99.88424143072282,
+        "max": 99.91640725257709,
+        "sum": 27682.368940972665,
+        "nonfinite": 0
+      },
+      "blob": "sha256/98/98a807e22187e1cfd74ad92218698dd20aff9588b640149415df39f8080ba927.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:38:39Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/spadd/cuda/spadd_cuda",
+    "binary_sha256": "9968c671910bb219ac62c565db863bd6beccaa395c0ee02a1deb99b0ec04159d",
+    "command": [
+      "build/spadd/cuda/spadd_cuda"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.677,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/spadd/m10000/run/stdout.log",
+      "log_sha256": "e075a5580ffc4990f4fa26bfba9bf2f0ad8fcde6c14ee33bb66224b348f63d0d"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

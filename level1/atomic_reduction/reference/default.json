@@ -1,0 +1,413 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "atomic_reduction",
+  "level": 1,
+  "input_id": "default",
+  "frozen": true,
+  "workload": {
+    "input_id": "default",
+    "params": {
+      "array_size": "compile-time constant",
+      "repeat": 100
+    },
+    "args": [],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "8a55f30939e1edf82ddc1a47457a2985f48bbc59bda1baf430e8de441ea65f22",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": null,
+        "match": "sum\\..+",
+        "count": 20,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "sum.atomic_reduction.b1024",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction.b128",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction.b256",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction.b512",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v16.b1024",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v16.b128",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v16.b256",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v16.b512",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v2.b1024",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v2.b128",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v2.b256",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v2.b512",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v4.b1024",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v4.b128",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v4.b256",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v4.b512",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v8.b1024",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v8.b128",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v8.b256",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "sum.atomic_reduction_v8.b512",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "4d59fac3d3e2828b9ac67d581d3ee9a35161c46a839904598aea372482c35827",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128, 256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it (cuda/reduction.cu:61, :113); integer, exact",
+      "stats": {
+        "min": 26217631.0,
+        "max": 26217631.0,
+        "sum": 26217631.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:15:47Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/atomic_reduction/cuda/atomic_reduction_cuda",
+    "binary_sha256": "f6767d1c0a6ad35f1daf358b2ee613bf030bcbd79655c404982523b927cdec6a",
+    "command": [
+      "build/atomic_reduction/cuda/atomic_reduction_cuda"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.73,
+      "pass_line": "VERIFICATION: PASS",
+      "pass_regex": "^VERIFICATION: PASS$",
+      "fail_regex": "^VERIFICATION: FAIL",
+      "log": "build/golden-make/atomic_reduction/default/run/stdout.log",
+      "log_sha256": "245dff24a39422c81755eb5b983613b6d53d87b7796c2efbec2572032ad1dc4c"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

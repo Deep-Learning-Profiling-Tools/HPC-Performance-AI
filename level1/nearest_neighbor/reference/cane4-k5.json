@@ -1,0 +1,118 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "nearest_neighbor",
+  "level": 1,
+  "input_id": "cane4-k5",
+  "frozen": true,
+  "workload": {
+    "input_id": "cane4-k5",
+    "params": {
+      "db_files": 4,
+      "records": "4 x cane4_*.db",
+      "k": 5,
+      "lat": 30,
+      "lng": 90
+    },
+    "args": [
+      "build/nearest_neighbor/cuda/filelist_4",
+      "-r",
+      "5",
+      "-lat",
+      "30",
+      "-lng",
+      "90"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/cane4_0.db": "ab2843d14581a9655484680a01cf8573182e89bb805ab8d0845760425a99de67",
+      "data/cane4_1.db": "c18e97284b8481ec036fa14d7ee6791fc918504f1b99589fa273ff13d79f702b",
+      "data/cane4_2.db": "3562b6d6d99006dfe4d011cfd1e9f3573f356ba6040a6a104d5f0b8cb5596daa",
+      "data/cane4_3.db": "000e9dbc0d8c44aab4052f7f64558d4518dc261bd748c941fbcae969adb9e545"
+    }
+  },
+  "inputs_yaml_sha256": "8d717b017ae30e95fef61a7383594c00d13e5077718e17d7baec164b621181b0",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "topk_distances",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.0001
+        },
+        "cpu": "topk_distances.cpu",
+        "basis": "verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu, records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "topk_distances",
+      "dtype": "f32",
+      "count": 5,
+      "bytes": 20,
+      "sha256": "df3813ece5587f581ed88721a41d70833cedc1bdce4a25208f504b934842523c",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "topk_distances.cpu",
+        "tol_effective": 0.0001
+      },
+      "basis": "verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu, records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation",
+      "stats": {
+        "min": 0.1999969482421875,
+        "max": 0.6082763671875,
+        "sum": 2.367375612258911,
+        "nonfinite": 0
+      },
+      "blob": "sha256/df/df3813ece5587f581ed88721a41d70833cedc1bdce4a25208f504b934842523c.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:37:01Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/nearest_neighbor/cuda/nearest_neighbor_cuda",
+    "binary_sha256": "309a0699b071230a2d25b589e98ebcd5abc1029e193e6f7bbb139eef756e663c",
+    "command": [
+      "python3",
+      "level1/nearest_neighbor/verify.py",
+      "build/nearest_neighbor/cuda/nearest_neighbor_cuda",
+      "build/nearest_neighbor/cuda/filelist_4",
+      "5",
+      "30",
+      "90"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.284,
+      "pass_line": "PASS: top-5 nearest-neighbor distances match CPU reference",
+      "pass_regex": "^PASS: top-\\d+ nearest-neighbor distances match CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/nearest_neighbor/cane4-k5/run/stdout.log",
+      "log_sha256": "fad4437b6440c2d7f434e41d9786464d243e491b56c092a02433f82c9070ba7c"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

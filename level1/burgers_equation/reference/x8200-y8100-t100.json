@@ -1,0 +1,139 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "burgers_equation",
+  "level": 1,
+  "input_id": "x8200-y8100-t100",
+  "frozen": true,
+  "workload": {
+    "input_id": "x8200-y8100-t100",
+    "params": {
+      "dim_x": 8200,
+      "dim_y": 8100,
+      "steps": 100
+    },
+    "args": [
+      "8200",
+      "8100",
+      "100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "0d4571b68a62a13fd6a544d3f03893fe9de0b782f8eaddd1ed6714d8b797a48a",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "du",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 1e-06
+        },
+        "cpu": "du.cpu",
+        "basis": "upstream's element-wise check fabs(du - u) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:208); the check allows 1e-6 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "dv",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 1e-06
+        },
+        "cpu": "dv.cpu",
+        "basis": "upstream's element-wise check fabs(dv - v) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:209); the check allows 1e-6 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "du",
+      "dtype": "f64",
+      "count": 66420000,
+      "bytes": 531360000,
+      "sha256": "445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 1e-06,
+        "d0_vs_cpu_reference": 2.220446049250313e-16,
+        "d0_source": "du.cpu",
+        "tol_effective": 9.999999997779553e-07
+      },
+      "basis": "upstream's element-wise check fabs(du - u) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:208); the check allows 1e-6 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 1.0,
+        "max": 2.0,
+        "sum": 70571242.37669814,
+        "nonfinite": 0
+      },
+      "blob": "sha256/44/445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e.bin"
+    },
+    {
+      "name": "dv",
+      "dtype": "f64",
+      "count": 66420000,
+      "bytes": 531360000,
+      "sha256": "445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 1e-06,
+        "d0_vs_cpu_reference": 2.220446049250313e-16,
+        "d0_source": "dv.cpu",
+        "tol_effective": 9.999999997779553e-07
+      },
+      "basis": "upstream's element-wise check fabs(dv - v) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:209); the check allows 1e-6 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 1.0,
+        "max": 2.0,
+        "sum": 70571242.37669814,
+        "nonfinite": 0
+      },
+      "blob": "sha256/44/445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:20:24Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/burgers_equation/cuda/burgers_equation_cuda",
+    "binary_sha256": "7143f11cc89664fedd0400c36be9a86bef2adccdac01c9fbb517a29c89cc860b",
+    "command": [
+      "build/burgers_equation/cuda/burgers_equation_cuda",
+      "8200",
+      "8100",
+      "100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 43.224,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/burgers_equation/x8200-y8100-t100/run/stdout.log",
+      "log_sha256": "91ed9f5e10fd99466cef3e8da8baeb2e4851ce985bfff039a95ba3b3ec30abdc"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

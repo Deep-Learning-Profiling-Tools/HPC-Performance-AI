@@ -1,0 +1,136 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "energy",
+  "level": 1,
+  "input_id": "size16000000",
+  "frozen": true,
+  "workload": {
+    "input_id": "size16000000",
+    "params": {
+      "size": 16000000,
+      "reps": 130
+    },
+    "args": [
+      "16000000",
+      "130"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "b209b9068ed8327debe78151e7d368165ee55e5ec9b0dd75ee116079694e5f4b",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "e_new",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 1e-10
+        },
+        "cpu": "e_new.cpu",
+        "basis": "the driver's element-wise check of e_new (f64[size]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:270); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "q_new",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 1e-10
+        },
+        "cpu": "q_new.cpu",
+        "basis": "the driver's element-wise check of q_new (f64[size]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:271); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "e_new",
+      "dtype": "f64",
+      "count": 16000000,
+      "bytes": 128000000,
+      "sha256": "a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 1e-10,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "e_new.cpu",
+        "tol_effective": 1e-10
+      },
+      "basis": "the driver's element-wise check of e_new (f64[size]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:270); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.09791267969202012,
+        "max": 0.09791267969202012,
+        "sum": 1566602.8750723223,
+        "nonfinite": 0
+      },
+      "blob": "sha256/a3/a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6.bin"
+    },
+    {
+      "name": "q_new",
+      "dtype": "f64",
+      "count": 16000000,
+      "bytes": 128000000,
+      "sha256": "82cb7cd0654397f68ee8c2688a8ad7a0fd32f8951b5de87c49b2530079d677fd",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 1e-10,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "q_new.cpu",
+        "tol_effective": 1e-10
+      },
+      "basis": "the driver's element-wise check of q_new (f64[size]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:271); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.0,
+        "max": 0.0,
+        "sum": 0.0,
+        "nonfinite": 0
+      },
+      "blob": "sha256/82/82cb7cd0654397f68ee8c2688a8ad7a0fd32f8951b5de87c49b2530079d677fd.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:28:42Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/energy/cuda/energy_cuda",
+    "binary_sha256": "1a0abc3aad3eedc470cab39d3d50ee66be36182a2f336822767bebee7b84b6b7",
+    "command": [
+      "build/energy/cuda/energy_cuda",
+      "16000000",
+      "130"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 35.838,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/energy/size16000000/run/stdout.log",
+      "log_sha256": "9659c6894a14645040af387821ef666de727aac15354707e364bccd8bf819ec1"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

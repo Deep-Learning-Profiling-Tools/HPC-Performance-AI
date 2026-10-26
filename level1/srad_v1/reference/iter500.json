@@ -1,0 +1,117 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "srad_v1",
+  "level": 1,
+  "input_id": "iter500",
+  "frozen": true,
+  "workload": {
+    "input_id": "iter500",
+    "params": {
+      "iterations": 500,
+      "lambda": 0.5,
+      "rows": 502,
+      "cols": 458
+    },
+    "args": [
+      "500",
+      "0.5",
+      "502",
+      "458",
+      "level1/srad_v1/data/image.pgm"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/image.pgm": "8988b14347d89515fdefe11d5bb2f2b065117be297d499e868ccc8c450438c45"
+    }
+  },
+  "inputs_yaml_sha256": "8e10e2bd61c7091e9e35d5e16fa62c38c51107dbc8eeb3ab1e15f738722a4ba9",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "image",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "trunc_int",
+          "tol": 3,
+          "frac_tol": 0.001
+        },
+        "cpu": "image.cpu",
+        "basis": "verify.py's check on the (int)-truncated image (what write_graphics writes) -- max pixel difference <= 3 and at most 0.1 % of the pixels differ by more than 1 (level1/srad_v1/verify.py:78-81); made conservative here (the share counts pixels differing by >= 1) and applied to the binary's float image (cuda/main.cu, after the copy-back)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "image",
+      "dtype": "f32",
+      "count": 229916,
+      "bytes": 919664,
+      "sha256": "f4f62ce60b56f9767c4e7af7bd4334ba9592ba60f457656121837f1bb010b793",
+      "rule": {
+        "metric": "trunc_int",
+        "tol": 3,
+        "frac_tol": 0.001,
+        "d0_frac_vs_cpu_reference": 0.0,
+        "frac_tol_effective": 0.001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "image.cpu",
+        "tol_effective": 3.0
+      },
+      "basis": "verify.py's check on the (int)-truncated image (what write_graphics writes) -- max pixel difference <= 3 and at most 0.1 % of the pixels differ by more than 1 (level1/srad_v1/verify.py:78-81); made conservative here (the share counts pixels differing by >= 1) and applied to the binary's float image (cuda/main.cu, after the copy-back)",
+      "stats": {
+        "min": 35.891632080078125,
+        "max": 236.46607971191406,
+        "sum": 24792837.4524498,
+        "nonfinite": 0
+      },
+      "blob": "sha256/f4/f4f62ce60b56f9767c4e7af7bd4334ba9592ba60f457656121837f1bb010b793.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:39:39Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/srad_v1/cuda/srad_v1_cuda",
+    "binary_sha256": "b6c58ecf14f46184e6bc833d7a1b9eaf6e2c38eefdfcb83eaa35de83ac0ee50f",
+    "command": [
+      "python3",
+      "level1/srad_v1/verify.py",
+      "build/srad_v1/cuda/srad_v1_cuda",
+      "500",
+      "0.5",
+      "502",
+      "458",
+      "level1/srad_v1/data/image.pgm"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 5.94,
+      "pass_line": "PASS: srad output image matches CPU reference (max pixel diff 0, frac>1 0.0000%)",
+      "pass_regex": "^PASS: srad output image matches CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/srad_v1/iter500/run/stdout.log",
+      "log_sha256": "adb469940d7a2c89fd1dd70261ecf592b637157cc0f7f6ab3932f707fda3e044"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

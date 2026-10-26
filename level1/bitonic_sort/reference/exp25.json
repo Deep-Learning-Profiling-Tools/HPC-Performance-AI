@@ -1,0 +1,90 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "bitonic_sort",
+  "level": 1,
+  "input_id": "exp25",
+  "frozen": true,
+  "workload": {
+    "input_id": "exp25",
+    "params": {
+      "exponent": 25,
+      "elements": 33554432,
+      "k": 2
+    },
+    "args": [
+      "25",
+      "2"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "756743ac1cdb47ee0d1cdd1f5f393c27da3431f7fbc2b7581fa0331827a0cf62",
+  "spec": {
+    "mode": "hash",
+    "outputs": [
+      {
+        "name": "sorted",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's memcmp of the 2^n sorted ints with the serial host BitonicSort of the same input (cuda/main.cu:237-240); integer, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "sorted",
+      "dtype": "i32",
+      "count": 33554432,
+      "bytes": 134217728,
+      "sha256": "f9ee45f30be28bb412300b94672035823a1d5522ec78329baaccc5e594413166",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp of the 2^n sorted ints with the serial host BitonicSort of the same input (cuda/main.cu:237-240); integer, exact"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:17:25Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/bitonic_sort/cuda/bitonic_sort_cuda",
+    "binary_sha256": "70bf9c93022e88d9c270c723d9f519f9374833587b1ec28b2c241c0fb1490865",
+    "command": [
+      "build/bitonic_sort/cuda/bitonic_sort_cuda",
+      "25",
+      "2"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "hash"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 13.086,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/bitonic_sort/exp25/run/stdout.log",
+      "log_sha256": "569cd133f6e6c24684804ba3c35c2c2c0ff467d1dc010f13f5b44691bd2199f6"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "bezier_surface",
+  "level": 1,
+  "input_id": "n300",
+  "frozen": true,
+  "workload": {
+    "input_id": "n300",
+    "params": {
+      "control_points_file": "data/control.txt",
+      "n": 300
+    },
+    "args": [
+      "-f",
+      "level1/bezier_surface/data/control.txt",
+      "-n",
+      "300"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/control.txt": "d65d7be2890025160cd1e95b4084b6914fe56527d9b06ae5ae982a826397103c"
+    }
+  },
+  "inputs_yaml_sha256": "4b076cfe6da321ebaaf3fa204b06caad5c227330dd45157cb2ac1f75e36a107f",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "surface",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "l1_rel",
+          "tol": 1e-06
+        },
+        "cpu": "surface.cpu",
+        "basis": "the out_size_i x out_size_j XYZ surface as 3 * n * n floats: upstream compare_output requires sum |gpu - cpu| / sum |cpu| over x, y and z of every point < 1e-6 against BezierCPU (cuda/main.cu:161-177); the check allows 1e-6 minus the B200 output's own L1 deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "surface",
+      "dtype": "f32",
+      "count": 270000,
+      "bytes": 1080000,
+      "sha256": "5658f0cddb1b4c937907d5e61992a1a5fd020a2a947b0162338433101c444fa0",
+      "rule": {
+        "metric": "l1_rel",
+        "tol": 1e-06,
+        "d0_vs_cpu_reference": 3.771280938892428e-08,
+        "d0_source": "surface.cpu",
+        "tol_effective": 9.622871543205237e-07
+      },
+      "basis": "the out_size_i x out_size_j XYZ surface as 3 * n * n floats: upstream compare_output requires sum |gpu - cpu| / sum |cpu| over x, y and z of every point < 1e-6 against BezierCPU (cuda/main.cu:161-177); the check allows 1e-6 minus the B200 output's own L1 deviation from the CPU reference",
+      "stats": {
+        "min": -0.5242741107940674,
+        "max": 0.5976090431213379,
+        "sum": 20822.472483985865,
+        "nonfinite": 0
+      },
+      "blob": "sha256/56/5658f0cddb1b4c937907d5e61992a1a5fd020a2a947b0162338433101c444fa0.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:16:29Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/bezier_surface/cuda/bezier_surface_cuda",
+    "binary_sha256": "08033d0cd48bb4cf1a98ed2832cf097bdc8a7c479309ef16f985c4ec6055d910",
+    "command": [
+      "build/bezier_surface/cuda/bezier_surface_cuda",
+      "-f",
+      "level1/bezier_surface/data/control.txt",
+      "-n",
+      "300"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.729,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/bezier_surface/n300/run/stdout.log",
+      "log_sha256": "67541e1bcea805c9ee5ba66c524fdeca90321693a7b7f8d9d41676d35428c4a5"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

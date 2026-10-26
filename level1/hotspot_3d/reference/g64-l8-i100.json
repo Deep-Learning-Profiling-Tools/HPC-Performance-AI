@@ -1,0 +1,114 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "hotspot_3d",
+  "level": 1,
+  "input_id": "g64-l8-i100",
+  "frozen": true,
+  "workload": {
+    "input_id": "g64-l8-i100",
+    "params": {
+      "grid": 64,
+      "layers": 8,
+      "iterations": 100
+    },
+    "args": [
+      "64",
+      "8",
+      "100",
+      "level1/hotspot_3d/data/power_64x8",
+      "level1/hotspot_3d/data/temp_64x8",
+      "output.out"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/power_64x8": "c6f627b4be69ee9e1adfd3cf858fd113e84ea46cb4f3dabc25e37c52d0d517c4",
+      "data/temp_64x8": "6f1d1f8adf0b47ac1b86195bc8644fa51bfcd8550490d39b4b8d93af70eeb403"
+    }
+  },
+  "inputs_yaml_sha256": "0e34f98f145c839656f9b56d05a04c90746b749f517bf8d92163227a393c0fd8",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "tempOut",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "rmse",
+          "tol": 0.01
+        },
+        "cpu": "tempOut.cpu",
+        "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144, :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "tempOut",
+      "dtype": "f32",
+      "count": 32768,
+      "bytes": 131072,
+      "sha256": "1d491bf45ebdee886b5d93c73769c73f4a762dcf189bbcf0da70d6f26518ed71",
+      "rule": {
+        "metric": "rmse",
+        "tol": 0.01,
+        "d0_vs_cpu_reference": 0.00013193587416854047,
+        "d0_source": "tempOut.cpu",
+        "tol_effective": 0.00986806412583146
+      },
+      "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144, :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
+      "stats": {
+        "min": 308.8646240234375,
+        "max": 325.9517822265625,
+        "sum": 10399989.874633789,
+        "nonfinite": 0
+      },
+      "blob": "sha256/1d/1d491bf45ebdee886b5d93c73769c73f4a762dcf189bbcf0da70d6f26518ed71.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:31:10Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/hotspot_3d/cuda/hotspot_3d_cuda",
+    "binary_sha256": "ef90c73793867a05d4ba945d8fa924fbbe12b1ce0618f3c1a5b1e6721577cdac",
+    "command": [
+      "python3",
+      "level1/hotspot_3d/verify.py",
+      "build/hotspot_3d/cuda/hotspot_3d_cuda",
+      "64",
+      "8",
+      "100",
+      "level1/hotspot_3d/data/power_64x8",
+      "level1/hotspot_3d/data/temp_64x8"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.678,
+      "pass_line": "PASS: accuracy vs built-in CPU reference = 1.319e-04 (threshold 1e-2)",
+      "pass_regex": "^PASS: accuracy",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/hotspot_3d/g64-l8-i100/run/stdout.log",
+      "log_sha256": "787dc8ec7d2cea153a0b7f07fbf6754e7873d407105d4154d753e9b06dfed3a7"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

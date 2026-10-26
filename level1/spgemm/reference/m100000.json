@@ -1,0 +1,160 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "spgemm",
+  "level": 1,
+  "input_id": "m100000",
+  "frozen": true,
+  "workload": {
+    "input_id": "m100000",
+    "params": {
+      "m": 100000,
+      "nnz_per_row": 30,
+      "repeat": 1
+    },
+    "args": [
+      "--m",
+      "100000"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "581f136b3b67dbfdefad573dd5e50f60d3391ba12b8b34a8275c926e192db94a",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "Crow",
+        "match": null,
+        "count": null,
+        "dtype": "u64",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the check compares every row size Crow[i+1] - Crow[i] with the CPU product's (cuda/main.cu:503-506); Crow is the host symbolic phase's row-pointer array (size_t) the GPU numeric phase fills",
+        "log": null
+      },
+      {
+        "name": "Ccol",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the check sorts each GPU row and requires its columns to equal the sorted CPU columns (cuda/main.cu:509); captured in that canonical order",
+        "log": null
+      },
+      {
+        "name": "Cval",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 1e-10
+        },
+        "cpu": "Cval.cpu",
+        "basis": "the check fails on |gpu - ref| > 1e-10 * (1 + |ref|) per sorted entry (cuda/main.cu:512-513); the check allows 1e-10 minus the B200 output's own deviation from the CPU product",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "Crow",
+      "dtype": "u64",
+      "count": 100001,
+      "bytes": 800008,
+      "sha256": "fe1da92233853f9fba90ea4eb5f1a51913561b55444433dd22db1cba653f98ca",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the check compares every row size Crow[i+1] - Crow[i] with the CPU product's (cuda/main.cu:503-506); Crow is the host symbolic phase's row-pointer array (size_t) the GPU numeric phase fills",
+      "stats": {
+        "min": 0.0,
+        "max": 89221782.0,
+        "sum": 4461130231572.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Ccol",
+      "dtype": "i32",
+      "count": 89221782,
+      "bytes": 356887128,
+      "sha256": "7ccf7d860a6bf04e1fca1e0041fb7e500ba1732c5db3c4125c3330e7240d7d19",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the check sorts each GPU row and requires its columns to equal the sorted CPU columns (cuda/main.cu:509); captured in that canonical order",
+      "stats": {
+        "min": 0.0,
+        "max": 99999.0,
+        "sum": 4462476416904.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Cval",
+      "dtype": "f64",
+      "count": 89221782,
+      "bytes": 713774256,
+      "sha256": "31bf7c0c1ef61e609ab266b1d0aa2b21926a6916628e341cc36ce00fbf8f3201",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 1e-10,
+        "d0_vs_cpu_reference": 2.303277866646793e-14,
+        "d0_source": "Cval.cpu",
+        "tol_effective": 9.997696722133122e-11
+      },
+      "basis": "the check fails on |gpu - ref| > 1e-10 * (1 + |ref|) per sorted entry (cuda/main.cu:512-513); the check allows 1e-10 minus the B200 output's own deviation from the CPU product",
+      "stats": {
+        "min": -4897.976107059749,
+        "max": 5754.190589506525,
+        "sum": 15444968.114417015,
+        "nonfinite": 0
+      },
+      "blob": "sha256/31/31bf7c0c1ef61e609ab266b1d0aa2b21926a6916628e341cc36ce00fbf8f3201.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:40:02Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/spgemm/cuda/spgemm_cuda",
+    "binary_sha256": "9a3c61fd04bd4de59460a4b8fce2bac283d30c06abc649fad5d730166739070c",
+    "command": [
+      "build/spgemm/cuda/spgemm_cuda",
+      "--m",
+      "100000"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 27.973,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/spgemm/m100000/run/stdout.log",
+      "log_sha256": "6c0f99fc9fdd5cb173a648e71c9a84de9e111fd7718106000eb7130a4e757863"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

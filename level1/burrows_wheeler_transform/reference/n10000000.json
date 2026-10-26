@@ -1,0 +1,92 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "burrows_wheeler_transform",
+  "level": 1,
+  "input_id": "n10000000",
+  "frozen": true,
+  "workload": {
+    "input_id": "n10000000",
+    "params": {
+      "string_length": 10000000
+    },
+    "args": [
+      "10000000"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "10e520f3af6af90a41377d005f8079defe1fe03529a5ed30032a05ad3feb918b",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "bwt",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's exact string comparison cpu_seq.compare(gpu_seq) == 0 of the n transformed characters against the host transform bwt_cpu (common/main.cpp:91); a deterministic permutation of the input, compared byte for byte",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "bwt",
+      "dtype": "u8",
+      "count": 10000000,
+      "bytes": 10000000,
+      "sha256": "5f889265efbd2d65fd4f4c807a0727533b56319db8dc5c01e7b119112d17324b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact string comparison cpu_seq.compare(gpu_seq) == 0 of the n transformed characters against the host transform bwt_cpu (common/main.cpp:91); a deterministic permutation of the input, compared byte for byte",
+      "stats": {
+        "min": 65.0,
+        "max": 84.0,
+        "sum": 717523253.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:20:49Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/burrows_wheeler_transform/cuda/burrows_wheeler_transform_cuda",
+    "binary_sha256": "a4da85d9ab61ee769a98dc50fc068655e9a604458e751ce2fa7397b163e86bfb",
+    "command": [
+      "build/burrows_wheeler_transform/cuda/burrows_wheeler_transform_cuda",
+      "10000000"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 20.24,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/burrows_wheeler_transform/n10000000/run/stdout.log",
+      "log_sha256": "476afb83144683b4f98498dae2eac47d1047475711355c89f4dc89a4c257dd22"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

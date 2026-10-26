@@ -1,0 +1,135 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "black_scholes",
+  "level": 1,
+  "input_id": "x1048576",
+  "frozen": true,
+  "workload": {
+    "input_id": "x1048576",
+    "params": {
+      "options": 1048576
+    },
+    "args": [
+      "-x",
+      "1048576"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "13adac4d46e94f3cb6fff0101401678ec1bb8b1c22999995e5d6617ab517e88e",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "call_price",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.0001
+        },
+        "cpu": "call_price.cpu",
+        "basis": "upstream Verify fails on fabs(verify_call_price_[y] - call_price_[y]) > 1e-4f for every padded element (num_tiles_ * tile_size_; common/bs_benchmark.cc:168); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "put_price",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.0001
+        },
+        "cpu": "put_price.cpu",
+        "basis": "upstream Verify fails on fabs(verify_put_price_[y] - put_price_[y]) > 1e-4f (common/bs_benchmark.cc:175); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "call_price",
+      "dtype": "f32",
+      "count": 1048576,
+      "bytes": 4194304,
+      "sha256": "af1fa9180a7519eb0851725f38c8c147c4a9138efc182c7a4dd8145f58f29087",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 2.288818359375e-05,
+        "d0_source": "call_price.cpu",
+        "tol_effective": 7.711181640625e-05
+      },
+      "basis": "upstream Verify fails on fabs(verify_call_price_[y] - call_price_[y]) > 1e-4f for every padded element (num_tiles_ * tile_size_; common/bs_benchmark.cc:168); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.10779198259115219,
+        "max": 39.939781188964844,
+        "sum": 13167400.360601746,
+        "nonfinite": 0
+      },
+      "blob": "sha256/af/af1fa9180a7519eb0851725f38c8c147c4a9138efc182c7a4dd8145f58f29087.bin"
+    },
+    {
+      "name": "put_price",
+      "dtype": "f32",
+      "count": 1048576,
+      "bytes": 4194304,
+      "sha256": "d8f46f97afc8e4dd0bc4bac01da470a15e472e99083065c636eac88d6378cf62",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 1.043081283569336e-05,
+        "d0_source": "put_price.cpu",
+        "tol_effective": 8.956918716430665e-05
+      },
+      "basis": "upstream Verify fails on fabs(verify_put_price_[y] - put_price_[y]) > 1e-4f (common/bs_benchmark.cc:175); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.008289848454296589,
+        "max": 0.5928860306739807,
+        "sum": 318419.7255381467,
+        "nonfinite": 0
+      },
+      "blob": "sha256/d8/d8f46f97afc8e4dd0bc4bac01da470a15e472e99083065c636eac88d6378cf62.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:17:31Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/black_scholes/cuda/black_scholes_cuda",
+    "binary_sha256": "40c345d113a294b8a9e6ab75cb7dae321445a8474782119d1aca262a27dc6041",
+    "command": [
+      "build/black_scholes/cuda/black_scholes_cuda",
+      "-x",
+      "1048576"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.733,
+      "pass_line": "Passed.",
+      "pass_regex": "^Passed\\.$",
+      "fail_regex": "^Verification failed",
+      "log": "build/golden-make/black_scholes/x1048576/run/stdout.log",
+      "log_sha256": "693f07323017370514ff68971b7c8542a644409c65bd1746573f1a665f69a1ed"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

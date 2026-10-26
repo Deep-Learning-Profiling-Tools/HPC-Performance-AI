@@ -1,0 +1,99 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "aes",
+  "level": 1,
+  "input_id": "plaintext-4mib",
+  "frozen": true,
+  "workload": {
+    "input_id": "plaintext-4mib",
+    "params": {
+      "plaintext_mib": 4,
+      "key_bytes": 32
+    },
+    "args": [
+      "-i",
+      "build/aes/cuda/data/input_4MB.hex",
+      "-k",
+      "build/aes/cuda/data/key.hex"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "7675df810588bd0b0d9db64ca1967a1ed138ff2549d5a3062daf6b61cd613da3",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "ciphertext",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream Verify compares every ciphertext byte with the CPU AES-256 reference, ciphertext_cpu[i] != ciphertext_[i] fails (common/aes_benchmark.cc:158); captured by AesBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "ciphertext",
+      "dtype": "u8",
+      "count": 4194304,
+      "bytes": 4194304,
+      "sha256": "ed4cc3d28a183b1cf876ccdd72e3a5f1d25db4ab5dbee384524a9697853a1479",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream Verify compares every ciphertext byte with the CPU AES-256 reference, ciphertext_cpu[i] != ciphertext_[i] fails (common/aes_benchmark.cc:158); captured by AesBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc)",
+      "stats": {
+        "min": 0.0,
+        "max": 255.0,
+        "sum": 534756592.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:15:36Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/aes/cuda/aes_cuda",
+    "binary_sha256": "cfd9bfcf4de87f5e44ffa074441d275878cfba8113a2b1e3e83d83dec123ac18",
+    "command": [
+      "build/aes/cuda/aes_cuda",
+      "-i",
+      "build/aes/cuda/data/input_4MB.hex",
+      "-k",
+      "build/aes/cuda/data/key.hex"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.382,
+      "pass_line": "Passed. 4194304 bytes encrypted.",
+      "pass_regex": "^Passed\\. [0-9]+ bytes encrypted",
+      "fail_regex": "expected to be 0x",
+      "log": "build/golden-make/aes/plaintext-4mib/run/stdout.log",
+      "log_sha256": "2c633d5b183addc530f531c4803fa92da01a7feec04a9956a5830fe9a99dcbfa"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}
