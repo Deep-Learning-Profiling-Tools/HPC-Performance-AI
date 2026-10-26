@@ -794,10 +794,10 @@ for run in sorted(glob.glob(os.path.join(repo, "level2", "*", "run.sh"))):
         bad.append(f"{name}: build.sh does not put tools/timing/roi on the include path")
 print("ALLOK" if not bad else "\n".join(bad[:10]))
 PY
-if /usr/bin/grep -rn 'HPCPERF_ROI_LOG\|HPCPERF_SKIP_VERIFY' "$REPO"/level1/*/CMakeLists.txt "$REPO"/level2/*/validate.sh >/dev/null 2>&1; then
-    bad "6c: ctest or validate.sh sets a measurement variable -- validation would change"
+if /usr/bin/grep -rn 'HPCPERF_ROI_LOG\|HPCPERF_SKIP_VERIFY\|HPCPERF_CPU_REFERENCE=' "$REPO"/level1/*/CMakeLists.txt "$REPO"/level2/*/validate.sh >/dev/null 2>&1; then
+    bad "6c: ctest or validate.sh sets a measurement / CPU-reference variable -- validation would change"
 else
-    ok "6c: no ctest command or validate.sh sets HPCPERF_ROI_LOG / HPCPERF_SKIP_VERIFY"
+    ok "6c: no ctest command or validate.sh sets HPCPERF_ROI_LOG / HPCPERF_SKIP_VERIFY / HPCPERF_CPU_REFERENCE"
 fi
 # the executables the registry cases run (build/<benchmark>/cuda*/...), else a legacy build root
 exes="$(/usr/bin/awk -F'\t' '!/^#/ {print $5}' "$TOOLS/cases/level1_registry.tsv" | sed "s#{REPO}#$REPO#" | sort -u)"
@@ -922,16 +922,38 @@ case "$res" in "2 2 0 0 TPU_NAME"*) ok "8b: the measurement side refuses interfa
                *) bad "8b: collector_wrap / backend_env_allow: $res" ;; esac
 
 echo
-echo "=== 9: Level 1 skip-verify switch is default-off"
-patched=0; badlog=""
-for f in $(/usr/bin/grep -rl 'hpcperf_skip_verify' "$REPO"/level1/*/cuda/ "$REPO"/level1/*/common/ 2>/dev/null); do
-    patched=$((patched+1))
-    if /usr/bin/grep -qE 'HPCPERF_SKIP_VERIFY"?\s*\)\s*==\s*NULL|skip_verify\s*=\s*true' "$f"; then
-        badlog="$badlog $f"
-    fi
-done
-[ "$patched" -ge 20 ] && [ -z "$badlog" ] && ok "9a: $patched files carry the switch, never enabled by default" \
-                                          || bad "9a: $patched files; default-on suspicion:$badlog"
+echo "=== 9: Level 1 CPU reference is off by default (tools/golden)"
+# Every skip switch of a CPU reference is the golden gate (hpcperf_cpu_reference_enabled: off unless
+# HPCPERF_CPU_REFERENCE=1). lud (L*U residual) and graph_coloring (validity scan) keep the plain
+# HPCPERF_SKIP_VERIFY switch: their checks are property checks, not CPU references. No source enables
+# the CPU reference by itself.
+res="$(python3 - "$REPO" <<'PY'
+import glob, os, re, sys
+repo = sys.argv[1]
+defn = re.compile(r"\bhpcperf_skip_verify\s*\(\s*(void)?\s*\)\s*\{")
+keep_old = ("lud", "graph_coloring", "fir", "color_histogram")   # property checks / time-seeded (pending)
+defs = bad = 0; notes = []
+for f in sorted(glob.glob(os.path.join(repo, "level1", "*", "*", "*"))):
+    if not os.path.isfile(f) or f.split(os.sep)[-2] not in ("cuda", "common", "hip"):
+        continue
+    t = open(f, errors="replace").read()
+    for m in defn.finditer(t):
+        defs += 1
+        body = t[m.end():m.end() + 400].split("}")[0]
+        bench = f.split(os.sep)[-3]
+        if bench in keep_old:
+            if re.search(r'HPCPERF_SKIP_VERIFY"?\s*\)\s*==\s*NULL|skip_verify\s*=\s*true', body):
+                bad += 1; notes.append(f)
+        elif "hpcperf_cpu_reference_enabled" not in body:
+            bad += 1; notes.append(f)
+    if re.search(r'(setenv|putenv)\s*\(\s*"HPCPERF_CPU_REFERENCE', t):
+        bad += 1; notes.append(f + " sets HPCPERF_CPU_REFERENCE")
+print(defs, bad, " ".join(notes[:6]))
+PY
+)"
+set -- $res; patched="$1"; nbad="$2"; shift 2; badlog="$*"
+[ "$patched" -ge 20 ] && [ "$nbad" = 0 ] && ok "9a: $patched definitions of the switch; every CPU-reference one is the golden gate (off by default), lud / graph_coloring keep their property-check switch" \
+                                       || bad "9a: $patched definitions, $nbad not gated by hpcperf_cpu_reference_enabled: $badlog"
 
 echo
 echo "=== 10: gen_cases.py resolves a working ctest and writes one row per ctest test"

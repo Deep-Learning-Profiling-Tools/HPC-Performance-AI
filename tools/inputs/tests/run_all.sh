@@ -67,7 +67,7 @@ t="$(python3 "$TOOL" parse-timing "$R/level2/quicksilver" "$FX/quicksilver_two_t
 python3 - "$t" <<'PY' && ok "quicksilver: 'main' from the Cumulative table (not Last Cycle), us -> s" || bad "quicksilver parse: $t"
 import json,sys; d=json.loads(sys.argv[1]); assert abs(d["main_compute_s"]-7.057)<1e-6 and d["raw_value"]==7.057e6 and d["unit"]=="us"
 PY
-t="$(python3 "$TOOL" parse-timing "$R/level1/background_subtraction" "$FX/bgsub_r102.log" --input w4096-h2048-merged0-r102 2>&1 | noise)"
+t="$(python3 "$TOOL" parse-timing "$FX/registry_bgsub_legacy" "$FX/bgsub_r102.log" --input w4096-h2048-merged0-r102 2>&1 | noise)"
 python3 - "$t" <<'PY' && ok "background_subtraction: per-frame us x (repeat-2) frames" || bad "bgsub parse: $t"
 import json,sys; d=json.loads(sys.argv[1]); assert d["work_count"]==100 and abs(d["main_compute_s"]-100*63.5e-6)<1e-9
 PY
@@ -119,10 +119,10 @@ import json,sys; d=json.load(open(sys.argv[1]))
 assert all(d[k]["present"] for k in ("pass_ratios","pass_facet","pass_no_loss","pass_fluence")) and not d["fail_marker"]["present"]
 assert d["final_cycle_census"]["value"]==91801 and d["final_cycle_num_seg"]["value"]==1868057 and abs(d["final_cycle_scalar_flux"]["value"]-5.918521e5)<1
 PY
-python3 "$TOOL" extract "$R/level1/background_subtraction" "$FX/bgsub_r102.log" > "$TMP/bg.json" 2>/dev/null
-python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['max_error']['value']==0 and d['pass_marker']['present']" "$TMP/bg.json" && mkbase "$R/level1/background_subtraction" w4096-h2048-merged0-r102 "$TMP/bg.json" > "$TMP/bg_base.json"
+python3 "$TOOL" extract "$FX/registry_bgsub_legacy" "$FX/bgsub_r102.log" > "$TMP/bg.json" 2>/dev/null
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['max_error']['value']==0 and d['pass_marker']['present']" "$TMP/bg.json" && mkbase "$FX/registry_bgsub_legacy" w4096-h2048-merged0-r102 "$TMP/bg.json" > "$TMP/bg_base.json"
 [ $? -eq 0 ] && ok "background_subtraction: Max error 0 + PASS extracted" || bad "bgsub extract"
-python3 "$TOOL" compare "$R/level1/background_subtraction" "$TMP/bg_base.json" "$FX/bgsub_fail.log" >/dev/null 2>&1; rc=$?
+python3 "$TOOL" compare "$FX/registry_bgsub_legacy" "$TMP/bg_base.json" "$FX/bgsub_fail.log" >/dev/null 2>&1; rc=$?
 [ $rc -eq 1 ] && ok "background_subtraction: 'Max error is 3' + FAIL -> compare fails" || bad "bgsub FAIL log accepted (rc=$rc)"
 
 # ---- 6. run.sh selectors (dry-run; needs the built app) -------------------------------------
@@ -231,7 +231,7 @@ python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/lj_baseline.json" "$FX/hipbone
 python3 "$TOOL" compare "$R/level2/hipbone" "$TMP/hb_baseline.json" "$FX/hipbone_nx24_p14.log" --rc 134 >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 1 ] && grep -q '"verified": false' "$TMP/c.json" && grep -q 'exited 134' "$TMP/c.json" && ok "neg: candidate exited 134 -> compare fails without reading the science fields" || bad "neg: failed candidate compared (rc=$rc)"
 # 8f. exit 0 but the log says FAIL (background_subtraction really does this: printf FAIL; return 0)
-python3 "$TOOL" compare "$R/level1/background_subtraction" "$TMP/bg_base.json" "$FX/bgsub_fail.log" --rc 0 >"$TMP/c.json" 2>/dev/null; rc=$?
+python3 "$TOOL" compare "$FX/registry_bgsub_legacy" "$TMP/bg_base.json" "$FX/bgsub_fail.log" --rc 0 >"$TMP/c.json" 2>/dev/null; rc=$?
 [ $rc -eq 1 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); c={x['name']:x for x in d['checks']}; assert not c['fail_marker']['ok'] and not c['pass_marker']['ok'] and not c['max_error']['ok']" "$TMP/c.json" 2>/dev/null \
     && ok "neg: exit 0 + 'FAIL' + 'Max error is 3' -> all three markers fail" || bad "neg: FAIL log with exit 0 accepted (rc=$rc)"
 # 8h. record-only rules: nothing fails, but nothing is verified either -> exit 3, never 0
@@ -960,12 +960,14 @@ PY
 unset FAKE_SHARED
 # real registries: the wired checks render, the closed-form and channel_shuffle rules behave
 python3 "$TOOL" check "$R/level1/bfs" graph4096 --out "$TMP/ck_bfs" --dry-run > "$TMP/ck_bfs.json" 2>/dev/null; rc=$?
-python3 - "$TMP/ck_bfs.json" "$R" <<'PY' && ok "bfs: check renders verify.py <exe> <absolute graph path> (standalone, covers all)" || bad "bfs check render rc=$rc $(cat "$TMP/ck_bfs.json")"
+python3 - "$TMP/ck_bfs.json" "$R" <<'PY' && ok "bfs: check renders the golden check (post_run, capture dir in run_env, {input_id} expanded, covers all) -- no verify.py CPU recomputation" || bad "bfs check render rc=$rc $(cat "$TMP/ck_bfs.json")"
 import json, sys; d = json.load(open(sys.argv[1])); R = sys.argv[2]
-assert d["kind"] == "standalone" and d["command"][:2] == ["python3", f"{R}/level1/bfs/verify.py"] and d["command"][3] == f"{R}/level1/bfs/data/graph4096.txt", d["command"]
+assert d["kind"] == "post_run" and d["command"][:3] == ["python3", f"{R}/tools/golden/hpcperf_golden.py", "check"], d["command"]
+assert d["command"][3] == f"{R}/level1/bfs" and d["command"][4] == "graph4096", d["command"]
+assert d["run_env"]["HPCPERF_GOLDEN_DUMP"].endswith("/golden-capture") and not any("verify.py" in c for c in d["command"]), d
 PY
 python3 "$TOOL" check "$R/level1/hotspot" g512-p2-t200 --out "$TMP/ck_hs" --dry-run > "$TMP/ck_hs.json" 2>/dev/null
-python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['command'][3:6]==['512','2','200'] and d['command'][6].endswith('/data/temp_512'), d['command']" "$TMP/ck_hs.json" && ok "hotspot: check renders grid / pyramid height / sim_time from the params and the data files from the args" || bad "hotspot check render: $(cat "$TMP/ck_hs.json")"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='post_run' and d['command'][2]=='check' and d['command'][4]=='g512-p2-t200', d['command']" "$TMP/ck_hs.json" && ok "hotspot: check renders the golden check of the input" || bad "hotspot check render: $(cat "$TMP/ck_hs.json")"
 python3 "$TOOL" check "$R/level2/examinimd" snap-ta06a --out "$TMP/x" --dry-run > "$TMP/snap.json" 2>"$TMP/e"; rc=$?
 [ $rc -eq 0 ] && python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['command'][1].endswith('validate_snap.py') and d['command'][-1]=='100', d['command']" "$TMP/snap.json" \
     && ok "examinimd: the SNAP input's per-input check overrides the LJ check with validate_snap.py (initial state, completeness)" || bad "examinimd snap rc=$rc $(head -c 300 "$TMP/e")"
@@ -988,19 +990,16 @@ assert hi.native_check(doc, {"l2_norm": {"value": 0.0180}, "elapsed_line": el}, 
 PY
 printf '(N=1 C=32 W=224 H=224)\nAverage time of channel shuffle (NHWC): 0.1 (ms)\nAverage time of channel shuffle (NCHW): 0.2 (ms)\n' > "$TMP/cs_ok.log"
 printf '(N=1 C=32 W=224 H=224)\n' > "$TMP/cs_skip.log"
-python3 - "$R" "$TMP/cs_ok.log" "$TMP/cs_skip.log" <<'PY' && ok "channel_shuffle: the 'Average time' lines are required evidence that the built-in memcmp ran -- a skip-verify style log no longer passes on the absent failure marker alone" || bad "channel_shuffle evidence rule"
-import sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
-from pathlib import Path
-doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w255-h255")
-assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[2]), inp), inp)["verdict"] == "PASS"
-assert hi.compare(doc, {}, hi.extract(doc, Path(sys.argv[3]), inp), inp)["verdict"] == "FAIL"
-PY
-# an aborted sweep (upstream's int numel overflows at N=16, C=512, W=H=512; cudaMalloc fails; exit 0) is a
-# failure of the check, not a pass on the configurations that ran before it
-python3 - "$R" <<'PY' && ok "channel_shuffle: the check's fail line covers the aborted sweep ('Device memory allocation failed')" || bad "channel_shuffle aborted-sweep rule"
+# channel_shuffle (golden, 2026-10-26): the check compares all 24 outputs with the frozen reference (sha256), so a
+# skipped or aborted sweep (upstream's int numel overflows at N=16, C=512, W=H=512; cudaMalloc fails; exit 0) misses
+# outputs and fails; the one-time CPU validation of make recognises the aborted sweep by its own line
+python3 - "$R" <<'PY' && ok "channel_shuffle: golden check of all 24 outputs (hash mode, exact); make's CPU validation fails on a mismatch or an aborted sweep" || bad "channel_shuffle golden rules"
 import re, sys; sys.path.insert(0, sys.argv[1] + "/tools/inputs"); import hpcperf_inputs as hi
 doc = hi.load(sys.argv[1] + "/level1/channel_shuffle"); inp = hi.get_input(doc, "g2-w255-h255")
-fail = hi.check_of(doc, inp)["fail_regex"]
+ck = hi.check_of(doc, inp); g = doc["golden"]
+assert ck["kind"] == "post_run" and "hpcperf_golden.py" in ck["command"][1] and ck["run_env"]["HPCPERF_GOLDEN_MODE"] == "hash", ck
+assert g["mode"] == "hash" and g["outputs"][0]["count"] == 24 and g["outputs"][0]["rule"]["metric"] == "exact", g
+fail = g["cpu_check"]["fail_regex"]
 assert re.search(fail, "Device memory allocation failed. Exit"), fail
 assert re.search(fail, "Failed to pass channel shuffle (NCHW) check"), fail
 assert not re.search(fail, "Average time of channel shuffle (NCHW): 0.2 (ms)"), fail
