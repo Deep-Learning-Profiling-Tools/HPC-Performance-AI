@@ -21,7 +21,7 @@ atomic_reduction	HeCBench	cuda,hip	-	outside	-	-
 background_subtraction	HeCBench	cuda,hip	synthetic frame generation; CPU reference (merge_ref)	excluded	-	-
 backprop	Rodinia	cuda	-	outside	-	-
 bezier_surface	HeCBench	cuda,hip	-	outside	-	-
-bfs	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+bfs	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
 bilateral_filter	HeCBench	cuda,hip	-	outside	-	-
 binary_search	HeCBench	cuda,hip	-	none	-	-
 bitonic_sort	HeCBench	cuda,hip	-	outside	-	-
@@ -43,7 +43,7 @@ ft	NPB-GPU	cuda,hip	-	outside	-	-
 gaussian_elimination	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
 graph_coloring	Kokkos-Kernels	cuda,hip	-	outside	-	-
 histogram	HeCBench	cuda,hip	-	outside	-	-
-hotspot	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+hotspot	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
 hotspot_3d	Rodinia	cuda	-	outside	-	-
 is	NPB-GPU	cuda,hip	-	inside	-	partial verification runs as a device kernel (rank_gpu_kernel_7) inside every timed iteration; inseparable without editing an upstream kernel
 jacobi_2d	RAJAPerf	cuda,hip	-	outside	-	-
@@ -54,12 +54,12 @@ matvec_3d_stencil	RAJAPerf	cuda,hip	-	outside	-	-
 mg	NPB-GPU	cuda,hip	-	outside	-	-
 murmurhash3	HeCBench	cuda,hip	-	outside	-	-
 nbody	HeCBench	cuda,hip	-	outside	-	-
-nearest_neighbor	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
-needleman_wunsch	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+nearest_neighbor	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
+needleman_wunsch	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
 pagerank	Hetero-Mark	cuda,hip	-	outside	-	-
-pathfinder	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+pathfinder	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
 pressure	RAJAPerf	cuda,hip	-	outside	-	-
 spadd	Kokkos-Kernels	cuda,hip	-	outside	-	-
 spgemm	Kokkos-Kernels	cuda,hip	-	outside	-	-
 spmv	Kokkos-Kernels	cuda,hip	-	outside	-	-
-srad_v1	Rodinia	cuda	-	none	-	checked outside the binary by verify.py (ctest wrapper)
+srad_v1	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
