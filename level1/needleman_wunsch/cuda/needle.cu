@@ -1,5 +1,6 @@
 #define LIMIT -999
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -176,11 +177,16 @@ void runTest( int argc, char** argv)
 	
 	FILE *fpo = fopen("result.txt","w");
 	fprintf(fpo, "print traceback value GPU:\n");
+	// tools/golden: the checked output = the traceback values written to result.txt (i32, in file order)
+	hpcperf_golden_stream hpcperf_tb;
+	hpcperf_golden_begin(&hpcperf_tb, "traceback", "i32");
     
 	for (int i = max_rows - 2,  j = max_rows - 2; i>=0, j>=0;){
 		int nw, n, w, traceback;
 		if ( i == max_rows - 2 && j == max_rows - 2 )
 			fprintf(fpo, "%d ", output_itemsets[ i * max_cols + j]); //print the first element
+		if ( i == max_rows - 2 && j == max_rows - 2 )
+			hpcperf_golden_append(&hpcperf_tb, &output_itemsets[ i * max_cols + j], 1);
 		if ( i == 0 && j == 0 )
            break;
 		if ( i > 0 && j > 0 ){
@@ -214,6 +220,7 @@ void runTest( int argc, char** argv)
             traceback = n;
 			
 		fprintf(fpo, "%d ", traceback);
+		hpcperf_golden_append(&hpcperf_tb, &traceback, 1);
 
 		if(traceback == nw )
 		{i--; j--; continue;}
@@ -228,6 +235,7 @@ void runTest( int argc, char** argv)
 		;
 	}
 	
+	hpcperf_golden_end(&hpcperf_tb);
 	fclose(fpo);
 
 #endif

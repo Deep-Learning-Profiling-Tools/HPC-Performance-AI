@@ -33,18 +33,19 @@ cmake --build build/needleman_wunsch/cuda
 ## Run
 
 ```bash
-python3 level1/needleman_wunsch/verify.py ./build/needleman_wunsch/cuda/needleman_wunsch_cuda 2048 10
+cd <run dir> && ./build/needleman_wunsch/cuda/needleman_wunsch_cuda 2048 10     # writes result.txt (TRACEBACK build)
 ```
 
 ## Validation
 
-Added check (verify.py): reproduces the glibc rand() input, recomputes the DP matrix on the CPU, and walks the upstream traceback (TRACEBACK code path enabled at build time) comparing all values.
-
-Run it via:
+Correctness = the traceback values (written to result.txt by the TRACEBACK code path enabled at build time, captured as `traceback`, i32 in file order) byte-identical to the frozen B200 golden reference `reference/<input_id>.json` (rule in `inputs.yaml` `golden:`). The added check `verify.py` (reproduces the glibc rand() input, recomputes the DP matrix on the CPU and walks the upstream traceback, comparing all values) validated that reference once and runs only on request (below). As in verify.py the DP matrix itself is not compared, only the traceback derived from it.
 
 ```bash
-ctest --test-dir build/needleman_wunsch/cuda --output-on-failure
+ctest --test-dir build/needleman_wunsch/cuda --output-on-failure   # golden run of the registry's default input
+python3 tools/golden/hpcperf_golden.py run level1/needleman_wunsch [<input_id>]   # the same for any registered input
 ```
+
+**Correctness switch.** The binary has no built-in CPU check (nothing to skip, so it prints no `SKIP_VERIFY`); its CPU reference is `verify.py`, which a plain run, ctest, `tools/inputs` and `tools/timing` never run and nothing falls back to. `tools/golden/hpcperf_golden.py make` runs it once, offline (`HPCPERF_CPU_REFERENCE=1`, `HPCPERF_GOLDEN_DUMP`), to validate the golden reference. `HPCPERF_GOLDEN_DUMP=<dir>` makes the binary capture its output. See [tools/golden/README.md](../../tools/golden/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/needle.cu`: both anti-diagonal sweeps. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 
