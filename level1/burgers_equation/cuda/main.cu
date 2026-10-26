@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,13 +8,14 @@
 #include <cuda.h>
 #include "kernels.h"
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -130,8 +132,12 @@ int main(int argc, char* argv[])
 
   cudaMemcpy(du, d_u, grid_size, cudaMemcpyDeviceToHost);
   cudaMemcpy(dv, d_v, grid_size, cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("du", du, (size_t)grid_elems, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("dv", dv, (size_t)grid_elems, "f64");
 
   if (hpcperf_skip_verify()) {
+    // default: the CPU reference (a serial re-run of all time steps on the host) is skipped;
+    // correctness = the captured outputs against the frozen golden reference (tools/golden)
     printf("SKIP_VERIFY\n");
   } else {
     printf("Serial computing for verification...\n");
@@ -192,6 +198,9 @@ int main(int argc, char* argv[])
         }
       }
     }
+
+    hpcperf_golden_output("du.cpu", u, (size_t)grid_elems, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("dv.cpu", v, (size_t)grid_elems, "f64");
 
     bool ok = true;
     for(int i = 0; i < y_points; i++){

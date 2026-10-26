@@ -45,7 +45,7 @@ cmake --build build/burgers_equation/hip
 
 ## Validation
 
-Built-in: GPU solution field compared against the upstream CPU implementation; prints PASS/FAIL.
+Golden reference (tools/golden): a plain run captures the GPU solution fields `du` and `dv` (f64, dim_x * dim_y each; `HPCPERF_GOLDEN_DUMP`) and `hpcperf_golden.py check` compares them with the frozen B200 reference `reference/<input>.json`: max |a - g| <= 1e-6 - d0 per field, i.e. upstream's tolerance against the serial CPU solver minus the golden's own deviation d0 from that solver (measured once when the reference was frozen). The serial CPU solver itself (prints PASS/FAIL) runs only on the explicit offline request below. ctest runs `hpcperf_golden.py run` on the registry's default input (`x8200-y8100-t100`, the former ctest arguments); the `check:` block of `inputs.yaml` does the same for every registered input.
 
 Run it via:
 
@@ -54,7 +54,7 @@ ctest --test-dir build/burgers_equation/cuda --output-on-failure
 ```
 
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**CPU reference switch.** By default the host-side CPU check is skipped: the benchmark prints `SKIP_VERIFY` (never PASS/FAIL) and its correctness is the golden check above. `HPCPERF_CPU_REFERENCE=1` runs the CPU reference (offline only: `hpcperf_golden.py make` uses it once to validate a new golden reference; no measurement, check or ctest path sets it, and nothing falls back to it); `HPCPERF_SKIP_VERIFY=1` (tools/timing) keeps it off as well. See [tools/golden](../../tools/golden/) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: each region the benchmark's own timer measures around its kernel launches. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -120,7 +121,14 @@ int main(int argc, char* argv[])
 
   hipMemcpy(du, d_u, grid_size, hipMemcpyDeviceToHost);
   hipMemcpy(dv, d_v, grid_size, hipMemcpyDeviceToHost);
+  hpcperf_golden_output("du", du, (size_t)grid_elems, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("dv", dv, (size_t)grid_elems, "f64");
 
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference is skipped; correctness = the captured outputs against the
+    // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+    printf("SKIP_VERIFY\n");
+  } else {
   printf("Serial computing for verification...\n");
 
   // Reset velocities
@@ -180,6 +188,9 @@ int main(int argc, char* argv[])
     }
   }
 
+  hpcperf_golden_output("du.cpu", u, (size_t)grid_elems, "f64");   // the CPU reference (golden make only)
+  hpcperf_golden_output("dv.cpu", v, (size_t)grid_elems, "f64");
+
   bool ok = true;
   for(int i = 0; i < y_points; i++){
     for(int j = 0; j < x_points; j++){
@@ -188,6 +199,7 @@ int main(int argc, char* argv[])
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  }
 
   free(x);
   free(y);
