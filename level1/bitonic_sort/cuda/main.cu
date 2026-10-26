@@ -35,6 +35,7 @@
 // accordingly in parallel.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <math.h>
 #include <string.h>
 #include <chrono>
@@ -174,13 +175,14 @@ void Usage(std::string prog_name, int exponent) {
 
 #include <cstdlib>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 int main(int argc, char *argv[]) {
@@ -223,10 +225,12 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Bitonic sort (parallel)..\n";
   ParallelBitonicSort(data_gpu, n);
+  hpcperf_golden_output("sorted", data_gpu, size, "i32");   // tools/golden: the checked output (after the D2H copy)
 
 
   if (hpcperf_skip_verify()) {
-    /* measurement mode: host-side verification is not part of the timed work */
+    // default: the CPU reference (serial BitonicSort) is skipped; correctness = the captured
+    // sorted array against the frozen golden reference (tools/golden)
     std::cout << "SKIP_VERIFY" << std::endl;
   } else {
     std::cout << "Bitonic sort (serial)..\n";
