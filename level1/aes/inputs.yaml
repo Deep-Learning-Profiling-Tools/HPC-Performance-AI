@@ -14,19 +14,38 @@ timing:
   reason: the port exposes no timing option (upstream's benchmark_runner -t timing mode is not wired into the CLI);
     only the verification line is printed
 baseline:
-  method: 'built-in (upstream Verify): ciphertext vs the CPU AES-256 reference: ''Passed.'''
-  reference: this build's first measured run (self baseline); see method
+  method: 'the ciphertext against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    CPU AES-256 reference (Verify) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: Passed
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: (FAIL|[Ff]ail)
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the
+  # ciphertext only when upstream Verify printed 'Passed.'; every later run is compared with that frozen output.
+  mode: data
+  cpu_check: {pass_regex: '^Passed\. [0-9]+ bytes encrypted', fail_regex: 'expected to be 0x'}
+  outputs:
+  - name: ciphertext
+    dtype: u8
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream Verify compares every ciphertext byte with the CPU AES-256 reference, ciphertext_cpu[i] !=
+      ciphertext_[i] fails (common/aes_benchmark.cc:158); captured by AesBenchmark::CaptureGoldenOutputs after the
+      timed Run()s (common/benchmark_runner.cc)
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the ciphertext (text_length_ bytes) byte-identical to the frozen B200 golden reference
+    reference/<input_id>.json (upstream Verify is an exact byte compare against the CPU AES reference); no CPU
+    reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: three points of the upstream size sweep from the repository's deterministic generator (the upstream data

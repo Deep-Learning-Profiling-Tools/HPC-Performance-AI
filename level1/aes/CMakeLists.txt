@@ -55,10 +55,16 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
-    add_test(NAME aes_run COMMAND ${_hpcperf_target} -i ${CMAKE_CURRENT_BINARY_DIR}/data/input_1MB.hex -k ${CMAKE_CURRENT_BINARY_DIR}/data/key.hex)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    # one plain run of the registry's default input (no CPU reference), its output compared with
+    # the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME aes_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(aes_run PROPERTIES TIMEOUT 600
-        PASS_REGULAR_EXPRESSION "Passed"
-        FAIL_REGULAR_EXPRESSION "expected to be")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

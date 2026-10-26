@@ -145,6 +145,7 @@ class AesBenchmark : public Benchmark {
   void Verify() override;
   void Cleanup() override;
   void Summarize() override;
+  void CaptureGoldenOutputs() override;  // tools/golden
 
   void SetInputFileName(const std::string &file_name) {
     input_file_name_ = file_name;

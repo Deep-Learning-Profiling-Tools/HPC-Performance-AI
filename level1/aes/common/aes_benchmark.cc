@@ -32,6 +32,7 @@
  */
 
 #include "aes_benchmark.h"
+#include "hpcperf_golden.h"
 #include <inttypes.h>
 #include <cstdio>
 #include <cstring>
@@ -116,6 +117,12 @@ void AesBenchmark::DumpExpandedKey() {
     printf("\nword[%d]: %08x ", i, expanded_key_[i]);
   }
   printf("\n");
+}
+
+// tools/golden: the ciphertext Verify() compares byte-wise with the CPU AES reference
+// (written back by the last timed Run(); a no-op unless HPCPERF_GOLDEN_DUMP is set)
+void AesBenchmark::CaptureGoldenOutputs() {
+  hpcperf_golden_output("ciphertext", ciphertext_, text_length_, "u8");
 }
 
 void AesBenchmark::Verify() {
