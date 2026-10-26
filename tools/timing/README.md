@@ -81,7 +81,7 @@ One set of markers serves two measurements:
 | unit | 51 cases of 50 benchmark binaries | 28 cases of 24 `level2/<app>/run.sh` | 10 cases of 10 `level3/<app>/run.sh`, 2 GPUs each |
 | region | ROI markers | ROI markers | **the application's own loop timer** (no markers, see below) |
 | runs per case | 1 warm-up + 5 clean + 1 profiled | 1 warm-up (discarded) + 3 clean + 1 profiled | 0 whole-process warm-up + 3 fixed clean + 1 separate profiled (QMCPACK: 3 clean, no profiled run by default); headline = median of the 3, spread (max - min) / median <= 10 % or UNSTABLE, no adaptive extension (final, 2026-10-03; the campaigns before it had 1 clean run) |
-| verification | outside the ROI; `HPCPERF_SKIP_VERIFY=1` also skips the CPU reference (minutes for some) | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
+| verification | outside the ROI; no CPU reference runs (default off, `tools/golden`); `HPCPERF_SKIP_VERIFY=1` also skips the remaining property checks | outside the ROI; `validate.sh` is never called | outside; `validate.sh` is never called, and only 2 of the 10 timing inputs are ones it checks |
 | FOM | none (the benchmarks' own printouts are not comparable) | the application's own metric where it prints one (16 of 24) | LAMMPS and SPARTA print one |
 
 The headline therefore carries **no profiler overhead**: the profiler's cost shows
@@ -542,11 +542,17 @@ must set up what `run.sh` needs (the toolchain, the MPI transport profile).
 
 ## Level 1 verification switch
 
-Most Level 1 benchmarks validate by recomputing the whole workload on one CPU core.
-That is outside the ROI now, but it can take minutes, so `measure_level1.sh` still
-sets `HPCPERF_SKIP_VERIFY=1` (41 benchmarks honor it; `--keep-verify` turns it
-off). ctest never sets it, and the tests assert that nothing enables it by
-default. NPB `is` verifies inside its timed kernels and cannot be separated
+Most Level 1 benchmarks used to validate by recomputing the whole workload on one CPU
+core. Since 2026-10-26 that CPU reference never runs by default: the benchmarks skip it
+unless `HPCPERF_CPU_REFERENCE=1` is set explicitly, and correctness is the comparison of
+their captured outputs with the frozen B200 golden reference (`tools/golden/README.md`;
+`hpcperf_golden.py make` is the only caller of the switch, once per input). The clean
+environment of a measurement never passes `HPCPERF_CPU_REFERENCE` and cases cannot set it
+(reserved name). `measure_level1.sh` still sets `HPCPERF_SKIP_VERIFY=1`, which now only
+switches off the checks that are not CPU references (lud's L*U residual, graph_coloring's
+validity scan) and the two time-seeded benchmarks whose conversion is pending (fir,
+color_histogram); `--keep-verify` leaves those on. ctest runs the golden comparison; the
+tests assert that no source enables the CPU reference by itself. NPB `is` verifies inside its timed kernels and cannot be separated
 without editing an upstream kernel: its ROI includes that check
 (`verify_vs_roi=inside`, caveated). `background_subtraction` generates frames and
 runs its CPU reference inside the frame loop; both are excluded.

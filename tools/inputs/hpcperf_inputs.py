@@ -120,8 +120,12 @@ STABLE_SPREAD = 0.10
 # correctness checks (inputs.yaml `check:`): a checker command run outside any timing
 CHECK_KINDS = ("standalone", "post_run", "none")
 CHECK_SCHEMA = "hpcperf-inputs-check-1"
-TEMPLATE_NAMES = ("exe", "args", "run_dir", "log", "outputs", "bench_dir", "repo", "param", "arg")
-TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|param:[A-Za-z0-9_.-]+|arg:\d+)\}")
+TEMPLATE_NAMES = ("exe", "args", "run_dir", "log", "outputs", "bench_dir", "repo", "input_id", "param", "arg")
+TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|input_id|param:[A-Za-z0-9_.-]+|arg:\d+)\}")
+# The variables that switch a benchmark's own host-side CPU reference on (tools/golden/hpcperf_golden.h) or make it
+# capture its outputs: no measurement and no correctness check inherits them from the caller's shell -- a check
+# compares against the frozen golden reference and never falls back to the CPU reference.
+CPU_REFERENCE_VARS = ("HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE")
 
 
 class InputError(Exception):
@@ -441,12 +445,12 @@ def check_context(doc, inp, root: Path, bench_dir: Path, run_dir: Path, log=None
         raise InputError(f"binary {exe} not built")
     return {"exe": str(exe), "args": resolve_repo_args(root, inp.get("args") or []), "params": inp.get("params") or {},
             "run_dir": str(run_dir), "log": None if log is None else str(log), "outputs": None if outputs is None else str(outputs),
-            "bench_dir": str(Path(bench_dir).resolve()), "repo": str(root)}
+            "bench_dir": str(Path(bench_dir).resolve()), "repo": str(root), "input_id": inp["id"]}
 
 
 def render_token(tok: str, ctx: dict):
     """One template token. `{args}` alone expands to the input's argument list; every other placeholder
-    ({exe} {run_dir} {log} {outputs} {bench_dir} {repo} {param:NAME} {arg:N}) is substituted in place."""
+    ({exe} {run_dir} {log} {outputs} {bench_dir} {repo} {input_id} {param:NAME} {arg:N}) is substituted in place."""
     if tok == "{args}":
         return list(ctx["args"])
 
@@ -1164,6 +1168,8 @@ def summarize(doc, inp, runs, reps):
 def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps: int, timeout: int, gpus: int):
     out.mkdir(parents=True, exist_ok=True)
     cmd, env, entry_path = build_command(doc, inp, root, bench_dir, gpus)
+    for k in CPU_REFERENCE_VARS:            # a measured run never runs the CPU reference nor captures outputs
+        env.pop(k, None)
     e2e_boundary = ("process wall of the benchmark binary (fork/exec to exit; includes CUDA context creation)"
                     if doc["entry"]["kind"] == "binary" else
                     "wrapper wall of run.sh (env sourcing, launcher, mpirun, binding audit, application)")
@@ -1326,6 +1332,8 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
         except InputError as ex:
             return finish("ERROR", f"the benchmark cannot be run: {ex}")
         env.pop("HPCPERF_SKIP_VERIFY", None)      # a correctness run is never a skip-verify (timing) run
+        for k in CPU_REFERENCE_VARS:              # nor a CPU-reference run: only run_env may set the capture switches
+            env.pop(k, None)
         for k, v in r["run_env"].items():
             if v is None:
                 env.pop(k, None)
@@ -1344,6 +1352,8 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
     if r["command"]:
         env = dict(os.environ)
         env.pop("HPCPERF_SKIP_VERIFY", None)
+        for k in CPU_REFERENCE_VARS:
+            env.pop(k, None)
         env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
         for k, v in r["env"].items():
             if v is None:

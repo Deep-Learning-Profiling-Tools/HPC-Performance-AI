@@ -40,5 +40,8 @@ level3/*/.discarded-*
 level3/.materialize-staging/
 .artifacts/
 .hpcperf/
+# frozen golden references (tools/golden): the reference/<input>.json records are committed; the raw output bytes of
+# outputs compared with a tolerance live in the content-addressed golden store, never in git
+.golden-store/
 workspaces/
 *.tar.zst

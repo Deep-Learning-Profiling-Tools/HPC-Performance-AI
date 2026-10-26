@@ -111,7 +111,8 @@ their schema (`hpcperf-timing-1`).
   and a "Measurement markers" paragraph in each benchmark README. Pure insertions;
   Rodinia's CRLF line endings preserved.
 * Earlier on the branch: the `HPCPERF_SKIP_VERIFY=1` switch (41 benchmarks skip their
-  CPU reference while measuring; default off, ctest unchanged; commit `8daa974`), and two
+  CPU reference while measuring; default off, ctest unchanged; commit `8daa974` -- since
+  2026-10-26 the CPU reference is off by default everywhere, `tools/golden`), and two
   off-by-default cross-check switches, `HPCPERF_L1_PHASE_TIMING=1` (Hetero-Mark phase
   table) and `-DHPCPERF_NPB_PROFILING=ON` (NPB per-kernel table) (commit `6589737`).
 * `level1/README.md`: the runtime-measurement section.

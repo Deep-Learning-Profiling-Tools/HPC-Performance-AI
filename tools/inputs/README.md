@@ -292,16 +292,17 @@ check:
   reason: <why there is no check>           # kind none only
 ```
 
-* `standalone`: the checker runs the benchmark itself (a `verify.py` that runs the binary and
-  recomputes the result on the CPU, a `validate.sh`); cwd = `<out>/run`.
+* `standalone`: the checker runs the benchmark itself (a checker script, a `validate.sh`); cwd = `<out>/run`.
 * `post_run`: the tool runs the benchmark once in `<out>/run` (stdout -> `stdout.log`; the
-  timing switch `HPCPERF_SKIP_VERIFY` is never set; `run_env` applied), copies the declared
+  timing switch `HPCPERF_SKIP_VERIFY` is never set, the CPU-reference / capture switches
+  `HPCPERF_CPU_REFERENCE`, `HPCPERF_GOLDEN_DUMP`, `HPCPERF_GOLDEN_MODE` of the caller are dropped
+  -- only `run_env` may set the capture -- and `run_env` applied), copies the declared
   `outputs` (paths or globs of files the application writes into shared directories; `new: true`
   = only files modified by this run) into `<out>/outputs`, then runs the checker -- or, without
   a `command`, reads the program's own pass/fail lines from `stdout.log`.
 * Templates: `{exe}` (the binary, or the run.sh entry), `{args}` (the input's whole argument
   list, repository paths made absolute), `{arg:N}`, `{param:NAME}`, `{run_dir}`, `{log}` (the
-  post_run stdout), `{outputs}`, `{bench_dir}`, `{repo}`. `validate` renders every input's block
+  post_run stdout), `{outputs}`, `{bench_dir}`, `{repo}`, `{input_id}`. `validate` renders every input's block
   and refuses unknown parameters, arguments or placeholders.
 * Verdict (`check.json`, schema `hpcperf-inputs-check-1`, with the workload identity, command,
   environment overrides, exit codes, log sha256, outputs with sha256, git head, host / GPU and
@@ -332,8 +333,20 @@ missing file is an error that satisfies nothing, not even `absent`), and the rul
 compares a quantity with a reference constant (`value`) at a relative tolerance (`tol`) -- for
 analytic or upstream-published results (p3_heat3d's closed-form `L2_norm`).
 
+**No CPU reference at run time (2026-10-26, decision of the project owner).** No measurement, no
+check and no optimization candidate runs a benchmark's CPU reference implementation. Where the
+correctness criterion used to be "recompute on the CPU and compare" (40 Level 1 benchmarks, Level 2
+Kripke and ExaCMech), the oracle is the frozen B200 golden reference of the input (`tools/golden`):
+the outputs of the unmodified build, frozen once after that CPU reference validated them, compared
+with the upstream metric and tolerance minus the golden's own measured deviation from the CPU
+reference (so the original criterion is not loosened). The CPU references stay in the sources for
+that one-time validation and run only with an explicit `HPCPERF_CPU_REFERENCE=1`; nothing falls back
+to them. Independent checks (analytic solutions, conservation, official reference values,
+property checks, frozen references made earlier) are unchanged.
+
 Principles (fixed for this project): upstream / native check > upstream reference > exact
-deterministic comparison > same-input unoptimized baseline; a tolerance needs an upstream or
+deterministic comparison > same-input unoptimized baseline (for the CPU-referenced benchmarks the
+frozen B200 golden above, CPU-validated at freeze time, takes the place of the run-time CPU reference); a tolerance needs an upstream or
 numerical basis and is never fitted to a candidate; runtime, FOM, iteration counts, sizes, exit
 0 and "no NaN" are diagnostics, never correctness; a required `record` is never downgraded to
 a diagnostic; correctness instrumentation stays outside the ROI.
