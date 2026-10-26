@@ -11,11 +11,11 @@ entry:
 timing:
   kind: none
   status: NEEDS_TIMING_SUPPORT
-  reason: the CUDA port prints only 'Kernel Executed N times'; hop counts go to result.txt (checked by ctest verify.py)
+  reason: the CUDA port prints only 'Kernel Executed N times'; hop counts go to result.txt (golden check)
 baseline:
-  method: no PASS line from the binary; verify.py recomputes all hop counts on the CPU and compares result.txt
-    exactly -- the registry's correctness check (check:)
-  reference: this build's first measured run (self baseline); see method
+  method: 'no PASS line from the binary; the hop counts against the frozen B200 golden reference (`check:` / `golden:`
+    below); verify.py (CPU BFS) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: kernel_executed
     role: diagnostic
@@ -73,13 +73,27 @@ inputs:
   files:
   - data/graph4096.txt
   input_form: file
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures its hop counts) and recomputes every hop count with an independent CPU BFS;
+  # the capture is frozen only when verify.py printed PASS; every later run is compared with that frozen output instead.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}']
+    pass_regex: '^PASS: all \d+ BFS costs match the CPU reference'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: cost
+    dtype: i32
+    rule: {metric: exact}
+    basis: verify.py's exact comparison of every node's hop count (result.txt, written from this buffer) with a CPU BFS
+      of the same graph (level1/bfs/verify.py:44-56; cuda/bfs.cu h_cost after the final copy-back); integers -> byte-identical
 check:
-  # tools/inputs `check`: the checker runs the binary on the input's graph and recomputes every hop count
-  # with an independent CPU breadth-first search from the same graph file; result.txt must match exactly.
-  kind: standalone
-  command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}']
-  pass_regex: '^PASS: all \d+ BFS costs match the CPU reference'
-  fail_regex: '^FAIL'
-  basis: exact integer comparison of every node's hop count with the CPU BFS of level1/bfs/verify.py (upstream ships no
-    reference; the graph file is the same one the benchmark reads)
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'every node''s hop count byte-identical to the frozen B200 golden reference reference/<input_id>.json (made once
+    and validated there by verify.py''s CPU BFS, exact); no CPU reference is run'
   covers: all
