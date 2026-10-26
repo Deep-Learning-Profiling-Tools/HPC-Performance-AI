@@ -19,19 +19,38 @@ timing:
     key: repeat
     offset: 0
 baseline:
-  method: 'built-in comparison of every 128-bit hash with the CPU reference: SUCCESS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the 128-bit hashes against the frozen B200 golden reference (`check:` / `golden:` below); the upstream host
+    MurmurHash3_x64_128 reference (cuda/murmurhash3.cu) runs only once, offline, to validate that reference (tools/golden
+    make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: success_marker
-    role: required
-    regex: ^SUCCESS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: FAIL
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the hashes only
+  # when the upstream check printed SUCCESS; every later run is compared with that frozen output instead.
+  mode: data
+  cpu_check: {pass_regex: '^SUCCESS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: hash
+    dtype: u64
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's exact comparison of both 64-bit halves of every key's hash, d_out[2*i] != out[i][0] ||
+      d_out[2*i+1] != out[i][1] -> FAIL, against the host MurmurHash3_x64_128 (cuda/murmurhash3.cu:244); 2 x numKeys
+      integers, compared byte for byte
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 2 x numKeys 64-bit hash words against the frozen B200 golden reference reference/<input_id>.json, byte for
+    byte (sha256), as upstream compared them with the host MurmurHash3; no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger key counts

@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -11,6 +12,16 @@
 #include <cassert>
 #include <chrono>
 #include <hip/hip_runtime.h>
+
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
+static bool hpcperf_skip_verify() {
+  return !hpcperf_cpu_reference_enabled();
+}
 
 #define BLOCK_SIZE 256
 
@@ -155,7 +166,8 @@ int main(int argc, char** argv)
     for (uint32_t c = 0; c < length[i]; c++) {
       keys[i][c] = c % 256;
     }
-    MurmurHash3_x64_128 (keys[i], length[i], i, out[i]);
+    if (!hpcperf_skip_verify())
+      MurmurHash3_x64_128 (keys[i], length[i], i, out[i]);  /* host reference only */
 #ifdef DEBUG
     printf("%lu %lu\n", out[i][0], out[i][1]);
 #endif
@@ -218,7 +230,13 @@ int main(int argc, char** argv)
   printf("Average kernel execution time %f (s)\n", (time * 1e-9f) / repeat);
 
   hipMemcpy(d_out, dev_out, sizeof(uint64_t)*(numKeys*2), hipMemcpyDeviceToHost);
+  hpcperf_golden_output("hash", d_out, (size_t)numKeys * 2, "u64");   // tools/golden: the checked output
 
+  if (hpcperf_skip_verify()) {
+    // default: the host MurmurHash3 reference (computed above only when enabled) is skipped;
+    // correctness = the captured output against the frozen golden reference (tools/golden)
+    printf("SKIP_VERIFY\n");
+  } else {
   // verify
   bool error = false;
   for (uint32_t i = 0; i < numKeys; i++) {
@@ -229,6 +247,7 @@ int main(int argc, char** argv)
   }
   if (error) printf("FAIL\n");
   else printf("SUCCESS\n");
+  }
 
   for (uint32_t i = 0; i < numKeys; i++) {
     free(out[i]);
