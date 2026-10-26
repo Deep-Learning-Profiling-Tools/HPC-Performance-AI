@@ -6,6 +6,7 @@
 // Validation: element-wise comparison of GPU vs CPU e_new and q_new.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream ENERGY.hpp
@@ -229,14 +230,17 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.e_new, d_e_new, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(g.q_new, d_q_new, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("e_new", g.e_new, size, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("q_new", g.q_new, size, "f64");
 #define DFREE(n) cudaFree(d_##n);
   ENERGY_ARRAYS(DFREE)
 #undef DFREE
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -259,6 +263,8 @@ int main(int argc, char** argv)
         for (Index_type i = ibegin; i < iend; ++i ) { ENERGY_BODY6; }
       }
     }
+    hpcperf_golden_output("e_new.cpu", cd.e_new, size, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("q_new.cpu", cd.q_new, size, "f64");
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("e_new", cd.e_new, g.e_new, size, 1.0e-10)
