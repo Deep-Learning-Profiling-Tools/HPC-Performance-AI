@@ -6,6 +6,7 @@
 // data initialization. Validation: element-wise comparison of A and B.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_JACOBI_2D.hpp
@@ -74,12 +75,15 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(A, dA, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(B, dB, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("A", A, len, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("B", B, len, "f64");
   cudaFree(dA); cudaFree(dB);
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -102,6 +106,8 @@ int main(int argc, char** argv)
         }
       }
     }
+    hpcperf_golden_output("A.cpu", A_ref, len, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("B.cpu", B_ref, len, "f64");
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("A", A_ref, A, len, 1.0e-10)

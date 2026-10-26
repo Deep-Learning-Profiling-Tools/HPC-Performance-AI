@@ -6,6 +6,7 @@
 // data initialization. Validation: element-wise comparison of A and B.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_JACOBI_2D.hpp
@@ -74,32 +75,44 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(A, dA, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(B, dB, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("A", A, len, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("B", B, len, "f64");
   cudaFree(dA); cudaFree(dB);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr A_ref; Real_ptr B_ref;
-  allocAndInitData(A_ref, len);
-  allocAndInitData(B_ref, len);
-  {
-    Real_ptr A = A_ref; Real_ptr B = B_ref;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type i = 1; i < N-1; ++i ) {
-        for (Index_type j = 1; j < N-1; ++j ) {
-          POLYBENCH_JACOBI_2D_BODY1;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr A_ref; Real_ptr B_ref;
+    allocAndInitData(A_ref, len);
+    allocAndInitData(B_ref, len);
+    {
+      Real_ptr A = A_ref; Real_ptr B = B_ref;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type i = 1; i < N-1; ++i ) {
+          for (Index_type j = 1; j < N-1; ++j ) {
+            POLYBENCH_JACOBI_2D_BODY1;
+          }
         }
-      }
-      for (Index_type i = 1; i < N-1; ++i ) {
-        for (Index_type j = 1; j < N-1; ++j ) {
-          POLYBENCH_JACOBI_2D_BODY2;
+        for (Index_type i = 1; i < N-1; ++i ) {
+          for (Index_type j = 1; j < N-1; ++j ) {
+            POLYBENCH_JACOBI_2D_BODY2;
+          }
         }
       }
     }
-  }
+    hpcperf_golden_output("A.cpu", A_ref, len, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("B.cpu", B_ref, len, "f64");
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("A", A_ref, A, len, 1.0e-10)
-          & compareArrays("B", B_ref, B, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("A", A_ref, A, len, 1.0e-10)
+            & compareArrays("B", B_ref, B, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
