@@ -1,4 +1,5 @@
 #include <cmath>
+#include "hpcperf_golden.h"
 
 void accelerate_particles_ref( Particle* p, const int n, const float kSofteningSquared, const float kG )
 {
@@ -98,6 +99,7 @@ void GSimulation::Verify() {
     ref_kenergy_ = 0.5 * energy[0];
   }  // end of the time step loop
   std::cout << "\n";
+  hpcperf_golden_output("kenergy.cpu", &ref_kenergy_, 1, "f32");   // the CPU reference (golden make only)
   bool ok = fabsf(kenergy_ - ref_kenergy_) < 1e-3f;
   printf("%s\n", ok ? "PASS" : "FAIL");
 }

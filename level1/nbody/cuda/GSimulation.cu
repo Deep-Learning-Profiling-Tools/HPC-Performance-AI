@@ -5,6 +5,7 @@
 // =============================================================
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cuda.h>
 #include "GSimulation.hpp"
 #include "GSimulationKernels.hpp"
@@ -160,6 +161,9 @@ void GSimulation::Start() {
   std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
   std::cout << "===============================\n";
+  // tools/golden: the checked output -- the kinetic energy of the last step (the only quantity
+  // Verify() compares), after the timed loop
+  hpcperf_golden_output("kenergy", &kenergy_, 1, "f32");
 
   cudaFree(p);
   cudaFree(e);

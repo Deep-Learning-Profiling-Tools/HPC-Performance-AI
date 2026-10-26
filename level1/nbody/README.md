@@ -45,7 +45,7 @@ cmake --build build/nbody/hip
 
 ## Validation
 
-Built-in: particle state compared against the upstream CPU reference (GSimulationReference.hpp); prints PASS/FAIL.
+Golden reference (tools/golden): a plain run captures the final kinetic energy `kenergy` (f32 scalar; `HPCPERF_GOLDEN_DUMP`) -- the only quantity upstream's check compares -- and `hpcperf_golden.py check` compares it with the frozen B200 reference `reference/<input>.json`: |a - g| <= 1e-3 - d0, i.e. upstream's tolerance against the CPU reference (GSimulationReference.hpp) minus the golden's own deviation d0 from it (measured once when the reference was frozen). Note: neither upstream's check nor the golden check compares the particle state (positions/velocities) itself. The CPU reference (prints PASS/FAIL) runs only on the explicit offline request below. ctest runs `hpcperf_golden.py run` on the registry's default input (`n16000-s10`, the former ctest arguments); the `check:` block of `inputs.yaml` does the same for every registered input.
 
 Run it via:
 
@@ -54,7 +54,7 @@ ctest --test-dir build/nbody/cuda --output-on-failure
 ```
 
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**CPU reference switch.** By default the host-side CPU check is skipped: the benchmark prints `SKIP_VERIFY` (never PASS/FAIL) and its correctness is the golden check above. `HPCPERF_CPU_REFERENCE=1` runs the CPU reference (offline only: `hpcperf_golden.py make` uses it once to validate a new golden reference; no measurement, check or ctest path sets it, and nothing falls back to it); `HPCPERF_SKIP_VERIFY=1` (tools/timing) keeps it off as well. See [tools/golden](../../tools/golden/) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/GSimulation.cu` and the HIP port: all integration steps. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 
