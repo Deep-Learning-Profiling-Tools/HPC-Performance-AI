@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -125,12 +126,18 @@ int main(int argc, char* argv[])
   printf("Average kernel execution time %f (ms)\n", time * 1e-6f / repeat);
 
   hipMemcpy(p, d_p, size_bytes, hipMemcpyDeviceToHost); 
+  hpcperf_golden_output("p", p, vector_size, "f32");   // tools/golden: the checked output
 
   hipFree(d_p);
   hipFree(d_m);
   hipFree(d_v);
   hipFree(d_g);
 
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference is skipped; correctness = the captured output against the
+    // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+    printf("SKIP_VERIFY\n");
+  } else {
   // verify
   reference<float, float>(
     repeat,
@@ -143,6 +150,7 @@ int main(int argc, char* argv[])
     vector_size,
     mode,
     decay);
+  hpcperf_golden_output("p.cpu", r, vector_size, "f32");   // the CPU reference (golden make only)
 
   bool ok = true; 
   double cr = 0, cp = 0;
@@ -156,6 +164,7 @@ int main(int argc, char* argv[])
 
   printf("%s\n", ok ? "PASS" : "FAIL");
   printf("Checksum: %lf %lf\n", cr / vector_size, cp / vector_size);
+  }
 
   free(p);
   free(m);
