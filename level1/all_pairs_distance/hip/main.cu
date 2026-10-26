@@ -6,6 +6,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -226,13 +227,18 @@ int main(int argc, char **argv) {
   dimGrid.y = INSTANCES;
 
 
-  /* CPU */
+  /* CPU reference for the three memcmp checks below; runs only with HPCPERF_CPU_REFERENCE=1 (golden make).
+     Default: skipped; correctness = the captured outputs against the frozen golden reference (tools/golden) */
   auto start = std::chrono::steady_clock::now();
-  bzero(cpu_distance,INSTANCES*INSTANCES*sizeof(int));
-  CPU(data, cpu_distance);
-  auto end = std::chrono::steady_clock::now();
-  double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-  printf("CPU time: %f (us)\n", elapsedTime);
+  auto end = start;
+  double elapsedTime = 0;
+  if (hpcperf_cpu_reference_enabled()) {
+    bzero(cpu_distance,INSTANCES*INSTANCES*sizeof(int));
+    CPU(data, cpu_distance);
+    end = std::chrono::steady_clock::now();
+    elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    printf("CPU time: %f (us)\n", elapsedTime);
+  }
 
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
@@ -248,10 +254,15 @@ int main(int argc, char **argv) {
 
   hipMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k1", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k1
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  printf("%s\n", status ? "FAIL" : "PASS");
+  if (!hpcperf_cpu_reference_enabled()) {
+    printf("SKIP_VERIFY\n");
+  } else {
+    status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+    printf("%s\n", status ? "FAIL" : "PASS");
+  }
 
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
@@ -267,10 +278,15 @@ int main(int argc, char **argv) {
 
   hipMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k2", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k2
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  printf("%s\n", status ? "FAIL" : "PASS");
+  if (!hpcperf_cpu_reference_enabled()) {
+    printf("SKIP_VERIFY\n");
+  } else {
+    status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+    printf("%s\n", status ? "FAIL" : "PASS");
+  }
 
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
@@ -286,10 +302,15 @@ int main(int argc, char **argv) {
 
   hipMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), hipMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k3", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k3
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
-  status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-  printf("%s\n", status ? "FAIL" : "PASS");
+  if (!hpcperf_cpu_reference_enabled()) {
+    printf("SKIP_VERIFY\n");
+  } else {
+    status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
+    printf("%s\n", status ? "FAIL" : "PASS");
+  }
 
   free(cpu_distance);
   free(gpu_distance);
@@ -298,5 +319,5 @@ int main(int argc, char **argv) {
   hipFree(data_char_device);
   hipFree(distance_device);
 
-  return status;
+  return hpcperf_cpu_reference_enabled() ? status : 0;  /* exit code is the verify result */
 }

@@ -6,6 +6,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -13,13 +14,14 @@
 #include <cuda.h>
 #include <cub/cub.cuh>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -236,7 +238,7 @@ int main(int argc, char **argv) {
   dimGrid.y = INSTANCES;
 
 
-  /* CPU reference for the three memcmp checks below; skipped in measurement mode */
+  /* CPU reference for the three memcmp checks below; runs only with HPCPERF_CPU_REFERENCE=1 (golden make) */
   auto start = std::chrono::steady_clock::now();
   auto end = start;
   double elapsedTime = 0;
@@ -262,6 +264,7 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k1", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k1
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
@@ -285,6 +288,7 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k2", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k2
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
@@ -308,6 +312,7 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k3", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k3
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
