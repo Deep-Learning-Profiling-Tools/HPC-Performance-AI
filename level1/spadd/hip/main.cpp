@@ -33,6 +33,7 @@
 // bitwise-order-identical accumulation (values, rel tol 1e-13).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -361,6 +362,26 @@ int main(int argc, char** argv)
   printf("Mean numeric time:  %f\n", numericTime / repeat);
   printf("C has %zu entries.\n", (size_t)nnzC);
 
+  // C back to the host (after the ROI; D2H only) and captured: the outputs the check below compares
+  std::vector<Offset> Crow(m + 1); std::vector<Ordinal> Ccol(nnzC); std::vector<Scalar> Cval(nnzC);
+  GPU_CHECK(cudaMemcpy(Crow.data(), dCrow, (m + 1) * sizeof(Offset), cudaMemcpyDeviceToHost));
+  GPU_CHECK(cudaMemcpy(Ccol.data(), dCcol, nnzC * sizeof(Ordinal), cudaMemcpyDeviceToHost));
+  GPU_CHECK(cudaMemcpy(Cval.data(), dCval, nnzC * sizeof(Scalar), cudaMemcpyDeviceToHost));
+  {
+    static_assert(sizeof(Offset) == 8 && sizeof(Ordinal) == 4, "golden dtypes u64 / i32");
+    const uint64_t nnzC_u64 = nnzC;
+    hpcperf_golden_output("nnzC", &nnzC_u64, 1, "u64");               // tools/golden: the checked outputs
+    hpcperf_golden_output("Crow", Crow.data(), m + 1, "u64");
+    hpcperf_golden_output("Ccol", Ccol.data(), nnzC, "i32");
+    hpcperf_golden_output("Cval", Cval.data(), nnzC, "f64");
+  }
+
+  bool ok = true;
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference is skipped; correctness = the captured outputs against the
+    // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+    printf("SKIP_VERIFY\n");
+  } else {
   // ----- validation (added): CPU reference with identical merge order -----
   std::vector<Offset> Crow_ref(m + 1, 0);
   std::vector<Ordinal> Ccol_ref; std::vector<Scalar> Cval_ref;
@@ -378,13 +399,9 @@ int main(int argc, char** argv)
     }
     Crow_ref[i + 1] = Ccol_ref.size();
   }
+  hpcperf_golden_output("Cval.cpu", Cval_ref.data(), Cval_ref.size(), "f64");   // the CPU reference (golden make only)
 
-  std::vector<Offset> Crow(m + 1); std::vector<Ordinal> Ccol(nnzC); std::vector<Scalar> Cval(nnzC);
-  GPU_CHECK(cudaMemcpy(Crow.data(), dCrow, (m + 1) * sizeof(Offset), cudaMemcpyDeviceToHost));
-  GPU_CHECK(cudaMemcpy(Ccol.data(), dCcol, nnzC * sizeof(Ordinal), cudaMemcpyDeviceToHost));
-  GPU_CHECK(cudaMemcpy(Cval.data(), dCval, nnzC * sizeof(Scalar), cudaMemcpyDeviceToHost));
-
-  bool ok = (Crow_ref == Crow) && ((Offset)Ccol_ref.size() == nnzC);
+  ok = (Crow_ref == Crow) && ((Offset)Ccol_ref.size() == nnzC);
   if (ok) {
     for (Offset k = 0; k < nnzC && ok; k++) {
       if (Ccol[k] != Ccol_ref[k]) ok = false;
@@ -392,5 +409,6 @@ int main(int argc, char** argv)
     }
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
