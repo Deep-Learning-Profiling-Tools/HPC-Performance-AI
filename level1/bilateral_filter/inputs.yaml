@@ -13,19 +13,48 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: three per-radius timers (3x3, 6x6, 9x9) are printed; no total
 baseline:
-  method: 'built-in comparison with the upstream CPU reference: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the filtered images of the 3x3, 6x6 and 9x9 filters against the frozen B200 golden reference (`check:` /
+    `golden:` below); the upstream CPU reference (common/reference.h, |r - g| <= 1e-3 per pixel) runs only once,
+    offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the three
+  # images only when the upstream check printed PASS; every later run is compared with those frozen outputs instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: dst.r3
+    dtype: f32
+    rule: {metric: max_abs, tol: 1.0e-3}
+    cpu: dst.r3.cpu
+    basis: upstream's per-pixel check |r_dst[i] - h_dst[i]| <= 1e-3 of the R=3 filter against reference<3>
+      (cuda/main.cu:153, common/reference.h); the check allows 1e-3 minus the B200 output's own deviation
+  - name: dst.r6
+    dtype: f32
+    rule: {metric: max_abs, tol: 1.0e-3}
+    cpu: dst.r6.cpu
+    basis: the same per-pixel check of the R=6 filter against reference<6> (cuda/main.cu:181)
+  - name: dst.r9
+    dtype: f32
+    rule: {metric: max_abs, tol: 1.0e-3}
+    cpu: dst.r9.cpu
+    basis: the same per-pixel check of the R=9 filter against reference<9> (cuda/main.cu:209)
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the three filtered images against the frozen B200 golden reference reference/<input_id>.json
+    (max |a - g| <= 1e-3 - d0 per image, d0 = the golden''s deviation from the upstream CPU reference measured
+    when it was frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus a 4x image
