@@ -265,10 +265,10 @@ int main(int argc, char **argv) {
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
   start = std::chrono::steady_clock::now();
@@ -288,10 +288,10 @@ int main(int argc, char **argv) {
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
   start = std::chrono::steady_clock::now();
@@ -311,10 +311,10 @@ int main(int argc, char **argv) {
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
   free(cpu_distance);
