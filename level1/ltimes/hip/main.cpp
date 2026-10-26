@@ -15,6 +15,7 @@
 // data initialization. Validation: element-wise comparison of phi.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 #define LTIMES_BODY \
@@ -88,31 +89,41 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(phidat, d_phi, philen * sizeof(Real_type), cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("phi", phidat, philen, "f64");   // tools/golden: the checked output
   cudaFree(d_phi); cudaFree(d_ell); cudaFree(d_psi);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr phi_r; Real_ptr ell_r; Real_ptr psi_r;
-  allocAndInitDataConst(phi_r, philen, Real_type(0.0));
-  allocAndInitData(ell_r, elllen);
-  allocAndInitData(psi_r, psilen);
-  {
-    Real_ptr phidat = phi_r; Real_ptr elldat = ell_r; Real_ptr psidat = psi_r;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type z = 0; z < num_z; ++z ) {
-        for (Index_type g = 0; g < num_g; ++g ) {
-          for (Index_type m = 0; m < num_m; ++m ) {
-            for (Index_type d = 0; d < num_d; ++d ) {
-              LTIMES_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr phi_r; Real_ptr ell_r; Real_ptr psi_r;
+    allocAndInitDataConst(phi_r, philen, Real_type(0.0));
+    allocAndInitData(ell_r, elllen);
+    allocAndInitData(psi_r, psilen);
+    {
+      Real_ptr phidat = phi_r; Real_ptr elldat = ell_r; Real_ptr psidat = psi_r;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type z = 0; z < num_z; ++z ) {
+          for (Index_type g = 0; g < num_g; ++g ) {
+            for (Index_type m = 0; m < num_m; ++m ) {
+              for (Index_type d = 0; d < num_d; ++d ) {
+                LTIMES_BODY;
+              }
             }
           }
         }
       }
     }
-  }
+    hpcperf_golden_output("phi.cpu", phi_r, philen, "f64");   // the CPU reference (golden make only)
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("phi", phi_r, phidat, philen, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("phi", phi_r, phidat, philen, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
