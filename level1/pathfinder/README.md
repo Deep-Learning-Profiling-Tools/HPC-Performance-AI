@@ -33,18 +33,19 @@ cmake --build build/pathfinder/cuda
 ## Run
 
 ```bash
-python3 level1/pathfinder/verify.py ./build/pathfinder/cuda/pathfinder_cuda 100000 100 20
+./build/pathfinder/cuda/pathfinder_cuda 100000 100 20     # BENCH_PRINT: prints the whole wall, then the first row and the result row
 ```
 
 ## Validation
 
-Added check (verify.py): reproduces the glibc rand() wall, checks the printed first row (validating the reproduction), recomputes the DP result row on the CPU, and compares.
-
-Run it via:
+Correctness = the final DP row (`result` after the final copy-back, captured as `result`, i32; the last line BENCH_PRINT prints) byte-identical to the frozen B200 golden reference `reference/<input_id>.json` (rule in `inputs.yaml` `golden:`). The added check `verify.py` (reproduces the glibc rand() wall, checks the printed first row, recomputes the DP result row on the CPU in pure Python, ~10-13 s for the default input) validated that reference once and runs only on request (below).
 
 ```bash
-ctest --test-dir build/pathfinder/cuda --output-on-failure
+ctest --test-dir build/pathfinder/cuda --output-on-failure   # golden run of the registry's default input
+python3 tools/golden/hpcperf_golden.py run level1/pathfinder [<input_id>]   # the same for any registered input
 ```
+
+**Correctness switch.** The binary has no built-in CPU check (nothing to skip, so it prints no `SKIP_VERIFY`); its CPU reference is `verify.py`, which a plain run, ctest, `tools/inputs` and `tools/timing` never run and nothing falls back to. `tools/golden/hpcperf_golden.py make` runs it once, offline (`HPCPERF_CPU_REFERENCE=1`, `HPCPERF_GOLDEN_DUMP`), to validate the golden reference. `HPCPERF_GOLDEN_DUMP=<dir>` makes the binary capture its output. See [tools/golden/README.md](../../tools/golden/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/pathfinder.cu`: calc_path (all pyramid steps). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

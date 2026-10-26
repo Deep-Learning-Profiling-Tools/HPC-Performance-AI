@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -215,6 +216,7 @@ void run(int argc, char** argv)
 
     HPCPERF_ROI_END_SYNC();
     cudaMemcpy(result, gpuResult[final_ret], sizeof(int)*cols, cudaMemcpyDeviceToHost);
+    hpcperf_golden_output("result", result, cols, "i32");   // tools/golden: the checked output (the final DP row printed by BENCH_PRINT)
 
 
 #ifdef BENCH_PRINT
