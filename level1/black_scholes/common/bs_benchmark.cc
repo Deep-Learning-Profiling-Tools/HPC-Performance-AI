@@ -38,6 +38,7 @@
  */
 
 #include "bs_benchmark.h"
+#include "hpcperf_golden.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -135,6 +136,13 @@ void BsBenchmark::BlackScholesCPU(float *rand_array, float *call_price,
   cpu_gpu_logger_->CPUOff();
 }
 
+// tools/golden: the call/put prices Verify() compares with the CPU implementation
+// (written back by the last timed Run(); a no-op unless HPCPERF_GOLDEN_DUMP is set)
+void BsBenchmark::CaptureGoldenOutputs() {
+  hpcperf_golden_output("call_price", call_price_, num_tiles_ * tile_size_, "f32");
+  hpcperf_golden_output("put_price", put_price_, num_tiles_ * tile_size_, "f32");
+}
+
 void BsBenchmark::Verify() {
   // For every elements in the array we will run the
   // following sequence of equations
@@ -150,6 +158,9 @@ void BsBenchmark::Verify() {
     BlackScholesCPU(rand_array_, verify_call_price_, verify_put_price_, index,
                     tile_size_);
   }
+  // the CPU reference (golden make only)
+  hpcperf_golden_output("call_price.cpu", verify_call_price_, num_tiles_ * tile_size_, "f32");
+  hpcperf_golden_output("put_price.cpu", verify_put_price_, num_tiles_ * tile_size_, "f32");
   fprintf(stderr, "[512]= %f\n", call_price_[512]);
 
   // Here we verify the results
