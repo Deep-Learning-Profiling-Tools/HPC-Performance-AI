@@ -13,20 +13,49 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the CUDA port prints no timer (only the error lines and PASS)
 baseline:
-  method: 'added check: identical network trained with the upstream CPU bpnn_train, weights/errors compared (rel
-    1e-3): PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the trained weights (input and hidden layer) against the frozen B200 golden reference (`check:` / `golden:`
+    below); the added check''s CPU training step (upstream bpnn_train on a cloned network, cuda/facetrain.c) runs only
+    once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the weights only
+  # when the added check printed PASS; every later run is compared with those frozen outputs instead.
+  # The check also compared the output/hidden error scalars, but bpnn_train_cuda (cuda/backprop_cuda.cu:60) never writes
+  # *eo / *eh, so those are uninitialized in backprop_face (cuda/facetrain.c:70) -- they are NOT captured.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: input_weights
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-3}
+    cpu: input_weights.cpu
+    basis: the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->input_weights[0..in][0..hid] against the
+      CPU-trained clone (cuda/facetrain.c:63, :102, :113); the check allows 1e-3 minus the B200 output's own deviation
+      from the CPU reference
+  - name: hidden_weights
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-3}
+    cpu: hidden_weights.cpu
+    basis: the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->hidden_weights[0..hid][0..out] against the
+      CPU-trained clone (cuda/facetrain.c:63, :107, :113); the check allows 1e-3 minus the B200 output's own deviation
+      from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'input_weights and hidden_weights against the frozen B200 golden reference reference/<input_id>.json (max |a -
+    g| / (1 + |g|) <= 1e-3 - d0 per matrix, d0 = the golden''s deviation from the CPU-trained clone measured when it was
+    frozen); no CPU reference is run. The error scalars the added check also compared are uninitialized on the GPU path
+    and are not compared'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger input layers

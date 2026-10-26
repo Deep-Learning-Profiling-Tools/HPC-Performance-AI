@@ -38,7 +38,7 @@ cmake --build build/backprop/cuda
 
 ## Validation
 
-Added check: an identically-initialized network is trained with the upstream CPU implementation (bpnn_train) and weights/errors are compared (rel tol 1e-3); prints PASS/FAIL.
+Golden reference (tools/golden): a plain run captures the trained weights `input_weights` ((in + 1) x (hid + 1)) and `hidden_weights` ((hid + 1) x (out + 1)), f32, streamed row by row from the row-pointer matrices (`HPCPERF_GOLDEN_DUMP`), and `hpcperf_golden.py check` compares them with the frozen B200 reference `reference/<input>.json`: max |a - g| / (1 + |g|) <= 1e-3 - d0 per matrix, i.e. the added check's tolerance against an identically-initialized network trained with the upstream CPU `bpnn_train`, minus the golden's own deviation d0 from it (measured once when the reference was frozen). That CPU training step (prints PASS/FAIL) runs only on the explicit offline request below. **Known defect (not fixed):** `bpnn_train_cuda` never writes its `*eo`/`*eh` arguments, so the output/hidden error scalars the added check also compares are uninitialized on the GPU path (they read 0 on dgx003 and dominate the printed "Max relative difference"); the golden check does not compare them. ctest runs `hpcperf_golden.py run` on the registry's default input (`n65536`, the former ctest argument); the `check:` block of `inputs.yaml` does the same for every registered input.
 
 Run it via:
 
@@ -47,7 +47,7 @@ ctest --test-dir build/backprop/cuda --output-on-failure
 ```
 
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**CPU reference switch.** By default the host-side CPU check is skipped: the benchmark prints `SKIP_VERIFY` (never PASS/FAIL) and its correctness is the golden check above. `HPCPERF_CPU_REFERENCE=1` runs the CPU reference (offline only: `hpcperf_golden.py make` uses it once to validate a new golden reference; no measurement, check or ctest path sets it, and nothing falls back to it); `HPCPERF_SKIP_VERIFY=1` (tools/timing) keeps it off as well. See [tools/golden](../../tools/golden/) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/backprop_cuda.cu`: one training step: GPU forward, host output layer/errors, GPU weight adjust. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 
