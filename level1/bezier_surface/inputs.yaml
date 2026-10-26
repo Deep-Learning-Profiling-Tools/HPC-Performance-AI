@@ -16,19 +16,39 @@ timing:
   regex: '^kernel execution time: (?P<value>[0-9.eE+-]+) ms'
   select: only
 baseline:
-  method: 'built-in comparison with the CPU result: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the evaluated surface (XYZ per output point) against the frozen B200 golden reference (`check:` /
+    `golden:` below); the upstream CPU reference (BezierCPU + relative L1 norm) runs only once, offline, to validate
+    that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the surface
+  # only when the upstream check printed PASS; every later run is compared with that frozen output instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: surface
+    dtype: f32
+    rule: {metric: l1_rel, tol: 1.0e-6}
+    cpu: surface.cpu
+    basis: 'the out_size_i x out_size_j XYZ surface as 3 * n * n floats: upstream compare_output requires
+      sum |gpu - cpu| / sum |cpu| over x, y and z of every point < 1e-6 against BezierCPU (cuda/main.cu:161-177);
+      the check allows 1e-6 minus the B200 output''s own L1 deviation from the CPU reference'
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the surface against the frozen B200 golden reference reference/<input_id>.json (sum |a - g| / sum |g|
+    <= 1e-6 - d0, d0 = the golden''s relative L1 deviation from the upstream CPU reference measured when it was
+    frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: >-

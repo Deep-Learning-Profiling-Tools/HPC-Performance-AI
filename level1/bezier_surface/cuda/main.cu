@@ -34,6 +34,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
@@ -44,13 +45,14 @@
 
 #include <cstdlib>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -262,7 +264,7 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   XYZ *cpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
   XYZ *gpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
 
-  // CPU run -- reference for the verification below; skipped in measurement mode
+  // CPU run -- reference for the verification below; runs only with HPCPERF_CPU_REFERENCE=1 (golden make)
   if (!hpcperf_skip_verify()) {
   auto start = std::chrono::steady_clock::now();
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
@@ -299,11 +301,17 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
 
   cudaMemcpy(gpu_out, d_out, out_size, cudaMemcpyDeviceToHost);
+  // tools/golden: the checked output, the XYZ surface as a flat array of 3 * out_size_i * out_size_j FLOATs
+  hpcperf_golden_output("surface", gpu_out, sizeof(XYZ) / sizeof(FLOAT) * (size_t)out_size_i * out_size_j,
+                        sizeof(FLOAT) == 8 ? "f64" : "f32");
 
   if (hpcperf_skip_verify()) {
-    /* measurement mode: host-side verification is not part of the timed work */
+    // default: the CPU reference (BezierCPU) was skipped; correctness = the captured surface
+    // against the frozen golden reference (tools/golden)
     printf("SKIP_VERIFY\n");
   } else {
+    hpcperf_golden_output("surface.cpu", cpu_out, sizeof(XYZ) / sizeof(FLOAT) * (size_t)out_size_i * out_size_j,
+                          sizeof(FLOAT) == 8 ? "f64" : "f32");   // the CPU reference (golden make only)
     // Verify
     int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
     printf("%s\n", (status == 0) ? "PASS" : "FAIL");
