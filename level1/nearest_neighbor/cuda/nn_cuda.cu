@@ -172,7 +172,8 @@ int main(int argc, char* argv[])
 int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &locations){
     FILE   *flist,*fp;
 	int    i=0;
-	char dbname[64];
+	char dbname[4096];   // [HPC-Performance-AI fix] was [64]: fscanf("%s") of the absolute .db paths of the
+	                     // configured filelist (90 chars here) overflowed it (stack corruption; see README)
 	int recNum=0;
 
     /**Main processing **/
