@@ -6,6 +6,7 @@
 // Validation: element-wise comparison of hz (and ex, ey).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_FDTD_2D.hpp
@@ -113,12 +114,16 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(hz, d_hz, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ex, d_ex, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ey, d_ey, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("hz", hz, len, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("ex", ex, len, "f64");
+  hpcperf_golden_output("ey", ey, len, "f64");
   cudaFree(d_hz); cudaFree(d_ex); cudaFree(d_ey); cudaFree(d_fict);
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -145,6 +150,9 @@ int main(int argc, char** argv)
         t = (t+1) % m_tsteps;
       }
     }
+    hpcperf_golden_output("hz.cpu", hz_r, len, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("ex.cpu", ex_r, len, "f64");
+    hpcperf_golden_output("ey.cpu", ey_r, len, "f64");
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("hz", hz_r, hz, len, 1.0e-10)

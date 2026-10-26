@@ -6,6 +6,7 @@
 // Validation: element-wise comparison of hz (and ex, ey).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_FDTD_2D.hpp
@@ -113,37 +114,51 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaMemcpy(hz, d_hz, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ex, d_ex, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(ey, d_ey, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("hz", hz, len, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("ex", ex, len, "f64");
+  hpcperf_golden_output("ey", ey, len, "f64");
   cudaFree(d_hz); cudaFree(d_ex); cudaFree(d_ey); cudaFree(d_fict);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr hz_r; Real_ptr ex_r; Real_ptr ey_r; Real_ptr fict_r;
-  allocAndInitDataConst(hz_r, len, 0.0);
-  allocAndInitData(ex_r, len);
-  allocAndInitData(ey_r, len);
-  allocAndInitData(fict_r, m_tsteps);
-  {
-    Real_ptr hz = hz_r; Real_ptr ex = ex_r; Real_ptr ey = ey_r; Real_ptr fict = fict_r;
-    Index_type t = 0;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY1; }
-      for (Index_type i = 1; i < nx; i++) {
-        for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY2; }
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr hz_r; Real_ptr ex_r; Real_ptr ey_r; Real_ptr fict_r;
+    allocAndInitDataConst(hz_r, len, 0.0);
+    allocAndInitData(ex_r, len);
+    allocAndInitData(ey_r, len);
+    allocAndInitData(fict_r, m_tsteps);
+    {
+      Real_ptr hz = hz_r; Real_ptr ex = ex_r; Real_ptr ey = ey_r; Real_ptr fict = fict_r;
+      Index_type t = 0;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY1; }
+        for (Index_type i = 1; i < nx; i++) {
+          for (Index_type j = 0; j < ny; j++) { POLYBENCH_FDTD_2D_BODY2; }
+        }
+        for (Index_type i = 0; i < nx; i++) {
+          for (Index_type j = 1; j < ny; j++) { POLYBENCH_FDTD_2D_BODY3; }
+        }
+        for (Index_type i = 0; i < nx - 1; i++) {
+          for (Index_type j = 0; j < ny - 1; j++) { POLYBENCH_FDTD_2D_BODY4; }
+        }
+        t = (t+1) % m_tsteps;
       }
-      for (Index_type i = 0; i < nx; i++) {
-        for (Index_type j = 1; j < ny; j++) { POLYBENCH_FDTD_2D_BODY3; }
-      }
-      for (Index_type i = 0; i < nx - 1; i++) {
-        for (Index_type j = 0; j < ny - 1; j++) { POLYBENCH_FDTD_2D_BODY4; }
-      }
-      t = (t+1) % m_tsteps;
     }
-  }
+    hpcperf_golden_output("hz.cpu", hz_r, len, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("ex.cpu", ex_r, len, "f64");
+    hpcperf_golden_output("ey.cpu", ey_r, len, "f64");
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("hz", hz_r, hz, len, 1.0e-10)
-          & compareArrays("ex", ex_r, ex, len, 1.0e-10)
-          & compareArrays("ey", ey_r, ey, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("hz", hz_r, hz, len, 1.0e-10)
+            & compareArrays("ex", ex_r, ex, len, 1.0e-10)
+            & compareArrays("ey", ey_r, ey, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
