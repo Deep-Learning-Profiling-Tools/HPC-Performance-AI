@@ -1,0 +1,130 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "kripke",
+  "level": 2,
+  "input_id": "z32-g64-q128",
+  "frozen": true,
+  "workload": {
+    "input_id": "z32-g64-q128",
+    "params": {
+      "zones": "32,32,32",
+      "groups": 64,
+      "quad": 128,
+      "layout": "GDZ",
+      "niter": 10
+    },
+    "args": [],
+    "env": {
+      "KRIPKE_ZONES": "32,32,32",
+      "KRIPKE_GROUPS": "64",
+      "KRIPKE_QUAD": "128"
+    },
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "2250925a140b612b9928431f15466557cf517aba97e96b6a6593fba1ce3a9d98",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "particle_count",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel",
+          "tol": 1e-06
+        },
+        "cpu": {
+          "log": {
+            "file": "{run_dir}/sequential.log"
+          }
+        },
+        "basis": "check_sequential.sh / validate.sh: |P_gpu - P_seq| / |P_seq| <= KRIPKE_VALIDATE_RTOL 1e-6 for every one of the iterations (one unit in the last of the 7 printed digits); the check allows 1e-6 minus the frozen counts' own deviation from the Sequential run",
+        "log": {
+          "regex": "^\\s*iter \\d+: particle count=(?P<value>[0-9.eE+-]+),"
+        }
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "particle_count",
+      "dtype": "f64",
+      "count": 10,
+      "bytes": 80,
+      "sha256": "2edb9e487f4b14f39002fab1bba53900242be32ea9492228eb790baa0cf01dcd",
+      "rule": {
+        "metric": "max_rel",
+        "tol": 1e-06,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "particle_count.cpu",
+        "tol_effective": 1e-06
+      },
+      "basis": "check_sequential.sh / validate.sh: |P_gpu - P_seq| / |P_seq| <= KRIPKE_VALIDATE_RTOL 1e-6 for every one of the iterations (one unit in the last of the 7 printed digits); the check allows 1e-6 minus the frozen counts' own deviation from the Sequential run",
+      "stats": {
+        "min": 85819060.0,
+        "max": 168473000.0,
+        "sum": 1523375060.0,
+        "nonfinite": 0
+      },
+      "blob": "sha256/2e/2edb9e487f4b14f39002fab1bba53900242be32ea9492228eb790baa0cf01dcd.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:23:12Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/level2/kripke/cuda/kripke.exe",
+    "binary_sha256": "4478a66aabb1420960eb77b74f442498da5226901aa0f3afee643d2a3a39c314",
+    "command": [
+      "bash",
+      "level2/kripke/check_sequential.sh",
+      "build/golden-make/kripke/z32-g64-q128/run/gpu_run.log",
+      "--zones",
+      "32,32,32",
+      "--groups",
+      "64",
+      "--quad",
+      "128",
+      "--layout",
+      "GDZ",
+      "--niter",
+      "10",
+      "CUDA"
+    ],
+    "gpu_run": {
+      "command": [
+        "bash",
+        "level2/kripke/run.sh",
+        "CUDA"
+      ],
+      "log": "build/golden-make/kripke/z32-g64-q128/run/gpu_run.log",
+      "log_sha256": "20e9548d1f8d098dfa48bd69da417df7a91022c94fb39c14dc5934ed7471ecc3"
+    },
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 460.323,
+      "pass_line": "Kripke CUDA vs Sequential (zones 32,32,32, groups 64, quad 128, layout GDZ, 10 iterations): PASS",
+      "pass_regex": "^Kripke CUDA vs Sequential \\(.*\\): PASS",
+      "fail_regex": "^Kripke CUDA vs Sequential \\(.*\\): FAIL",
+      "log": "build/golden-make/kripke/z32-g64-q128/run/stdout.log",
+      "log_sha256": "e11ef094d82bd83c94b2c8d12d989a8bfe7dc23857d88bc65bea60fb9c806c94"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}
