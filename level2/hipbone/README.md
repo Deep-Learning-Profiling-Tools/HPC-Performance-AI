@@ -252,6 +252,18 @@ Wall time is dominated by host-side setup at every size (the timed section is
 level2/hipbone/validate.sh CUDA
 ```
 
+**Modes (2026-10-26; no CPU reference computation on a default path).** By
+default (`HPCPERF_CPU_REFERENCE` unset or `0`) `validate.sh` runs nothing on
+the CPU: the `-m CUDA` run below with checks 1-3 for it, and instead of check 4
+the frozen-reference check of the registered default input
+`python3 tools/inputs/hpcperf_inputs.py check level2/hipbone coral2-nx24-p14 --out build/level2/hipbone/validate/frozen-reference-check`
+(the GPU run of that input against `reference/coral2-nx24-p14.json` with
+`check_reference.py`, see the next section). The log says
+`CPU reference: skipped (default; frozen reference check instead)`. Observed
+2026-10-26: PASS in 48.8 s (`r_norm_initial` rel 1.9e-5, `r_norm_final`
+|log10 ratio| 0.0010). The Serial run and check 4 run only on an explicit
+offline request (`HPCPERF_CPU_REFERENCE` set to `1`).
+
 Upstream has no reference solution or built-in check; its "Verifying
 correctness" section says to run with `-v` and confirm that the CG residual
 norm after the fixed 100 iterations is small, quoting the Nekbone CORAL-2

@@ -12,7 +12,7 @@
 #                                     polynomial order, 68,921 DOFs)
 #
 # once on the GPU backend and once with OCCA's Serial (CPU) backend as the
-# reference, both with -v, and checks:
+# reference, both with -v, and checks (the Serial run and check 4 only in offline mode, below):
 #   1. both runs exit 0 and report exactly 100 CG iterations (hipBone runs
 #      CG with tol = 0 for a fixed 100 iterations; fewer would mean a
 #      NaN/zero residual, more is impossible);
@@ -28,6 +28,19 @@
 # ||r_100|| agree statistically, not bit-wise). A broken operator or
 # gather-scatter shows up as a stagnating/NaN residual (checks 1-3), not as
 # a small shift.
+#
+# Two modes (project decision: no CPU reference computation on a default path):
+#   default  (HPCPERF_CPU_REFERENCE unset or 0) -- runs NOTHING on the CPU path: the GPU run only,
+#     checks 1-3 for it (upstream's GPU criteria, unchanged), and instead of check 4 the
+#     frozen-reference check of the registered default input coral2-nx24-p14:
+#       python3 tools/inputs/hpcperf_inputs.py check level2/hipbone coral2-nx24-p14 \
+#               --out build/level2/hipbone/validate/frozen-reference-check
+#     i.e. the GPU run of that input (run.sh) compared by check_reference.py with its frozen CPU
+#     reference reference/coral2-nx24-p14.json (OCCA OpenMP, 2026-09-30; dofs and iterations exact,
+#     r_norm_initial within 1 %, |log10(r_norm_final ratio)| <= 0.1). Exit 0 = PASS, anything else
+#     is a FAIL. The registered check covers the CUDA build only.
+#   offline  (HPCPERF_CPU_REFERENCE set to 1: an explicit request only) -- the original checks 1-4
+#     with the Serial reference run, unchanged.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,6 +78,11 @@ fi
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 
 PROBLEM=(-nx 3 -ny 3 -nz 3 -p 14)
+FROZEN_INPUT="coral2-nx24-p14"   # inputs.yaml default_input
+case "${HPCPERF_CPU_REFERENCE:-}" in
+    ''|0*) CPU_REF=0 ;;
+    *)     CPU_REF=1 ;;
+esac
 LOGDIR="$R/build/level2/hipbone/validate"
 mkdir -p "$LOGDIR"
 
@@ -102,7 +120,12 @@ fdiv() { awk -v a="$1" -v b="$2" 'BEGIN{ printf "%.6e", (a+0)/(b+0) }'; }
 flog10abs() { awk -v a="$1" 'BEGIN{ x=log(a+0)/log(10); if (x<0) x=-x; printf "%.3f", x }'; }
 
 run_mode "$BACKEND"
-run_mode Serial
+if [ "$CPU_REF" -eq 1 ]; then
+    echo "== CPU reference: offline mode (HPCPERF_CPU_REFERENCE requested): Serial reference run + check 4"
+    run_mode Serial
+else
+    echo "== CPU reference: skipped (default; frozen reference check instead)"
+fi
 
 GPU_RC="RC_$BACKEND"; GPU_R0="R0_$BACKEND"; GPU_R100="R100_$BACKEND"; GPU_NIT="NITER_$BACKEND"
 GPU_RC="${!GPU_RC}"; GPU_R0="${!GPU_R0}"; GPU_R100="${!GPU_R100}"; GPU_NIT="${!GPU_NIT}"
@@ -110,20 +133,23 @@ GPU_RC="${!GPU_RC}"; GPU_R0="${!GPU_R0}"; GPU_R100="${!GPU_R100}"; GPU_NIT="${!G
 echo "== checks"
 # 1. exit codes and fixed iteration count
 [ "$GPU_RC" -eq 0 ]    && ok "$BACKEND run exited 0"           || fail "$BACKEND run exited $GPU_RC"
-[ "$RC_Serial" -eq 0 ] && ok "Serial run exited 0"             || fail "Serial run exited $RC_Serial"
+[ "$CPU_REF" -eq 1 ] && { [ "$RC_Serial" -eq 0 ] && ok "Serial run exited 0"             || fail "Serial run exited $RC_Serial"; }
 [ "$GPU_NIT" = 100 ]   && ok "$BACKEND CG iterations = 100"    || fail "$BACKEND CG iterations = $GPU_NIT (expected 100)"
-[ "$NITER_Serial" = 100 ] && ok "Serial CG iterations = 100"   || fail "Serial CG iterations = $NITER_Serial (expected 100)"
+[ "$CPU_REF" -eq 1 ] && { [ "$NITER_Serial" = 100 ] && ok "Serial CG iterations = 100"   || fail "Serial CG iterations = $NITER_Serial (expected 100)"; }
 # 2. absolute residual (CORAL-2 rule)
 if fnum "$GPU_R100" && flt "$GPU_R100" 1e-8; then ok "$BACKEND final r norm $GPU_R100 < 1e-8"
 else fail "$BACKEND final r norm $GPU_R100 is not < 1e-8"; fi
+if [ "$CPU_REF" -eq 1 ]; then
 if fnum "$R100_Serial" && flt "$R100_Serial" 1e-8; then ok "Serial final r norm $R100_Serial < 1e-8"
 else fail "Serial final r norm $R100_Serial is not < 1e-8"; fi
+fi
 # 3. relative reduction
 if fnum "$GPU_R0" && fnum "$GPU_R100"; then
     RED="$(fdiv "$GPU_R100" "$GPU_R0")"
     if fle "$RED" 1e-9; then ok "$BACKEND ||r_100||/||r_0|| = $RED <= 1e-9"
     else fail "$BACKEND ||r_100||/||r_0|| = $RED > 1e-9"; fi
 else fail "$BACKEND residuals not finite ($GPU_R0, $GPU_R100)"; fi
+if [ "$CPU_REF" -eq 1 ]; then
 # 4. GPU vs Serial agreement
 if fnum "$GPU_R0" && fnum "$R0_Serial"; then
     D0="$(awk -v a="$GPU_R0" -v b="$R0_Serial" 'BEGIN{ d=(a-b)/b; if (d<0) d=-d; printf "%.3e", d }')"
@@ -135,9 +161,26 @@ if fnum "$GPU_R100" && fnum "$R100_Serial"; then
     if fle "$L" 1; then ok "final r norm $BACKEND=$GPU_R100 vs Serial=$R100_Serial (ratio $RATIO, |log10| = $L <= 1)"
     else fail "final r norm $BACKEND=$GPU_R100 vs Serial=$R100_Serial (ratio $RATIO, |log10| = $L > 1)"; fi
 else fail "final residuals not finite ($GPU_R100, $R100_Serial)"; fi
+else
+# 4'. frozen reference check of the registered default input (no CPU run)
+if [ "$BACKEND" != CUDA ]; then
+    fail "frozen reference check: the registered check (inputs.yaml, $FROZEN_INPUT) covers the CUDA build only; no frozen reference for $BACKEND (the Serial comparison runs only on an explicit offline request)"
+else
+    CHECK_OUT="$LOGDIR/frozen-reference-check"
+    echo "== frozen reference check: python3 tools/inputs/hpcperf_inputs.py check level2/hipbone $FROZEN_INPUT --out $CHECK_OUT"
+    python3 "$R/tools/inputs/hpcperf_inputs.py" check "$HERE" "$FROZEN_INPUT" --out "$CHECK_OUT"
+    rc=$?
+    [ "$rc" -eq 0 ] && ok "frozen reference check $FROZEN_INPUT PASS (vs reference/$FROZEN_INPUT.json)" \
+                    || fail "frozen reference check $FROZEN_INPUT exited $rc ($CHECK_OUT/check.json)"
+fi
+fi
 
 if [ "$FAIL" -eq 0 ]; then
+    if [ "$CPU_REF" -eq 1 ]; then
     echo "PASS: hipbone $BACKEND (-nx 3 -ny 3 -nz 3 -p 14: 100 CG iterations, final r norm $GPU_R100 < 1e-8, Serial reference $R100_Serial)"
+    else
+    echo "PASS: hipbone $BACKEND (-nx 3 -ny 3 -nz 3 -p 14: 100 CG iterations, final r norm $GPU_R100 < 1e-8; CPU reference skipped (default), frozen reference check $FROZEN_INPUT PASS)"
+    fi
     exit 0
 else
     echo "FAIL: hipbone $BACKEND (see $LOGDIR/*.log)"
