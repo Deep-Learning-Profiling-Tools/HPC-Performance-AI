@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cmath>
 #include <algorithm>
+#include "hpcperf_golden.h"   // tools/golden: CPU-reference gate, output capture
 
 using Index_type = std::ptrdiff_t;
 using Real_type = double;
@@ -21,25 +22,22 @@ using Int_type = int;
 using Int_ptr = Int_type*;
 
 // ---------------------------------------------------------------------------
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPC-Performance-AI correctness switch.
 //
-// These benchmarks validate by recomputing the whole GPU workload on one CPU
-// core. That recomputation is correctness machinery, not part of the workload
-// being timed, so tools/timing/measure_level1.sh sets HPCPERF_SKIP_VERIFY=1 and
-// the driver then skips the CPU reference and its comparison, printing
-// SKIP_VERIFY instead of PASS/FAIL. ctest never sets the variable, so the
-// default path -- and every correctness result -- is unchanged.
+// These drivers can validate by recomputing the whole GPU workload on one CPU
+// core (the upstream Base_Seq variant). That CPU reference runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py
+// make uses it once to validate the frozen golden reference); by default it is
+// skipped and the driver prints SKIP_VERIFY instead of PASS/FAIL. Correctness is
+// then judged by comparing the captured GPU outputs (hpcperf_golden_output,
+// HPCPERF_GOLDEN_DUMP) with the frozen B200 golden reference (tools/golden).
 //
 // It elides only host-side verification: no kernel, no data initialization, no
 // tolerance and no algorithm is touched.
 // ---------------------------------------------------------------------------
 inline bool hpcperf_skip_verify()
 {
-  static const bool skip = []() {
-    const char* e = std::getenv("HPCPERF_SKIP_VERIFY");
-    return e != nullptr && *e != '\0' && *e != '0';
-  }();
-  return skip;
+  return !hpcperf_cpu_reference_enabled();
 }
 
 inline int& rp_data_init_count() { static int count = 0; return count; }
