@@ -15,19 +15,51 @@ timing:
   regex: '^mm_time: (?P<value>[0-9.eE+-]+) \(numeric phase'
   select: only
 baseline:
-  method: 'added check: C compared with a CPU product: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'C (host row pointers; column indices and values in canonical column-sorted row order) against the frozen
+    B200 golden reference (`check:` / `golden:` below); the added CPU product runs only once, offline, to validate
+    that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes C only when
+  # the added CPU check printed PASS; every later run is compared with that frozen output instead. The GPU's in-row
+  # order is nondeterministic (hash accumulator), so the captured rows are sorted by column first (as in the check).
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: Crow
+    dtype: u64
+    rule: {metric: exact}
+    cpu: null
+    basis: the check compares every row size Crow[i+1] - Crow[i] with the CPU product's (cuda/main.cu:503-506); Crow
+      is the host symbolic phase's row-pointer array (size_t) the GPU numeric phase fills
+  - name: Ccol
+    dtype: i32
+    rule: {metric: exact}
+    cpu: null
+    basis: the check sorts each GPU row and requires its columns to equal the sorted CPU columns (cuda/main.cu:509);
+      captured in that canonical order
+  - name: Cval
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: Cval.cpu
+    basis: the check fails on |gpu - ref| > 1e-10 * (1 + |ref|) per sorted entry (cuda/main.cu:512-513); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU product
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'Crow and Ccol byte-identical and Cval within max |a - g| / (1 + |g|) <= 1e-10 - d0 of the frozen
+    B200 golden reference reference/<input_id>.json, rows in canonical column-sorted order (d0 = the golden''s
+    deviation from the CPU product measured when it was frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: default generated matrix plus a 10x larger one

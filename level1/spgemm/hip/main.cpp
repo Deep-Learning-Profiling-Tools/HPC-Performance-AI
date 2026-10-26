@@ -37,6 +37,7 @@
 // per-row entries sorted and compared (cols exact, values rel tol 1e-10).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -433,12 +434,39 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END_SYNC();
   printf("mm_time: %f (numeric phase, %d repeats)\n", numeric_time / repeat, repeat);
 
-  // ---- validation (added): host dense-accumulator reference ----
+  // C back to the host (after the ROI; D2H only) and captured: the outputs the check below compares.
+  // The GPU's in-row order is nondeterministic (hash accumulator, atomics), so each row is put in
+  // canonical (column-sorted) order first, the same order the check compares in; this is a
+  // canonicalization of the GPU result, not a CPU reference, and runs only when capturing.
   std::vector<Ordinal> Ccol(nnzC); std::vector<Scalar> Cval(nnzC);
   GPU_CHECK(cudaMemcpy(Ccol.data(), dCcol, nnzC * sizeof(Ordinal), cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(Cval.data(), dCval, nnzC * sizeof(Scalar), cudaMemcpyDeviceToHost));
+  if (hpcperf_golden_active()) {
+    static_assert(sizeof(Offset) == 8 && sizeof(Ordinal) == 4, "golden dtypes u64 / i32");
+    std::vector<std::pair<Ordinal, Scalar>> row;
+    for (Ordinal i = 0; i < m; i++) {
+      row.clear();
+      for (Offset k = Crow[i]; k < Crow[i + 1]; k++) row.push_back({Ccol[k], Cval[k]});
+      std::sort(row.begin(), row.end());
+      Offset k = Crow[i];
+      for (auto& p : row) { Ccol[k] = p.first; Cval[k] = p.second; k++; }
+    }
+    hpcperf_golden_output("Crow", Crow.data(), m + 1, "u64");          // tools/golden: the checked outputs
+    hpcperf_golden_output("Ccol", Ccol.data(), nnzC, "i32");
+    hpcperf_golden_output("Cval", Cval.data(), nnzC, "f64");
+  }
+
   bool ok = true;
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference is skipped; correctness = the captured outputs against the
+    // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+    printf("SKIP_VERIFY\n");
+  } else {
+  // ---- validation (added): host dense-accumulator reference ----
   {
+    hpcperf_golden_stream cpu_vals;                                    // the CPU reference (golden make only),
+    hpcperf_golden_begin(&cpu_vals, "Cval.cpu", "f64");                // in the same canonical order
+    std::vector<Scalar> ref_row;
     std::vector<Scalar> acc(n, 0.0);
     std::vector<char> marker(n, 0);
     std::vector<Ordinal> touched;
@@ -454,6 +482,9 @@ int main(int argc, char** argv)
         }
       }
       std::sort(touched.begin(), touched.end());
+      ref_row.clear();
+      for (Ordinal c : touched) ref_row.push_back(acc[c]);
+      hpcperf_golden_append(&cpu_vals, ref_row.data(), ref_row.size());
       // gather + sort the GPU row
       gpu_row.clear();
       for (Offset k = Crow[i]; k < Crow[i + 1]; k++) gpu_row.push_back({Ccol[k], Cval[k]});
@@ -476,7 +507,9 @@ int main(int argc, char** argv)
       }
       for (Ordinal c : touched) marker[c] = 0;
     }
+    hpcperf_golden_end(&cpu_vals);
   }
   printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }
