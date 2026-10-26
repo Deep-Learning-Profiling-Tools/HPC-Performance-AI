@@ -5,14 +5,16 @@
 #include <chrono>
 #include <cstdlib>
 #include "bwt.hpp"
+#include "hpcperf_golden.h"
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -74,8 +76,12 @@ int main(int argc, char const *argv[])
   start = NOW;
   auto gpu_seq = bwt(sequence);
   auto gpu_time = std::chrono::duration_cast<std::chrono::milliseconds>(NOW - start);
+  // tools/golden: the checked output (the n transformed characters), after the timed device run
+  hpcperf_golden_output("bwt", gpu_seq.data(), gpu_seq.size(), "u8");
 
   if (skip_verify) {
+    // default: the host transform (bwt_cpu) is skipped; correctness = the captured output against
+    // the frozen golden reference (tools/golden)
     std::cout << "Device time: " << gpu_time.count() << " ms" << std::endl;
     std::cout << "SKIP_VERIFY\n";
   } else {

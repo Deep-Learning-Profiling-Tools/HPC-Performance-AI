@@ -16,19 +16,36 @@ timing:
   regex: '^Device time: (?P<value>[0-9.eE+-]+) ms'
   select: only
 baseline:
-  method: 'built-in comparison with the host transform: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the transformed sequence against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    host transform bwt_cpu (common/main.cpp) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the output
+  # only when the upstream check printed PASS; every later run is compared with that frozen output instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: bwt
+    dtype: u8
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's exact string comparison cpu_seq.compare(gpu_seq) == 0 of the n transformed characters against
+      the host transform bwt_cpu (common/main.cpp:91); a deterministic permutation of the input, compared byte for byte
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the transformed sequence (n bytes) against the frozen B200 golden reference reference/<input_id>.json, byte
+    for byte (sha256), as upstream compared it with the host transform; no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus a 4x string
