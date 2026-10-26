@@ -16,9 +16,9 @@ timing:
   regex: '^\s*(?P<value>[0-9.]+) s,\s+[0-9.]+ % : COMPUTE$'
   select: only
 baseline:
-  method: no PASS line; verify.py re-implements SRAD in numpy float32 and compares image_out.pgm -- the registry's
-    correctness check (check:)
-  reference: this build's first measured run (self baseline); see method
+  method: 'no PASS line; the output image against the frozen B200 golden reference (`check:` / `golden:` below);
+    verify.py (numpy float32 re-implementation) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: total_time_line
     role: diagnostic
@@ -107,13 +107,31 @@ inputs:
   files:
   - data/image.pgm
   input_form: file
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures the float image before write_graphics truncates it to int) and re-implements
+  # extract -> niter x (statistics, srad, srad2) -> compress in numpy float32 (captured as image.cpu, same column-major
+  # order); the capture is frozen only when verify.py printed PASS.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
+    pass_regex: '^PASS: srad output image matches CPU reference'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: image
+    dtype: f32
+    rule: {metric: trunc_int, tol: 3, frac_tol: 0.001}
+    cpu: image.cpu
+    basis: verify.py's check on the (int)-truncated image (what write_graphics writes) -- max pixel difference <= 3 and
+      at most 0.1 % of the pixels differ by more than 1 (level1/srad_v1/verify.py:78-81); made conservative here (the
+      share counts pixels differing by >= 1) and applied to the binary's float image (cuda/main.cu, after the copy-back)
 check:
-  # verify.py runs the binary with the input's arguments (niter, lambda, rows, cols, image -> image_out.pgm in the run
-  # directory) and re-implements extract -> niter x (statistics, srad, srad2) -> compress in numpy float32.
-  kind: standalone
-  command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
-  pass_regex: '^PASS: srad output image matches CPU reference'
-  fail_regex: '^FAIL'
-  basis: verify.py's own tolerance on the 8-bit output image -- max pixel difference <= 3 and at most 0.1 % of the pixels
-    differ by more than 1 LSB (ctest, niter 100); at 500 / 2000 iterations established by running, not by adjusting
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the output image against the frozen B200 golden reference reference/<input_id>.json (truncated pixels: max
+    difference <= 3 - d0 and share of pixels differing by >= 1 <= 0.001 - f0, d0 / f0 = the golden''s deviation from
+    verify.py''s CPU re-implementation measured when it was frozen); no CPU reference is run'
   covers: all

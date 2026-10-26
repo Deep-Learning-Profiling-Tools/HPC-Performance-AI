@@ -7,8 +7,12 @@ directly from the extracted kernels, and compares image_out.pgm.
 
 Usage: verify.py <exe> <niter> <lambda> <rows> <cols> <input_image>
 """
-import subprocess, sys
+import os, subprocess, sys
 import numpy as np
+# tools/golden: when HPCPERF_GOLDEN_DUMP is set (only `tools/golden/hpcperf_golden.py make`, the one-time
+# validation of a frozen golden reference), the CPU reference array is captured next to the binary's output
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools", "golden"))
+import hpcperf_golden_capture as gc  # noqa: E402
 
 exe, niter, lam, Nr, Nc, img = (sys.argv[1], int(sys.argv[2]), float(sys.argv[3]),
                                 int(sys.argv[4]), int(sys.argv[5]), sys.argv[6])
@@ -68,6 +72,7 @@ for _ in range(niter):
     D = cN*dN + cS*dS + cW*dW + cE*dE
     I = (I + np.float32(0.25)*lam*D).astype(np.float32)
 I = np.log(I) * np.float32(255)                                # compress kernel
+gc.capture("image.cpu", I.T, "f32")   # the binary's float image is column-major (element j*Nr + i)
 
 out, w, h = read_pgm("image_out.pgm")
 ref = np.trunc(I).astype(np.int64)      # write_graphics casts to (int)
