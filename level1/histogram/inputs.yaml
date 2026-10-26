@@ -13,19 +13,41 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: two atomics variants (shared / global) each print 'Avg time'; no total
 baseline:
-  method: 'built-in: PASS per variant'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the six histograms (3 genres x shared/global atomics) against the frozen B200 golden reference (`check:` /
+    `golden:` below); the upstream CPU histogram HistogramGold (cuda/histogram_compare.cu) runs only once, offline, to
+    validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: PASS
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: FAIL
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the histograms
+  # only when the upstream check passed (a mismatching variant prints FAIL / INCORRECT and exits 1 via AssertEquals);
+  # every later run is compared with those frozen outputs instead. Names: hist.<uchar1|uchar4|float4>.<smem|gmem>.
+  mode: data
+  cpu_check: {pass_regex: '\sPASS$', fail_regex: '\sFAIL$|INCORRECT'}
+  outputs:
+  - match: 'hist\.(uchar1|uchar4|float4)\.(smem|gmem)'
+    count: 6
+    dtype: u32
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification
+      launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in
+      cuda/test_util.h:545); integer bin counts, compared byte for byte
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the six histograms (uchar1 / uchar4 / float4 x smem / gmem atomics) against the frozen B200 golden reference
+    reference/<input_id>.json, byte for byte (sha256), as upstream compared them with the CPU histogram; no CPU
+    reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: ctest run line plus two larger random images through the program's own --width/--height

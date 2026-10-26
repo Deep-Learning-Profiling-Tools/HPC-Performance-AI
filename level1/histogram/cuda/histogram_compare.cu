@@ -26,6 +26,7 @@
  ******************************************************************************/
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <map>
 #include <vector>
@@ -77,14 +78,20 @@ __device__ __forceinline__ void DecodePixel(uchar1 pixel, unsigned int (&bins)[A
 
 #include <cstdlib>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured outputs (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
+
+// tools/golden: the genre of a histogram variant, part of its output name
+static const char* hpcperf_genre(const uchar1*) { return "uchar1"; }
+static const char* hpcperf_genre(const uchar4*) { return "uchar4"; }
+static const char* hpcperf_genre(const float4*) { return "float4"; }
 
 //---------------------------------------------------------------------
 // Globals, constants, and type declarations
@@ -419,10 +426,21 @@ void RunTest(
     // Run single test to verify (and code cache)
     (*f)(d_pixels, width, height, d_hist, !g_report);
 
-    if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
+    {  // tools/golden: the checked output of this variant -- the histogram of the verification launch
+        // above (the one CompareDeviceResults copies back), copied to the host outside the ROI
+        std::vector<unsigned int> hpcperf_hist(ACTIVE_CHANNELS * NUM_BINS);
+        cudaMemcpy(hpcperf_hist.data(), d_hist, sizeof(unsigned int) * ACTIVE_CHANNELS * NUM_BINS, cudaMemcpyDeviceToHost);
+        char hpcperf_name[64];
+        snprintf(hpcperf_name, sizeof(hpcperf_name), "hist.%s.%.4s", hpcperf_genre(d_pixels), short_name);
+        hpcperf_golden_output(hpcperf_name, hpcperf_hist.data(), hpcperf_hist.size(), "u32");
+    }
+
     int compare = hpcperf_skip_verify() ? 0
                   : CompareDeviceResults(h_hist, d_hist, ACTIVE_CHANNELS * NUM_BINS, true, g_verbose);
-    if (!g_report) printf("\t%s\n", compare ? "FAIL" : "PASS"); fflush(stdout);
+    // default: nothing was compared (the CPU reference is skipped) -> SKIP_VERIFY, never PASS
+    if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
+    else if (!g_report) printf("\t%s\n", compare ? "FAIL" : "PASS");
+    fflush(stdout);
 
     double elapsed_ms = 0;
     HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed iterations, not the verify/warm-up run before them
