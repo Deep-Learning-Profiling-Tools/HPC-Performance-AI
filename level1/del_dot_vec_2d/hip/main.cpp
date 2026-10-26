@@ -9,6 +9,7 @@
 // Validation: element-wise comparison of div.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -202,31 +203,41 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.div, d_div, rbytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("div", g.div, array_length, "f64");   // tools/golden: the checked output
   cudaFree(d_x); cudaFree(d_y); cudaFree(d_xdot); cudaFree(d_ydot);
   cudaFree(d_div); cudaFree(d_rz);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Data c; setUp(c, domain);
-  {
-    Real_ptr div = c.div;
-    const Real_type ptiny = c.ptiny;
-    const Real_type half = c.half;
-    Real_ptr x1,x2,x3,x4, y1,y2,y3,y4, fx1,fx2,fx3,fx4, fy1,fy2,fy3,fy4;
-    NDSET2D(domain.jp, c.x, x1,x2,x3,x4) ;
-    NDSET2D(domain.jp, c.y, y1,y2,y3,y4) ;
-    NDSET2D(domain.jp, c.xdot, fx1,fx2,fx3,fx4) ;
-    NDSET2D(domain.jp, c.ydot, fy1,fy2,fy3,fy4) ;
-    Index_ptr real_zones = c.real_zones;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type ii = 0; ii < iend; ++ii ) {
-        DEL_DOT_VEC_2D_BODY_INDEX;
-        DEL_DOT_VEC_2D_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Data c; setUp(c, domain);
+    {
+      Real_ptr div = c.div;
+      const Real_type ptiny = c.ptiny;
+      const Real_type half = c.half;
+      Real_ptr x1,x2,x3,x4, y1,y2,y3,y4, fx1,fx2,fx3,fx4, fy1,fy2,fy3,fy4;
+      NDSET2D(domain.jp, c.x, x1,x2,x3,x4) ;
+      NDSET2D(domain.jp, c.y, y1,y2,y3,y4) ;
+      NDSET2D(domain.jp, c.xdot, fx1,fx2,fx3,fx4) ;
+      NDSET2D(domain.jp, c.ydot, fy1,fy2,fy3,fy4) ;
+      Index_ptr real_zones = c.real_zones;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type ii = 0; ii < iend; ++ii ) {
+          DEL_DOT_VEC_2D_BODY_INDEX;
+          DEL_DOT_VEC_2D_BODY;
+        }
       }
     }
-  }
+    hpcperf_golden_output("div.cpu", c.div, array_length, "f64");   // the CPU reference (golden make only)
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("div", c.div, g.div, array_length, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("div", c.div, g.div, array_length, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

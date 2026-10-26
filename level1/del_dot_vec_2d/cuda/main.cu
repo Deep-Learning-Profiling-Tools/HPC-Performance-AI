@@ -9,6 +9,7 @@
 // Validation: element-wise comparison of div.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -202,13 +203,15 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.div, d_div, rbytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("div", g.div, array_length, "f64");   // tools/golden: the checked output
   cudaFree(d_x); cudaFree(d_y); cudaFree(d_xdot); cudaFree(d_ydot);
   cudaFree(d_div); cudaFree(d_rz);
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -230,6 +233,7 @@ int main(int argc, char** argv)
         }
       }
     }
+    hpcperf_golden_output("div.cpu", c.div, array_length, "f64");   // the CPU reference (golden make only)
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("div", c.div, g.div, array_length, 1.0e-10);
