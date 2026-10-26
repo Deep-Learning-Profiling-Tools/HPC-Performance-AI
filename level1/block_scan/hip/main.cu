@@ -26,6 +26,7 @@
  *
  ******************************************************************************/
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
@@ -187,8 +188,21 @@ void Test()
         d_in,
         d_out);
 
-    // Check results for the first warmup run
+    // tools/golden: the checked output of this variant = d_out after the first (warm-up) launch, i.e.
+    // the TILE_SIZE exclusive prefix sums followed by the aggregate (before the timed region; a D2H copy only)
     if (i == 0) {
+      GPU_CHECK(hipMemcpy(h_gpu, d_out, sizeof(int) * (TILE_SIZE + 1), hipMemcpyDeviceToHost));
+      char hpcperf_name[96];
+      snprintf(hpcperf_name, sizeof(hpcperf_name), "scan.%s.t%d.i%d",
+               (ALGORITHM == BLOCK_SCAN_RAKING) ? "raking" : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? "raking_memoize" : "warp_scans",
+               BLOCK_THREADS, ITEMS_PER_THREAD);
+      hpcperf_golden_output(hpcperf_name, h_gpu, TILE_SIZE + 1, "i32");
+    }
+
+    // Check results for the first warmup run (HPCPERF_CPU_REFERENCE=1 only, golden make)
+    if (i == 0 && !hpcperf_cpu_reference_enabled()) {
+      printf("SKIP_VERIFY\n");
+    } else if (i == 0) {
       printf("\tOutput items: ");
       int compare = CompareDeviceResults(h_reference, d_out, TILE_SIZE);
       printf("%s\n", compare ? "FAIL" : "PASS");

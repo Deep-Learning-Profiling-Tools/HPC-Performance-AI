@@ -26,6 +26,7 @@
  *
  ******************************************************************************/
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
@@ -35,13 +36,14 @@
 
 #include <cstdlib>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -198,7 +200,18 @@ void Test()
         d_in,
         d_out);
 
-    // Check results for the first warmup run
+    // tools/golden: the checked output of this variant = d_out after the first (warm-up) launch, i.e.
+    // the TILE_SIZE exclusive prefix sums followed by the aggregate (before the timed region; a D2H copy only)
+    if (i == 0) {
+      GPU_CHECK(cudaMemcpy(h_gpu, d_out, sizeof(int) * (TILE_SIZE + 1), cudaMemcpyDeviceToHost));
+      char hpcperf_name[96];
+      snprintf(hpcperf_name, sizeof(hpcperf_name), "scan.%s.t%d.i%d",
+               (ALGORITHM == BLOCK_SCAN_RAKING) ? "raking" : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? "raking_memoize" : "warp_scans",
+               BLOCK_THREADS, ITEMS_PER_THREAD);
+      hpcperf_golden_output(hpcperf_name, h_gpu, TILE_SIZE + 1, "i32");
+    }
+
+    // Check results for the first warmup run (HPCPERF_CPU_REFERENCE=1 only, golden make)
     if (i == 0 && hpcperf_skip_verify()) {
       printf("SKIP_VERIFY\n");
     } else if (i == 0) {

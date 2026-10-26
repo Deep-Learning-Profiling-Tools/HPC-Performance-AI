@@ -13,24 +13,40 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: two scan variants each print 'Average kernel time'; no total
 baseline:
-  method: 'built-in: ''Output items: PASS'' and ''Aggregate: PASS'' per variant'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the scan output (1024 exclusive prefix sums + the aggregate) of each of the 18 BlockScan variants, after
+    its first (warm-up) launch, against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    check (memcmp with the host prefix sums from Initialize) runs only once, offline, to validate that reference
+    (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: output_pass
-    role: required
-    regex: '^\s*Output items: PASS'
-    compare:
-      rule: present
-  - name: aggregate_pass
-    role: required
-    regex: '^\s*Aggregate: PASS'
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: FAIL
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the 18 scan
+  # outputs only when every upstream check printed PASS; every later run is compared with them instead.
+  mode: data
+  cpu_check: {pass_regex: '^\s*(Output items|Aggregate): PASS$', fail_regex: '^\s*(Output items|Aggregate): FAIL'}
+  outputs:
+  - match: 'scan\..+'
+    count: 18
+    dtype: i32
+    rule: {metric: exact}
+    basis: 'scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first
+      warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate
+      from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream
+      neither)'
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 18 scan outputs byte-identical (sha256) to the frozen B200 golden reference
+    reference/<input_id>.json (upstream compares them exactly with memcmp); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: ctest run line plus a 4x grid
