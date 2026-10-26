@@ -74,6 +74,7 @@ class PrBenchmark : public Benchmark {
   void Verify() override;
   void Summarize() override;
   void Cleanup() override;
+  void CaptureGoldenOutputs() override;  // tools/golden
 
   // Setters
   void SetMaxIteration(uint32_t max_iteration) {

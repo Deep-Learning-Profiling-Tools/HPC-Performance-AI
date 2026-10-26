@@ -38,6 +38,7 @@
  */
 
 #include "pr_benchmark.h"
+#include "hpcperf_golden.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -82,6 +83,12 @@ void PrBenchmark::LoadInputFile() {
   }
 }
 
+// tools/golden: the PageRank vector Verify() compares with the CPU implementation
+// (written back by the last timed Run(); a no-op unless HPCPERF_GOLDEN_DUMP is set)
+void PrBenchmark::CaptureGoldenOutputs() {
+  hpcperf_golden_output("page_rank", page_rank_, num_nodes_, "f32");
+}
+
 void PrBenchmark::Verify() {
   uint32_t i;
   float *cpu_page_rank = new float[num_nodes_];
@@ -104,6 +111,7 @@ void PrBenchmark::Verify() {
   if (i % 2 != 0) {
     memcpy(cpu_page_rank, cpu_page_rank_old, num_nodes_ * sizeof(float));
   }
+  hpcperf_golden_output("page_rank.cpu", cpu_page_rank, num_nodes_, "f32");  // the CPU reference (golden make only)
 
   // Compare with GPU result
   bool has_error = false;
