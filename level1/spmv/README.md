@@ -57,14 +57,13 @@ cmake --build build/spmv/cuda
 
 ## Validation
 
-Upstream built-in check: sequential CPU gold-standard SpMV; relative squared error of y must be <= 1e-5 (check_errors). Prints numErrors and PASS/FAIL.
+Correctness = y against the frozen B200 golden reference `reference/<input_id>.json` (sum (a - g)^2 / sum g^2 <= (sqrt 1e-5 - sqrt d0)^2; rule in `inputs.yaml` `golden:`). As in upstream's check, y is the result of the single SpMV before the timed loop (the loop's own y is never copied back or checked). The upstream check (sequential CPU gold-standard SpMV, relative squared error <= 1e-5, check_errors, prints PASS/FAIL) validated that reference once and runs only on request (below); by default the CPU gold y is not computed either (the matrix-value overwrite of generate_gold_standard still runs) and the numErrors column stays 0.
 
 ```bash
-ctest --test-dir build/spmv/cuda --output-on-failure
+ctest --test-dir build/spmv/cuda --output-on-failure   # golden run of the registry's default input
 ```
 
-
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Correctness switch.** By default the host-side CPU check is skipped and the benchmark prints `SKIP_VERIFY` (tools/timing relies on it); a plain run, ctest, `tools/inputs` and `tools/timing` never run the CPU reference and nothing falls back to it. `HPCPERF_CPU_REFERENCE=1` runs the original CPU check (offline only: `tools/golden/hpcperf_golden.py make` uses it once to validate the golden reference); `HPCPERF_SKIP_VERIFY=1` still forces it off. `HPCPERF_GOLDEN_DUMP=<dir>` makes the run capture its outputs. See [tools/golden/README.md](../../tools/golden/README.md) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: the benchmark loop, not the warm-up call and check before it. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

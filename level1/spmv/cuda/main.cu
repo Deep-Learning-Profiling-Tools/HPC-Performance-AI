@@ -23,6 +23,7 @@
 // sequential CPU gold standard must be <= 1e-5.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -51,13 +52,14 @@ __device__ inline Scalar shfl_down_width(Scalar v, int delta, int width) {
 #else
 #include <cuda_runtime.h>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 __device__ inline Scalar shfl_down_width(Scalar v, int delta, int width) {
@@ -200,9 +202,13 @@ int main(int argc, char** argv)
   for (int i = 0; i < numRows; i++) h_y[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
 
   // ----- upstream generate_gold_standard: overwrite values, CPU gold -----
+  // (the CPU gold y is reference work: computed only when the CPU check runs; the value
+  // overwrite is the benchmark's data initialization and always runs)
+  const bool cpu_gold = !hpcperf_skip_verify();
   for (int i = 0; i < numRows; i++) {
     Offset start = rowPtr[i], end = rowPtr[i + 1];
     for (Offset j = start; j < end; j++) values[j] = colInd[j] + i;
+    if (!cpu_gold) continue;
     h_y_compare[i] = 0;
     for (Offset j = start; j < end; j++) {
       Scalar tmp_val = colInd[j] + i;
@@ -236,7 +242,8 @@ int main(int argc, char** argv)
 
   int num_errors = 0;
   double total_error = 0.0;
-  if (!hpcperf_skip_verify()) {  // upstream check_errors
+  if (cpu_gold) {  // upstream check_errors
+    hpcperf_golden_output("y.cpu", h_y_compare, numRows, "f64");   // the CPU gold standard (golden make only)
     double error = 0.0, sum = 0.0;
     for (int i = 0; i < numRows; i++) {
       error += (h_y_compare[i] - h_y[i]) * (h_y_compare[i] - h_y[i]);
@@ -261,6 +268,10 @@ int main(int argc, char** argv)
   }
   HPCPERF_ROI_END_SYNC();
   GPU_CHECK(cudaGetLastError());
+  // tools/golden: the y the check above compares -- the result of the single SpMV before the
+  // timed loop (h_y, copied back there; the loop's own y never reaches the host), captured here
+  // after the ROI
+  hpcperf_golden_output("y", h_y, numRows, "f64");
 
   // upstream-style performance summary
   double matrix_size = 1.0 * ((nnz * (sizeof(Scalar) + sizeof(Ordinal)) + numRows * sizeof(Offset))) / 1024 / 1024;
@@ -272,6 +283,6 @@ int main(int argc, char** argv)
          2.0 * nnz * loop / ave_time / 1e9, ave_time / loop * 1000, num_errors);
   printf("launch config: vector_length=%d team_size=%d rows_per_team=%d worksets=%d\n",
          vector_length, team_size, rows_per_team, worksets);
-  printf("%s\n", hpcperf_skip_verify() ? "SKIP_VERIFY" : (num_errors == 0 ? "PASS" : "FAIL"));
+  printf("%s\n", !cpu_gold ? "SKIP_VERIFY" : (num_errors == 0 ? "PASS" : "FAIL"));
   return num_errors == 0 ? 0 : 1;
 }

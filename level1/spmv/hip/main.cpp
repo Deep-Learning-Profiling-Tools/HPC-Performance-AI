@@ -23,6 +23,7 @@
 // sequential CPU gold standard must be <= 1e-5.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -190,9 +191,13 @@ int main(int argc, char** argv)
   for (int i = 0; i < numRows; i++) h_y[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
 
   // ----- upstream generate_gold_standard: overwrite values, CPU gold -----
+  // (the CPU gold y is reference work: computed only when the CPU check runs; the value
+  // overwrite is the benchmark's data initialization and always runs)
+  const bool cpu_gold = hpcperf_cpu_reference_enabled();
   for (int i = 0; i < numRows; i++) {
     Offset start = rowPtr[i], end = rowPtr[i + 1];
     for (Offset j = start; j < end; j++) values[j] = colInd[j] + i;
+    if (!cpu_gold) continue;
     h_y_compare[i] = 0;
     for (Offset j = start; j < end; j++) {
       Scalar tmp_val = colInd[j] + i;
@@ -226,7 +231,8 @@ int main(int argc, char** argv)
 
   int num_errors = 0;
   double total_error = 0.0;
-  {  // upstream check_errors
+  if (cpu_gold) {  // upstream check_errors
+    hpcperf_golden_output("y.cpu", h_y_compare, numRows, "f64");   // the CPU gold standard (golden make only)
     double error = 0.0, sum = 0.0;
     for (int i = 0; i < numRows; i++) {
       error += (h_y_compare[i] - h_y[i]) * (h_y_compare[i] - h_y[i]);
@@ -251,6 +257,10 @@ int main(int argc, char** argv)
   }
   HPCPERF_ROI_END_SYNC();
   GPU_CHECK(cudaGetLastError());
+  // tools/golden: the y the check above compares -- the result of the single SpMV before the
+  // timed loop (h_y, copied back there; the loop's own y never reaches the host), captured here
+  // after the ROI
+  hpcperf_golden_output("y", h_y, numRows, "f64");
 
   // upstream-style performance summary
   double matrix_size = 1.0 * ((nnz * (sizeof(Scalar) + sizeof(Ordinal)) + numRows * sizeof(Offset))) / 1024 / 1024;
@@ -262,6 +272,8 @@ int main(int argc, char** argv)
          2.0 * nnz * loop / ave_time / 1e9, ave_time / loop * 1000, num_errors);
   printf("launch config: vector_length=%d team_size=%d rows_per_team=%d worksets=%d\n",
          vector_length, team_size, rows_per_team, worksets);
-  printf("%s\n", num_errors == 0 ? "PASS" : "FAIL");
+  // default: the CPU check is skipped (SKIP_VERIFY); correctness = the captured y against the
+  // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+  printf("%s\n", !cpu_gold ? "SKIP_VERIFY" : (num_errors == 0 ? "PASS" : "FAIL"));
   return num_errors == 0 ? 0 : 1;
 }
