@@ -39,8 +39,9 @@ log written by the one-time CPU validation (`cpu: {log: {file: <template>, regex
 {log} = that GPU run's log; `env:` templated) as the one-time CPU validation of that very output.
 Each tolerance is the benchmark's own upstream tolerance for its GPU-vs-CPU check. make measures
 d0 = the same metric between the B200 output and the CPU reference, and the check uses
-tol_effective = tol - d0 (for l2_rel_sq: (sqrt tol - sqrt d0)^2): by the triangle inequality a
-candidate within tol_effective of the golden is within the upstream tolerance of the CPU reference,
+tol_effective = tol - d0 for absolute metrics, (tol - d0) / (1 + d0) for relative ones, ((sqrt tol - sqrt d0) /
+(1 + sqrt d0))^2 for l2_rel_sq (see tol_effective): by the triangle inequality a candidate within
+tol_effective of the golden is within (<=) the upstream tolerance of the CPU reference,
 so replacing the CPU reference by the golden does not loosen the original criterion (relative metrics:
 (tol - d0) / (1 + d0), see tol_effective). A non-finite value where the golden is finite always fails.
 """
@@ -384,7 +385,7 @@ def trunc_int_value(a_path, g_path, dtype, count, a_sha=None, g_sha=None):
 
 def tol_effective(metric, tol, d0, rule=None):
     """The tolerance against the golden g that keeps a candidate a within `tol` of the CPU reference c, given
-    d0 = metric(g, c) (triangle inequality, strictly):
+    d0 = metric(g, c) (triangle inequality; the bound is <= tol and attained):
       max_abs, rmse                 |a-c| <= |a-g| + |g-c|                      -> tol - d0
       max_rel1p, max_rel, l1_rel    the golden's magnitude in the denominator is at most (1 + d0) times the
                                     CPU reference's                              -> (tol - d0) / (1 + d0)
@@ -615,12 +616,11 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
                 rule["d0_vs_cpu_reference"] = d0
                 rule["d0_source"] = cpu_name
             else:
-                d0 = None
-                rule["d0_vs_cpu_reference"] = None
-                rule["d0_source"] = "not measured (the CPU reference keeps no comparable array); tol_effective = tol"
-                if rule["metric"] == "trunc_int":
-                    rule["d0_frac_vs_cpu_reference"] = None
-                    rule["frac_tol_effective"] = rule["frac_tol"]
+                # without the CPU array the golden's own deviation is unknown and tol_effective = tol would
+                # loosen the original criterion by that unknown amount: refuse (declare a `cpu:` capture)
+                print(f"REFUSED: {tag}: output '{name}' is compared with a tolerance but the spec names no CPU-reference "
+                      f"capture (cpu:), so d0 cannot be measured and the budget would be looser than the original check")
+                return 1
             te = tol_effective(rule["metric"], rule["tol"], d0, rule) if rule["metric"] != "trunc_int" else None
             if rule["metric"] == "trunc_int":
                 te = rule["tol"] - (d0 or 0.0)          # integer pixel differences: tol - d0 may be 0 (exact pixels)

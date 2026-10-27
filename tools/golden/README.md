@@ -88,7 +88,7 @@ capture whose bytes do not match its recorded sha256 fails; a missing golden blo
 
 `make` also captures the CPU reference's own array (`cpu:`) and records
 `d0 = metric(B200 golden, CPU reference)`. The check allows `tol_effective`, chosen so that by the
-triangle inequality a candidate within `tol_effective` of the golden is **strictly** within the
+triangle inequality a candidate within `tol_effective` of the golden is within (<=) the
 upstream tolerance of the CPU reference -- replacing the CPU reference by the golden does not loosen
 the original criterion:
 
@@ -101,8 +101,8 @@ the original criterion:
 | `trunc_int` | `tol - d0` levels and `frac_tol - share0` (share of pixels >= 1 level apart: conservative) |
 
 Outputs compared exactly need no budget: the original check already proved golden == CPU
-reference bit for bit. When the CPU reference keeps no comparable array, d0 is not measured,
-`tol_effective = tol`, and the reference says so (`d0_source`).
+reference bit for bit. A tolerance output without a CPU-reference capture (`cpu:`) is refused by
+`make`: an unmeasured d0 would make `tol_effective = tol` looser than the original check.
 
 ## `make`: the one-time, CPU-validated freeze
 
