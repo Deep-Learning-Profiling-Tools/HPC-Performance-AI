@@ -1,0 +1,106 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "pagerank",
+  "level": 1,
+  "input_id": "nodes16384-m5",
+  "frozen": true,
+  "workload": {
+    "input_id": "nodes16384-m5",
+    "params": {
+      "nodes": 16384,
+      "avg_out_degree": 16,
+      "max_iterations": 5
+    },
+    "args": [
+      "-i",
+      "build/pagerank/cuda/data/16384.data",
+      "-m",
+      "5"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "c01ff09ed5c0a1c1a08035c3623207c5835363e09971e0a05f96f2cee3398ba7",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "page_rank",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel",
+          "tol": 0.001
+        },
+        "cpu": "page_rank.cpu",
+        "basis": "upstream Verify fails on isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000 (common/pr_benchmark.cc:119-120), i.e. max |a - c| / c <= 1e-3; the check allows 1e-3 minus the B200 output's own deviation from the CPU reference (a NaN fails)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "page_rank",
+      "dtype": "f32",
+      "count": 16384,
+      "bytes": 65536,
+      "sha256": "7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5",
+      "rule": {
+        "metric": "max_rel",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 3.1585616920794013e-07,
+        "d0_source": "page_rank.cpu",
+        "tol_effective": 0.0009996838280744878
+      },
+      "basis": "upstream Verify fails on isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000 (common/pr_benchmark.cc:119-120), i.e. max |a - c| / c <= 1e-3; the check allows 1e-3 minus the B200 output's own deviation from the CPU reference (a NaN fails)",
+      "stats": {
+        "min": 9.784269423107617e-06,
+        "max": 0.00013634479546453804,
+        "sum": 1.000000130722583,
+        "nonfinite": 0
+      },
+      "blob": "sha256/7e/7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-27T18:46:27Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "16f99f9ba17d76a4d8a837e675db083daeb6c29d",
+    "source_clean": true,
+    "binary": "build/pagerank/cuda/pagerank_cuda",
+    "binary_sha256": "d71cddd96e496dc79ce6429b20c36e87f96bbe89a219aa246752765f1b170845",
+    "command": [
+      "build/pagerank/cuda/pagerank_cuda",
+      "-i",
+      "build/pagerank/cuda/data/16384.data",
+      "-m",
+      "5"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.974,
+      "pass_line": "Passed.",
+      "pass_regex": "^Passed\\.$",
+      "fail_regex": "^Error with node",
+      "log": "build/golden-make/pagerank/nodes16384-m5/run/stdout.log",
+      "log_sha256": "4bcdec9d5b9106e247f0dd5724a913432db15922f0f077b4371812122d40f6b5"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "169e4f0d7da831138ad80b531bf635ac924072eda3f4141ce4f8fc59e44abc84",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}
