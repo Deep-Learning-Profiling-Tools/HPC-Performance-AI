@@ -63,6 +63,7 @@ class FirBenchmark : public Benchmark {
   void Verify() override;
   void Summarize() override;
   void Cleanup() override;
+  void CaptureGoldenOutputs() override;  // tools/golden
 
   void SetNumBlock(uint32_t num_block) { num_block_ = num_block; }
   void SetNumDataPerBlock(uint32_t num_data_per_block) {
