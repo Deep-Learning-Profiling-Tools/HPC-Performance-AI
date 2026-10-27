@@ -157,6 +157,15 @@ def load(bench_dir: Path) -> dict:
 
 COVERAGE_STATUS = ("MULTI_INPUT", "SINGLE_INPUT", "BLOCKED")
 INPUT_FORMS = ("runtime", "file", "compile-time")
+# input purpose: a performance input is measured/timed and counts for coverage; a correctness-probe input exists only to
+# detect wrong implementations (e.g. data on which a constant or skipped computation cannot pass) -- it is checked
+# (`check`) and frozen (tools/golden make) like any input, but never measured, never timed, never the default input and
+# never counted for coverage
+PURPOSES = ("performance", "correctness-probe")
+
+
+def is_probe(inp) -> bool:
+    return isinstance(inp, dict) and inp.get("purpose", "performance") == "correctness-probe"
 
 
 TIMING_NONE_STATUS = ("NEEDS_TIMING_SUPPORT", "NO_TIMED_REGION")
@@ -303,6 +312,13 @@ def validate(doc: dict) -> list:
         for f in inp.get("files", []) or []:
             if not (Path(doc["_path"]).parent / f).exists():
                 errs.append(f"input '{i}': referenced file '{f}' does not exist under the benchmark directory")
+        if inp.get("purpose", "performance") not in PURPOSES:
+            errs.append(f"input '{i}': purpose must be one of {PURPOSES}")
+        if is_probe(inp):
+            if not isinstance(inp.get("probe_basis"), str) or not inp["probe_basis"].strip():
+                errs.append(f"input '{i}': a correctness-probe input needs probe_basis (which wrong implementations it detects and why the performance inputs cannot)")
+            if i == doc.get("default_input"):
+                errs.append(f"input '{i}': a correctness-probe input cannot be the default_input")
     if doc["default_input"] not in ids:
         errs.append(f"default_input '{doc['default_input']}' is not a registered input id")
     cov = doc.get("coverage")
@@ -310,7 +326,7 @@ def validate(doc: dict) -> list:
         if not isinstance(cov, dict) or cov.get("status") not in COVERAGE_STATUS:
             errs.append(f"coverage.status must be one of {COVERAGE_STATUS}")
         else:
-            runnable = [i for i in doc["inputs"] if isinstance(i, dict) and i.get("materialized", True) is not False]
+            runnable = [i for i in doc["inputs"] if isinstance(i, dict) and i.get("materialized", True) is not False and not is_probe(i)]
             if cov["status"] == "MULTI_INPUT" and len(runnable) < 2:
                 errs.append("coverage MULTI_INPUT needs at least two runnable (materialized) inputs")
             if cov["status"] == "SINGLE_INPUT" and len(runnable) != 1:
@@ -1562,7 +1578,7 @@ def main(argv=None):
             raise InputError(f"{doc['_path']} is invalid: " + "; ".join(errs))
         if a.cmd == "list":
             for inp in doc["inputs"]:
-                d = " (default)" if inp["id"] == doc["default_input"] else ""
+                d = " (default)" if inp["id"] == doc["default_input"] else " (correctness-probe)" if is_probe(inp) else ""
                 print(f"{inp['id']:32s} {inp['variant']:20s} {inp['source']['kind']:24s} {inp['case']}{d}")
             return 0
         if a.cmd == "show":
@@ -1676,6 +1692,8 @@ def main(argv=None):
             print(status_line(s)); return 0
         if a.cmd == "measure":
             inp = get_input(doc, a.input_id)
+            if is_probe(inp):
+                raise InputError(f"input '{inp['id']}' is a correctness-probe input: it is checked (`check`), never measured")
             root = repo_root(bench_dir)
             meta = measure(doc, inp, root, bench_dir, Path(a.out), a.warmup, a.reps, a.timeout, a.gpus)
             s = meta["summary"]

@@ -75,7 +75,9 @@ def audit(root, mdir=None, blockers=None, cdir=None):
     for f in sorted(glob.glob(os.path.join(root, "level*", "*", "inputs.yaml"))):
         d = yaml.safe_load(open(f)); lvl = LEVELS[f.split(os.sep)[-3]]; b = d["benchmark"]
         cov = d.get("coverage") or {}
-        ins = d["inputs"]; runnable = [i for i in ins if i.get("materialized", True) is not False]
+        probes = [i["id"] for i in d["inputs"] if i.get("purpose", "performance") == "correctness-probe"]
+        ins = [i for i in d["inputs"] if i["id"] not in probes]   # correctness probes: checked, never measured, no coverage count
+        runnable = [i for i in ins if i.get("materialized", True) is not False]
         kinds = [i["source"]["kind"] for i in ins]
         forms = sorted({i.get("input_form", "runtime") for i in ins})
         timing_status = (d["timing"].get("status", "NEEDS_TIMING_SUPPORT") if d["timing"].get("kind") == "none"
@@ -146,6 +148,7 @@ def audit(root, mdir=None, blockers=None, cdir=None):
             "invalidated_inputs": sorted(k for k, m in meas.items() if m.get("invalidated")),
             "unmeasured_inputs": [i["id"] for i in runnable if i["id"] not in completed] if mdir else [i["id"] for i in runnable],
             "unmaterialized_inputs": [i["id"] for i in ins if i.get("materialized", True) is False],
+            "correctness_probes": probes,
             "checker": checker, "record_only": rec, "correctness": corr,
             "checks": checks, "has_check": has_check, "verdicts": verdicts,
             "verdict_counts": {v: sum(1 for x in verdicts.values() if x == v) for v in ("PASS", "INCOMPLETE", "FAIL")},

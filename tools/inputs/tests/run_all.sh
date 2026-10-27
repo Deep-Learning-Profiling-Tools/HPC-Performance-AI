@@ -1526,5 +1526,34 @@ assert all(q[f"l2err_{n}_final"]["role"] == "diagnostic" for n in ("u", "p", "s0
 assert all("DOES print the exact-solution error" in x["check"]["reason"] for x in d["inputs"])
 PY
 
+# ---- correctness-probe inputs: checked, never measured, never the default, no coverage count -------------------
+mkdir -p "$TMP/probe"
+cat > "$TMP/probe/inputs.yaml" <<'EOF'
+schema: hpcperf-inputs-1
+benchmark: probe
+level: 1
+default_input: perf-a
+entry: {kind: binary, path: build/probe/cuda/probe_cuda}
+timing: {scope: x, kind: total, unit: ms, regex: 'time (?P<value>\d+)', select: only}
+baseline: {quantities: [{name: q, regex: 'q=(?P<value>\d+)', compare: {rule: exact}}]}
+coverage: {status: SINGLE_INPUT, reason: one performance input}
+inputs:
+  - {id: perf-a, case: c, variant: size, source: {kind: custom, derivation: d}, params: {}, args: ['1'], backends_validated: []}
+  - {id: probe-b, purpose: correctness-probe, probe_basis: 'random data: a constant fill cannot pass', case: c, variant: parameter, source: {kind: custom, derivation: d}, params: {}, args: ['--probe'], backends_validated: []}
+EOF
+out="$(python3 "$TOOL" validate "$TMP/probe" 2>&1 | noise)"; rc=$?
+[ $rc -eq 0 ] && ok "probe: a registry with one performance input + one correctness probe is SINGLE_INPUT (the probe does not count)" || bad "probe validate: $out"
+python3 "$TOOL" list "$TMP/probe" 2>/dev/null | grep -q '^probe-b .*(correctness-probe)' && ok "probe: list marks the probe" || bad "probe list"
+python3 "$TOOL" measure "$TMP/probe" probe-b --out "$TMP/probe/m" >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -eq 1 ] && grep -q 'correctness-probe input: it is checked' "$TMP/e" && [ ! -e "$TMP/probe/m" ] && ok "probe: measure refuses a correctness probe (exit 1, nothing run)" || bad "probe measure: rc=$rc $(cat "$TMP/e")"
+python3 "$TOOL" check "$TMP/probe" probe-b --out "$TMP/probe/c" --dry-run >/dev/null 2>"$TMP/e"; rc=$?
+[ $rc -ne 1 ] || ! grep -q 'correctness-probe' "$TMP/e" && ok "probe: check is not refused for a correctness probe" || bad "probe check refused: $(cat "$TMP/e")"
+sed -e 's/^default_input: perf-a/default_input: probe-b/' "$TMP/probe/inputs.yaml" > "$TMP/probe/x" && mkdir -p "$TMP/probe2" && mv "$TMP/probe/x" "$TMP/probe2/inputs.yaml"
+out="$(python3 "$TOOL" validate "$TMP/probe2" 2>&1 | noise)"; rc=$?
+[ $rc -eq 1 ] && grep -q 'cannot be the default_input' <<<"$out" && ok "probe: a correctness probe as default_input is refused" || bad "probe default: $out"
+sed -e "s/probe_basis: 'random data: a constant fill cannot pass', //" -e 's/^coverage: .*/coverage: {status: MULTI_INPUT}/' "$TMP/probe/inputs.yaml" > "$TMP/probe2/inputs.yaml"
+out="$(python3 "$TOOL" validate "$TMP/probe2" 2>&1 | noise)"; rc=$?
+[ $rc -eq 1 ] && grep -q 'needs probe_basis' <<<"$out" && grep -q 'MULTI_INPUT needs at least two runnable' <<<"$out" && ok "probe: probe_basis required; a probe does not make a registry MULTI_INPUT" || bad "probe basis/coverage: $out"
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

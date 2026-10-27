@@ -233,6 +233,8 @@ def registered_inputs(repo=REPO):
         for f in sorted(glob.glob(os.path.join(repo, f"level{lvl}", "*", "inputs.yaml"))):
             doc = hi.load(os.path.dirname(f))
             for inp in doc["inputs"]:
+                if inp.get("purpose", "performance") == "correctness-probe":
+                    continue   # correctness-only: checked, never timed, not a registered performance input
                 out.append({"level": lvl, "benchmark": doc["benchmark"], "input_id": inp["id"], "case": inp.get("case"),
                             "variant": inp.get("variant"), "source_kind": (inp.get("source") or {}).get("kind"),
                             "input_form": inp.get("input_form", "runtime"), "params": inp.get("params") or {},

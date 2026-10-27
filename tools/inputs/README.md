@@ -147,6 +147,19 @@ upstream/derived/custom, input forms, selector, native timing status, measured
 inputs, correctness status, blocker) plus the SINGLE_INPUT / BLOCKED /
 derived-custom / not-measured lists and the totals.
 
+## Correctness-probe inputs (`purpose: correctness-probe`, 2026-10-27)
+
+An input is a performance input unless it says `purpose: correctness-probe`. A correctness probe exists only to
+detect wrong implementations the performance inputs cannot expose (e.g. upstream set-up data on which a constant fill
+or a skipped kernel produces the right output). It runs through exactly the same kernels; only its set-up data differs
+(selected by its `args`), and the performance inputs stay byte-identical. Rules (enforced by `validate` / the tools):
+
+* `probe_basis` (required): which wrong implementations it detects and why the performance inputs cannot;
+* never the `default_input`; never counted for `coverage` (MULTI_INPUT / SINGLE_INPUT count performance inputs only);
+* `measure` refuses it (exit 1, nothing is run); tools/timing generates no case for it (`gen_registry_cases.py`,
+  `registry_view.py` skip it), so it is never timed and never appears among the registered performance inputs;
+* `check` runs it like any input, and tools/golden `make` freezes its reference like any input (one CPU validation).
+
 ## Runtime measurement (tools/timing)
 
 Runtime is measured by `tools/timing` over each benchmark's marked region of interest; the registered

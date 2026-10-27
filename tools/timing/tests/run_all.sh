@@ -113,7 +113,7 @@ PY
 
 echo
 echo "=== 1r: registered inputs (inputs.yaml -> generated cases/level<N>_registry.tsv)"
-pycheck "1r1: registry tables: one case per registered input (counts from the registry), case == input_id, no drift" <<'PY'
+pycheck "1r1: registry tables: one case per registered performance input (correctness probes excluded), case == input_id, no drift" <<'PY'
 import os, subprocess, sys, glob
 sys.path.insert(0, os.environ["TOOLS"])
 import cases, gen_registry_cases as g
@@ -125,9 +125,9 @@ for lvl, fn in ((1, cases.level1_registry_rows), (2, cases.level2_registry_rows)
     for f in glob.glob(os.path.join(repo, f"level{lvl}", "*", "inputs.yaml")):
         out = subprocess.run([sys.executable, os.path.join(repo, "tools/inputs/hpcperf_inputs.py"), "list", os.path.dirname(f)],
                              capture_output=True, text=True).stdout
-        n += len([l for l in out.splitlines() if l.strip()])
+        n += len([l for l in out.splitlines() if l.strip() and "(correctness-probe)" not in l])   # probes are never timed
     if len(rows) != n:
-        bad.append(f"level {lvl}: {len(rows)} registry cases for {n} registered inputs")
+        bad.append(f"level {lvl}: {len(rows)} registry cases for {n} registered performance inputs")
     if any(r["case"] != r["input_id"] or not r["input_id"] for r in rows):
         bad.append(f"level {lvl}: a registry case without its input id")
 if g.check():
