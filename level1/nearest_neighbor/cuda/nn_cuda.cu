@@ -7,6 +7,7 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
 #include <stdio.h>
+#include <ctype.h>     // isspace: the bounded file-list read in loadData()
 #include <sys/time.h>
 #include <float.h>
 #include <vector>
@@ -24,6 +25,11 @@
 #define REC_LENGTH 53 // size of a record in db
 #define LATITUDE_POS 28	// character position of the latitude value in each record
 #define OPEN 10000	// initial value of nearest neighbors
+// [HPC-Performance-AI fix] the longest path accepted: Linux PATH_MAX (4096 bytes including the NUL) - 1, i.e. the
+// longest path open(2) accepts at all. Paths are read with this field width; a longer one is an error (exit 1).
+#define NN_PATH_CHARS 4095
+#define NN_STR_(x) #x
+#define NN_STR(x) NN_STR_(x)
 
 
 typedef struct latLong
@@ -182,8 +188,8 @@ int main(int argc, char* argv[])
 int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &locations){
     FILE   *flist,*fp;
 	int    i=0;
-	char dbname[4096];   // [HPC-Performance-AI fix] was [64]: fscanf("%s") of the absolute .db paths of the
-	                     // configured filelist (90 chars here) overflowed it (stack corruption; see README)
+	char dbname[NN_PATH_CHARS + 1];   // [HPC-Performance-AI fix] was [64], read with an unbounded fscanf("%s"): the
+	                                  // configured absolute .db paths (90 chars here) overflowed it (see README)
 	int recNum=0;
 
     /**Main processing **/
@@ -195,10 +201,18 @@ int loadData(char *filename,std::vector<Record> &records,std::vector<LatLong> &l
 		* If this is the last file in the filelist, then done
 		* else open next file to be read next iteration
 		*/
-		if(fscanf(flist, "%s\n", dbname) != 1) {
+		// [HPC-Performance-AI fix] bounded read (upstream: "%s\n" without a field width)
+		if(fscanf(flist, "%" NN_STR(NN_PATH_CHARS) "s", dbname) != 1) {
             fprintf(stderr, "error reading filelist\n");
             exit(0);
         }
+        int next = fgetc(flist);   // a path that fills the field and goes on does not fit: fail, never truncate
+        if (next != EOF && !isspace(next)) {
+            fprintf(stderr, "error: a .db path in the filelist %s is longer than %d characters\n", filename, NN_PATH_CHARS);
+            exit(1);
+        }
+        while (next != EOF && isspace(next)) next = fgetc(flist);   // the rest of upstream's "\n" directive: skip
+        if (next != EOF) ungetc(next, flist);                       // the whitespace (EOF after the last path)
         fp = fopen(dbname, "r");
         if(!fp) {
             printf("error opening a db\n");
