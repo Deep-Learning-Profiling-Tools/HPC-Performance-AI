@@ -31,7 +31,7 @@ budget").
 | `HPCPERF_CPU_REFERENCE=1` | the benchmark runs its own CPU reference and prints its pass line; also enables the offline CPU cross-check scripts of Level 2 (`check_sequential.sh`, `check_reference.sh`, `validate.sh` offline mode) | **only** `hpcperf_golden.py make` (or a person, explicitly). `tools/inputs` measure/check and `tools/timing` drop it from the environment; `tools/timing` cases cannot set it |
 | `HPCPERF_GOLDEN_DUMP=<dir>` | the program writes each declared output to `<dir>/<name>.bin` plus one line in `<dir>/manifest.jsonl` (name, dtype, count, bytes, sha256) | the `check:` block (`run_env`), `make`, `run` |
 | `HPCPERF_GOLDEN_MODE=hash` | record the sha256 only (huge outputs compared exactly, e.g. channel_shuffle's 23-30 GB) | the benchmark's `golden.mode` |
-| `HPCPERF_SKIP_VERIFY=1` | unchanged meaning for the remaining property checks (lud, graph_coloring); for every converted benchmark it is implied | `tools/timing` |
+| `HPCPERF_SKIP_VERIFY=1` | unchanged meaning for the remaining property checks of the GPU output (lud, graph_coloring, binary_search's `verify()`, which runs by default next to the golden comparison); for every other converted benchmark it is implied | `tools/timing` |
 | `HPCPERF_RANDOM_SEED=time\|<n>` | fir / color_histogram only: a non-registered random input (the registered inputs use seed 1); such a run FAILs the golden check, and tools/inputs, tools/golden run and tools/timing never pass it on | a person, explicitly |
 | `HPCPERF_GOLDEN_STORE=<dir>` | where the raw bytes of tolerance-compared outputs live (default `<repo>/.golden-store`) | the environment |
 

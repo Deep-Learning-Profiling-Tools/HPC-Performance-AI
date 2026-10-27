@@ -931,7 +931,7 @@ res="$(python3 - "$REPO" <<'PY'
 import glob, os, re, sys
 repo = sys.argv[1]
 defn = re.compile(r"\bhpcperf_skip_verify\s*\(\s*(void)?\s*\)\s*\{")
-keep_old = ("lud", "graph_coloring")   # property checks, not CPU references
+keep_old = ("lud", "graph_coloring", "binary_search")   # property checks of the GPU output, not CPU references
 defs = bad = 0; notes = []
 for f in sorted(glob.glob(os.path.join(repo, "level1", "*", "*", "*"))):
     if not os.path.isfile(f) or f.split(os.sep)[-2] not in ("cuda", "common", "hip"):

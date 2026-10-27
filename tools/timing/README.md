@@ -550,7 +550,8 @@ their captured outputs with the frozen B200 golden reference (`tools/golden/READ
 environment of a measurement never passes `HPCPERF_CPU_REFERENCE` and cases cannot set it
 (reserved name). `measure_level1.sh` still sets `HPCPERF_SKIP_VERIFY=1`, which now only
 switches off the checks that are not CPU references (lud's L*U residual, graph_coloring's
-validity scan); `--keep-verify` leaves those on. ctest runs the golden comparison; the
+validity scan, binary_search's `verify()` property check -- on by default since 2026-10-27); `--keep-verify`
+leaves those on. ctest runs the golden comparison; the
 tests assert that no source enables the CPU reference by itself. NPB `is` verifies inside its timed kernels and cannot be separated
 without editing an upstream kernel: its ROI includes that check
 (`verify_vs_roi=inside`, caveated). `background_subtraction` generates frames and
