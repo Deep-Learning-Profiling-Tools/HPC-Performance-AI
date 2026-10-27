@@ -28,7 +28,8 @@ budget").
 | `HPCPERF_CPU_REFERENCE=1` | the benchmark runs its own CPU reference and prints its pass line; also enables the offline CPU cross-check scripts of Level 2 (`check_sequential.sh`, `check_reference.sh`, `validate.sh` offline mode) | **only** `hpcperf_golden.py make` (or a person, explicitly). `tools/inputs` measure/check and `tools/timing` drop it from the environment; `tools/timing` cases cannot set it |
 | `HPCPERF_GOLDEN_DUMP=<dir>` | the program writes each declared output to `<dir>/<name>.bin` plus one line in `<dir>/manifest.jsonl` (name, dtype, count, bytes, sha256) | the `check:` block (`run_env`), `make`, `run` |
 | `HPCPERF_GOLDEN_MODE=hash` | record the sha256 only (huge outputs compared exactly, e.g. channel_shuffle's 23-30 GB) | the benchmark's `golden.mode` |
-| `HPCPERF_SKIP_VERIFY=1` | unchanged meaning for the remaining property checks (lud, graph_coloring) and the pending fir / color_histogram; for every converted benchmark it is implied | `tools/timing` |
+| `HPCPERF_SKIP_VERIFY=1` | unchanged meaning for the remaining property checks (lud, graph_coloring); for every converted benchmark it is implied | `tools/timing` |
+| `HPCPERF_RANDOM_SEED=time\|<n>` | fir / color_histogram only: a non-registered random input (the registered inputs use seed 1); such a run FAILs the golden check, and tools/inputs, tools/golden run and tools/timing never pass it on | a person, explicitly |
 | `HPCPERF_GOLDEN_STORE=<dir>` | where the raw bytes of tolerance-compared outputs live (default `<repo>/.golden-store`) | the environment |
 
 Call sites capture **after** the timed region (ROI) and after the final device-to-host copy;
@@ -164,6 +165,4 @@ without the CPU reference, capturing, then checks.
 * `lud` (L*U residual), `gaussian_elimination` (residual of the printed solution), `graph_coloring`
   (validity; its valid colorings are not unique and differ run to run): property checks, unchanged.
 * `ao_bench`: already a frozen B200 image hash (`reference/iter100.sha256`), unchanged.
-* `fir`, `color_histogram`: their input is seeded from the clock (`time(NULL)`), so no output can
-  be frozen until the seed is fixed -- pending a decision; their CPU check keeps the old switch.
 * `binary_search`: has no check in the default build (`verify()` only under `-DDEBUG`) -- pending.

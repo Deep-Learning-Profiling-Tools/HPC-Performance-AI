@@ -125,7 +125,8 @@ TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|input_
 # The variables that switch a benchmark's own host-side CPU reference on (tools/golden/hpcperf_golden.h) or make it
 # capture its outputs: no measurement and no correctness check inherits them from the caller's shell -- a check
 # compares against the frozen golden reference and never falls back to the CPU reference.
-CPU_REFERENCE_VARS = ("HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE")
+# HPCPERF_RANDOM_SEED switches fir / color_histogram to a non-registered (random) input: never inherited either.
+CPU_REFERENCE_VARS = ("HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE", "HPCPERF_RANDOM_SEED")
 
 
 class InputError(Exception):

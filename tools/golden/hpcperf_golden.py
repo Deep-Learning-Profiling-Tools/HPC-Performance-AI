@@ -434,7 +434,8 @@ def cuda_version():
 def clean_env(base=None):
     """The environment of a golden run: never a skip-verify or CPU-reference run unless asked."""
     env = dict(os.environ if base is None else base)
-    for k in ("HPCPERF_SKIP_VERIFY", "HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE"):
+    for k in ("HPCPERF_SKIP_VERIFY", "HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE",
+              "HPCPERF_RANDOM_SEED"):
         env.pop(k, None)
     env.setdefault("CUDA_VISIBLE_DEVICES", os.environ.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0"))
     return env

@@ -58,6 +58,8 @@ RESERVED = {"HPCPERF_ROI_LOG", "HPCPERF_SKIP_VERIFY", "HPCPERF_GPUS", "HPCPERF_N
             # the CPU-reference switch and the golden-output capture (tools/golden): a measurement never runs
             # a CPU reference nor captures outputs
             "HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE",
+            # a non-registered random input (fir / color_histogram)
+            "HPCPERF_RANDOM_SEED",
             # set by the registry selector helper inside run.sh (tools/inputs/hpcperf_input_selector.sh)
             "HPCPERF_INPUT_ARGS", "HPCPERF_INPUT_ID",
             "HPCPERF_L3_RUN_SUBDIR"}
