@@ -125,6 +125,30 @@ reference's pass line, exit 0 and no fail line, measures d0 per output and write
 * for tolerance-compared outputs, the raw bytes in the content-addressed store
   `$HPCPERF_GOLDEN_STORE/sha256/<aa>/<sha256>.bin` (**never in git**; large).
 
+## The correctness gate (optimization candidates)
+
+`check` and `run` read the registry and the frozen reference only from the canonical benchmark directory
+(`<repo>/level<N>/<name>`); a copy -- an optimization candidate's workspace -- is refused, so a candidate can
+never supply its own reference or rules, and `make` refuses a copy as well. `run --exe <candidate binary>`
+runs that binary on the registered input (no CPU reference, capture into a private directory) and compares;
+`--json <file>` writes the machine-readable verdict (`hpcperf-golden-verdict-1`: verdict, reason, every
+output's metric value and limit, the reference file and its sha256, the binary and its sha256, the command,
+exit code). An optimization harness accepts a candidate's timing only with a PASS verdict whose
+`binary_sha256` is the sha256 of the binary it timed. Exit 0 only for PASS; a missing reference, a missing or
+corrupted blob, a changed spec, another workload, a missing or partial capture, a non-zero exit are all FAIL.
+
+`store-put <file>` / `store-get <sha256>`: content-addressed storage of a frozen reference that is a file
+rather than captured arrays (e.g. a plotfile archive); `store-get` verifies the sha256 and fails when the
+blob is missing or corrupted.
+
+## Cost
+
+The capture computes SHA-256 with the system's libcrypto when it can be dlopen'ed at run time (CPU SHA
+instructions: ~2 GB/s on the Xeon 8570; `HPCPERF_GOLDEN_PORTABLE_SHA=1` forces the portable code, ~0.2 GB/s);
+the digest is the same. Measured on a B200 (capture overhead on top of the plain run / Python comparison):
+channel_shuffle g2-w224-h224 (23 GB, hash) +24 s / 0.3 s (was +125 s); bezier_surface n8192 (0.8 GB)
++1.3 s / 3.2 s (was +5.0 s / 8.2 s); burgers x8200 (1 GB) +1.6 s / 2.6 s; spgemm m100000 +3.1 s / 2.5 s.
+
 ## `check` / `run`
 
 `check` reads the frozen reference and the run's capture (or, for log outputs, the run's log),

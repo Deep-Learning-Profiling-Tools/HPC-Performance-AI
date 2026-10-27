@@ -309,5 +309,31 @@ out="$(FAKE_SHIFT=0.0002 "$PY" "$REPO/tools/inputs/hpcperf_inputs.py" check "$L"
 [ "$rc" = 0 ] && ok "8d: a shift inside the budget passes" || bad "8d: rc=$rc $(tail -3 "$TMP/ckl/check.log")"
 
 echo
+echo "=== 9: the correctness gate: canonical directory only, machine-readable verdict, both SHA-256 paths"
+cp -r "$B" "$FR/level1/fake_copy"
+out="$("$PY" "$G" run "$FR/level1/fake_copy" --workdir "$TMP/rc" 2>&1)"; rc=$?
+[ "$rc" = 1 ] && echo "$out" | /usr/bin/grep -q 'not the canonical benchmark directory' \
+    && ok "9a: a copy of the benchmark (e.g. a candidate workspace) never supplies the registry or the reference" || bad "9a: rc=$rc $out"
+out="$("$PY" "$G" make "$FR/level1/fake_copy" n1000 --replace --reason x --workdir "$TMP/mkc" 2>&1)"; rc=$?
+[ "$rc" = 2 ] && echo "$out" | /usr/bin/grep -q 'not the canonical benchmark directory' \
+    && ok "9b: make refuses a copy (a candidate never makes a golden reference)" || bad "9b: rc=$rc $out"
+rm -rf "$FR/level1/fake_copy"
+"$PY" "$G" run "$B" --workdir "$TMP/rj" --json "$TMP/rj.json" >/dev/null 2>&1
+FAKE_BIAS=9.5e-9 "$PY" "$G" run "$B" --workdir "$TMP/rj2" --json "$TMP/rj2.json" >/dev/null 2>&1
+"$PY" - "$TMP/rj.json" "$TMP/rj2.json" "$FR/build/fake/cuda/fake" <<'PY' && ok "9c: --json: verdict, per-output value/limit, reference and binary sha256 (PASS and FAIL)" || bad "9c: json"
+import json, sys, hashlib
+a = json.load(open(sys.argv[1])); b = json.load(open(sys.argv[2]))
+sha = hashlib.sha256(open(sys.argv[3], 'rb').read()).hexdigest()
+assert a["verdict"] == "PASS" and a["run"]["binary_sha256"] == sha and a["reference_sha256"] and a["run"]["cpu_reference"] is False
+assert b["verdict"] == "FAIL" and any(o["name"] == "y" and not o["ok"] and o["value"] > o["limit"] for o in b["outputs"]), b
+PY
+head -c 5000017 /dev/urandom > "$TMP/r.bin"
+rm -rf "$TMP/s1" "$TMP/s2"
+HPCPERF_GOLDEN_DUMP="$TMP/s1" "$TMP/gct" 4099 < "$TMP/r.bin" > /dev/null
+HPCPERF_GOLDEN_DUMP="$TMP/s2" HPCPERF_GOLDEN_PORTABLE_SHA=1 "$TMP/gct" 4099 < "$TMP/r.bin" > /dev/null
+[ "$(cut -c1-400 "$TMP/s1/manifest.jsonl")" = "$(cut -c1-400 "$TMP/s2/manifest.jsonl")" ] && /usr/bin/grep -q "$(sha256sum "$TMP/r.bin" | cut -c1-64)" "$TMP/s1/manifest.jsonl" \
+    && ok "9d: the libcrypto and the portable SHA-256 give the same digests (= sha256sum)" || bad "9d: digests differ"
+
+echo
 echo "golden tests: $pass passed, $fail failed"
 [ "$fail" = 0 ]

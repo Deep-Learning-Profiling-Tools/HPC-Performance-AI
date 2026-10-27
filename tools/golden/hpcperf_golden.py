@@ -278,7 +278,7 @@ def array_stats(path, dtype, count, sha_check=None):
     for i in range(0, count, CHUNK):
         c = np.asarray(a[i:i + CHUNK])
         if h:
-            h.update(c.tobytes())
+            h.update(c)
         x = c.astype(np.float64)
         fin = np.isfinite(x)
         nonfinite += int(x.size - fin.sum())
@@ -300,35 +300,44 @@ def metric_value(metric, a_path, g_path, dtype, count, a_sha=None, g_sha=None, r
     ha = hashlib.sha256() if a_sha else None
     hg = hashlib.sha256() if g_sha else None
     worst = 0.0; num = 0.0; den = 0.0
+    inf = float("inf")
     for i in range(0, count, CHUNK):
         ca = np.asarray(a[i:i + CHUNK]); cg = np.asarray(g[i:i + CHUNK])
         if ha:
-            ha.update(ca.tobytes())
+            ha.update(ca)
         if hg:
-            hg.update(cg.tobytes())
-        x = ca.astype(np.float64); y = cg.astype(np.float64)
-        bad = ~np.isfinite(x) & np.isfinite(y)
-        same_nonfinite = ~np.isfinite(x) & ~np.isfinite(y) & ((x == y) | (np.isnan(x) & np.isnan(y)))
+            hg.update(cg)
+        if worst == inf:
+            continue                      # already a FAIL; keep reading only for the integrity checks
         with np.errstate(all="ignore"):
-            d = np.abs(x - y)
-            d[same_nonfinite] = 0.0
-            if bad.any() or np.isnan(d).any():
-                worst = float("inf")
+            d = np.abs(np.subtract(ca, cg, dtype=np.float64))
+            if not np.isfinite(d).all():
+                # slow path: a non-finite value somewhere. The same non-finite value on both sides (inf == inf,
+                # nan vs nan) is no difference; anything else non-finite fails.
+                x = ca.astype(np.float64); y = cg.astype(np.float64)
+                same = ~np.isfinite(x) & ~np.isfinite(y) & ((x == y) | (np.isnan(x) & np.isnan(y)))
+                if (~np.isfinite(d) & ~same).any():
+                    worst = inf; continue
+                d[same] = 0.0
+            if d.size == 0:
+                continue
             if metric == "max_abs":
-                worst = max(worst, float(np.nanmax(d)) if d.size else 0.0)
+                worst = max(worst, float(d.max()))
             elif metric == "max_rel1p":
-                worst = max(worst, float(np.nanmax(d / (1.0 + np.abs(y)))) if d.size else 0.0)
+                worst = max(worst, float((d / (1.0 + np.abs(cg, dtype=np.float64))).max()))
             elif metric == "max_rel":
-                r = np.where(y != 0, d / np.abs(y), np.where(d == 0, 0.0, np.inf))
-                worst = max(worst, float(np.nanmax(r)) if r.size else 0.0)
+                ag = np.abs(cg, dtype=np.float64)
+                r = np.where(ag != 0, d / ag, np.where(d == 0, 0.0, inf))
+                worst = max(worst, float(r.max()))
             elif metric == "max_relabs":
-                den_ = rule["rtol"] * np.abs(y) + rule["atol"]
-                r = np.where(den_ > 0, d / den_, np.where(d == 0, 0.0, np.inf))
-                worst = max(worst, float(np.nanmax(r)) if r.size else 0.0)
+                den_ = rule["rtol"] * np.abs(cg, dtype=np.float64) + rule["atol"]
+                r = np.where(den_ > 0, d / den_, np.where(d == 0, 0.0, inf))
+                worst = max(worst, float(r.max()))
             elif metric == "l1_rel":
-                num += float(np.nansum(d)); den += float(np.nansum(np.abs(y)))
+                num += float(d.sum()); den += float(np.abs(cg, dtype=np.float64).sum())
             elif metric in ("l2_rel_sq", "rmse"):
-                num += float(np.nansum(d * d)); den += float(np.nansum(y * y))
+                y = cg.astype(np.float64)
+                num += float(np.dot(d, d)); den += float(np.dot(y, y))
     if ha and ha.hexdigest() != a_sha:
         raise GoldenError(f"{a_path}: content does not match its recorded sha256 (partial capture?)")
     if hg and hg.hexdigest() != g_sha:
@@ -355,9 +364,9 @@ def trunc_int_value(a_path, g_path, dtype, count, a_sha=None, g_sha=None):
     for i in range(0, count, CHUNK):
         ca = np.asarray(a[i:i + CHUNK]); cg = np.asarray(g[i:i + CHUNK])
         if ha:
-            ha.update(ca.tobytes())
+            ha.update(ca)
         if hg:
-            hg.update(cg.tobytes())
+            hg.update(cg)
         x = ca.astype(np.float64); y = cg.astype(np.float64)
         if (~np.isfinite(x) & np.isfinite(y)).any():
             worst = float("inf"); ge1 = count; continue
@@ -492,6 +501,10 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
     rel_bench = os.path.relpath(bench_dir, root)
     if rel_bench.startswith("workspaces") or "/workspaces/" in str(bench_dir):
         print(f"REFUSED: {tag}: a golden reference is never made from an agent workspace"); return 2
+    canonical = (root / f"level{doc['level']}" / doc["benchmark"]).resolve()
+    if Path(bench_dir).resolve() != canonical:
+        print(f"REFUSED: {tag}: {bench_dir} is not the canonical benchmark directory {os.path.relpath(canonical, root)} "
+              f"(a copy -- e.g. an optimization candidate -- never makes a golden reference)"); return 2
     dirty = git(root, "status", "--porcelain", "--", rel_bench, "tools/golden", "tools/timing/roi").strip()
     dirty = "\n".join(l for l in dirty.splitlines() if not l[3:].startswith(f"{rel_bench}/reference/"))
     if dirty and not args.allow_dirty_for_tests:
@@ -660,11 +673,21 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
 
 
 # ----------------------------------------------------------------------------- check
-def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None) -> int:
+def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None, result=None) -> int:
+    """Compare a capture with the frozen reference. `result` (a dict) receives the machine-readable verdict:
+    the reference file and its sha256, every output's metric value and limit, and the verdict/reason."""
     tag = f"{doc['benchmark']}/{inp['id']}"
+    res = result if result is not None else {}
+    res.update({"schema": "hpcperf-golden-verdict-1", "benchmark": doc["benchmark"], "level": doc["level"],
+                "input_id": inp["id"], "verdict": None, "reason": None, "outputs": []})
 
     def fail(msg):
+        res["verdict"] = "FAIL"; res["reason"] = msg
         print(f"FAIL: golden check {tag}: {msg}"); return 1
+    canonical = (root / f"level{doc['level']}" / doc["benchmark"]).resolve()
+    if Path(bench_dir).resolve() != canonical:
+        return fail(f"{bench_dir} is not the canonical benchmark directory {os.path.relpath(canonical, root)}: the registry "
+                    f"and the frozen reference are read only from there (a copy -- e.g. an optimization candidate's -- is never trusted)")
     spec = spec_of(doc, inp)
     if spec is None or spec.get("unsupported"):
         return fail("this input has no golden spec" + (f" ({spec['unsupported']})" if spec else ""))
@@ -675,6 +698,8 @@ def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None) -> int:
         ref = json.loads(rp.read_text())
     except json.JSONDecodeError as ex:
         return fail(f"{rp} is not JSON ({ex})")
+    res.update({"reference": os.path.relpath(rp, root), "reference_sha256": hi.sha256_file(rp),
+                "reference_made_utc": (ref.get("provenance") or {}).get("made_utc")})
     if ref.get("schema") != REF_SCHEMA or ref.get("input_id") != inp["id"] or ref.get("benchmark") != doc["benchmark"]:
         return fail(f"{rp} is not the reference of this input (schema/benchmark/input_id)")
     mism = hi.workload_mismatch(ref.get("workload") or {}, hi.workload_identity(doc, inp))
@@ -692,8 +717,12 @@ def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None) -> int:
         return fail(str(ex))
     store = store_root(root)
     bad = []
+
+    def note(name, ok, metric, value=None, limit=None, why=None):
+        res["outputs"].append({"name": name, "ok": ok, "metric": metric, "value": value, "limit": limit, "why": why})
     for e in ref["outputs"]:
         name, rule = e["name"], e["rule"]
+        nbad = len(bad)
         rec = man.get(name)
         if rec is None:
             bad.append(f"{name}: not captured"); print(f"   FAIL {name}: not captured"); continue
@@ -743,21 +772,30 @@ def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None) -> int:
         if not (v <= te):
             bad.append(f"{name}: {rule['metric']} {v:.3e} > {te:.3e}")
             print(f"   FAIL {name}: {rule['metric']} {v:.3e} > {te:.3e} ({how})")
+            note(name, False, rule["metric"], v, te)
         else:
             print(f"   ok   {name}: {rule['metric']} {v:.3e} <= {te:.3e} ({how})")
+            note(name, True, rule["metric"], v, te)
+    failed = {b.split(":")[0] for b in bad}
+    for e in ref["outputs"]:
+        if not any(o["name"] == e["name"] for o in res["outputs"]):
+            note(e["name"], e["name"] not in failed, e["rule"]["metric"], limit=e["rule"].get("tol_effective"),
+                 why=next((b for b in bad if b.split(":")[0] == e["name"]), None))
     extra = sorted(set(man) - {e["name"] for e in ref["outputs"]})
     if extra:
         print(f"   note: captured but not in the reference (ignored): {', '.join(extra)}")
     if bad:
         return fail(f"{len(bad)} of {len(ref['outputs'])} outputs differ from the frozen B200 reference: " + "; ".join(bad))
+    res["verdict"] = "PASS"
     print(f"PASS: golden check {tag} ({len(ref['outputs'])} outputs match the frozen reference made {ref['provenance'].get('made_utc')} "
           f"on {(ref['provenance'].get('gpu') or {}).get('name')})")
     return 0
 
 
 # ----------------------------------------------------------------------------- run (ctest)
-def run(doc, inp, root: Path, bench_dir: Path, exe, workdir, timeout) -> int:
+def run(doc, inp, root: Path, bench_dir: Path, exe, workdir, timeout, result=None) -> int:
     tag = f"{doc['benchmark']}/{inp['id']}"
+    res = result if result is not None else {}
     spec = spec_of(doc, inp)
     try:
         cmd, env0, _ = hi.build_command(doc, inp, root, bench_dir, 1)
@@ -778,10 +816,53 @@ def run(doc, inp, root: Path, bench_dir: Path, exe, workdir, timeout) -> int:
     log = run_dir / "stdout.log"
     rc, wall = run_logged(cmd, env, run_dir, log, timeout)
     print(f"   run: {' '.join(cmd)} -> exit {rc} in {wall:.1f} s (log {log})")
+    run_rec = {"binary": cmd[0], "binary_sha256": hi.sha256_file(cmd[0]), "command": cmd, "exit_code": rc,
+               "wall_s": round(wall, 3), "log": str(log), "env": {"HPCPERF_GOLDEN_MODE": env["HPCPERF_GOLDEN_MODE"]},
+               "cpu_reference": False}
     if rc != 0:
         print(log.read_text(errors="replace")[-2000:])
+        res.update({"schema": "hpcperf-golden-verdict-1", "benchmark": doc["benchmark"], "input_id": inp["id"],
+                    "verdict": "FAIL", "reason": f"the benchmark run exited {rc}", "outputs": [], "run": run_rec})
         print(f"FAIL: golden check {tag}: the benchmark run exited {rc}"); return 1
-    return check(doc, inp, root, bench_dir, dump, log)
+    out = check(doc, inp, root, bench_dir, dump, log, res)
+    res["run"] = run_rec
+    return out
+
+
+# ----------------------------------------------------------------------------- store helpers
+def file_sha256(path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for blk in iter(lambda: fh.read(1 << 24), b""):
+            h.update(blk)
+    return h.hexdigest()
+
+
+def store_put(root: Path, path: Path) -> str:
+    """Copy a file into the content-addressed store (idempotent); returns its sha256. For frozen references
+    that are files rather than captured arrays (e.g. a plotfile archive)."""
+    sha = file_sha256(path)
+    bp = blob_path(store_root(root), sha)
+    if not bp.exists():
+        bp.parent.mkdir(parents=True, exist_ok=True)
+        tmp = bp.with_suffix(".tmp")
+        shutil.copyfile(path, tmp)
+        if file_sha256(tmp) != sha:
+            tmp.unlink(); raise GoldenError(f"copy of {path} into the store does not match its sha256")
+        os.replace(tmp, bp)
+    return sha
+
+
+def store_get(root: Path, sha: str) -> Path:
+    """The verified store path of a blob; a missing or corrupted blob is an error (never a fallback)."""
+    if not re.fullmatch(r"[0-9a-f]{64}", sha or ""):
+        raise GoldenError(f"not a sha256: {sha!r}")
+    bp = blob_path(store_root(root), sha)
+    if not bp.is_file():
+        raise GoldenError(f"golden blob {sha} missing in the store {store_root(root)}")
+    if file_sha256(bp) != sha:
+        raise GoldenError(f"golden blob {bp} does not match its sha256 (corrupted store)")
+    return bp
 
 
 # ----------------------------------------------------------------------------- status / validate
@@ -820,12 +901,24 @@ def main(argv=None):
     m.add_argument("--keep-capture", action="store_true", help="keep the captured .bin files in the work directory")
     m.add_argument("--allow-dirty-for-tests", action="store_true", help=argparse.SUPPRESS)
     c = sub.add_parser("check"); c.add_argument("bench_dir"); c.add_argument("input_id"); c.add_argument("--dump", required=True)
-    c.add_argument("--log")
+    c.add_argument("--log"); c.add_argument("--json", help="write the machine-readable verdict here")
     r = sub.add_parser("run"); r.add_argument("bench_dir"); r.add_argument("input_id", nargs="?")
     r.add_argument("--exe"); r.add_argument("--workdir"); r.add_argument("--timeout", type=int, default=7200)
+    r.add_argument("--json", help="write the machine-readable verdict (incl. the binary's sha256) here")
     s = sub.add_parser("status"); s.add_argument("bench_dirs", nargs="+")
     v = sub.add_parser("validate"); v.add_argument("bench_dirs", nargs="+")
+    sp = sub.add_parser("store-put", help="copy a file into the content-addressed golden store; prints its sha256")
+    sp.add_argument("file")
+    sg = sub.add_parser("store-get", help="print the verified store path of a blob (exit 1 when missing/corrupted)")
+    sg.add_argument("sha256")
     a = ap.parse_args(argv)
+    if a.cmd in ("store-put", "store-get"):
+        root = hi.repo_root(HERE)          # the store of the repository this tool belongs to (or $HPCPERF_GOLDEN_STORE)
+        try:
+            print(store_put(root, Path(a.file)) if a.cmd == "store-put" else store_get(root, a.sha256))
+            return 0
+        except (GoldenError, OSError) as ex:
+            print(f"ERROR: {ex}"); return 1
     try:
         if a.cmd in ("status", "validate"):
             rc = 0
@@ -854,9 +947,19 @@ def main(argv=None):
                 rc = max(rc, make_one(doc, hi.get_input(doc, iid), root, bd, a))
             return rc
         inp = hi.get_input(doc, a.input_id or doc["default_input"])
-        if a.cmd == "check":
-            return check(doc, inp, root, bd, Path(a.dump), a.log)
-        return run(doc, inp, root, bd, a.exe, a.workdir, a.timeout)
+        res = {}
+        try:
+            if a.cmd == "check":
+                rc = check(doc, inp, root, bd, Path(a.dump), a.log, res)
+            else:
+                rc = run(doc, inp, root, bd, a.exe, a.workdir, a.timeout, res)
+        finally:
+            if getattr(a, "json", None):
+                res.setdefault("verdict", "ERROR")
+                res["tool_sha256"] = hi.sha256_file(HERE / "hpcperf_golden.py")
+                res["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                Path(a.json).write_text(json.dumps(res, indent=2) + "\n")
+        return rc
     except (hi.InputError, GoldenError) as ex:
         print(f"FAIL: golden check: {ex}" if a.cmd in ("check", "run") else f"ERROR: {ex}")
         return 1 if a.cmd in ("check", "run") else 2

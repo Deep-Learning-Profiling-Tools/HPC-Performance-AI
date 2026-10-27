@@ -25,11 +25,13 @@
  * Call sites capture outputs AFTER the timed region (never inside the ROI) and after the
  * final device-to-host copy. Names are [A-Za-z0-9._-], unique within one run. An I/O
  * failure while capturing ends the process with exit code 97, so a check never reads a
- * partial capture. Header-only C99/C++, no dependencies beyond libc and POSIX mkdir.
+ * partial capture. Header-only C99/C++, no dependencies beyond libc, POSIX mkdir and dlopen (the
+ * system's libcrypto is used for SHA-256 when it can be loaded at run time; see below).
  */
 #ifndef HPCPERF_GOLDEN_H
 #define HPCPERF_GOLDEN_H
 
+#include <dlfcn.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -137,11 +139,50 @@ HPCPERF_GOLDEN_FN void hpcperf_sha256_hex(hpcperf_sha256_ctx* c, char out[65]) {
   out[64] = '\0';
 }
 
+/* ------------------------------------------------------------------ fast SHA-256 (libcrypto, optional)
+ * The digest is standard SHA-256 either way. When the system's libcrypto can be dlopen'ed (no link-time
+ * dependency; OpenSSL uses the CPU's SHA instructions, ~2 GB/s here) it computes the digest; otherwise --
+ * or with HPCPERF_GOLDEN_PORTABLE_SHA=1 -- the portable implementation above does (~0.2 GB/s). */
+typedef struct {
+  int tried, ok;
+  void* (*ctx_new)(void);
+  void (*ctx_free)(void*);
+  const void* (*md)(void);
+  int (*init)(void*, const void*, void*);
+  int (*update)(void*, const void*, size_t);
+  int (*final_)(void*, unsigned char*, unsigned int*);
+} hpcperf_golden_evp_t;
+
+HPCPERF_GOLDEN_DATA hpcperf_golden_evp_t hpcperf_golden_evp_api_;
+
+HPCPERF_GOLDEN_FN hpcperf_golden_evp_t* hpcperf_golden_evp_(void) {
+  hpcperf_golden_evp_t* e = &hpcperf_golden_evp_api_;
+  if (!e->tried) {
+    static const char* libs[] = {"libcrypto.so.3", "libcrypto.so.1.1", "libcrypto.so", NULL};
+    int i;
+    e->tried = 1;
+    if (hpcperf_golden_flag_("HPCPERF_GOLDEN_PORTABLE_SHA")) return NULL;
+    for (i = 0; libs[i] != NULL && !e->ok; i++) {
+      void* h = dlopen(libs[i], RTLD_NOW | RTLD_LOCAL);
+      if (h == NULL) continue;
+      *(void**)(&e->ctx_new) = dlsym(h, "EVP_MD_CTX_new");
+      *(void**)(&e->ctx_free) = dlsym(h, "EVP_MD_CTX_free");
+      *(void**)(&e->md) = dlsym(h, "EVP_sha256");
+      *(void**)(&e->init) = dlsym(h, "EVP_DigestInit_ex");
+      *(void**)(&e->update) = dlsym(h, "EVP_DigestUpdate");
+      *(void**)(&e->final_) = dlsym(h, "EVP_DigestFinal_ex");
+      e->ok = e->ctx_new && e->ctx_free && e->md && e->init && e->update && e->final_;
+    }
+  }
+  return e->ok ? e : NULL;
+}
+
 /* ------------------------------------------------------------------ golden output capture */
 typedef struct {
   int active, data;
   FILE* f;
   hpcperf_sha256_ctx sha;
+  void* evp;            /* libcrypto EVP_MD_CTX, or NULL: the portable implementation */
   size_t esize;
   unsigned long long count;
   char dir[1024], name[128], dtype[8];
@@ -190,6 +231,14 @@ HPCPERF_GOLDEN_FN void hpcperf_golden_begin(hpcperf_golden_stream* s, const char
     s->f = fopen(path, "wb");
     if (s->f == NULL) hpcperf_golden_die_("cannot open the output file", path);
   }
+  s->evp = NULL;
+  {
+    hpcperf_golden_evp_t* e = hpcperf_golden_evp_();
+    if (e != NULL) {
+      s->evp = e->ctx_new();
+      if (s->evp == NULL || e->init(s->evp, e->md(), NULL) != 1) hpcperf_golden_die_("libcrypto SHA-256 init failed", name);
+    }
+  }
   hpcperf_sha256_init(&s->sha);
   s->active = 1;
 }
@@ -198,7 +247,11 @@ HPCPERF_GOLDEN_FN void hpcperf_golden_append(hpcperf_golden_stream* s, const voi
   size_t bytes;
   if (!s->active || count == 0) return;
   bytes = count * s->esize;
-  hpcperf_sha256_update(&s->sha, data, bytes);
+  if (s->evp != NULL) {
+    if (hpcperf_golden_evp_()->update(s->evp, data, bytes) != 1) hpcperf_golden_die_("libcrypto SHA-256 update failed", s->name);
+  } else {
+    hpcperf_sha256_update(&s->sha, data, bytes);
+  }
   if (s->data && fwrite(data, 1, bytes, s->f) != bytes) hpcperf_golden_die_("short write", s->name);
   s->count += count;
 }
@@ -207,7 +260,19 @@ HPCPERF_GOLDEN_FN void hpcperf_golden_end(hpcperf_golden_stream* s) {
   char hex[65], path[1200];
   FILE* m;
   if (!s->active) return;
-  hpcperf_sha256_hex(&s->sha, hex);
+  if (s->evp != NULL) {
+    static const char hx[] = "0123456789abcdef";
+    unsigned char dg[32];
+    unsigned int n = 0, k;
+    hpcperf_golden_evp_t* e = hpcperf_golden_evp_();
+    if (e->final_(s->evp, dg, &n) != 1 || n != 32) hpcperf_golden_die_("libcrypto SHA-256 final failed", s->name);
+    e->ctx_free(s->evp);
+    s->evp = NULL;
+    for (k = 0; k < 32; k++) { hex[2 * k] = hx[dg[k] >> 4]; hex[2 * k + 1] = hx[dg[k] & 15]; }
+    hex[64] = '\0';
+  } else {
+    hpcperf_sha256_hex(&s->sha, hex);
+  }
   errno = 0;
   if (s->data && fclose(s->f) != 0) hpcperf_golden_die_("close failed", s->name);
   snprintf(path, sizeof(path), "%s/manifest.jsonl", s->dir);
