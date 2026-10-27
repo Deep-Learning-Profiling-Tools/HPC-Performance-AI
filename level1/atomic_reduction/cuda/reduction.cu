@@ -89,7 +89,14 @@ int main(int argc, char** argv)
   int sum;
   double times;
 
+// tools/golden: before each variant's timed region (outside the ROI and the chrono timer) the output `out` that all
+// 20 variants share and its captured host copy `sum` are poisoned (all-ones bytes, -1). Every timed iteration clears
+// `out` and recomputes it, so a correct variant overwrites the poison; a variant that does not run leaves -1 in its
+// capture instead of the previous variant's identical sum.
 #define benchmark(kernel_name, grid_size) \
+    cudaMemset(out, 0xFF, sizeof(int)); \
+    sum = -1; \
+    cudaDeviceSynchronize(); \
     t1 = std::chrono::high_resolution_clock::now(); \
     HPCPERF_ROI_BEGIN_SYNC(); \
     for(int i=0;i<N;i++) { \

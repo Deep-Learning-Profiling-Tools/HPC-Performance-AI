@@ -45,7 +45,7 @@ cmake --build build/atomic_reduction/hip
 
 ## Validation
 
-Golden reference (tools/golden): a plain run captures the 20 reduction sums (`sum.<kernel>.b<block size>`, int, compared exactly), and `tools/golden/hpcperf_golden.py check` compares the capture with the frozen B200 reference `reference/<input_id>.json` (inputs.yaml `golden:` / `check:`). ctest runs the registry's default input this way (`hpcperf_golden.py run`). The upstream CPU reference (`sum == checksum` against the host sum of the input; prints `VERIFICATION: PASS/FAIL`) stays in the source and runs only with `HPCPERF_CPU_REFERENCE=1`, which `hpcperf_golden.py make` uses once to validate a new reference.
+Golden reference (tools/golden): a plain run captures the 20 reduction sums (`sum.<kernel>.b<block size>`, int, compared exactly); the output all 20 variants share (`out` and the captured host copy `sum`) is poisoned (all-ones bytes, -1) before each variant's timed region, outside it and the timer, so a variant that does not run fails the check instead of passing on the previous variant's identical sum; and `tools/golden/hpcperf_golden.py check` compares the capture with the frozen B200 reference `reference/<input_id>.json` (inputs.yaml `golden:` / `check:`). ctest runs the registry's default input this way (`hpcperf_golden.py run`). The upstream CPU reference (`sum == checksum` against the host sum of the input; prints `VERIFICATION: PASS/FAIL`) stays in the source and runs only with `HPCPERF_CPU_REFERENCE=1`, which `hpcperf_golden.py make` uses once to validate a new reference.
 
 Run it via:
 
