@@ -115,7 +115,11 @@ Per case, for the N-GPU run:
    particle_compare's abs/rel norms per component at the same tolerance.
 3. **Cross-backend reference**: CPU-profile binary (Nyx_GPU_BACKEND=NONE, same
    Nyx/AMReX/deck), rel_tol **1e-8** fixed before any run (FMA/libm/reduction
-   differences host vs device over 10 steps).
+   differences host vs device over 10 steps). **Since 2026-10-27 the default path runs no
+   CPU Nyx**: the run is compared with the frozen B200 GPU reference
+   `reference/<case>.<mode>.json` at `(1e-8 - d0)/(1 + d0)` (heat/cool `(5e-5 - d0)/(1 + d0)`),
+   see "Frozen B200 reference (check [3])" below; the live CPU reference runs only offline with
+   `HPCPERF_CPU_REFERENCE=1` (unchanged code path).
 4. **Conservation**: comoving baryon mass `sum(density*dV)` (`amrex_fvolumesum`)
    plt00000 -> final, |dM/M| <= 1e-9; DM count exact.
 
@@ -277,6 +281,11 @@ From the fixed source (Nyx `e06eabc1`, `Source/HeatCool/f_rhs_struct.H`,
   |dI_R| = 0.28-0.33 exceeds this estimate ~15x, so no criterion derived from the
   state tolerance accepts the field; and "exclude it and PASS" is not a criterion.
   The estimate is recorded to show why no tolerance is set, not as a proven bound.
+  **Correction (2026-10-27, see "I_R investigation" below): this estimate used the runlog's
+  `dt` column (2.99e5, in years) instead of the code-unit step dt = 3.06e-7; with the code dt
+  the scale `max|a^2 rho e|/(dt a_half)` is 5.7e14 and the estimate becomes ~2.9e10, i.e. the
+  observed |dI_R| ~ 0.3 is ~11 orders of magnitude below it, not 15x above.** The judgement of
+  I_R is unchanged (still reported, not gated, I_R_CHECK_PENDING).
 - Consequence: the validator reports `I_R` (parsed, finite, not gated) and
   downgrades the case to I_R_CHECK_PENDING (exit 3). The heat/cool deck is
   therefore **not** in the count of full correctness passes and its timings do not
@@ -285,7 +294,69 @@ From the fixed source (Nyx `e06eabc1`, `Source/HeatCool/f_rhs_struct.H`,
   the SDC_IR/hydro-source intermediates) to attribute the variation to a term, an
   independent tolerance comparison, and a regime (more steps, lower z) where the
   reaction term is physical. None of this was run in the 2026-09-07/08 rounds;
-  historical run directories are untouched.
+  historical run directories are untouched. (The repeat runs, per-step plotfiles and
+  the physical regime were run on 2026-10-27: next section.)
+
+### I_R investigation (2026-10-27; no change to how I_R is judged)
+
+Runs: this worktree's builds from the frozen source (profiles `cuda132-gcc133-heatcool`,
+`cpu-gcc133-heatcool`), the registered deck through the unchanged `run.sh`, 1 rank, GPU 0;
+run trees `build/level3/nyx/<profile>/run.irstudy-*` (per-step plotfiles: a copy of the derived
+deck with `amr.plot_int = 1`, launched through the common launcher). Comparisons with fcompare's
+own norm-0 definition (`||B - A||_inf / ||A||_inf`) on the plotfile data.
+
+| Pair (10-step deck, plt00010) | I_R max abs / rel | cells with different I_R | worst state field | bitwise-identical fields |
+|---|---|---|---|---|
+| GPU vs GPU, 4 repeats (6 pairs), same binary/deck/ranks | 0.265-0.297 / 1.13-1.27 | 77-80 % | Temp 1.1-1.3e-13 | Ne (identically 0), particle_count |
+| GPU vs GPU with `nyx.sundials_atomic_reductions=0` (2 runs) | 0.29 / 1.24 | 86 % | Temp 1.2e-13 | the same two |
+| CPU vs CPU, 3 repeats | 0 / 0 | 0 | 0 | **all 16** |
+| GPU vs CPU | 0.28 / 1.28 | 99.9 % | Temp 1.9e-13 | Ne, particle_count |
+| GPU vs GPU, **plt00000** (before the first step) | 0 (I_R = 0) | 0 | rho_e 3.7e-14, Temp 4.6e-14, density 3.8e-16 | Ne, I_R, particle_count |
+
+What I_R is in this deck: `I_R = [a_end^2 (rho e)_out - (a^2 (rho e)_orig + dt A_rhoe)] / (dt a_half) - a_end^2 reset / (dt a_half)`
+(`f_rhs_struct.H`), with dt the code-unit step (3.06e-7 at step 10; the runlog's `dt` column is in
+years). The cancelling terms are `a_end^2 |rho e| / (dt a_half)` = 3.0e14-5.7e14, so max|I_R| = 0.22-0.28
+is 3.8-5.0e-16 of them (1.7-2.2 machine epsilon); per cell |I_R| is a median 0.5 and at most 3.1-4.1
+units in the last place of the largest term (GPU and CPU alike); with per-step plotfiles max|I_R| is
+1.6-2.8 eps x scale at **every** step 1-10, and the I_R difference between any two runs is 1.1-1.7
+relative from step 1 on, while the state difference grows smoothly from 7e-14 to 1.5e-13. The
+increment I_R adds to (rho e)/(rho E), `dt a_half I_R / a_end^2`, is at most 6.5e-6 absolute =
+5.5e-16 of rho e. In this deck (z 100 -> 90, Ne identically 0, temperature following the adiabat)
+the net heating/cooling is below the floating-point resolution of the energy bookkeeping: **I_R is
+rounding residue, not a resolved physical quantity.**
+
+Answers:
+- Run-to-run variation: the CPU build is bitwise reproducible (all fields, also after 354 steps).
+  The GPU build is not: its state already differs at plt00000 (initialisation, before any
+  heating/cooling call -- consistent with atomic particle-to-mesh deposition; the adiabatic decks
+  show the same, MiniSB rerun ~2e-11) and the CVODE atomic reductions are not needed for it (the
+  `sundials_atomic_reductions=0` repeats differ the same way). Last-bit differences of the inputs
+  re-draw a rounding residue completely, hence O(1) relative differences of I_R with ~1e-13 state
+  differences. No race or uninitialised read is visible (CPU bitwise, GPU differences explained by
+  the state nondeterminism); a GPU-side race is not excluded by a sanitizer run (none was made).
+- A frozen-GPU-reference comparison of I_R in the 10-step deck does **not** make sense with any
+  relative tolerance: the frozen value is one sample of rounding noise (a GPU run differs from its
+  own rerun by 1.1-1.3 relative). A meaningful criterion would be reference-free and absolute, on the
+  rounding scale (e.g. |I_R| <= k eps max a_end^2|rho e|/(dt a_half), measured k <= 2.8), or the
+  acceptance would move to a regime where I_R is physical (below). Both are owner decisions; nothing
+  was changed: I_R stays reported-not-gated and the case stays I_R_CHECK_PENDING (exit 3).
+- The other heat/cool fields (10 steps): every state field agrees to <= 1.9e-13 (GPU-GPU <= 1.3e-13,
+  GPU-CPU <= 1.9e-13, CPU-CPU bitwise); Ne is identically 0 in every run; DM particles ~1e-15.
+- Physical regime, upstream's own test length (354 steps, plt00354, z = 2; `HPCPERF_NYX_STEPS=354`,
+  GPU run time 15.5 s, CPU 213-227 s): max|I_R| = 5.7e18 (upstream reports ||I_R|| ~ 6e18 there).
+  GPU vs GPU: I_R 1.4e-8, Temp 8.6e-7, rho_e 5.2e-8, Ne 7.3e-9 (upstream's nightly: I_R 4.2e-8,
+  Temp 2.8e-5 vs its GPU benchmark) -- a frozen-GPU-reference comparison at 5e-5 is meaningful there.
+  CPU vs CPU: bitwise. **GPU vs the CPU profile as built (default `nyx.sundials_use_tiling=1`):
+  Temp 6.3e-3, rho_e 5.3e-4, I_R 4.5e-4, Ne 1.0e-5 -- above 5e-5.** The CPU build integrates the
+  vectorised CVODE system per MFIter tile (16x8x8 = 1024 cells, default tile (1024000,8,8)), the GPU
+  build per box (16^3 = 4096 cells); CVODE's step-size and error control (reltol = abstol = 1e-4) is
+  shared over the batch, so the two solve the ODE to its tolerance along different step sequences.
+  With `nyx.sundials_use_tiling=0` on the CPU (a run-time parameter, same source) the GPU-CPU
+  difference at plt00354 falls to Temp 6.6e-6, rho_e 6.2e-7, I_R 5.5e-8 (inside 5e-5); at 10 steps
+  the tiling makes no difference (bitwise identical CPU results). Consequence, recorded, not acted
+  on: a CPU-validated frozen reference for the 354-step regime would need the CPU run with
+  `nyx.sundials_use_tiling=0` (d0 = 6.6e-6 -> budget (5e-5 - d0)/(1 + d0) = 4.3e-5); with the CPU
+  build's default the CPU reference itself is outside upstream's 5e-5.
 
 Heat/cool strong scaling (`Exec/LyA/inputs` 64^3, `amr.max_grid_size=16` -> 64
 boxes, 10 steps) and the 8/40/80-GPU dry-runs: 8 ranks planned (2 hypothetical
@@ -294,11 +365,63 @@ ranks)**; 80 ranks **refused** ("80 ranks requested but ... only 64 boxes -- a r
 without work is never launched silently"). Timings of the 1/2/4-GPU strong runs:
 `SECOND_BATCH_STATUS.md`.
 
+## Frozen B200 reference (check [3], 2026-10-27)
+
+Project policy: no CPU recomputation of the scientific result on a default path. Check [3] used to run
+the CPU-profile Nyx (1 rank) whenever no matching CPU run existed -- an automatic CPU fallback on every
+`validate.sh` and registry check. By default it now compares the run with a frozen B200 GPU reference;
+[1], [2], [4], the I_R handling and the exit codes 0/1/3/4 are unchanged.
+
+| `HPCPERF_CPU_REFERENCE` | check [3] |
+|---|---|
+| unset / `0` (default: plain `validate.sh`, registry check, timing never calls it) | frozen B200 reference `reference/<case>.<mode>.json`; missing / corrupted / other workload -> **FAIL**, never a CPU run; no CPU run tree is created |
+| `1` (explicit, offline) | the previous [3] unchanged (live CPU reference, reused while deck sha256 and steps match) |
+| `1` + `HPCPERF_NYX_FREEZE_REFERENCE=1`, `HPCPERF_GPUS=1` | as `1`, then `nyx_reference.py freeze` of each case whose [3] agreed (refuses an uncommitted `level3/nyx`, an existing reference unless `HPCPERF_NYX_FREEZE_REPLACE_REASON` is set, a non-CUDA or multi-rank run, a report of another pair) |
+
+What is frozen (`nyx_reference.py freeze`): the 1-GPU run's `plt<final>/` (whole plotfile) plus
+`chk00000/DM` and `chk<final>/DM` (what [3] compares) as a deterministic tar in the content-addressed
+golden store (`tools/golden/hpcperf_golden.py store-put`; `$HPCPERF_GOLDEN_STORE`, default
+`<repo>/.golden-store`, never in git); the JSON (schema `hpcperf-nyx-frozen-reference-1`, committed) holds
+the workload identity (case, mode, steps, grid, decomposition, upstream deck and IC sha256), every archive
+member's size and sha256, d0 per variable / particle component, the budget, and the provenance (GPU
+name/UUID/driver, CUDA, git HEAD, binary and fingerprint sha256 of the GPU and CPU runs, sha256 of the [3]
+reports and the validate.sh log, tool hashes). `fetch` (the default [3]) checks the workload, gets the
+archive with `store-get` (sha256-verified), checks every member against the JSON, refuses a JSON whose
+budget is not the one derived from its own tol/d0 or whose d0 is not finite in [0, tol), refuses a JSON that is not the
+committed, unmodified file (in an agent workspace: not byte-identical to the canonical repository's committed one;
+`HPCPERF_GOLDEN_ALLOW_UNCOMMITTED_REFERENCE=1` is for test harnesses and is printed loudly), and extracts it next to
+the run. Freeze mode freezes a case only when every other check of that case ([1], [2], [4]) passed in the same run.
+
+Tolerance budget. fcompare `-n 0` reports per variable and level `||B - A||_inf / ||A||_inf`, A = the first
+plotfile (the reference): the maximum difference normalised by the **reference field's maximum** over the
+level, not a per-cell relative error (`Tools/Plotfile/fcompare.cpp`: `aerror = norm0(B - A)`,
+`rerror = aerror / norm0(A)`; a field with `norm0(A) = 0` is the zero-reference case, judged exactly by
+`nyx_fcompare_check.py`). nyx_particle_compare.py uses the same max-normalised form per component. With the
+CPU reference C, the frozen GPU output G, `d0 = ||G - C|| / ||C||` and a candidate X with
+`r = ||X - G|| / ||G||`:
+`||X - C|| <= ||X - G|| + ||G - C|| = r ||G|| + d0 ||C||` and `||G|| <= (1 + d0) ||C||`, so
+`||X - C|| / ||C|| <= r (1 + d0) + d0`, which is `<= tol` whenever `r <= (tol - d0) / (1 + d0)` -- a run
+that passes against G passes the original criterion against C (for zero-reference fields both G and C are
+identically 0, and the exact rule is unchanged). One bound per comparison: d0 = the largest d0 over the
+gated variables (strictest), inflated by 1e-9 relative because fcompare prints 10 significant digits;
+I_R (diagnostic) and identically-zero fields are not part of it.
+
+The frozen references, their measured d0 and budgets: "Frozen references (check [3])" below, recorded with the reference files.
+
+What can give another verdict than before: a run of another step count (`HPCPERF_NYX_STEPS`), deck or IC
+than the frozen one is FAIL instead of a fresh CPU comparison; another `amr.max_grid_size`
+(`HPCPERF_NYX_MGS`) makes the [3] pair a legal re-blocking -> UNSUPPORTED_LAYOUT (exit 4) where the CPU run
+used the same layout before; a missing golden store (fresh clone, other machine) is FAIL until the archive
+is provided; the budget is stricter by d0 (e.g. MiniSB 9.955e-9 instead of 1e-8). Multi-GPU runs compare
+with the 1-GPU frozen reference (not exercised in this round: 1 GPU only). HIP would compare with the B200
+reference (untested).
+
 ## Files
 
 `fetch.sh` (pinned clones + SHA checks), `build.sh` (staged, profile-aware,
 fingerprinted), `run.sh` (cases/modes, decomposition guard, manifest),
-`validate.sh` + `nyx_particle_compare.py` (criteria above), this README.
+`validate.sh` + `nyx_fcompare_check.py` + `nyx_particle_compare.py` (criteria above),
+`nyx_reference.py` + `reference/*.json` (frozen B200 reference of check [3]), this README.
 
 <!-- hpcperf:source-section:begin -->
 ## Source distribution (frozen source artifact, scheme 3, 2026-09-10)
