@@ -49,4 +49,12 @@ if(BUILD_TESTING)
     set_tests_properties(mat_mat_shared_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same kernels on set-up data on which a
+    # constant fill or a skipped kernel cannot pass (`--probe`, cuda/main.cu); checked against its own
+    # frozen reference, never timed
+    add_test(NAME mat_mat_shared_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-rand --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-rand)
+    set_tests_properties(mat_mat_shared_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

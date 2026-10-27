@@ -108,3 +108,32 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-rand
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's set-up data A = B = 1 makes every element of C equal to N, so a constant fill (C = N) -- or any
+    tiling / indexing / operand-order error that still sums N ones -- passes every performance input with error 0
+    (measured 2026-10-27). Here A comes from upstream's own initDataRandValue (values in [0, 1]) and B from
+    initDataRandSign (+-0.1 with random signs), so C spans -8.5 .. 8.0 and C = B A, A^T B, A B^T or C^T differ from the
+    result by max |a - g| / (1 + |g|) = 6.8 .. 27 (tolerance 1e-10)
+  case: mat-mat-shared
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (N = 1000, 5); set-up data only (`--probe`, cuda/main.cu): A is initialized with
+      upstream DataUtils initDataRandValue and B with initDataRandSign instead of the constant 1 (same init order);
+      the Base_CUDA kernel and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000
+    reps: 5
+    probe_data: A initDataRandValue; B initDataRandSign
+  args:
+  - '1000'
+  - '5'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
