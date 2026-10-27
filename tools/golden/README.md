@@ -20,6 +20,7 @@ budget").
 | `hpcperf_golden_capture.py` | the Python twin of the capture (for `verify.py` CPU arrays) |
 | `hpcperf_golden.py` | `make` (one-time, CPU-validated freeze), `check` (compare a capture), `run` (ctest entry), `status`, `validate` |
 | `golden_artifacts.py` | distribution of the store: `pack` (deterministic bundles of the blobs the committed references name), `fetch` (verified install into the store), `verify`, `lock-check`, `plan` -- see [DISTRIBUTION.md](DISTRIBUTION.md) |
+| `hpcperf_golden_audit.py` | read-only consistency audit: every reference vs its registry input (spec, args, workload, provenance ancestry, sources changed since freezing, blobs), every golden benchmark's ctest and registry check vs the golden run, non-golden mechanisms, Level 2/3 `validate.sh` CPU gating, tolerance vs d0 / rounding; JSON + table, exit 1 on a HARD finding |
 | `golden_artifacts.lock.yaml` | the committed lock of the bundles (sha256, size, members; `status: unpublished` until the maintainer publishes) |
 | `tests/run_all.sh` | CPU-only tests (fake repository and benchmarks; no GPU); also runs `tests/test_golden_artifacts.sh` |
 

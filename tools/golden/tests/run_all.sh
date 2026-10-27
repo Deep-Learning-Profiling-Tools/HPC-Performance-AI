@@ -350,6 +350,12 @@ if bash "$(dirname "${BASH_SOURCE[0]}")/test_golden_artifacts.sh" > "$TMP/artifa
 else
     bad "10a: golden_artifacts.py suite: $(grep -E '^FAIL|failed' "$TMP/artifacts.log" | head -3)"
 fi
+# the read-only consistency audit (hpcperf_golden_audit.py) has its own CPU-only suite on a fake repository
+if bash "$(dirname "${BASH_SOURCE[0]}")/test_golden_audit.sh" > "$TMP/audit.log" 2>&1; then
+    ok "10b: hpcperf_golden_audit.py suite ($(grep -o '[0-9]* passed' "$TMP/audit.log" | tail -1))"
+else
+    bad "10b: hpcperf_golden_audit.py suite: $(grep -E '^FAIL|failed' "$TMP/audit.log" | head -3)"
+fi
 
 echo
 echo "golden tests: $pass passed, $fail failed"
