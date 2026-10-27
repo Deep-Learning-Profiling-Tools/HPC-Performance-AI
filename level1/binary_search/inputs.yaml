@@ -13,14 +13,43 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: four kernel variants (bs1..bs4) each print their own average; no total
 baseline:
-  method: no built-in PASS line; the program reports mismatches only on failure
-  reference: this build's first measured run (self baseline); see method
+  method: 'the four search results (r of bs1..bs4) against the frozen B200 golden reference (`check:` / `golden:`
+    below); upstream''s own property check verify() (a[r] <= z < a[r+1]; upstream compiles it only with -DDEBUG, so
+    the default build used to check nothing) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1: upstream's verify() then
+  # checks every result of the four variants on the host (no CPU recomputation) and the results are frozen only when
+  # it printed PASS. Each result is size_t[2 x elements] (134 MB per variant for n8388608, 2.1 GB for n134217728) and
+  # is compared exactly, so only its sha256 is recorded (mode hash).
+  mode: hash
+  cpu_check: {pass_regex: '^PASS: verify:', fail_regex: 'incorrect result|^FAIL'}
+  outputs:
+  - match: 'r\.bs[1-4]'
+    count: 4
+    dtype: u64
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251,
+      called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2
+      would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct
+      result equals the validated golden bit for bit; integer, exact
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture', HPCPERF_GOLDEN_MODE: hash}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the results of bs1..bs4 byte-identical (sha256) to the frozen B200 golden reference reference/<input_id>.json,
+    which upstream''s property check verify() validated once (the property determines every result uniquely); no
+    host-side check runs'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger element counts
@@ -63,6 +92,10 @@ inputs:
   backends_validated:
   - cuda
 - id: n134217728
+  # NO GOLDEN YET (2026-10-27, decision pending): Real_t is float, so above 2^24 a[i] = i and z = rand() % N are
+  # rounded; at this size 6 of the 268435456 queries round to a[aSize-1] = 134217728, for which no r with
+  # r+1 < aSize satisfies verify()'s a[r] <= z < a[r+1] -- verify() reports "incorrect result" for all four
+  # variants (bs1/bs2 return N-1, bs3/bs4 return N), so `make` refuses this input (README "Input n134217728").
   case: binary-search
   variant: size
   source:

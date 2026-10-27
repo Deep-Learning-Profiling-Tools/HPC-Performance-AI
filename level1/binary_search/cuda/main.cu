@@ -1,7 +1,9 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
+#include <string>
 #include <cuda.h>
 
 #ifndef Real_t 
@@ -210,8 +212,25 @@ void bs4 ( const size_t aSize,
   std::cout << "Average kernel execution time (bs4) " << (time * 1e-9f) / repeat << " (s)\n";
 }
 
+// HPC-Performance-AI correctness switch. verify() is upstream's own check of every search result: the
+// property a[r] <= z < a[r+1] (r+1 < aSize), which determines r uniquely for the non-decreasing a[] (also
+// where float rounding makes a[] repeat values); a host-side pass over the GPU output, not a CPU
+// recomputation. Upstream compiled it (and the copy-back of the results) only with -DDEBUG, so the default
+// build checked nothing. It now runs on an explicit offline request (HPCPERF_CPU_REFERENCE=1;
+// tools/golden/hpcperf_golden.py make uses it once to validate the frozen golden reference) or, as
+// upstream, in a -DDEBUG build. By default it is skipped and correctness is judged by comparing the
+// captured results of bs1..bs4 (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the frozen B200 golden
+// reference (tools/golden). No kernel, data initialization, tolerance or algorithm is touched.
+static bool hpcperf_skip_verify() {
 #ifdef DEBUG
-void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
+  return false;
+#else
+  return !hpcperf_cpu_reference_enabled();
+#endif
+}
+
+// returns whether every result satisfied the property (upstream: void, `break` at the first failure)
+bool verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::string msg)
 {
   for (size_t i = 0; i < zSize; ++i)
   {
@@ -220,14 +239,17 @@ void verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
     {
       std::cout << msg << ": incorrect result:" << std::endl;
       std::cout << "index = " << i << " r[index] = " << r[i] << std::endl;
-      std::cout << a[r[i]] << " <= " << z[i] << " < " << a[r[i] + 1] << std::endl;
-      break;
+      if (r[i]+1 < aSize)   // [HPC-Performance-AI] upstream printed a[r[i]], a[r[i]+1] also out of range
+        std::cout << a[r[i]] << " <= " << z[i] << " < " << a[r[i] + 1] << std::endl;
+      else
+        std::cout << "r[index] + 1 >= aSize = " << aSize << " (z[index] = " << z[i] << ")" << std::endl;
+      return false;
     }
     // clear result
     r[i] = 0xFFFFFFFF;
   }
+  return true;
 }
-#endif
 
 int main(int argc, char* argv[])
 {
@@ -266,33 +288,43 @@ int main(int argc, char* argv[])
   cudaMemcpy(d_a, a, sizeof(Real_t)*aSize, cudaMemcpyHostToDevice);
   cudaMemcpy(d_z, z, sizeof(Real_t)*zSize, cudaMemcpyHostToDevice);
 
+  static_assert(sizeof(size_t) == 8, "the results are captured as u64");
+  const bool verify_results = !hpcperf_skip_verify();
+  bool verify_ok = true;
+
   bs(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
-#ifdef DEBUG
+  // the result back to the host after the timed region / ROI (a D2H copy only; upstream did it only
+  // under -DDEBUG), captured for tools/golden before verify() clears it
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
-  verify(a, z, r, aSize, zSize, "bs");
-#endif
+  hpcperf_golden_output("r.bs1", r, zSize, "u64");
+  if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs");
 
   bs2(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
-#ifdef DEBUG
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
-  verify(a, z, r, aSize, zSize, "bs2");
-#endif
+  hpcperf_golden_output("r.bs2", r, zSize, "u64");
+  if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs2");
 
   bs3(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
-#ifdef DEBUG
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
-  verify(a, z, r, aSize, zSize, "bs3");
-#endif
+  hpcperf_golden_output("r.bs3", r, zSize, "u64");
+  if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs3");
 
   bs4(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
-#ifdef DEBUG
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
-  verify(a, z, r, aSize, zSize, "bs4");
-#endif
+  hpcperf_golden_output("r.bs4", r, zSize, "u64");
+  if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs4");
+
+  if (!verify_results)
+    // default: no host-side check runs; correctness = the captured results against the frozen golden reference
+    std::cout << "SKIP_VERIFY" << std::endl;
+  else if (verify_ok)
+    std::cout << "PASS: verify: a[r] <= z < a[r+1] for all " << zSize << " queries of bs1, bs2, bs3, bs4" << std::endl;
+  else
+    std::cout << "FAIL: verify: incorrect result (see above)" << std::endl;
 
   cudaFree(d_a);
   cudaFree(d_z);
