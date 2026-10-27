@@ -1,6 +1,7 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -251,6 +252,18 @@ bool verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
   return true;
 }
 
+// tools/golden: poison the result buffer that bs1..bs4 share -- d_r and the host copy r that is captured (all-ones
+// bytes, SIZE_MAX in every size_t: never a valid index) -- before each variant's timed region, outside the ROI and
+// the chrono timer in bs*(). Every kernel writes r[i] for all zSize queries, so a correct variant overwrites the
+// poison; a variant that does not run leaves SIZE_MAX in its capture instead of the previous variant's identical
+// result.
+static void hpcperf_poison_r(size_t *d_r, size_t *r, size_t zSize)
+{
+  cudaMemset(d_r, 0xFF, sizeof(size_t)*zSize);
+  memset(r, 0xFF, sizeof(size_t)*zSize);
+  cudaDeviceSynchronize();
+}
+
 int main(int argc, char* argv[])
 {
   if (argc != 3) {
@@ -292,6 +305,7 @@ int main(int argc, char* argv[])
   const bool verify_results = !hpcperf_skip_verify();
   bool verify_ok = true;
 
+  hpcperf_poison_r(d_r, r, zSize);
   bs(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
   // the result back to the host after the timed region / ROI (a D2H copy only; upstream did it only
@@ -300,18 +314,21 @@ int main(int argc, char* argv[])
   hpcperf_golden_output("r.bs1", r, zSize, "u64");
   if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs");
 
+  hpcperf_poison_r(d_r, r, zSize);
   bs2(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
   hpcperf_golden_output("r.bs2", r, zSize, "u64");
   if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs2");
 
+  hpcperf_poison_r(d_r, r, zSize);
   bs3(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
   hpcperf_golden_output("r.bs3", r, zSize, "u64");
   if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs3");
 
+  hpcperf_poison_r(d_r, r, zSize);
   bs4(aSize, zSize, d_a, d_z, d_r, N, repeat);
 
   cudaMemcpy(r, d_r, sizeof(size_t)*zSize, cudaMemcpyDeviceToHost);
