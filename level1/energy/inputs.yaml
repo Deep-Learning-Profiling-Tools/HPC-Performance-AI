@@ -115,3 +115,33 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-randsign
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's set-up data (initData) gives delvc > 0 for every element, so the delvc <= 0 branches of ENERGY_BODY2/5/6
+    never run, q_new stays 0 and every e_new (0.167-0.170) falls below e_cut and is clamped to emin: a constant fill
+    (e_new = emin, q_new = 0) passes every performance input with error 0 (measured 2026-10-27). Here
+    delvc comes from upstream's own initDataRandSign (about half the elements negative) and e_cut, emin are scaled by
+    1e-2: q_new is non-zero on 50.1% of the elements (0.199-0.206), no e_new is clamped (0.168-0.266), so constant
+    fills, skipped kernels and a skipped delvc <= 0 branch fail
+  case: energy-eos
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (1000000, 130); set-up data only (`--probe`, cuda/main.cu setUp): delvc is
+      initialized with upstream DataUtils initDataRandSign instead of initData (same factor, same init count), e_cut
+      and emin are multiplied by 1e-2; the six Base_CUDA kernels and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000000
+    reps: 130
+    probe_data: delvc initDataRandSign; e_cut and emin x 1e-2
+  args:
+  - '1000000'
+  - '130'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

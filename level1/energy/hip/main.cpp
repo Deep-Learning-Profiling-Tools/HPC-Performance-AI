@@ -8,6 +8,7 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
 #include "rp_common.hpp"
+#include <cstring>
 
 // upstream ENERGY.hpp
 #define ENERGY_BODY1 \
@@ -161,12 +162,19 @@ struct Data {
 };
 
 // upstream ENERGY.cpp setUp (init order preserved)
-static void setUp(Data& d, Index_type size)
+// probe (correctness-probe input, `--probe`; set-up only, the kernels are unchanged): upstream's data gives
+// delvc > 0 everywhere, so the delvc <= 0 branches of ENERGY_BODY2/5/6 never run, q_new stays 0 and every
+// e_new (0.167-0.170) falls below e_cut and is clamped to emin -- a constant fill reproduces the output.
+// The probe initializes delvc with upstream's own random-sign helper (DataUtils initDataRandSign, same
+// factor, same init count) and scales the cut-offs e_cut and emin by 1e-2, so both branches run and no
+// e_new is clamped.
+static void setUp(Data& d, Index_type size, bool probe)
 {
   resetDataInitCount();
   allocAndInitDataConst(d.e_new, size, 0.0);
   allocAndInitData(d.e_old, size);
-  allocAndInitData(d.delvc, size);
+  if (probe) allocAndInitDataRandSign(d.delvc, size);
+  else       allocAndInitData(d.delvc, size);
   allocAndInitData(d.p_new, size);
   allocAndInitData(d.p_old, size);
   allocAndInitDataConst(d.q_new, size, 0.0);
@@ -183,6 +191,7 @@ static void setUp(Data& d, Index_type size)
   initData(d.e_cut);
   initData(d.emin);
   initData(d.q_cut);
+  if (probe) { d.e_cut *= 1.0e-2; d.emin *= 1.0e-2; }
 }
 
 int main(int argc, char** argv)
@@ -191,12 +200,20 @@ int main(int argc, char** argv)
   Index_type run_reps = 130;   // upstream default reps
   if (argc > 1) size = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
+  bool probe = false;          // correctness-probe set-up data (see setUp); never a performance input
+  if (argc > 3) {
+    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
+      fprintf(stderr, "usage: %s [size [reps [--probe]]]\n", argv[0]);
+      return 2;
+    }
+    probe = true;
+  }
   const Index_type ibegin = 0;
   const Index_type iend = size;
   const size_t bytes = size * sizeof(Real_type);
 
   // ------------------------- GPU (upstream Base_CUDA) ----------------------
-  Data g; setUp(g, size);
+  Data g; setUp(g, size, probe);
 #define DDECL(n) Real_ptr d_##n;
   ENERGY_ARRAYS(DDECL)
 #undef DDECL
@@ -244,7 +261,7 @@ int main(int argc, char** argv)
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
-    Data cd; setUp(cd, size);
+    Data cd; setUp(cd, size, probe);
     {
       Real_ptr e_new = cd.e_new; Real_ptr e_old = cd.e_old; Real_ptr delvc = cd.delvc;
       Real_ptr p_new = cd.p_new; Real_ptr p_old = cd.p_old; Real_ptr q_new = cd.q_new;
