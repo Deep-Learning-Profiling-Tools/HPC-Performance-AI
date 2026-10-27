@@ -138,6 +138,30 @@ exit code). An optimization harness accepts a candidate's timing only with a PAS
 `binary_sha256` is the sha256 of the binary it timed. Exit 0 only for PASS; a missing reference, a missing or
 corrupted blob, a changed spec, another workload, a missing or partial capture, a non-zero exit are all FAIL.
 
+### Wiring an optimization harness to the gate
+
+Rules for any harness that accepts LLM-generated candidates (PerfSkills or another):
+
+1. Every candidate's timing is accepted only together with a golden PASS of the **same binary**: the verdict
+   JSON's `run.binary_sha256` must equal the sha256 of the binary that was timed (or, stronger, the timed run
+   itself captures -- `HPCPERF_GOLDEN_DUMP=<per-run dir>` in its environment, the capture is outside the ROI
+   -- and `hpcperf_golden.py check <canonical bench_dir> <input> --dump <that dir> --json ...` judges that very
+   process).
+2. The gate is `hpcperf_golden.py run|check` against the CANONICAL `level<N>/<name>` directory -- never against
+   the candidate's copy (refused anyway). Exit 0 / `"verdict": "PASS"` is the only accepting state.
+3. Do not rely on a harness default. Measured 2026-10-27 with PerfSkills `shared/scripts/bench.py`
+   (`--oracle "python3 tools/golden/hpcperf_golden.py run level1/adam n10000-t200 --exe <candidate> ..."`):
+   a wrong candidate (half the Adam steps, 1.11x faster) is recorded `correctness: failed` (golden max_abs
+   0.549 > 9.8e-4) -- but bench.py still exits 0 and still reports the speedup, so the harness must gate on
+   `correctness.status == "passed"`; PerfSkills' experiment controller excludes failed candidates from
+   confirmation, but with no `oracle` in the plan it falls back to the exit code (`returncode`) -- a plan
+   without the golden oracle has no correctness gate at all.
+4. `HPCPERF_SKIP_VERIFY` during timing is fine: no CPU reference runs anyway, and the gate is a separate,
+   explicit step that the acceptance rule requires.
+5. A candidate's process should not be able to read the golden store or write the canonical tree (run it
+   from its own workspace, with the store and the repository read-only or absent): otherwise a program could
+   copy the frozen outputs instead of computing them.
+
 `store-put <file>` / `store-get <sha256>`: content-addressed storage of a frozen reference that is a file
 rather than captured arrays (e.g. a plotfile archive); `store-get` verifies the sha256 and fails when the
 blob is missing or corrupted.
