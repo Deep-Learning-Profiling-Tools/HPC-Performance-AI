@@ -37,7 +37,8 @@ Parser semantics (one rule for every mode):
       energies, T_e table and transported photon count, the per-step counts, the run's provenance
       (binary sha256, rank count, launch, allocation, start/finish, log sha256 and where the log is
       kept) and the comparison rule with its basis. Refuses a GPU log, an unfinished run and an
-      existing file (--force overwrites).
+      existing file (--force overwrites). --seed N records the effective seed of a run that overrode
+      the deck's <seed> on the command line (validate.sh's --seed 1234; default: the deck's seed).
 Prints the per-step / per-quantity figures and "   ERROR: ..." lines, then
 "PASS: branson log check ..." / "FAIL: branson log check ..."; exit 0/1 (freeze: the file, exit 0/2).
 """
@@ -149,7 +150,7 @@ def compare_final(g, c, g_label='GPU', c_label='CPU'):
 def freeze(argv):
     """freeze --input-id ID --deck DECK --cpu-log LOG --ranks N --out FILE [--binary-sha256 S] [--build-options S]
     [--launch S] [--allocation S] [--started UTC] [--finished UTC] [--log-kept-at REL] [--upstream-commit C]
-    [--param k=v ...] [--note S] [--generated-by S] [--generated-utc UTC] [--force]"""
+    [--param k=v ...] [--seed N] [--note S] [--generated-by S] [--generated-utc UTC] [--force]"""
     opts, params, i = {}, {}, 0
     while i < len(argv):
         a = argv[i]
@@ -173,6 +174,8 @@ def freeze(argv):
         sys.exit(f'check_log.py freeze: deck {deck} missing')
     deck_text = open(deck, errors='replace').read()
     seed = re.search(r'<seed>\s*(\d+)\s*</seed>', deck_text)
+    if 'seed' in opts and not re.fullmatch(r'[0-9]+', opts['seed']):
+        sys.exit('check_log.py freeze: --seed must be a non-negative integer')
     steps, text = parse(opts['cpu_log'])
     if not finished(text):
         sys.exit('check_log.py freeze: the CPU run did not finish (no "Photons Per Second (FOM)" line) -- not a reference')
@@ -191,7 +194,8 @@ def freeze(argv):
     deck_rel = os.path.relpath(os.path.abspath(deck), here)
     ref = {
         'schema': REFERENCE_SCHEMA, 'benchmark': 'branson', 'input_id': opts['input_id'],
-        'deck': deck_rel, 'deck_sha256': sha256_file(deck), 'seed': int(seed.group(1)) if seed else None,
+        'deck': deck_rel, 'deck_sha256': sha256_file(deck),
+        'seed': int(opts['seed']) if 'seed' in opts else (int(seed.group(1)) if seed else None),
         'params': params,
         'upstream': {'repo': 'lanl/branson', 'commit': opts.get('upstream_commit')},
         'reference_run': {

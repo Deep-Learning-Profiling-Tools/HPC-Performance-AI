@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Branson: candidate validation of a GPU run against the FROZEN CPU-only reference of its deck.
 
-    check_reference.py <gpu.log> --deck <deck.xml> [--reference-dir DIR]
+    check_reference.py <gpu.log> --deck <deck.xml> [--reference-dir DIR] [--expect-param KEY=VALUE ...]
 
 This is the registry's correctness check (level2/branson/inputs.yaml `check:`) and the only step a
 candidate evaluation runs: it reads reference/<id>.json -- written ONCE, at construction time, by
@@ -15,6 +15,9 @@ from these constants is refused, so the artifact cannot loosen the rule):
   final-step "Total Photons transported"              rel <= 0.05   (the last such line of the log, never the first)
   final-step T_e of every cell (when the deck prints it)  abs <= 0.02
   the candidate must complete the reference's number of steps and print the FOM line.
+--expect-param KEY=VALUE (repeatable) refuses (exit 2) a reference whose params.KEY is not VALUE: validate.sh
+passes --expect-param "args=--t-stop 0.05 --seed 1234" with --reference-dir reference/validate, so its frozen
+reference of the marshak deck must have been made with exactly the command-line arguments of its GPU run.
 The CPU reference is the correctness oracle only. It is not a performance baseline: speedups are
 measured against the original (unoptimized) GPU implementation's timing records.
 Prints the reference provenance and every compared quantity, then
@@ -109,6 +112,8 @@ def main():
     ap.add_argument("gpu_log")
     ap.add_argument("--deck", required=True, help="the deck the candidate ran (its sha256 must match the reference)")
     ap.add_argument("--reference-dir", default=REF_DIR)
+    ap.add_argument("--expect-param", action="append", default=[], metavar="KEY=VALUE",
+                    help="refuse a reference whose params.KEY differs from VALUE (validate.sh: the run's arguments)")
     a = ap.parse_args()
     if not os.path.isfile(a.gpu_log):
         return error(f"candidate log {a.gpu_log} missing")
@@ -121,6 +126,14 @@ def main():
     problem = validate_reference(ref, path, a.deck)
     if problem:
         return error(problem)
+    for kv in a.expect_param:
+        k, sep, v = kv.partition("=")
+        if not sep or not k:
+            return error(f"--expect-param {kv!r} is not KEY=VALUE")
+        got = (ref.get("params") or {}).get(k) if isinstance(ref.get("params"), dict) else None
+        if got is None or str(got) != v:
+            return error(f"{path}: params.{k} is {got!r}, this run uses {v!r} -- the reference does not belong to this "
+                         "run's arguments; refused")
     rr = ref["reference_run"]
     print(f"== frozen reference {os.path.relpath(path, HERE)}: CPU-only Branson (USE_GPU=OFF), {rr['mpi_ranks']} MPI rank(s), "
           f"binary sha256 {rr['binary_sha256'][:12]}..., CPU log sha256 {rr['log_sha256'][:12]}... (run finished {rr['finished_utc']}), "
