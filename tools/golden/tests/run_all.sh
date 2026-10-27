@@ -143,6 +143,12 @@ out="$(FAKE_CPU_FAIL=1 "$PY" "$G" make "$B" n1000 --workdir "$TMP/mk" 2>&1)"; rc
     && ok "3c: a failing one-time CPU validation freezes nothing" || bad "3c: rc=$rc $out"
 out="$("$PY" "$G" make "$B" n1000 --workdir "$TMP/mk" 2>&1)"; rc=$?
 [ "$rc" = 0 ] && [ -f "$B/reference/n1000.json" ] && ok "3d: make freezes the reference" || bad "3d: rc=$rc $out"
+out="$("$PY" "$G" run "$B" --workdir "$TMP/rn0" 2>&1)"; rc=$?
+[ "$rc" = 1 ] && echo "$out" | /usr/bin/grep -q 'is untracked' && ok "3h: a reference that is not committed is not trusted (FAIL)" || bad "3h: rc=$rc $out"
+out="$(HPCPERF_GOLDEN_ALLOW_UNCOMMITTED_REFERENCE=1 "$PY" "$G" run "$B" --workdir "$TMP/rn0" --json "$TMP/rn0.json" 2>&1)"; rc=$?
+[ "$rc" = 0 ] && echo "$out" | /usr/bin/grep -q 'WARNING' && "$PY" -c "import json,sys;sys.exit(0 if json.load(open('$TMP/rn0.json'))['reference_committed'] is False else 1)" \
+    && ok "3i: the test-only override passes but records reference_committed false" || bad "3i: rc=$rc"
+( cd "$FR" && git -c user.email=t@t -c user.name=t add level1/fake/reference && git -c user.email=t@t -c user.name=t commit -qm ref1 )
 "$PY" - "$B/reference/n1000.json" "$TMP/store" <<'PY' && ok "3e: d0, tol_effective, exact sha, trunc_int budget and the blob are recorded" || bad "3e: reference content"
 import json, sys, os
 r = json.load(open(sys.argv[1])); o = {e['name']: e for e in r['outputs']}
@@ -209,6 +215,9 @@ touch "$FR/build/fake/cuda/fake"
 out="$("$PY" "$G" make "$B" n1000 --replace --reason "test" --workdir "$TMP/mk" 2>&1)"; rc=$?
 [ "$rc" = 0 ] && "$PY" -c "import json,sys;r=json.load(open('$B/reference/n1000.json'));sys.exit(0 if r['replaces']['reason']=='test' and r['replaces']['previous_sha256'] else 1)" \
     && ok "5d: make --replace --reason records what it replaced" || bad "5d: rc=$rc $out"
+out="$("$PY" "$G" run "$B" --workdir "$TMP/rn5" 2>&1)"; rc=$?
+[ "$rc" = 1 ] && echo "$out" | /usr/bin/grep -q 'modified relative to HEAD' && ok "5e: a replaced but uncommitted reference is not trusted until committed" || bad "5e: rc=$rc $out"
+( cd "$FR" && git -c user.email=t@t -c user.name=t add level1/fake/reference && git -c user.email=t@t -c user.name=t commit -qm ref2 )
 
 echo
 echo "=== 6: spec validation"
@@ -294,6 +303,7 @@ YAML
 ( cd "$FR" && git -c user.email=t@t -c user.name=t add -A && git -c user.email=t@t -c user.name=t commit -qm fakelog )
 touch "$FR/build/fakelog/app"
 out="$("$PY" "$G" make "$L" d5 --workdir "$TMP/mkl" 2>&1)"; rc=$?
+( cd "$FR" && git -c user.email=t@t -c user.name=t add level2/fakelog/reference && git -c user.email=t@t -c user.name=t commit -qm ref3 )
 "$PY" - "$L/reference/d5.json" <<'PY' && [ "$rc" = 0 ] && ok "8a: make: GPU run, then the after_run CPU validation; 15 log values frozen, d0 from the CPU log (~0.01 of the normalised tolerance)" || bad "8a: rc=$rc $out"
 import json, sys
 r = json.load(open(sys.argv[1])); e = r['outputs'][0]

@@ -132,6 +132,9 @@ reference's pass line, exit 0 and no fail line, measures d0 per output and write
 (`<repo>/level<N>/<name>`); a copy -- an optimization candidate's workspace -- is refused, so a candidate can
 never supply its own reference or rules, and `make` refuses a copy as well. `run --exe <candidate binary>`
 runs that binary on the registered input (no CPU reference, capture into a private directory) and compares;
+The reference itself counts only when it is committed in git and unmodified (`reference_committed` in the
+verdict; an untracked or edited `reference/<input>.json` is a FAIL -- `HPCPERF_GOLDEN_ALLOW_UNCOMMITTED_REFERENCE=1`
+lets tests proceed, prints a warning and records `reference_committed: false`, which is never an acceptance).
 `--json <file>` writes the machine-readable verdict (`hpcperf-golden-verdict-1`: verdict, reason, every
 output's metric value and limit, the reference file and its sha256, the binary and its sha256, the command,
 exit code). An optimization harness accepts a candidate's timing only with a PASS verdict whose

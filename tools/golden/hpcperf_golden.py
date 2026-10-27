@@ -405,6 +405,11 @@ def tol_effective(metric, tol, d0, rule=None):
 
 
 # ----------------------------------------------------------------------------- helpers
+def hpcperf_flag(name):
+    v = os.environ.get(name, "")
+    return v != "" and not v.startswith("0")
+
+
 def git(root: Path, *a):
     return subprocess.run(["git", "-C", str(root), *a], capture_output=True, text=True).stdout
 
@@ -701,6 +706,21 @@ def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None, result=No
         return fail(f"{rp} is not JSON ({ex})")
     res.update({"reference": os.path.relpath(rp, root), "reference_sha256": hi.sha256_file(rp),
                 "reference_made_utc": (ref.get("provenance") or {}).get("made_utc")})
+    # a reference counts only as committed in git and unmodified: nobody (no agent, no candidate harness) can
+    # make a check pass by editing or replacing it in the working tree
+    relp = os.path.relpath(rp, root)
+    tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relp],
+                             capture_output=True, text=True).returncode == 0
+    clean = tracked and subprocess.run(["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", relp],
+                                       capture_output=True, text=True).returncode == 0
+    res["reference_committed"] = clean
+    if not clean:
+        why = "untracked" if not tracked else "modified relative to HEAD"
+        if hpcperf_flag("HPCPERF_GOLDEN_ALLOW_UNCOMMITTED_REFERENCE"):
+            print(f"   WARNING: the reference {relp} is {why} (HPCPERF_GOLDEN_ALLOW_UNCOMMITTED_REFERENCE=1: test use only; "
+                  f"such a verdict is never an acceptance)")
+        else:
+            return fail(f"the frozen reference {relp} is {why}: a reference counts only as committed and unmodified")
     if ref.get("schema") != REF_SCHEMA or ref.get("input_id") != inp["id"] or ref.get("benchmark") != doc["benchmark"]:
         return fail(f"{rp} is not the reference of this input (schema/benchmark/input_id)")
     mism = hi.workload_mismatch(ref.get("workload") or {}, hi.workload_identity(doc, inp))
