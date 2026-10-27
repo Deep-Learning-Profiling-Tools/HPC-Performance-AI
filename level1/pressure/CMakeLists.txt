@@ -49,4 +49,12 @@ if(BUILD_TESTING)
     set_tests_properties(pressure_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same kernels on set-up data on which a
+    # constant fill or a skipped kernel cannot pass (`--probe`, cuda/main.cu setUp); checked against its own
+    # frozen reference, never timed
+    add_test(NAME pressure_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-randvalue --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-randvalue)
+    set_tests_properties(pressure_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

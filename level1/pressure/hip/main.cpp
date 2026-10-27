@@ -8,6 +8,7 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
 #include "rp_common.hpp"
+#include <cstring>
 
 // upstream PRESSURE.hpp
 #define PRESSURE_BODY1 \
@@ -52,18 +53,25 @@ struct Data {
 };
 
 // upstream PRESSURE.cpp setUp (init order preserved)
-static void setUp(Data& d, Index_type size)
+// probe (correctness-probe input, `--probe`; set-up only, the kernels are unchanged): upstream's data gives
+// p_new = bvc * e_old ~ 0.0117 < p_cut and vnewc >= eosvmax everywhere, so every p_new is clamped to pmin --
+// a constant fill reproduces the output. The probe initializes vnewc with upstream's own random-value helper
+// (DataUtils initDataRandValue, values in [0, 1], same init count) and scales the cut-offs p_cut and pmin by
+// 1e-2, so about a fifth of the elements (vnewc < eosvmax) keep p_new = bvc * e_old.
+static void setUp(Data& d, Index_type size, bool probe)
 {
   resetDataInitCount();
   allocAndInitData(d.compression, size);
   allocAndInitData(d.bvc, size);
   allocAndInitDataConst(d.p_new, size, 0.0);
   allocAndInitData(d.e_old, size);
-  allocAndInitData(d.vnewc, size);
+  if (probe) allocAndInitDataRandValue(d.vnewc, size);
+  else       allocAndInitData(d.vnewc, size);
   initData(d.cls);
   initData(d.p_cut);
   initData(d.pmin);
   initData(d.eosvmax);
+  if (probe) { d.p_cut *= 1.0e-2; d.pmin *= 1.0e-2; }
 }
 
 int main(int argc, char** argv)
@@ -72,12 +80,20 @@ int main(int argc, char** argv)
   Index_type run_reps = 700;   // upstream default reps
   if (argc > 1) size = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
+  bool probe = false;          // correctness-probe set-up data (see setUp); never a performance input
+  if (argc > 3) {
+    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
+      fprintf(stderr, "usage: %s [size [reps [--probe]]]\n", argv[0]);
+      return 2;
+    }
+    probe = true;
+  }
   const Index_type ibegin = 0;
   const Index_type iend = size;
   const size_t bytes = size * sizeof(Real_type);
 
   // ------------------------- GPU (upstream Base_CUDA) ----------------------
-  Data g; setUp(g, size);
+  Data g; setUp(g, size, probe);
   Real_ptr d_compression, d_bvc, d_p_new, d_e_old, d_vnewc;
   GPU_CHECK(cudaMalloc(&d_compression, bytes));
   GPU_CHECK(cudaMalloc(&d_bvc, bytes));
@@ -115,7 +131,7 @@ int main(int argc, char** argv)
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
-    Data c; setUp(c, size);
+    Data c; setUp(c, size, probe);
     {
       Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
       Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;

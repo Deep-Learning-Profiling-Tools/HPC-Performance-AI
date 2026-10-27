@@ -115,3 +115,32 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-randvalue
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's set-up data (initData) gives p_new = bvc * e_old ~ 0.0117 < p_cut and vnewc >= eosvmax for every element,
+    so every p_new is clamped to pmin: a constant fill (p_new = pmin) passes every performance input with error 0
+    (measured 2026-10-27). Here vnewc comes from upstream's own initDataRandValue (values in [0, 1]) and p_cut, pmin are
+    scaled by 1e-2: 19.6% of the elements (vnewc < eosvmax) keep p_new = bvc * e_old (0.0115-0.0117), the rest are
+    clamped, so a constant fill or a skipped / short-circuited pressurecalc2 fails
+  case: pressure-eos
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (1000000, 700); set-up data only (`--probe`, cuda/main.cu setUp): vnewc is
+      initialized with upstream DataUtils initDataRandValue instead of initData (same init count), p_cut and pmin are
+      multiplied by 1e-2; both Base_CUDA kernels and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000000
+    reps: 700
+    probe_data: vnewc initDataRandValue; p_cut and pmin x 1e-2
+  args:
+  - '1000000'
+  - '700'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
