@@ -23,7 +23,7 @@ backprop	Rodinia	cuda	-	outside	-	-
 bezier_surface	HeCBench	cuda,hip	-	outside	-	-
 bfs	Rodinia	cuda	-	none	-	output captured after the ROI and compared with the frozen golden reference (tools/golden; ctest runs hpcperf_golden.py run); verify.py is only the one-time CPU validation of that reference
 bilateral_filter	HeCBench	cuda,hip	-	outside	-	-
-binary_search	HeCBench	cuda,hip	-	none	-	-
+binary_search	HeCBench	cuda,hip	-	outside	-	-
 bitonic_sort	HeCBench	cuda,hip	-	outside	-	-
 black_scholes	Hetero-Mark	cuda,hip	-	outside	-	-
 block_scan	HeCBench	cuda,hip	-	outside	-	-

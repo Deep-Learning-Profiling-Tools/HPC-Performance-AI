@@ -16,7 +16,7 @@ backprop	default	{BUILD}/level1/backprop/backprop_cuda	65536	{BUILD}/level1/back
 bezier_surface	default	{BUILD}/level1/bezier_surface/bezier_surface_cuda	-f {REPO}/level1/bezier_surface/data/control.txt -n 8192	{BUILD}/level1/bezier_surface	600	golden	PASS: golden check
 bfs	default	{BUILD}/level1/bfs/bfs_cuda	{REPO}/level1/bfs/data/graph65536.txt	{BUILD}/level1/bfs	900	golden	PASS: golden check
 bilateral_filter	default	{BUILD}/level1/bilateral_filter/bilateral_filter_cuda	2960 1440 0.5 0.5 1000	{BUILD}/level1/bilateral_filter	600	golden	PASS: golden check
-binary_search	default	{BUILD}/level1/binary_search/binary_search_cuda	8388608 100	{BUILD}/level1/binary_search	600	direct	-
+binary_search	default	{BUILD}/level1/binary_search/binary_search_cuda	8388608 100	{BUILD}/level1/binary_search	600	golden	PASS: golden check
 bitonic_sort	default	{BUILD}/level1/bitonic_sort/bitonic_sort_cuda	25 2	{BUILD}/level1/bitonic_sort	600	golden	PASS: golden check
 black_scholes	default	{BUILD}/level1/black_scholes/black_scholes_cuda	-x 1048576	{BUILD}/level1/black_scholes	600	golden	PASS: golden check
 block_scan	default	{BUILD}/level1/block_scan/block_scan_cuda	2227104 100	{BUILD}/level1/block_scan	600	golden	PASS: golden check
@@ -24,13 +24,13 @@ burgers_equation	default	{BUILD}/level1/burgers_equation/burgers_equation_cuda	8
 burrows_wheeler_transform	default	{BUILD}/level1/burrows_wheeler_transform/burrows_wheeler_transform_cuda	10000000	{BUILD}/level1/burrows_wheeler_transform	600	golden	PASS: golden check
 cg	default	{BUILD}/level1/cg/cg_cuda	-	{BUILD}/level1/cg	1200	direct	Verification    =               SUCCESSFUL
 channel_shuffle	default	{BUILD}/level1/channel_shuffle/channel_shuffle_cuda	2 224 224 100	{BUILD}/level1/channel_shuffle	1800	golden	PASS: golden check
-color_histogram	default	{BUILD}/level1/color_histogram/color_histogram_cuda	-x 1048576	{BUILD}/level1/color_histogram	600	direct	Passed
+color_histogram	default	{BUILD}/level1/color_histogram/color_histogram_cuda	-x 1048576	{BUILD}/level1/color_histogram	600	golden	PASS: golden check
 daxpy	default	{BUILD}/level1/daxpy/daxpy_cuda	-	{BUILD}/level1/daxpy	900	golden	PASS: golden check
 del_dot_vec_2d	default	{BUILD}/level1/del_dot_vec_2d/del_dot_vec_2d_cuda	-	{BUILD}/level1/del_dot_vec_2d	900	golden	PASS: golden check
 energy	default	{BUILD}/level1/energy/energy_cuda	-	{BUILD}/level1/energy	900	golden	PASS: golden check
 ep	default	{BUILD}/level1/ep/ep_cuda	-	{BUILD}/level1/ep	1200	direct	Verification    =               SUCCESSFUL
 fdtd_2d	default	{BUILD}/level1/fdtd_2d/fdtd_2d_cuda	-	{BUILD}/level1/fdtd_2d	900	golden	PASS: golden check
-fir	default	{BUILD}/level1/fir/fir_cuda	-y 1024 -x 4096	{BUILD}/level1/fir	600	direct	Passed
+fir	default	{BUILD}/level1/fir/fir_cuda	-y 1024 -x 4096	{BUILD}/level1/fir	600	golden	PASS: golden check
 floyd_warshall	default	{BUILD}/level1/floyd_warshall/floyd_warshall_cuda	-	{BUILD}/level1/floyd_warshall	1200	golden	PASS: golden check
 ft	default	{BUILD}/level1/ft/ft_cuda	-	{BUILD}/level1/ft	1200	direct	Verification    =               SUCCESSFUL
 gaussian_elimination	default	{BUILD}/level1/gaussian_elimination/gaussian_elimination_cuda	-f {REPO}/level1/gaussian_elimination/data/matrix208.txt	{BUILD}/level1/gaussian_elimination	900	verify.py	PASS
