@@ -1,11 +1,14 @@
 // Minimal standalone driver for the Hetero-Mark color histogram benchmark (HIP).
 // Replaces the upstream command-line-option framework; the benchmark class,
-// its CPU reference implementation, and Verify() are unchanged upstream code.
+// its CPU reference implementation, and Verify() are unchanged upstream code (plus the
+// tools/golden capture calls; the CPU reference runs only with HPCPERF_CPU_REFERENCE=1; the
+// input seed is fixed to 1 unless HPCPERF_RANDOM_SEED asks otherwise, common/hpcperf_measure.h).
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include "hist_hip_benchmark.h"
 #include "benchmark_runner.h"
+#include "hpcperf_measure.h"
 #include "time_measurement_impl.h"
 
 static void usage(const char *prog) {
@@ -29,7 +32,10 @@ int main(int argc, char **argv) {
   benchmark.SetNumPixel(num_pixels);
   benchmark.SetQuietMode(true);
   runner.SetQuietMode(true);
-  runner.SetVerificationMode(true);  // always verify GPU result against CPU reference
+  // default: the CPU reference (Verify) is skipped; correctness = the captured outputs against the
+  // frozen golden reference (tools/golden). HPCPERF_CPU_REFERENCE=1 runs it (offline only).
+  runner.SetVerificationMode(!hpcperf_skip_verify());
+  if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
   runner.Run();
   return 0;
 }

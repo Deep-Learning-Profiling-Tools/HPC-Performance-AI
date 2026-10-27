@@ -58,6 +58,7 @@ class HistBenchmark : public Benchmark {
   void Verify() override;
   void Summarize() override;
   void Cleanup() override;
+  void CaptureGoldenOutputs() override;  // tools/golden
 
   // Setters
   void SetNumColor(uint32_t num_color) { num_color_ = num_color; }
