@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "backprop.h"
 #include "omp.h"
 #include "hpcperf_golden.h"
@@ -124,8 +125,12 @@ char *argv[];
 	
   int seed;
 
+  /* [HPC-Performance-AI] `--probe` selects the correctness-probe set-up (backprop.c bpnn_probe_init) */
+  if (argc == 3 && strcmp(argv[2], "--probe") == 0) {
+    bpnn_probe_init = 1;
+  } else
   if (argc!=2){
-  fprintf(stderr, "usage: backprop <num of input elements>\n");
+  fprintf(stderr, "usage: backprop <num of input elements> [--probe]\n");
   exit(0);
   }
   layer_size = atoi(argv[1]);

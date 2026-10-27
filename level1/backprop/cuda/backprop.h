@@ -39,6 +39,7 @@ typedef struct {
 /*** User-level functions ***/
 
 void bpnn_initialize();
+extern int bpnn_probe_init;   /* [HPC-Performance-AI] correctness probe set-up switch (backprop.c) */
 
 BPNN *bpnn_create();
 void bpnn_free();

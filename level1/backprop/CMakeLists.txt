@@ -40,4 +40,17 @@ if(BUILD_TESTING)
     set_tests_properties(backprop_run PROPERTIES TIMEOUT 600
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probes (inputs.yaml purpose: correctness-probe): the same kernels on set-up data on which a
+    # constant fill or a skipped kernel cannot pass (`--probe`, cuda/facetrain.c, cuda/backprop.c); checked against their own
+    # frozen reference, never timed
+    add_test(NAME backprop_probe_n32 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-dpn1-n32 --exe $<TARGET_FILE:backprop_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-dpn1-n32)
+    set_tests_properties(backprop_probe_n32 PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    add_test(NAME backprop_probe_n1024 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-dpn1-n1024 --exe $<TARGET_FILE:backprop_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-dpn1-n1024)
+    set_tests_properties(backprop_probe_n1024 PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()
