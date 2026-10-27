@@ -9,11 +9,15 @@ writes ao.ppm. This script runs the benchmark twice and checks that:
 This is a sanity check, not a full numerical validation -- upstream ships no
 CPU reference for this benchmark.
 
-Usage: verify.py <exe> <iterations>
+Usage: verify.py <exe> <iterations> [--reference <reference.sha256>]
+With --reference (ctest), the image must in addition be byte-identical to the frozen reference image of
+this input (check_ppm.py, the registry's check): the sanity checks alone accept a wrong but deterministic,
+non-constant image.
 """
-import subprocess, sys, hashlib
+import os, subprocess, sys, hashlib
 
 exe, iters = sys.argv[1], sys.argv[2]
+reference = sys.argv[sys.argv.index("--reference") + 1] if "--reference" in sys.argv else None
 
 def run_once():
     r = subprocess.run([exe, iters], capture_output=True, text=True)
@@ -43,3 +47,7 @@ if hashlib.sha256(img1).digest() != hashlib.sha256(img2).digest():
     sys.exit(1)
 print(f"PASS: ao.ppm well-formed ({w}x{h}), non-degenerate, deterministic "
       f"across runs (sha256 {hashlib.sha256(img1).hexdigest()[:16]}...)")
+if reference:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import check_ppm
+    sys.exit(check_ppm.main(["check_ppm.py", "ao.ppm", "--reference", reference]))

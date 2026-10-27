@@ -45,7 +45,7 @@ cmake --build build/ao_bench/hip
 
 ## Validation
 
-Added sanity check (verify.py): PPM structure, non-degenerate image, and byte-identical output across two runs (deterministic per-pixel RNG). Upstream ships no reference.
+Added sanity check (verify.py): PPM structure, non-degenerate image, and byte-identical output across two runs (deterministic per-pixel RNG). Upstream ships no reference. Since 2026-10-27 the ctest also requires the image to be byte-identical to the frozen B200 reference image of the input (`verify.py --reference reference/iter100.sha256`, i.e. `check_ppm.py`, the registry's check): the sanity checks alone accept a wrong but deterministic, non-constant image.
 
 Run it via:
 
