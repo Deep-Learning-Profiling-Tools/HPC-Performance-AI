@@ -26,8 +26,9 @@ baseline:
 golden:
   # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the weights only
   # when the added check printed PASS; every later run is compared with those frozen outputs instead.
-  # The check also compared the output/hidden error scalars, but bpnn_train_cuda (cuda/backprop_cuda.cu:60) never writes
-  # *eo / *eh, so those are uninitialized in backprop_face (cuda/facetrain.c:70) -- they are NOT captured.
+  # The check also compares the output/hidden error scalars. Upstream's bpnn_train_cuda (cuda/backprop_cuda.cu:60) never
+  # wrote *eo / *eh, so they were uninitialized in backprop_face (cuda/facetrain.c:70); since 2026-10-27 it returns
+  # them (after the ROI). They are NOT captured: the frozen spec is unchanged.
   mode: data
   cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
   outputs:
@@ -53,8 +54,8 @@ check:
   fail_regex: '^FAIL: golden check'
   basis: 'input_weights and hidden_weights against the frozen B200 golden reference reference/<input_id>.json (max |a -
     g| / (1 + |g|) <= 1e-3 - d0 per matrix, d0 = the golden''s deviation from the CPU-trained clone measured when it was
-    frozen); no CPU reference is run. The error scalars the added check also compared are uninitialized on the GPU path
-    and are not compared'
+    frozen); no CPU reference is run. The error scalars the added check also compares (uninitialized on the GPU path
+    before 2026-10-27) are not part of the golden spec'
   covers: all
 coverage:
   status: MULTI_INPUT
