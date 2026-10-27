@@ -42,6 +42,7 @@ using Offset  = size_t;
 #define cudaMalloc hipMalloc
 #define cudaFree hipFree
 #define cudaMemcpy hipMemcpy
+#define cudaMemset hipMemset
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaDeviceSynchronize hipDeviceSynchronize
@@ -254,6 +255,15 @@ int main(int argc, char** argv)
     total_error += error;
   }
 
+  // tools/golden: poison y on the device and in the host copy (all-ones bytes, a NaN in every f64) after the
+  // checked SpMV above and before the timed loop, outside the ROI and the per-launch timer. The kernel writes
+  // every y[iRow] (alpha = 1, beta = 0) and never reads y, so a correct timed loop overwrites the poison
+  // completely; a loop whose SpMV does not run leaves NaN in the capture below instead of the identical result
+  // of the SpMV above.
+  GPU_CHECK(cudaMemset(d_y, 0xFF, numRows * sizeof(Scalar)));
+  memset(h_y, 0xFF, numRows * sizeof(Scalar));
+  GPU_CHECK(cudaDeviceSynchronize());
+
   // ----- upstream benchmark loop -----
   double ave_time = 0.0, max_time = 0.0, min_time = 1.0e32;
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the benchmark loop, not the warm-up call and check before it
@@ -268,9 +278,9 @@ int main(int argc, char** argv)
   }
   HPCPERF_ROI_END_SYNC();
   GPU_CHECK(cudaGetLastError());
-  // tools/golden: the y the check above compares -- the result of the single SpMV before the
-  // timed loop (h_y, copied back there; the loop's own y never reaches the host), captured here
-  // after the ROI
+  // tools/golden: y after the timed loop (the result of its last SpMV; bit-identical to the single SpMV
+  // before the loop that the CPU check above compares), copied back and captured after the ROI
+  GPU_CHECK(cudaMemcpy(h_y, d_y, numRows * sizeof(Scalar), cudaMemcpyDeviceToHost));
   hpcperf_golden_output("y", h_y, numRows, "f64");
 
   // upstream-style performance summary
