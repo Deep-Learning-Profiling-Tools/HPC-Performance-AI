@@ -16,19 +16,33 @@ timing:
   regex: '^Time consumed\(ms\): (?P<value>[0-9.eE+-]+)'
   select: only
 baseline:
-  method: 'built-in -v: L*U recombined and compared with the original matrix; ''dismatch'' printed on failure'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the post-run residual check (`check:` below): upstream''s lud_verify criterion, every element of A - L*U
+    within 1e-4, applied by lud_residual_check.py to the factors captured after the timed region; upstream''s own
+    single-thread host recomposition (-v, common/common.c lud_verify) runs only offline with HPCPERF_CPU_REFERENCE=1'
+  reference: none needed (reference-free; the residual against the input matrix regenerated from create_matrix)
   quantities:
-  - name: verify_marker
-    role: required
-    regex: '>>>Verify<<<<'
-    compare:
-      rule: present
   - name: dismatch
-    role: required
+    role: diagnostic
     regex: dismatch
     compare:
       rule: absent
+check:
+  # The run captures the packed factor matrix after the timed region and the final device-to-host copy
+  # (cuda/lud.cu hpcperf_golden_output "lu", HPCPERF_GOLDEN_DUMP); -v no longer runs the O(n^3) host check by
+  # default (15 min at s8192). lud_residual_check.py regenerates A bit-identically from create_matrix, forms
+  # A - L*U in float64 with BLAS and applies upstream's per-element 1e-4 to all n*n elements; a non-finite
+  # factor fails. No golden, no CPU reference: the criterion needs only the factors and the input.
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/lud-capture'}
+  command: [python3, '{bench_dir}/lud_residual_check.py', --dump, '{run_dir}/lud-capture', --, '{args}']
+  pass_regex: '^PASS: lud residual'
+  fail_regex: '^FAIL: lud residual'
+  basis: 'upstream lud_verify (common/common.c): any i, j with fabs(A_ij - (L U)_ij) > 0.0001 prints "dismatch";
+    here PASS iff every factor is finite and max_ij |A_ij - (L U)_ij| <= 1e-4 over all n*n elements, L U and the
+    difference evaluated in float64 (upstream accumulates in float32: its own rounding, up to 1.3e-5 / 1.8e-5 /
+    1.9e-5 at s256 / s2048 / s8192, is part of its verdict; README "Validation"); upstream passes NaN factors
+    (the comparison is false), this check fails them'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: three matrix sizes through upstream's built-in generator (-s)

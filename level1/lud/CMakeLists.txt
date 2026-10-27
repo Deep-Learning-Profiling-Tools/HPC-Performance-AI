@@ -29,9 +29,16 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(lud_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: the CPU-reference gate (upstream's host check, off by default) and the capture of the factors
+target_include_directories(lud_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
-    add_test(NAME lud_run COMMAND lud_cuda -s 256 -v)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    # one plain run of the registry's default input (-s 256 -v; upstream's host recomposition does not run),
+    # its captured factors checked against upstream's criterion max|A - L*U| <= 1e-4 by lud_residual_check.py
+    add_test(NAME lud_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify.py
+             --workdir ${CMAKE_CURRENT_BINARY_DIR}/lud-residual-ctest $<TARGET_FILE:lud_cuda> -s 256 -v)
     set_tests_properties(lud_run PROPERTIES TIMEOUT 600
-        FAIL_REGULAR_EXPRESSION "dismatch")
+        PASS_REGULAR_EXPRESSION "PASS: lud residual"
+        FAIL_REGULAR_EXPRESSION "FAIL: lud residual;dismatch")
 endif()
