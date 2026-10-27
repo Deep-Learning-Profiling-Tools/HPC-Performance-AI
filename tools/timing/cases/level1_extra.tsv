@@ -5,4 +5,4 @@
 #   env        NAME=VALUE;... -- only names listed in the benchmark's extra_env (level1_apps.tsv)
 #   timeout_s  "-" = the default case's
 #app	case	args	env	timeout_s	notes
-all_pairs_distance	n20000	20000	-	-	demonstration: twice the default point count (the default case is 10000)
+all_pairs_distance	n20000	20000	-	-	demonstration: twice the default ITERATION count (argv[1] = iterations, cuda/main.cu:197; the point count INSTANCES is fixed); not a registered input and has no golden reference -- a timing-only demonstration case
