@@ -9,8 +9,13 @@ entry:
   kind: binary
   path: build/srad_v1/cuda/srad_v1_cuda
 timing:
-  scope: 'upstream''s own stage timer for the COMPUTE stage (all SRAD iterations: prepare/reduce/srad/srad2 kernels);
-    setup, image I/O and transfers are separate stages'
+  scope: 'upstream''s own stage timer for the COMPUTE stage (all SRAD iterations: prepare/reduce/srad/srad2 kernels;
+    cuda/main.cu time7 -> time8): host wall clock WITHOUT a device synchronize -- it is complete only because every
+    iteration blocks on the cudaMemcpy of the two sums; it starts after the asynchronous extract launch and stops before
+    the last iteration''s srad/srad2 finish (B200, 2026-10-27: 0.27-0.31 ms less than the synchronized tools/timing ROI,
+    which also covers extract and compress). A variant without the per-iteration host round-trip would be timed as
+    launch overhead only, so candidates are timed with tools/timing (synchronized ROI), not with this line; setup,
+    image I/O and transfers are separate stages'
   kind: total
   unit: s
   regex: '^\s*(?P<value>[0-9.]+) s,\s+[0-9.]+ % : COMPUTE$'
