@@ -1,6 +1,7 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <chrono>
 #include <iostream>
@@ -215,18 +216,20 @@ void bs4 ( const size_t aSize,
 
 // HPC-Performance-AI correctness switch. verify() is upstream's own check of every search result: the
 // property a[r] <= z < a[r+1] (r+1 < aSize), which determines r uniquely for the non-decreasing a[] (also
-// where float rounding makes a[] repeat values); a host-side pass over the GPU output, not a CPU
-// recomputation. Upstream compiled it (and the copy-back of the results) only with -DDEBUG, so the default
-// build checked nothing. It now runs on an explicit offline request (HPCPERF_CPU_REFERENCE=1;
-// tools/golden/hpcperf_golden.py make uses it once to validate the frozen golden reference) or, as
-// upstream, in a -DDEBUG build. By default it is skipped and correctness is judged by comparing the
-// captured results of bs1..bs4 (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the frozen B200 golden
-// reference (tools/golden). No kernel, data initialization, tolerance or algorithm is touched.
+// where float rounding makes a[] repeat values); a host-side pass over the GPU output (~0.1 s per variant
+// at the default input), not a CPU recomputation -- a property check like lud's and graph_coloring's.
+// Upstream compiled it (and the copy-back of the results) only with -DDEBUG (Makefile VERIFY=yes), so the
+// default build checked nothing. It now runs BY DEFAULT, after each variant's timed region / ROI, next to
+// the comparison of the captured results of bs1..bs4 (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with
+// the frozen B200 golden reference (tools/golden), and a failure ends the run with exit code 1.
+// HPCPERF_SKIP_VERIFY=1 (tools/timing/measure_level1.sh sets it) turns it off for timing; a -DDEBUG build
+// runs it regardless, as upstream. No kernel, data initialization, tolerance or algorithm is touched.
 static bool hpcperf_skip_verify() {
 #ifdef DEBUG
   return false;
 #else
-  return !hpcperf_cpu_reference_enabled();
+  const char* e = getenv("HPCPERF_SKIP_VERIFY");
+  return e != nullptr && *e != '\0' && *e != '0';
 #endif
 }
 
@@ -236,14 +239,23 @@ bool verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
   for (size_t i = 0; i < zSize; ++i)
   {
     // check result
-    if (!(r[i]+1 < aSize && a[r[i]] <= z[i] && z[i] < a[r[i] + 1]))
+    // [HPC-Performance-AI] r[i] < aSize - 1 instead of upstream's r[i]+1 < aSize: the same for every r except
+    // SIZE_MAX -- the poison a variant leaves where it wrote no result (hpcperf_poison_r) -- for which r+1 wraps to
+    // 0 and upstream then read a[SIZE_MAX], i.e. before the allocation (ASan: heap-buffer-overflow)
+    if (!(r[i] < aSize - 1 && a[r[i]] <= z[i] && z[i] < a[r[i] + 1]))
     {
       std::cout << msg << ": incorrect result:" << std::endl;
       std::cout << "index = " << i << " r[index] = " << r[i] << std::endl;
-      if (r[i]+1 < aSize)   // [HPC-Performance-AI] upstream printed a[r[i]], a[r[i]+1] also out of range
+      if (r[i] < aSize - 1)   // [HPC-Performance-AI] upstream printed a[r[i]], a[r[i]+1] also out of range
         std::cout << a[r[i]] << " <= " << z[i] << " < " << a[r[i] + 1] << std::endl;
       else
-        std::cout << "r[index] + 1 >= aSize = " << aSize << " (z[index] = " << z[i] << ")" << std::endl;
+        std::cout << "r[index] is not below aSize - 1 = " << aSize - 1 << " (z[index] = " << z[i] << ")" << std::endl;
+      if (!(z[i] < a[aSize - 1])) {   // [HPC-Performance-AI] diagnostic only: such a query has no valid r at all
+        char why[256];
+        snprintf(why, sizeof why, "z[index] = %.1f is not below a[aSize-1] = %.1f: no r with r+1 < aSize satisfies "
+                 "a[r] <= z < a[r+1] (README \"Input n134217728\")", (double)z[i], (double)a[aSize - 1]);
+        std::cout << why << std::endl;
+      }
       return false;
     }
     // clear result
@@ -336,7 +348,8 @@ int main(int argc, char* argv[])
   if (verify_results) verify_ok &= verify(a, z, r, aSize, zSize, "bs4");
 
   if (!verify_results)
-    // default: no host-side check runs; correctness = the captured results against the frozen golden reference
+    // HPCPERF_SKIP_VERIFY=1 (timing): no host-side check; correctness = the captured results against the frozen
+    // golden reference (tools/golden), a separate step
     std::cout << "SKIP_VERIFY" << std::endl;
   else if (verify_ok)
     std::cout << "PASS: verify: a[r] <= z < a[r+1] for all " << zSize << " queries of bs1, bs2, bs3, bs4" << std::endl;
@@ -349,5 +362,6 @@ int main(int argc, char* argv[])
   free(a);
   free(z);
   free(r);
-  return 0;
+  // [HPC-Performance-AI] a verify() failure fails the run (upstream: exit 0 either way)
+  return (verify_results && !verify_ok) ? 1 : 0;
 }

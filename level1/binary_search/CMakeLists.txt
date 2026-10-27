@@ -42,8 +42,9 @@ target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    # one plain run of the registry's default input (verify() not run), its four results compared with
-    # the frozen B200 golden reference (reference/<input>.json; sha256, mode hash)
+    # one plain run of the registry's default input, its four results compared with the frozen B200 golden
+    # reference (reference/<input>.json; sha256, mode hash); the run's own verify() (a[r] <= z < a[r+1] for every
+    # query) runs as well and exits 1 on a failure, which the golden run reports as FAIL
     add_test(NAME binary_search_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
              run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(binary_search_run PROPERTIES TIMEOUT 600

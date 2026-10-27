@@ -14,8 +14,10 @@ timing:
   reason: four kernel variants (bs1..bs4) each print their own average; no total
 baseline:
   method: 'the four search results (r of bs1..bs4) against the frozen B200 golden reference (`check:` / `golden:`
-    below); upstream''s own property check verify() (a[r] <= z < a[r+1]; upstream compiles it only with -DDEBUG, so
-    the default build used to check nothing) runs only once, offline, to validate that reference (tools/golden make)'
+    below), and in the same run upstream''s own property check verify() (a[r] <= z < a[r+1] for every query, a host
+    pass over the GPU output; upstream compiles it only with -DDEBUG, so the unmodified default build checked
+    nothing): it runs by default after each variant''s timed region, exits 1 on a failure, and is off only with
+    HPCPERF_SKIP_VERIFY=1 (tools/timing)'
   reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: fail_marker
@@ -24,10 +26,11 @@ baseline:
     compare:
       rule: absent
 golden:
-  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1: upstream's verify() then
-  # checks every result of the four variants on the host (no CPU recomputation) and the results are frozen only when
-  # it printed PASS. Each result is size_t[2 x elements] (134 MB per variant for n8388608, 2.1 GB for n134217728) and
-  # is compared exactly, so only its sha256 is recorded (mode hash).
+  # tools/golden/README.md. make runs the unmodified build once (with HPCPERF_CPU_REFERENCE=1, which this benchmark no
+  # longer needs: verify() runs by default): upstream's verify() checks every result of the four variants on the host
+  # (no CPU recomputation) and the results are frozen only when it printed PASS. Each result is size_t[2 x elements]
+  # (134 MB per variant for n8388608, 2.1 GB for n134217728) and is compared exactly, so only its sha256 is recorded
+  # (mode hash).
   mode: hash
   cpu_check: {pass_regex: '^PASS: verify:', fail_regex: 'incorrect result|^FAIL'}
   outputs:
@@ -47,8 +50,9 @@ check:
   pass_regex: '^PASS: golden check'
   fail_regex: '^FAIL: golden check'
   basis: 'the results of bs1..bs4 byte-identical (sha256) to the frozen B200 golden reference reference/<input_id>.json,
-    which upstream''s property check verify() validated once (the property determines every result uniquely); no
-    host-side check runs'
+    which upstream''s property check verify() validated once (the property determines every result uniquely); the
+    checked run also runs verify() itself (a host pass, ~0.1 s per variant at n8388608) and exits 1 when a result
+    violates the property, so the check FAILs (the benchmark run exited 1) independently of the reference'
   covers: all
 coverage:
   status: MULTI_INPUT
@@ -96,6 +100,8 @@ inputs:
   # rounded; at this size 6 of the 268435456 queries round to a[aSize-1] = 134217728, for which no r with
   # r+1 < aSize satisfies verify()'s a[r] <= z < a[r+1] -- verify() reports "incorrect result" for all four
   # variants (bs1/bs2 return N-1, bs3/bs4 return N), so `make` refuses this input (README "Input n134217728").
+  # Since verify() runs by default, a plain run, ctest-style golden run and the registry check of this input FAIL
+  # (exit 1); HPCPERF_SKIP_VERIFY=1 (timing) still runs it to completion.
   case: binary-search
   variant: size
   source:
