@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 
     std::vector<Record> records;
 	std::vector<LatLong> locations;
-	char filename[100];
+	char filename[NN_PATH_CHARS + 1];   // [HPC-Performance-AI fix] was [100]: see parseCommandline()
 	int resultsCount=10;
 
     // parse command line
@@ -279,7 +279,14 @@ int parseCommandline(int argc, char *argv[], char* filename,int *r,float *lat,fl
                      int *q, int *t, int *p, int *d){
     int i;
     if (argc < 2) return 1; // error
-    strncpy(filename,argv[1],100);
+    // [HPC-Performance-AI fix] was strncpy(filename,argv[1],100), which leaves filename without a NUL terminator
+    // for a path of >= 100 characters (e.g. an agent workspace's build directory); now a path that does not fit
+    // is an error (exit 1), never truncated or read past the buffer
+    if (strlen(argv[1]) > NN_PATH_CHARS) {
+      fprintf(stderr, "error: the filelist path is longer than %d characters\n", NN_PATH_CHARS);
+      exit(1);
+    }
+    strcpy(filename, argv[1]);   // fits: strlen(argv[1]) <= NN_PATH_CHARS, filename has NN_PATH_CHARS + 1 bytes
     char flag;
 
     for(i=1;i<argc;i++) {
