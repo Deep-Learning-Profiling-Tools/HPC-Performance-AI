@@ -53,10 +53,12 @@ coverage:
   status: MULTI_INPUT
   reason: >-
     the upstream Makefile run (-n 8192) and the program's own default resolution (-n 300). The x2 and x4
-    resolutions (16384, 32768) are NOT registered: the port's own check (relative L1 norm of the GPU
-    surface against the double-precision CPU reference, threshold 1e-6) reports FAIL there while the
-    default passes; the cause is not established (the float parametric evaluation is suspected, not
-    verified) -- the two attempts are kept as unregistered records in the rollout measurements
+    resolutions (16384, 32768) are NOT registered and cannot run on this port: run() sizes the device
+    buffer as `int out_size = n * n * sizeof(XYZ)`, which wraps for n >= 13378 (n = 16384: 3221225472 bytes
+    -> -1073741824), so cudaMalloc fails and the kernel writes through an unallocated pointer
+    (compute-sanitizer 2026-10-27: cudaErrorMemoryAllocation, then invalid __global__ writes) -- that, not
+    the float evaluation suspected earlier, is why the port's own check reported FAIL in the two
+    unregistered rollout attempts. main() now refuses -n outside 2..13377 with an error (exit 1)
 inputs:
 - id: n8192
   case: bezier-surface

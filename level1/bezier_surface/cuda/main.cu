@@ -35,6 +35,7 @@
 
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
+#include <limits.h>   // INT_MAX: the -n guard in main()
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
@@ -237,7 +238,10 @@ void BezierGPU(const XYZ *inp, XYZ *outp, const int NI, const int NJ, const int 
   FLOAT   mui, muj, bi, bj;
 
   i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i > RESOLUTIONI) return;
+  // [HPC-Performance-AI fix, class D] was `i > RESOLUTIONI`, which let thread i == RESOLUTIONI write row
+  // RESOLUTIONI, one row past outp (compute-sanitizer memcheck at -n 300: invalid __global__ write after the
+  // 1,080,000-byte allocation); upstream's own SYCL port has `i >= out_size_i`, its OpenMP port `i < out_size_i`
+  if (i >= RESOLUTIONI) return;
 
   mui = i / (FLOAT)(RESOLUTIONI - 1);
   for(j = 0; j < RESOLUTIONJ; j++) {
@@ -327,6 +331,17 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
+  // [HPC-Performance-AI guard] run() sizes the buffers with int arithmetic (int out_size = out_size_i * out_size_j *
+  // sizeof(XYZ), passed to the device allocation and copies; the point index i * RESOLUTIONJ + j is int as well) and
+  // evaluates mu = i / (RESOLUTION - 1): refuse an output resolution for which that wraps (n * n * sizeof(XYZ) >
+  // INT_MAX: n >= 13378 in float) or divides by zero (n < 2) instead of computing on a wrapped size. Every accepted
+  // n (the registered inputs: 300, 8192) runs unchanged.
+  const int hpcperf_n_max = (int)floor(sqrt((double)INT_MAX / sizeof(XYZ)));
+  if (p.out_size_i < 2 || p.out_size_i > hpcperf_n_max || p.out_size_j < 2 || p.out_size_j > hpcperf_n_max) {
+    fprintf(stderr, "error: unsupported output resolution -n %d: this port needs 2 <= n <= %d (n * n * %d bytes must "
+                    "fit its int buffer size)\n", p.out_size_i, hpcperf_n_max, (int)sizeof(XYZ));
+    return 1;
+  }
   int in_size   = (p.in_size_i + 1) * (p.in_size_j + 1) * sizeof(XYZ);
   //int out_size  = p.out_size_i * p.out_size_j * sizeof(XYZ);
 
