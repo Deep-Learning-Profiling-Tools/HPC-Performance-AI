@@ -51,8 +51,8 @@ check:
   pass_regex: '^PASS: golden check'
   fail_regex: '^FAIL: golden check'
   basis: 'y against the frozen B200 golden reference reference/<input_id>.json (sum (a - g)^2 / sum g^2 <=
-    (sqrt 1e-5 - sqrt d0)^2, d0 = the golden''s deviation from the upstream CPU gold standard measured when it was
-    frozen); no CPU reference is run'
+    ((sqrt 1e-5 - sqrt d0) / (1 + sqrt d0))^2, d0 = the golden''s deviation from the upstream CPU gold standard
+    measured when it was frozen); no CPU reference is run'
   covers: all
 coverage:
   status: MULTI_INPUT
