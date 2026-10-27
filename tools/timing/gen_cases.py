@@ -18,7 +18,8 @@ Since 2026-10-26 most ctests run tools/golden/hpcperf_golden.py run <bench_dir> 
 the table records the binary with the registry input's arguments -- what the runner execs (wrapper
 "golden"); the registry is read through tools/inputs/hpcperf_inputs.py, nothing is executed.
 
-Every ctest test becomes one case. A benchmark with a single test gets the case
+Every ctest test becomes one case, except a golden ctest of a correctness-probe input (inputs.yaml
+`purpose: correctness-probe`), which is never timed. A benchmark with a single (timed) test gets the case
 name "default"; one with several gets one case per test, named after the test (a
 benchmark that gains a second input is measured, not silently dropped). Extra inputs
 that ctest does not know about go in cases/level1_extra.tsv (hand-written).
@@ -127,6 +128,21 @@ def inner_argv_of_golden(golden_argv, test_dir=None):
     return [exe] + args
 
 
+def is_probe_test(test):
+    """True for a golden ctest of a correctness-probe input (inputs.yaml `purpose: correctness-probe`): such a
+    test checks correctness only and is never timed, so it gets no case (and does not count when deciding
+    whether a benchmark has a single test, i.e. whether its case is named "default")."""
+    command = list(test.get("command", []))
+    if len(command) < 4 or os.path.basename(command[1]) != "hpcperf_golden.py" or command[2] != "run":
+        return False
+    sys.path.insert(0, os.path.join(REPO, "tools", "inputs"))
+    import hpcperf_inputs as hi
+    a = command[1:]
+    input_id = a[3] if len(a) > 3 and not a[3].startswith("--") else None
+    doc = hi.load(hi.Path(a[2]))
+    return hi.is_probe(hi.get_input(doc, input_id or doc["default_input"]))
+
+
 def resolve_ctest(build_root):
     """Find a working ctest, preferring the one that generated this build tree.
 
@@ -226,7 +242,7 @@ def build_rows(build_root):
         raise RuntimeError(f"no benchmark build directories under {build_root}")
     for bm, test_dir in dirs.items():
         payload = ctest_show(ctest, test_dir)
-        tests = payload.get("tests", [])
+        tests = [t for t in payload.get("tests", []) if not is_probe_test(t)]   # correctness probes: never timed
         for test in tests:
             rows.append(_row(bm, test, test_dir, build_root, single=len(tests) == 1))
     return rows
