@@ -426,21 +426,20 @@ void RunTest(
     // Run single test to verify (and code cache)
     (*f)(d_pixels, width, height, d_hist, !g_report);
 
-    {  // tools/golden: the checked output of this variant -- the histogram of the verification launch
-        // above (the one CompareDeviceResults copies back), copied to the host outside the ROI
-        std::vector<unsigned int> hpcperf_hist(ACTIVE_CHANNELS * NUM_BINS);
-        cudaMemcpy(hpcperf_hist.data(), d_hist, sizeof(unsigned int) * ACTIVE_CHANNELS * NUM_BINS, cudaMemcpyDeviceToHost);
-        char hpcperf_name[64];
-        snprintf(hpcperf_name, sizeof(hpcperf_name), "hist.%s.%.4s", hpcperf_genre(d_pixels), short_name);
-        hpcperf_golden_output(hpcperf_name, hpcperf_hist.data(), hpcperf_hist.size(), "u32");
-    }
-
     int compare = hpcperf_skip_verify() ? 0
                   : CompareDeviceResults(h_hist, d_hist, ACTIVE_CHANNELS * NUM_BINS, true, g_verbose);
     // default: nothing was compared (the CPU reference is skipped) -> SKIP_VERIFY, never PASS
     if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
     else if (!g_report) printf("\t%s\n", compare ? "FAIL" : "PASS");
     fflush(stdout);
+
+    // tools/golden: poison d_hist (all-ones bytes in every bin; d_hist is shared by both variants of a genre)
+    // after the verification launch and its CPU check, before the timed iterations, outside the ROI and the
+    // per-launch GPU timer. Every launch rewrites all ACTIVE_CHANNELS * NUM_BINS bins of d_hist (the accumulation
+    // kernel stores each total; nothing accumulates across launches), so correct timed iterations overwrite the
+    // poison; timed iterations that do not run leave it in the capture below instead of the identical histogram.
+    cudaMemset(d_hist, 0xFF, sizeof(unsigned int) * ACTIVE_CHANNELS * NUM_BINS);
+    cudaDeviceSynchronize();
 
     double elapsed_ms = 0;
     HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: the timed iterations, not the verify/warm-up run before them
@@ -449,6 +448,16 @@ void RunTest(
         elapsed_ms += (*f)(d_pixels, width, height, d_hist, false);
     }
     HPCPERF_ROI_END_SYNC();
+
+    {  // tools/golden: the checked output of this variant -- the histogram of the last timed iteration (bit-identical
+        // to the verification launch's histogram that CompareDeviceResults compares), copied to the host after the ROI
+        std::vector<unsigned int> hpcperf_hist(ACTIVE_CHANNELS * NUM_BINS);
+        cudaMemcpy(hpcperf_hist.data(), d_hist, sizeof(unsigned int) * ACTIVE_CHANNELS * NUM_BINS, cudaMemcpyDeviceToHost);
+        char hpcperf_name[64];
+        snprintf(hpcperf_name, sizeof(hpcperf_name), "hist.%s.%.4s", hpcperf_genre(d_pixels), short_name);
+        hpcperf_golden_output(hpcperf_name, hpcperf_hist.data(), hpcperf_hist.size(), "u32");
+    }
+
     double avg_us = (elapsed_ms / timing_iterations) * 1000;    // average in us
     timings.push_back(std::pair<std::string, double>(short_name, avg_us));
 
