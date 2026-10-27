@@ -188,17 +188,6 @@ void Test()
         d_in,
         d_out);
 
-    // tools/golden: the checked output of this variant = d_out after the first (warm-up) launch, i.e.
-    // the TILE_SIZE exclusive prefix sums followed by the aggregate (before the timed region; a D2H copy only)
-    if (i == 0) {
-      GPU_CHECK(hipMemcpy(h_gpu, d_out, sizeof(int) * (TILE_SIZE + 1), hipMemcpyDeviceToHost));
-      char hpcperf_name[96];
-      snprintf(hpcperf_name, sizeof(hpcperf_name), "scan.%s.t%d.i%d",
-               (ALGORITHM == BLOCK_SCAN_RAKING) ? "raking" : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? "raking_memoize" : "warp_scans",
-               BLOCK_THREADS, ITEMS_PER_THREAD);
-      hpcperf_golden_output(hpcperf_name, h_gpu, TILE_SIZE + 1, "i32");
-    }
-
     // Check results for the first warmup run (HPCPERF_CPU_REFERENCE=1 only, golden make)
     if (i == 0 && !hpcperf_cpu_reference_enabled()) {
       printf("SKIP_VERIFY\n");
@@ -215,6 +204,15 @@ void Test()
   }
   GPU_CHECK(hipDeviceSynchronize());
 
+  // tools/golden: poison d_out on the device and in the host copy (all-ones bytes, -1 in every int) after the
+  // warm-up launches (whose first one the CPU check above compares) and before the timed region, outside the ROI
+  // and the chrono timer. Every launch rewrites all TILE_SIZE + 1 ints of d_out, so correct timed launches
+  // overwrite the poison; timed launches that do not run leave -1 in the capture below instead of the identical
+  // result of the warm-up launches.
+  GPU_CHECK(hipMemset(d_out, 0xFF, sizeof(int) * (TILE_SIZE + 1)));
+  memset(h_gpu, 0xFF, sizeof(int) * (TILE_SIZE + 1));
+  GPU_CHECK(hipDeviceSynchronize());
+
   // Run this several times and average the performance results
   auto start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
@@ -229,6 +227,18 @@ void Test()
   HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  // tools/golden: the checked output of this variant = d_out after the timed launches (the last one), i.e. the
+  // TILE_SIZE exclusive prefix sums followed by the aggregate -- bit-identical to the first warm-up launch's
+  // output that the CPU check compares; a D2H copy after the ROI and the timer
+  GPU_CHECK(hipMemcpy(h_gpu, d_out, sizeof(int) * (TILE_SIZE + 1), hipMemcpyDeviceToHost));
+  {
+    char hpcperf_name[96];
+    snprintf(hpcperf_name, sizeof(hpcperf_name), "scan.%s.t%d.i%d",
+             (ALGORITHM == BLOCK_SCAN_RAKING) ? "raking" : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? "raking_memoize" : "warp_scans",
+             BLOCK_THREADS, ITEMS_PER_THREAD);
+    hpcperf_golden_output(hpcperf_name, h_gpu, TILE_SIZE + 1, "i32");
+  }
 
   // Display timing results
   float avg_millis        = elapsed * 1e-6 / repeat;
