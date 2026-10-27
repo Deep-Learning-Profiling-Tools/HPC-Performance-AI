@@ -19,7 +19,9 @@ budget").
 | `hpcperf_golden.h` | header-only C/C++: `hpcperf_cpu_reference_enabled()` (the gate, **off by default**), `hpcperf_golden_output()` / `_begin` / `_append` / `_end` (output capture) |
 | `hpcperf_golden_capture.py` | the Python twin of the capture (for `verify.py` CPU arrays) |
 | `hpcperf_golden.py` | `make` (one-time, CPU-validated freeze), `check` (compare a capture), `run` (ctest entry), `status`, `validate` |
-| `tests/run_all.sh` | CPU-only tests (fake repository and benchmarks; no GPU) |
+| `golden_artifacts.py` | distribution of the store: `pack` (deterministic bundles of the blobs the committed references name), `fetch` (verified install into the store), `verify`, `lock-check`, `plan` -- see [DISTRIBUTION.md](DISTRIBUTION.md) |
+| `golden_artifacts.lock.yaml` | the committed lock of the bundles (sha256, size, members; `status: unpublished` until the maintainer publishes) |
+| `tests/run_all.sh` | CPU-only tests (fake repository and benchmarks; no GPU); also runs `tests/test_golden_artifacts.sh` |
 
 ## Switches
 
@@ -110,7 +112,8 @@ reference bit for bit. A tolerance output without a CPU-reference capture (`cpu:
 python3 tools/golden/hpcperf_golden.py make level1/adam n10000-t200     # or --all
 ```
 
-It refuses (exit 2) when: the benchmark directory, `tools/golden` or `tools/timing/roi` have
+It refuses (exit 2) when: the benchmark directory, the tool files that capture / compare
+(`hpcperf_golden.py`, `hpcperf_golden.h`, `hpcperf_golden_capture.py`) or `tools/timing/roi` have
 uncommitted changes (a golden comes only from committed, unmodified sources -- never from an
 optimization candidate or an agent workspace); the binary is older than its sources; a reference
 already exists (replacing one needs `--replace --reason "..."`, and the new file records what it
@@ -125,6 +128,12 @@ reference's pass line, exit 0 and no fail line, measures d0 per output and write
   the tool's own sha256);
 * for tolerance-compared outputs, the raw bytes in the content-addressed store
   `$HPCPERF_GOLDEN_STORE/sha256/<aa>/<sha256>.bin` (**never in git**; large).
+
+After committing new or replaced references: `python3 tools/golden/golden_artifacts.py pack --staging
+$HPCPERF_ARTIFACT_STAGING/golden` and commit the regenerated `golden_artifacts.lock.yaml` (`lock-check` must say
+CURRENT); bundles of unchanged benchmarks keep their names and bytes. A fresh clone has no store: `python3
+tools/golden/golden_artifacts.py fetch [level1/<b> ...]` installs the verified blobs (DISTRIBUTION.md); until then a
+tolerance-rule check FAILs with "golden blob ... missing" (never a fallback).
 
 ## The correctness gate (optimization candidates)
 

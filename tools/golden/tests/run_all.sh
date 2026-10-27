@@ -344,6 +344,13 @@ HPCPERF_GOLDEN_DUMP="$TMP/s2" HPCPERF_GOLDEN_PORTABLE_SHA=1 "$TMP/gct" 4099 < "$
 [ "$(cut -c1-400 "$TMP/s1/manifest.jsonl")" = "$(cut -c1-400 "$TMP/s2/manifest.jsonl")" ] && /usr/bin/grep -q "$(sha256sum "$TMP/r.bin" | cut -c1-64)" "$TMP/s1/manifest.jsonl" \
     && ok "9d: the libcrypto and the portable SHA-256 give the same digests (= sha256sum)" || bad "9d: digests differ"
 
+# the distribution tool (golden_artifacts.py) has its own CPU-only suite on fixture repositories
+if bash "$(dirname "${BASH_SOURCE[0]}")/test_golden_artifacts.sh" > "$TMP/artifacts.log" 2>&1; then
+    ok "10a: golden_artifacts.py suite ($(grep -o '[0-9]* passed' "$TMP/artifacts.log" | tail -1))"
+else
+    bad "10a: golden_artifacts.py suite: $(grep -E '^FAIL|failed' "$TMP/artifacts.log" | head -3)"
+fi
+
 echo
 echo "golden tests: $pass passed, $fail failed"
 [ "$fail" = 0 ]

@@ -469,6 +469,8 @@ def render(tokens, ctx):
     return out
 
 
+# the tool files whose uncommitted change makes `make` refuse (they capture, compare or time the outputs)
+GOLDEN_TOOL_FILES = ("tools/golden/hpcperf_golden.py", "tools/golden/hpcperf_golden.h", "tools/golden/hpcperf_golden_capture.py")
 HARNESS = re.compile(r"(^|/)(reference/|tests?/|inputs\.yaml$|[^/]*\.md$|run\.sh$|validate\.sh$|build\.sh$|check_[^/]*$|"
                      r"generate_reference[^/]*$|LICENSE|COPYRIGHT|NOTICE|CHANGELOG|RELEASE$)")
 
@@ -512,7 +514,9 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
     if Path(bench_dir).resolve() != canonical:
         print(f"REFUSED: {tag}: {bench_dir} is not the canonical benchmark directory {os.path.relpath(canonical, root)} "
               f"(a copy -- e.g. an optimization candidate -- never makes a golden reference)"); return 2
-    dirty = git(root, "status", "--porcelain", "--", rel_bench, "tools/golden", "tools/timing/roi").strip()
+    # the benchmark directory (sources, registry) and the tool files that capture / compare / time the outputs; other
+    # files of tools/golden (e.g. the distribution tool, an audit tool, a regenerated lock) do not affect a reference
+    dirty = git(root, "status", "--porcelain", "--", rel_bench, *GOLDEN_TOOL_FILES, "tools/timing/roi").strip()
     dirty = "\n".join(l for l in dirty.splitlines() if not l[3:].startswith(f"{rel_bench}/reference/"))
     if dirty and not args.allow_dirty_for_tests:
         print(f"REFUSED: {tag}: uncommitted changes under {rel_bench} / tools/golden / tools/timing/roi -- a golden "
@@ -769,7 +773,8 @@ def check(doc, inp, root: Path, bench_dir: Path, dump: Path, log=None, result=No
             bad.append(f"{name}: no data"); print(f"   FAIL {name}: captured as hash only; a tolerance rule needs the bytes"); continue
         bp = store / e["blob"]
         if not bp.is_file():
-            bad.append(f"{name}: blob missing"); print(f"   FAIL {name}: golden blob {bp} missing (the golden store is not available)"); continue
+            bad.append(f"{name}: blob missing"); print(f"   FAIL {name}: golden blob {bp} missing (the golden store is not available; "
+                                                       f"fetch it: python3 tools/golden/golden_artifacts.py fetch level{doc['level']}/{doc['benchmark']})"); continue
         if rule["metric"] == "trunc_int":
             try:
                 v, f = trunc_int_value(rec["path"], bp, e["dtype"], e["count"], rec["sha256"], e["sha256"])
@@ -880,7 +885,7 @@ def store_get(root: Path, sha: str) -> Path:
         raise GoldenError(f"not a sha256: {sha!r}")
     bp = blob_path(store_root(root), sha)
     if not bp.is_file():
-        raise GoldenError(f"golden blob {sha} missing in the store {store_root(root)}")
+        raise GoldenError(f"golden blob {sha} missing in the store {store_root(root)} (python3 tools/golden/golden_artifacts.py fetch)")
     if file_sha256(bp) != sha:
         raise GoldenError(f"golden blob {bp} does not match its sha256 (corrupted store)")
     return bp
