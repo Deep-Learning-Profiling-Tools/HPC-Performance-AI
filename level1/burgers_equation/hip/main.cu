@@ -8,13 +8,36 @@
 #include <hip/hip_runtime.h>
 #include "kernels.h"
 
+// HPC-Performance-AI correctness probe (`--probe` as a 4th argument; set-up only, the kernels are unchanged).
+// Upstream's initial condition gives u and v the same hat (2 on 0.5 < x, y < 1, 1 elsewhere); the two
+// equations are identical when u == v, so du == dv bit for bit and computing u and copying it to v (or any
+// u/v mix-up in the cross terms) reproduces the output. The probe moves v's hat by +0.25 in x
+// (2 on 0.75 < x < 1.25, 0.5 < y < 1) after upstream's initialisation, so u != v and each equation's
+// cross-advection term carries the other field. Never a performance input.
+static void probe_initial_v(double *v, double *v_new, const double *x, const double *y,
+                            const int x_points, const int y_points)
+{
+  for(int i = 0; i < y_points; i++){
+    for(int j = 0; j < x_points; j++){
+      v[idx(i,j)] = 1.0;
+      v_new[idx(i,j)] = 1.0;
+      if(x[j] > 0.75 && x[j] < 1.25 && y[i] > 0.5 && y[i] < 1.0){
+        v[idx(i,j)] = 2.0;
+        v_new[idx(i,j)] = 2.0;
+      }
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
-  if (argc != 4) {
-    printf("Usage: %s <dim_x> <dim_y> <nt>\n", argv[0]);
+  const bool probe = (argc == 5 && strcmp(argv[4], "--probe") == 0);   // correctness probe (see probe_initial_v)
+  if (argc != 4 && !probe) {
+    printf("Usage: %s <dim_x> <dim_y> <nt> [--probe]\n", argv[0]);
     printf("dim_x: number of grid points in the x axis\n");
     printf("dim_y: number of grid points in the y axis\n");
     printf("nt: number of time steps\n");
+    printf("--probe: correctness-probe initial condition (v's hat moved; never a performance input)\n");
     exit(-1);
   }
 
@@ -68,6 +91,8 @@ int main(int argc, char* argv[])
       }
     }
   }
+
+  if (probe) probe_initial_v(v, v_new, x, y, x_points, y_points);
 
   double *d_u_new;
   hipMalloc((void**)&d_u_new, grid_size);
@@ -147,6 +172,8 @@ int main(int argc, char* argv[])
       }
     }
   }
+
+  if (probe) probe_initial_v(v, v_new, x, y, x_points, y_points);
 
   for(int itr = 0; itr < num_itrs; itr++){
 

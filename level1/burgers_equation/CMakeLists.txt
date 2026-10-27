@@ -51,4 +51,12 @@ if(BUILD_TESTING)
     set_tests_properties(burgers_equation_run PROPERTIES TIMEOUT 600
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same kernels on a non-symmetric initial condition
+    # (u != v) on which computing u and copying it to v cannot pass (`--probe`, cuda/main.cu probe_initial_v); checked
+    # against its own frozen reference, never timed
+    add_test(NAME burgers_equation_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-x820-y810-t100 --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-x820-y810-t100)
+    set_tests_properties(burgers_equation_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

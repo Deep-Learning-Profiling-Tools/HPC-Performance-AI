@@ -117,3 +117,35 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-x820-y810-t100
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's initial condition gives u and v the same hat and the two equations are identical when u == v, so du ==
+    dv bit for bit on every performance input: computing u and copying it to v (half the work) or swapping u and v in
+    the cross-advection terms passes them (measured 2026-10-27). Here v's hat is moved by +0.25 in x (set-up only), so
+    max |du - dv| = 1 and the cross terms couple two different fields; on a 1/10-per-axis grid of the upstream run
+    (820 x 810, 100 steps) the fields move by up to 0.20 (u) and 0.22 (v) from the initial condition (tolerance 1e-6)
+  case: burgers-2d
+  variant: parameter
+  source:
+    kind: custom
+    derivation: >-
+      upstream's run line scaled to 1/10 per axis (820 810 100); set-up data only (`--probe`, cuda/main.cu
+      probe_initial_v): after upstream's initialisation v (and v_new) is reset to 1 with the hat 2 on 0.75 < x < 1.25,
+      0.5 < y < 1 (u unchanged); the four kernels and the serial CPU solver are unchanged. Upstream has no
+      non-symmetric initial condition, hence custom
+  params:
+    dim_x: 820
+    dim_y: 810
+    steps: 100
+    probe_data: v hat moved to 0.75 < x < 1.25, 0.5 < y < 1
+  args:
+  - '820'
+  - '810'
+  - '100'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
