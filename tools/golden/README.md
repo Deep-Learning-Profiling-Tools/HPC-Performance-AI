@@ -199,8 +199,11 @@ without the CPU reference, capturing, then checks.
 ## What is not (or not yet) a golden comparison
 
 * NPB `cg ep ft is mg`: official class reference values (unchanged).
-* `lud` (L*U residual), `gaussian_elimination` (residual of the printed solution), `graph_coloring`
-  (validity; its valid colorings are not unique and differ run to run): property checks, unchanged.
+* `lud`: reference-free, the captured factors' residual max |A - L*U| <= 1e-4 (upstream's criterion, evaluated in
+  float64 after the run by `level1/lud/lud_residual_check.py`, ~2 s at -s 8192; upstream's single-thread O(n^3)
+  host recomposition runs only with `HPCPERF_CPU_REFERENCE=1`). `gaussian_elimination` (residual of the printed
+  solution), `graph_coloring` (validity; its valid colorings are not unique and differ run to run): property
+  checks, unchanged.
 * `ao_bench`: already a frozen B200 image hash (`reference/iter100.sha256`), unchanged.
 * `binary_search` input `n134217728`: not frozen -- with `Real_t = float`, 6 of its 268435456 queries round to
   `a[aSize-1]`, which has no `r` with `r+1 < aSize`, so upstream's `verify()` rejects every variant and no validated

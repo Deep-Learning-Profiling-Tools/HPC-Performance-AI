@@ -1555,5 +1555,9 @@ sed -e "s/probe_basis: 'random data: a constant fill cannot pass', //" -e 's/^co
 out="$(python3 "$TOOL" validate "$TMP/probe2" 2>&1 | noise)"; rc=$?
 [ $rc -eq 1 ] && grep -q 'needs probe_basis' <<<"$out" && grep -q 'MULTI_INPUT needs at least two runnable' <<<"$out" && ok "probe: probe_basis required; a probe does not make a registry MULTI_INPUT" || bad "probe basis/coverage: $out"
 
+# ---- Level 1 checker: lud's post-run residual check (CPU-only unit tests of lud_residual_check.py) ----------
+out="$(python3 "$R/level1/lud/test_lud_residual_check.py" 2>&1)"; rc=$?
+[ $rc -eq 0 ] && grep -q 'ALL PASSED' <<<"$out" && ok "lud residual checker: $(grep -c '^ok' <<<"$out") unit checks (PASS/FAIL/refusal, NaN, manifest)" || bad "lud residual checker: $(grep -v '^ok' <<<"$out" | head -3)"
+
 echo; echo "inputs tests: $pass passed, $failn failed, $skip skipped"
 [ $failn -eq 0 ]

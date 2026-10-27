@@ -9,7 +9,7 @@
 adam	default	{BUILD}/level1/adam/adam_cuda	10000 200 100	{BUILD}/level1/adam	600	golden	PASS: golden check
 aes	default	{BUILD}/level1/aes/aes_cuda	-i {BUILD}/level1/aes/data/input_1MB.hex -k {BUILD}/level1/aes/data/key.hex	{BUILD}/level1/aes	600	golden	PASS: golden check
 all_pairs_distance	default	{BUILD}/level1/all_pairs_distance/all_pairs_distance_cuda	10000	{BUILD}/level1/all_pairs_distance	600	golden	PASS: golden check
-ao_bench	default	{BUILD}/level1/ao_bench/ao_bench_cuda	100	{BUILD}/level1/ao_bench	900	verify.py	PASS
+ao_bench	default	{BUILD}/level1/ao_bench/ao_bench_cuda	100	{BUILD}/level1/ao_bench	900	verify.py	PASS: aobench image check
 atomic_reduction	default	{BUILD}/level1/atomic_reduction/atomic_reduction_cuda	-	{BUILD}/level1/atomic_reduction	600	golden	PASS: golden check
 background_subtraction	default	{BUILD}/level1/background_subtraction/background_subtraction_cuda	4096 2048 0 102	{BUILD}/level1/background_subtraction	600	golden	PASS: golden check
 backprop	default	{BUILD}/level1/backprop/backprop_cuda	65536	{BUILD}/level1/backprop	600	golden	PASS: golden check
@@ -41,7 +41,7 @@ hotspot_3d	default	{BUILD}/level1/hotspot_3d/hotspot_3d_cuda	64 8 100 {REPO}/lev
 is	default	{BUILD}/level1/is/is_cuda	-	{BUILD}/level1/is	1200	direct	Verification    =               SUCCESSFUL
 jacobi_2d	default	{BUILD}/level1/jacobi_2d/jacobi_2d_cuda	-	{BUILD}/level1/jacobi_2d	900	golden	PASS: golden check
 ltimes	default	{BUILD}/level1/ltimes/ltimes_cuda	-	{BUILD}/level1/ltimes	900	golden	PASS: golden check
-lud	default	{BUILD}/level1/lud/lud_cuda	-s 256 -v	{BUILD}/level1/lud	600	direct	-
+lud	default	{BUILD}/level1/lud/lud_cuda	-s 256 -v	{BUILD}/level1/lud	600	verify.py	PASS: lud residual
 mat_mat_shared	default	{BUILD}/level1/mat_mat_shared/mat_mat_shared_cuda	-	{BUILD}/level1/mat_mat_shared	900	golden	PASS: golden check
 matvec_3d_stencil	default	{BUILD}/level1/matvec_3d_stencil/matvec_3d_stencil_cuda	-	{BUILD}/level1/matvec_3d_stencil	900	golden	PASS: golden check
 mg	default	{BUILD}/level1/mg/mg_cuda	-	{BUILD}/level1/mg	1200	direct	Verification    =               SUCCESSFUL
