@@ -45,7 +45,7 @@ cmake --build build/all_pairs_distance/hip
 
 ## Validation
 
-Golden reference (tools/golden): a plain run captures the three distance matrices (`distance.k1/k2/k3`, int, compared exactly), and `tools/golden/hpcperf_golden.py check` compares the capture with the frozen B200 reference `reference/<input_id>.json` (inputs.yaml `golden:` / `check:`). ctest runs the registry's default input this way (`hpcperf_golden.py run`). The upstream CPU reference (`CPU()` plus one `memcmp` per kernel) stays in the source and runs only with `HPCPERF_CPU_REFERENCE=1`, which `hpcperf_golden.py make` uses once to validate a new reference.
+Golden reference (tools/golden): a plain run captures the three distance matrices (`distance.k1/k2/k3`, int, compared exactly), each after its kernel's timed region; the matrix the three kernels share (`distance_device` and the captured host copy) is poisoned (all-ones bytes, -1) before each timed region, outside it and the timer, so a kernel that does not run fails the check instead of passing on the previous kernel's identical matrix; and `tools/golden/hpcperf_golden.py check` compares the capture with the frozen B200 reference `reference/<input_id>.json` (inputs.yaml `golden:` / `check:`). ctest runs the registry's default input this way (`hpcperf_golden.py run`). The upstream CPU reference (`CPU()` plus one `memcmp` per kernel) stays in the source and runs only with `HPCPERF_CPU_REFERENCE=1`, which `hpcperf_golden.py make` uses once to validate a new reference.
 
 Run it via:
 

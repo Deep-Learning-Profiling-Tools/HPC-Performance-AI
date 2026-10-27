@@ -177,6 +177,16 @@ __global__ void k3 (const char *data, int *distance) {
   }
 }
 
+// tools/golden: poison the output that k1, k2 and k3 share -- distance_device and the host copy gpu_distance that
+// is captured (all-ones bytes, -1 in every int) -- before each kernel's timed region, outside the ROI and the chrono
+// timer. Every timed iteration clears distance_device and recomputes it, so a correct timed region overwrites the
+// poison; a kernel that does not run leaves -1 in its capture instead of the previous kernel's identical matrix.
+static void hpcperf_poison_distance(int *d, int *h, size_t bytes) {
+  cudaMemset(d, 0xFF, bytes);
+  memset(h, 0xFF, bytes);
+  cudaDeviceSynchronize();
+}
+
 int main(int argc, char **argv) {
 
   if (argc != 2) {
@@ -250,6 +260,7 @@ int main(int argc, char **argv) {
     printf("CPU time: %f (us)\n", elapsedTime);
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
@@ -274,6 +285,7 @@ int main(int argc, char **argv) {
     printf("%s\n", status ? "FAIL" : "PASS");
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
@@ -298,6 +310,7 @@ int main(int argc, char **argv) {
     printf("%s\n", status ? "FAIL" : "PASS");
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
