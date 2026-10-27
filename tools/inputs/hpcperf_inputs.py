@@ -1345,7 +1345,10 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
         except OSError as ex:
             return finish("ERROR", f"the benchmark could not be started: {ex}")
         rec["run"] = {"command": cmd, "env_overrides": r["run_env"], "exit_code": rc, "e2e_s": round(wall, 4),
-                      "log": str(log), "log_sha256": sha256_file(log), "skip_verify": False}
+                      "log": str(log), "log_sha256": sha256_file(log), "skip_verify": False,
+                      # the identity of what ran (a binary entry: the benchmark binary; run.sh: the script), so a
+                      # timing record can be bound to the check of the same binary
+                      "entry_sha256": sha256_file(_entry) if _entry is not None else None}
         rec["outputs"] = collect_outputs(r["outputs"], outputs, since=t0 - 0.05)
         if rc != 0:
             return finish("FAIL", f"the benchmark run exited {rc}; its output is not checked")
