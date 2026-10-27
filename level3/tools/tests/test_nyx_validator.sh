@@ -334,8 +334,8 @@ fi
 
 # --- Part D (optional, no GPU): the REAL AMReX comparison tools and the REAL frozen reference minisb.smoke -------------
 # The candidate is the frozen reference's own data (extracted from the golden store) placed in synthetic run directories:
-# unperturbed -> PASS (r = 0); one Temp cell raised to a relative 9.98e-9 of max|Temp| (inside the original 1e-8, outside
-# the d0-reduced budget 9.955e-9) -> FAIL; 9.9e-9 -> PASS. Runs only where the CPU profile's tools, the reference JSON
+# unperturbed -> PASS (r = 0) at the reference's own budget; one Temp cell raised halfway between that budget and the
+# original 1e-8 (inside 1e-8, outside the d0-reduced budget) -> FAIL; 0.99 x the budget -> PASS. Runs only where the CPU profile's tools, the reference JSON
 # and its archive exist (a materialized + built worktree); otherwise skipped and said so.
 RTOOLS="$R/.deps/level3/nyx/cpu-gcc133-adiabatic/install/bin"; RREF="$R/level3/nyx/reference/minisb.smoke.json"
 if [ -f "$VAL" ] && [ -x "$RTOOLS/amrex_fcompare" ] && [ -f "$RREF" ] && git -C "$R" ls-files --error-unmatch "$RREF" > /dev/null 2>&1 && \
@@ -381,7 +381,7 @@ PY
     real() { rm -rf "$DR"; mk_real "$DR/minisb.smoke.np1" "$1"; mk_real "$DR/minisb.smoke.np1.rerun" "$1"
              HPCPERF_GPUS=1 bash "$VAL" CUDA > "$TMP/real.out" 2>&1; echo $?; }
     rc=$(real 0)
-    [ "$rc" -eq 0 ] && /usr/bin/grep -q 'minisb.np1.vs-frozen-B200: plotfile comparison rel_tol 9.955.*AGREE' "$TMP/real.out" && ok "D1: real fcompare/particles vs the real frozen minisb reference (its own data) -> PASS" || bad "D1: rc=$rc: $(tail -3 "$TMP/real.out")"
+    [ "$rc" -eq 0 ] && /usr/bin/grep -q "minisb.np1.vs-frozen-B200: plotfile comparison rel_tol $(python3 -c "import json,sys; print(repr(json.load(open(sys.argv[1]))['comparison']['mesh']['rel_tol_effective']))" "$RREF"): AGREE" "$TMP/real.out" && ok "D1: real fcompare/particles vs the real frozen minisb reference (its own data) -> PASS" || bad "D1: rc=$rc: $(tail -3 "$TMP/real.out")"
     # D2/D3 call the comparator directly (each AMReX tool start-up costs ~7 s of MPI initialisation here) on the extracted
     # frozen reference, at the rel_tol validate.sh derived for it
     FDR="$TMP/realreports/frozen-reference.minisb.smoke"; TM="$(sed -n 's/.*plotfile comparison rel_tol \([0-9.e+-]*\): AGREE.*/\1/p' "$TMP/real.out" | tail -1)"
