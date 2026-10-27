@@ -1,0 +1,308 @@
+{
+ "schema": "hpcperf-nyx-frozen-reference-1",
+ "benchmark": "nyx",
+ "level": 3,
+ "case": "minisb",
+ "mode": "smoke",
+ "steps": 10,
+ "variant": "adiabatic",
+ "workload": {
+  "case": "minisb",
+  "mode": "smoke",
+  "steps": "10",
+  "grid": "32x32x32",
+  "max_grid_size": "16",
+  "boxes": "8",
+  "deck_sha256": "688bf41c57cec49b35d2256a1ed920a8f9c5fdc7479104f85602630dd39b0f45",
+  "ic_sha256": "ic_sb_32.ascii=da28ee945276ba3e247719a946847343b8066a587c9c4620dde5338ec963bbfd",
+  "deck": "Exec/MiniSB/inputs.32",
+  "ranks": 1
+ },
+ "archive": {
+  "sha256": "a045f9610890965d36be817868a6c45823d9fa1cb406c5655f3ce6c92ee4d794",
+  "size": 10506240,
+  "format": "tar (GNU, deterministic: sorted, mtime 0, uid/gid 0, mode 0644)",
+  "store": "$HPCPERF_GOLDEN_STORE/sha256/a0/a045f9610890965d36be817868a6c45823d9fa1cb406c5655f3ce6c92ee4d794.bin (default <repo>/.golden-store; never in git)",
+  "members": [
+   {
+    "path": "chk00000/DM/Header",
+    "size": 182,
+    "sha256": "9bfd28613b7289a655a503774217c0ad2a53fd908fa26bc6e79bc998a87e2aed"
+   },
+   {
+    "path": "chk00000/DM/Level_0/DATA_00000",
+    "size": 2091904,
+    "sha256": "6dab8715e7d540885029768b9f40331cf439eeac4ac763b6753a99b3c87ca583"
+   },
+   {
+    "path": "chk00000/DM/Level_0/Particle_H",
+    "size": 251,
+    "sha256": "dace0f238563f3c01614a787b151db9834067ca762e0c2cd9b06db1ec477a9ea"
+   },
+   {
+    "path": "chk00010/DM/Header",
+    "size": 182,
+    "sha256": "7be9732a17941fa37ce50c65033a79584931550aa4503a4909a462cd5614a99b"
+   },
+   {
+    "path": "chk00010/DM/Level_0/DATA_00000",
+    "size": 2091904,
+    "sha256": "edbfdb218fb0bdd97bb96ed8de208397dd7bf9efdb840cd829f7e8bf2f3f7b12"
+   },
+   {
+    "path": "chk00010/DM/Level_0/Particle_H",
+    "size": 251,
+    "sha256": "dace0f238563f3c01614a787b151db9834067ca762e0c2cd9b06db1ec477a9ea"
+   },
+   {
+    "path": "plt00010/DM/Header",
+    "size": 183,
+    "sha256": "f6149707e0e42dbeb5069d69f260a9b16af07127e70e75b1e3ab893d5a33a7aa"
+   },
+   {
+    "path": "plt00010/DM/Level_0/DATA_00000",
+    "size": 2091904,
+    "sha256": "02b674ce272171bed269e085c782bf99a5d47fbdbd890b6aa2f0fe8e0bb2ed91"
+   },
+   {
+    "path": "plt00010/DM/Level_0/Particle_H",
+    "size": 251,
+    "sha256": "dace0f238563f3c01614a787b151db9834067ca762e0c2cd9b06db1ec477a9ea"
+   },
+   {
+    "path": "plt00010/DM/precision",
+    "size": 7,
+    "sha256": "6e71b67d8c07f6ff75c0bcafbebb42253cc8fa4818dc7abad0b3699b33214df4"
+   },
+   {
+    "path": "plt00010/Header",
+    "size": 405,
+    "sha256": "156fdd8470896ac3323b39acae7596640fd20cb5bb620799eadacc67be049fa4"
+   },
+   {
+    "path": "plt00010/Level_0/Cell_D_00000",
+    "size": 4195036,
+    "sha256": "e39b40938f4299f98120b14a87d949519f5f57e12170db81bebb9c2595391a13"
+   },
+   {
+    "path": "plt00010/Level_0/Cell_H",
+    "size": 6740,
+    "sha256": "9c663dda3cc32520ce64a68a04e1deb719d4b6568289307c955d59556e723c35"
+   },
+   {
+    "path": "plt00010/comoving_a",
+    "size": 18,
+    "sha256": "c8238f88e430e0fce195dda96fd8de4562b6ddc8a71651b2729ea0e745a51f01"
+   },
+   {
+    "path": "plt00010/job_info",
+    "size": 7769,
+    "sha256": "d6fbcf07ded59e2d4dc343b49ef5b2d95f2f38509a7ca3b3f2b71ed5adcd16fb"
+   },
+   {
+    "path": "plt00010/the_parameters",
+    "size": 3771,
+    "sha256": "7f9e63b5498a573d549ca28bfeeadfb49a435a3011478d7fe4001fbecfc3c9d3"
+   }
+  ],
+  "dm_particles": 32686
+ },
+ "comparison": {
+  "original_check": "validate.sh [3]: nyx_fcompare_check.py (AMReX fcompare -n 0 --rel_tol T) + nyx_particle_compare.py of this run against the CPU-profile build (Nyx_GPU_BACKEND=NONE) of the same sources and deck, 1 rank",
+  "metric_mesh": "fcompare -n 0: ||B - A||_inf / ||A||_inf per variable and level, A = the reference (normalised by the reference field's maximum over the level, not per cell)",
+  "metric_particles": "max|B - A| / max|A| per DM component, A = the reference (nyx_particle_compare.py)",
+  "budget": "rel_tol_effective = (tol - d0') / (1 + d0'), d0' = d0_max (1 + 1e-9): triangle inequality in the max norm, ||X - C|| <= r ||G|| + d0 ||C|| and ||G|| <= (1 + d0) ||C||, so r <= rel_tol_effective keeps X within tol of the CPU reference C; one bound per comparison from the largest d0 over the gated variables",
+  "mesh": {
+   "tol": 1e-08,
+   "d0_max": 3.970673251e-11,
+   "rel_tol_effective": 9.960293267054803e-09,
+   "d0_max_variable": "Temp",
+   "d0_vs_cpu_reference": {
+    "density": {
+     "0": {
+      "abs": 0.006011962891,
+      "rel": 4.633718646e-13
+     }
+    },
+    "xmom": {
+     "0": {
+      "abs": 1.005020142,
+      "rel": 7.050930928e-13
+     }
+    },
+    "ymom": {
+     "0": {
+      "abs": 0.9948730469,
+      "rel": 7.652559529e-13
+     }
+    },
+    "zmom": {
+     "0": {
+      "abs": 0.8955230713,
+      "rel": 5.683626515e-13
+     }
+    },
+    "rho_E": {
+     "0": {
+      "abs": 20040.5625,
+      "rel": 3.712926915e-11
+     }
+    },
+    "rho_e": {
+     "0": {
+      "abs": 20082.6875,
+      "rel": 3.868549627e-11
+     }
+    },
+    "Temp": {
+     "0": {
+      "abs": 0.0001663784496,
+      "rel": 3.970673251e-11
+     }
+    },
+    "Ne": {
+     "0": {
+      "abs": 0.0,
+      "rel": 0.0
+     }
+    },
+    "phi_grav": {
+     "0": {
+      "abs": 1.31840352e-08,
+      "rel": 1.121192769e-14
+     }
+    },
+    "grav_x": {
+     "0": {
+      "abs": 3.303284757e-09,
+      "rel": 2.205116078e-14
+     }
+    },
+    "grav_y": {
+     "0": {
+      "abs": 3.266904969e-09,
+      "rel": 2.161604694e-14
+     }
+    },
+    "grav_z": {
+     "0": {
+      "abs": 3.32511263e-09,
+      "rel": 2.471643594e-14
+     }
+    },
+    "pressure": {
+     "0": {
+      "abs": 13388.5,
+      "rel": 3.868561667e-11
+     }
+    },
+    "magvel": {
+     "0": {
+      "abs": 1.266329264e-10,
+      "rel": 6.405987115e-13
+     }
+    },
+    "particle_count": {
+     "0": {
+      "abs": 0.0,
+      "rel": 0.0
+     }
+    },
+    "particle_mass_density": {
+     "0": {
+      "abs": 8.392333984e-05,
+      "rel": 7.111425155e-16
+     }
+    }
+   },
+   "zero_reference_fields": [],
+   "diagnostic_fields": []
+  },
+  "particles": {
+   "tol": 1e-08,
+   "d0_max": 9.785124652830612e-16,
+   "rel_tol_effective": 9.999999021487525e-09,
+   "d0_max_component": "DM_zvel",
+   "d0_vs_cpu_reference": {
+    "DM_position_x": {
+     "abs": 7.105427357601002e-15,
+     "rel": 1.1102288389846054e-16
+    },
+    "DM_position_y": {
+     "abs": 7.105427357601002e-15,
+     "rel": 1.1102239503762338e-16
+    },
+    "DM_position_z": {
+     "abs": 7.105427357601002e-15,
+     "rel": 1.110231271832936e-16
+    },
+    "DM_mass": {
+     "abs": 0.0,
+     "rel": 0.0
+    },
+    "DM_xvel": {
+     "abs": 1.1368683772161603e-13,
+     "rel": 6.955811148692106e-16
+    },
+    "DM_yvel": {
+     "abs": 1.1368683772161603e-13,
+     "rel": 6.857436147323576e-16
+    },
+    "DM_zvel": {
+     "abs": 1.7053025658242404e-13,
+     "rel": 9.785124652830612e-16
+    }
+   }
+  }
+ },
+ "provenance": {
+  "made_utc": "2026-10-27T09:19:00Z",
+  "host": "dgx003.orc.gmu.edu",
+  "gpu": {
+   "index": "1",
+   "name": "NVIDIA B200",
+   "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
+   "driver": "595.58.03"
+  },
+  "cuda": "13.2.1",
+  "git_head": "2b4951fd3491e30e198e60485282e93048ff3bb6",
+  "harness_dirty": [],
+  "gpu_run": {
+   "run_id": "20261027T091745Z-260069-19277",
+   "profile": "cuda132-gcc133-adiabatic",
+   "binary": "nyx_MiniSB",
+   "binary_sha256": "bf9d3e25e12fb55e7dc9b38208c9129cd515732ef1c39e8767edb82a72cb8461",
+   "fingerprint_sha256": "d92139b1a00591d31297fb942a6c3b5fdd0b12dc353fbae73c48c2762f6b2229",
+   "input_sha256": "7783e23ca56b30ef62fc9f3d4bb732d17342f2bf51ab8e7589908fbe749e8f10",
+   "utc": "2026-10-27T09:17:50Z",
+   "dir": "build/level3/nyx/cuda132-gcc133-adiabatic/run.freeze-4d96d19/minisb.smoke.np1"
+  },
+  "cpu_validation": {
+   "run_id": "20261027T091821Z-261836-13683",
+   "profile": "cpu-gcc133-adiabatic",
+   "binary_sha256": "344e5917d71c97d08b1faa42114bad5b510a92440544f4962d3645ef7411c7d4",
+   "fingerprint_sha256": "c94b3c682e3c7582c48a6bee98e8994a1e9197004fcbd76fa30520bf733ba54b",
+   "utc": "2026-10-27T09:18:28Z",
+   "dir": "build/level3/nyx/cpu-gcc133-adiabatic/run.freeze-4d96d19/minisb.smoke.np1",
+   "fcompare_report_sha256": "3c5ebd66e5ad1b9e92da76adc1b4c3f8d5de6368f6411a4082cf45ec1f44c0bd",
+   "particle_report_sha256": "32f48f433240e243cfc06f93503a8f6eda64083db89558bb46825b33e783337b",
+   "validate_log_sha256": null,
+   "result": "RESULT: AGREE nvars=16 levels=1 rel_tol=1e-08 worst=Temp@L0 3.971e-11 zero_ref=none bad=none diagnostic=none"
+  },
+  "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
+  "tool_sha256": {
+   "nyx_reference.py": "fe4b3fc7c50af3da5c00da9760c34c25c63e5312fff6c008f924731102bf4edb",
+   "nyx_fcompare_check.py": "2c3159ad94866880742bf201e2fc59141047f929a71487190e83adef6509c877",
+   "nyx_particle_compare.py": "aaa12fd4a6d0e4969e833401763e3e2e0eef19e6147b97a5b166fb48f2094daa",
+   "validate.sh": "4fd2e15ba3d958fbe769ba8ed4b607879ecc966ed4c0250977e26504645ace5b",
+   "run.sh": "e062470d946d31a0231e57327ad5fd0fee65d3fc434b03df6bd8e3596fa4af8b"
+  },
+  "tool_sha256_at_git_head": {
+   "nyx_fcompare_check.py": "2c3159ad94866880742bf201e2fc59141047f929a71487190e83adef6509c877",
+   "nyx_particle_compare.py": "aaa12fd4a6d0e4969e833401763e3e2e0eef19e6147b97a5b166fb48f2094daa",
+   "validate.sh": "4fd2e15ba3d958fbe769ba8ed4b607879ecc966ed4c0250977e26504645ace5b",
+   "run.sh": "e062470d946d31a0231e57327ad5fd0fee65d3fc434b03df6bd8e3596fa4af8b"
+  },
+  "note": null
+ }
+}

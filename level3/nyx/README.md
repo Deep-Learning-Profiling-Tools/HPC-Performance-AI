@@ -408,11 +408,32 @@ I_R (diagnostic) and identically-zero fields are not part of it.
 
 The frozen references, their measured d0 and budgets: "Frozen references (check [3])" below, recorded with the reference files.
 
+### Frozen references (check [3])
+
+| reference | archive (sha256, size) | DM | plotfile d0 (variable) -> rel_tol | particle d0 (component) -> rel_tol |
+|---|---|---|---|---|
+| `minisb.smoke` | `a045f961...`, 10.5 MB | 32,686 | 3.971e-11 (Temp) -> 9.960293e-9 | 9.8e-16 (DM_zvel) -> 9.999999e-9 |
+| `lya_adiabatic.smoke` | `840b662b...`, 10.3 MB | 32,768 | 8.328e-14 (Temp) -> 9.999917e-9 | 7.0e-16 (DM_xvel) -> 9.999999e-9 |
+| `lya_adiabatic.strong` (64^3) | `7e5a33ed...`, 79.8 MB | 262,144 | 3.880e-13 (Temp) -> 9.999612e-9 | 1.1e-15 (DM_xvel) -> 9.999999e-9 |
+| `lya_heatcool.smoke` | `60c3ac24...`, 10.5 MB | 32,768 | 1.722e-13 (Temp) -> 4.9999999828e-5 | 8.8e-16 (DM_xvel) -> 4.9999999999e-5 |
+
+Frozen 2026-10-27 by the committed harness's own freeze mode (`HPCPERF_CPU_REFERENCE=1
+HPCPERF_NYX_FREEZE_REFERENCE=1 HPCPERF_GPUS=1 ./validate.sh CUDA`, plus `HPCPERF_NYX_VALIDATE_MODE=strong` and
+`HPCPERF_NYX_HEATCOOL=YES`; git HEAD 2b4951f, `level3/nyx` clean, `provenance.harness_dirty` empty) on dgx003
+GPU 1 (NVIDIA B200 `GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5`, driver 595.58.03, CUDA 13.2) from this worktree's
+build of the frozen source tree `71b64ddf...` (binaries `nyx_MiniSB` `bf9d3e25...`, `nyx_LyA` adiabatic
+`a6a12227...`, heat/cool `f920bb7c...`). Each reference is the 1-GPU run of a validation in which [1], [2], [4]
+and [3] against the live CPU-profile reference passed: PASS (adiabatic smoke and strong), STATE_AND_PARTICLES_PASS;
+I_R_CHECK_PENDING (heat/cool, exit 3 -- I_R is not part of the reference's budget). Run trees
+`build/level3/nyx/<profile>/run.freeze-4d96d19/`. Four earlier references made the same day by calling the freeze
+tool on runs of the pre-change harness (with the then-uncommitted `nyx_reference.py`) were discarded before any
+commit (their plotfile d0: 4.49e-11 / 9.62e-14 / 3.88e-13 / 1.87e-13).
+
 What can give another verdict than before: a run of another step count (`HPCPERF_NYX_STEPS`), deck or IC
 than the frozen one is FAIL instead of a fresh CPU comparison; another `amr.max_grid_size`
 (`HPCPERF_NYX_MGS`) makes the [3] pair a legal re-blocking -> UNSUPPORTED_LAYOUT (exit 4) where the CPU run
 used the same layout before; a missing golden store (fresh clone, other machine) is FAIL until the archive
-is provided; the budget is stricter by d0 (e.g. MiniSB 9.955e-9 instead of 1e-8). Multi-GPU runs compare
+is provided; the budget is stricter by d0 (e.g. MiniSB 9.960e-9 instead of 1e-8). Multi-GPU runs compare
 with the 1-GPU frozen reference (not exercised in this round: 1 GPU only). HIP would compare with the B200
 reference (untested).
 
