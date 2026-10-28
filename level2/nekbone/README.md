@@ -54,7 +54,8 @@ the generated `makenek` (upstream's `test/nek_gpu1/makenek.cuda` with `SOURCE_RO
 `USR_LFLAGS` replaced), the `makefile` upstream's `makenek.inc` generates from `src/makefile.template`,
 `obj/` and `nekbone`. `src/` is never written. `build.sh CPU` builds upstream's `makenek.mpi` variant (no
 `-acc`/`-cuda`: the host code path `cg` / `ax` / `dssum`) into `build/level2/nekbone/cpu/<id>/`; it is the
-reference build of the correctness check and of `validate.sh`, never measured.
+build the frozen references were made from and the reference of `validate.sh`'s offline mode
+(`HPCPERF_CPU_REFERENCE=1`), never measured and never built by a default `validate.sh`.
 
 ## Run (`run.sh [CUDA] [ID]`, `HPCPERF_NEKBONE_INPUT=<id>`)
 
@@ -214,6 +215,6 @@ the unused Blue Gene assembly and CUDA kernel variants (`nek_kernel*.cuf`, not b
 ## Status
 
 - Timing SUCCESS 5/5 (ROI = the timed CG solve), stable 5/5 (spread <= 0.5 %), run verification PASS 5/5, scientific
-  correctness PASS 5/5 against frozen CPU-build references; `validate.sh` PASS (CUDA build = CPU build on
-  `test/nek_gpu1` to 1.2e-16). Page rows published 2026-10-21 (`docs/timing/`).
+  correctness PASS 5/5 against frozen CPU-build references; `validate.sh` PASS (offline mode: CUDA build = CPU
+  build on `test/nek_gpu1` to 1.2e-16; the default mode checks the frozen reference of `n16-e32768`). Page rows published 2026-10-21 (`docs/timing/`).
 - Not done: multi-GPU validation, multi-node (site), the multigrid preconditioner (no OpenACC path upstream).
