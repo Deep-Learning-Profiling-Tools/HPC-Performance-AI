@@ -90,9 +90,13 @@ __global__ void reduce(	long d_Ne,											// number of elements in array
 			// remainder / final summation by last thread
 			if(tx==(df-1)){										//
 				// compute the remainder and final summation by last busy thread
+				// [HPC-Performance-AI] fix (class D, 2026-10, README "Changes relative to upstream"): element i of this
+				// reduction level is stored at d_sums[i*d_mul], as read at the top of this kernel; upstream (Rodinia
+				// 2.0.1 - 3.1) reads d_sums[i] here, i.e. level-1 values instead of partial sums from the second level on
+				// (d_mul >= NUMBER_THREADS)
 				for(i=(bx*NUMBER_THREADS)+df; i<(bx*NUMBER_THREADS)+nf; i++){						//
-					d_psum[tx] = d_psum[tx] + d_sums[i];
-					d_psum2[tx] = d_psum2[tx] + d_sums2[i];
+					d_psum[tx] = d_psum[tx] + d_sums[i*d_mul];
+					d_psum2[tx] = d_psum2[tx] + d_sums2[i*d_mul];
 				}
 				// final sumation by last thread in every block
 				d_sums[bx*d_mul*NUMBER_THREADS] = d_psum[tx];
