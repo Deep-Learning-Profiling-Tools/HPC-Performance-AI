@@ -48,6 +48,7 @@ using namespace hipcub;
 int grid_size = 1;
 int repeat = 100;
 bool g_verbose = false;
+bool g_probe = false;   // correctness-probe tile data (InitializeProbe, `--probe`); never a performance input
 
   template <typename T>
 int CompareDeviceResults(T *h_reference, T *d_data, size_t num_items)
@@ -142,6 +143,39 @@ int Initialize(
 
 
 /**
+ * tools/golden correctness probe (`--probe`, registry input probe-randsigned; set-up data only: the kernels, the 18
+ * variants, the grid and the timed launches are unchanged). Upstream's tile h_in[i] = i % 17 is a fixed pattern of
+ * small non-negative values whose prefix sums stay <= 8166: a scan that never reads d_in (the closed form of the
+ * pattern, or the 1025 frozen output values written as constants), a scan in f32 (exact up to 2^24) or in 16-bit
+ * integers (exact up to 32767) reproduces the output of every performance input; and since all 18 variants scan
+ * that same tile, one scan copied into all 18 outputs does too. The probe tile holds signed values uniform in
+ * [-2^21, 2^21) from a splitmix64 stream whose fixed seed differs per variant (a project choice; upstream has no
+ * other tile), so the 18 expected outputs differ from each other; the prefix sums leave the f32 and 16-bit ranges
+ * (-6.2e7 .. 6.6e7; 33 to 961 of the 1024 beyond 2^24 per variant) and every partial sum of 1024 such values lies
+ * in [-2^31, 2^31 - 1024], so no int overflow can occur (on the device or in the host reference below).
+ */
+int InitializeProbe(
+    int *h_in,
+    int *h_reference,
+    int num_items,
+    unsigned long long s)       // per-variant seed
+{
+  int inclusive = 0;
+  for (int i = 0; i < num_items; ++i)
+  {
+    unsigned long long z = (s += 0x9E3779B97F4A7C15ull);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+    z ^= z >> 31;
+    h_in[i] = static_cast<int>(z >> 42) - (1 << 21);    // 22 random bits -> [-2^21, 2^21)
+    h_reference[i] = inclusive;
+    inclusive += h_in[i];
+  }
+  return inclusive;
+}
+
+
+/**
  * Test thread block scan
  */
 template <
@@ -158,7 +192,10 @@ void Test()
   int *h_gpu       = new int[TILE_SIZE + 1];
 
   // Initialize problem and reference output on host
-  int h_aggregate = Initialize(h_in, h_reference, TILE_SIZE);
+  const unsigned long long probe_alg =   // 0 / 1 / 2, independent of the enum's values (CUB vs hipCUB)
+      (ALGORITHM == BLOCK_SCAN_RAKING) ? 0 : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? 1 : 2;
+  const unsigned long long probe_seed = 0x5EED5CA9ull ^ (probe_alg << 32) ^ BLOCK_THREADS;   // per variant
+  int h_aggregate = g_probe ? InitializeProbe(h_in, h_reference, TILE_SIZE, probe_seed) : Initialize(h_in, h_reference, TILE_SIZE);
 
   // Initialize device arrays
   int *d_in           = NULL;
@@ -258,17 +295,19 @@ void Test()
 
 int main(int argc, char** argv)
 {
-  if (argc != 3) {
+  if (argc != 3 && !(argc == 4 && strcmp(argv[3], "--probe") == 0)) {
     printf("The benchmark evaluates the impacts of the number of threads ");
     printf("per block and the number of items per thread on the performance ");
     printf("of block-level scans\n"); 
-    printf("Usage: %s <grid_size> <repeat>\n", argv[0]);
+    printf("Usage: %s <grid_size> <repeat> [--probe]\n", argv[0]);
     printf("grid_size specifies the number of thread blocks");
     return 1;
   }
 
   grid_size = atoi(argv[1]);
   repeat = atoi(argv[2]);
+  g_probe = (argc == 4);
+  if (g_probe) printf("correctness probe: signed tile values in [-2^21, 2^21) (set-up data only)\n");
 
   // Run tests
   Test<1024, 1, BLOCK_SCAN_RAKING>();

@@ -14,7 +14,8 @@ timing:
   reason: two scan variants each print 'Average kernel time'; no total
 baseline:
   method: 'the scan output (1024 exclusive prefix sums + the aggregate) of each of the 18 BlockScan variants, after
-    its first (warm-up) launch, against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    its timed launches (bit-identical to the first warm-up launch upstream checks), against the frozen B200 golden
+    reference (`check:` / `golden:` below); the upstream
     check (memcmp with the host prefix sums from Initialize) runs only once, offline, to validate that reference
     (tools/golden make)'
   reference: reference/<input_id>.json (frozen golden reference; tools/golden)
@@ -83,6 +84,45 @@ inputs:
   args:
   - '8908416'
   - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-randsigned
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's tile h_in[i] = i % 17 is a fixed pattern of small non-negative values (prefix sums <= 8166), scanned by
+    all 18 variants and by every one of the grid_size blocks: a scan that never reads d_in (the closed form of the
+    pattern), the 1025 frozen output values written as constants, a scan in f32 (exact to 2^24) or in 16-bit integers
+    (exact to 32767), and one scan copied into all 18 outputs reproduce every output of the performance inputs byte
+    for byte (measured 2026-10-28). The probe gives each variant its own tile of signed values uniform in
+    [-2^21, 2^21) (prefix sums -6.2e7 .. 6.6e7, 33 to 961 of the 1024 beyond 2^24 per variant, no int overflow
+    possible): those five fail (all 18 variants; the copy 17), as do an inclusive or shifted scan, a missing or short
+    aggregate, a half tile and a dropped last item; warp-local stitching fails the 15 variants with more than one warp
+    and per-thread stitching the 15 with more than one item per thread (both also on the performance inputs), while
+    8 legitimate variants (the other CUB scan algorithm, inclusive scan minus the item, a 64-bit scan, a serial and a
+    Hillis-Steele shared-memory scan, cub::DeviceScan, a single block instead of grid_size) pass. Exact comparison is
+    sound: integer addition is associative, so every correct evaluation order gives the same bits. Not caught by any
+    output check: how many of the grid_size blocks or of the timed launches ran (all write the same 1025 ints)
+  case: block-scan
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      the default run line (2227104 blocks, 100 timed launches) with set-up data only (`--probe`, cuda/main.cu
+      InitializeProbe): each variant's tile is filled from a splitmix64 stream (seed 0x5EED5CA9 xor algorithm << 32
+      xor threads) with values uniform in [-2^21, 2^21) instead of i % 17, and the host reference prefix sums are
+      computed from it as in upstream's Initialize; the 18 kernels, the launches and the capture are unchanged.
+      Upstream has no other tile, hence a project choice
+  params:
+    grid_size: 2227104
+    repeat: 100
+    probe_data: per-variant tiles, values uniform in [-2^21, 2^21) (splitmix64)
+  args:
+  - '2227104'
+  - '100'
+  - --probe
   runtime_config:
     gpus: 1
   build_config: null

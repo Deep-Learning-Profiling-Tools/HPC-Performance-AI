@@ -49,4 +49,13 @@ if(BUILD_TESTING)
     set_tests_properties(block_scan_run PROPERTIES TIMEOUT 600
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same 18 kernels and launches on signed random
+    # tiles, one per variant, on which a scan that never reads d_in, a memorized output table, an f32 / 16-bit scan
+    # or one scan copied into all 18 outputs cannot pass (`--probe`, cuda/main.cu InitializeProbe); checked against
+    # its own frozen reference, never timed
+    add_test(NAME block_scan_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-randsigned --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-randsigned)
+    set_tests_properties(block_scan_probe PROPERTIES TIMEOUT 600
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()
