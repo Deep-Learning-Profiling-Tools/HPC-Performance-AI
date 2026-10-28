@@ -88,8 +88,15 @@ struct Params {
         default:
             fprintf(stderr, "\nUnrecognized option!\n");
             usage();
-            exit(0);
+            exit(1);   // [HPC-Performance-AI] upstream exited 0 on an unrecognized option
       }
+    }
+    // [HPC-Performance-AI] input checks: upstream divided by a zero work-group size (-g 0: SIGFPE) and accepted
+    // non-positive sizes; the output resolution -n is checked in main()
+    if(work_group_size < 1 || in_size_i < 1) {
+      fprintf(stderr, "error: -g (work-group size) and -m (input size) must be >= 1 (got -g %d -m %d)\n",
+              work_group_size, in_size_i);
+      exit(1);
     }
   }
 
@@ -125,16 +132,36 @@ void read_input(XYZ *in, const Params &p) {
 
 
   // Store points from input file to array
+  // [HPC-Performance-AI] bounded: upstream read any number of points into the stack array v[10000] (an overflow
+  // beyond 10000) and used v[0..15] (k cycles mod 16) even when the file held fewer than 16 points
+  // (uninitialized values); both are refused now. A valid file reads exactly as before.
   int k = 0, ic = 0;
   XYZ v[10000];
 #if DOUBLE_PRECISION
-  while(fscanf(f, "%lf,%lf,%lf", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
+  while(ic < 10000 && fscanf(f, "%lf,%lf,%lf", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
 #else
-    while(fscanf(f, "%f,%f,%f", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
+    while(ic < 10000 && fscanf(f, "%f,%f,%f", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
 #endif
     {
       ic++;
     }
+  if(ic == 10000) {
+    XYZ extra;
+#if DOUBLE_PRECISION
+    if(fscanf(f, "%lf,%lf,%lf", &extra.x, &extra.y, &extra.z) == 3) {
+#else
+    if(fscanf(f, "%f,%f,%f", &extra.x, &extra.y, &extra.z) == 3) {
+#endif
+      fprintf(stderr, "error: %s holds more than 10000 control points\n", p.file_name);
+      exit(1);
+    }
+  }
+  fclose(f);
+  if(ic < 16) {
+    fprintf(stderr, "error: %s holds %d control points; at least 16 are needed (the surface uses v[0..15])\n",
+            p.file_name, ic);
+    exit(1);
+  }
   for(int i = 0; i <= p.in_size_i; i++) {
     for(int j = 0; j <= p.in_size_j; j++) {
       in[i * (p.in_size_j + 1) + j].x = v[k].x;
