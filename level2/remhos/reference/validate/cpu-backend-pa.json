@@ -76,7 +76,7 @@
  },
  "generated_by": "level2/remhos/check_cpu_backend_reference.py freeze (construction-time; from the offline run's logs, no rerun)",
  "generated_utc": "2026-10-27T08:12:36Z",
- "note": "the CUDA build of 2026-10-27 (build.sh CUDA from the committed, unmodified Remhos sources) on dgx003; every value equals the CPU-backend run of 2026-10-26 (the 2026-09 build, binary sha256 c38091f7...) and the README 'Validation' table of 2026-09 to all 10 printed digits (d0 = 0); validate.sh compares the GPU values with these at its unchanged tolerances",
+ "note": "the CUDA build of 2026-10-27 (build.sh CUDA from the committed, unmodified Remhos sources); every value equals the CPU-backend run of 2026-10-26 (the 2026-09 build, binary sha256 c38091f7...) and the README 'Validation' table of 2026-09 to all 10 printed digits (d0 = 0); validate.sh compares the GPU values with these at its unchanged tolerances",
  "reference_run": {
   "binary": "build/level2/remhos/cuda/remhos",
   "binary_bytes": 181621952,
@@ -86,14 +86,24 @@
   "cpu_model": "INTEL(R) XEON(R) PLATINUM 8570",
   "finished_utc": "2026-10-27T08:00:34Z",
   "git_head": "c1d23cc5fc28a4ef8a6a2fbffac5aca69183260a",
-  "host": "dgx003",
   "implementation": "the CPU backend (MFEM Device 'cpu', host loops of the same mfem::forall kernels) of the CUDA build",
   "launch": "cd build/level2/remhos/cuda/run && mpirun -np 1 build/level2/remhos/cuda/remhos -no-vis <args> (CUDA_VISIBLE_DEVICES=0; the mesh path absolute, recorded here relative to level2/remhos)",
-  "log_kept_at": "/projects/kzhou6/bcui2/research/HPC-Performance-AI-results/golden-2026-10-26/validate-frozen-2026-10-27/remhos/validate-<case>-cpu.log (outside the repository, with the offline run's output and execve trace validate_offline.{out,strace})",
   "mfem_config_mk_sha256": "f1e3bf062e7332457a85a19f2c2bbc3569086d4a027fc25ce476c3406fe86527",
   "mode": "HPCPERF_CPU_REFERENCE=1 bash level2/remhos/validate.sh CUDA (offline mode, the one explicit offline request; Part B check 2's live CPU-backend runs, each after the case's GPU run; PASS)",
   "remhos_sources_clean": true,
-  "slurm_job": "2956114",
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "redacted_text": [
+    "note: host name"
+   ],
+   "removed": [
+    "host",
+    "log_kept_at",
+    "slurm_job"
+   ],
+   "rule": "hpcperf-provenance-scrub-1",
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  },
   "started_utc": "2026-10-27T07:59:29Z"
  },
  "schema": "hpcperf-remhos-cpu-backend-reference-1",

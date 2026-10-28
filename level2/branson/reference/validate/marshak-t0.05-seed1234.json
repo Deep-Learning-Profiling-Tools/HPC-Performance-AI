@@ -53,7 +53,6 @@
   50578
  ],
  "reference_run": {
-  "allocation": "dgx003, Slurm job 2956114",
   "binary_sha256": "4b29fd3325f1cca66d14331cce38c72f587f29bf69986a89fba127e8776beec0",
   "build_options": "validate.sh (C) offline build into build/level2/branson/cpu_ref: cmake -DCMAKE_BUILD_TYPE=Release -DUSE_GPU=OFF -DUSE_CUDA=OFF -DUSE_HIP=OFF -DUSE_UMPIRE=OFF -DUSE_CALIPER=OFF -DBUILD_TESTING=OFF on level2/branson/src (the GPU build's sources, unmodified at git HEAD 9544e6e; project toolchain hpcperf_env.sh, conda GCC 13.3, Open MPI 5.0.10; CPATH tools/timing/roi), built 2026-10-27T08:01:39Z",
   "finished_utc": "2026-10-27T08:01:47Z",
@@ -61,9 +60,17 @@
   "implementation": "CPU-only Branson built from the same sources with -DUSE_GPU=OFF: Branson's CPU transport, independent of the GPU transport kernel (the deck's use_gpu_transporter is ignored by that build)",
   "launch": "mpirun -np 1 --bind-to none build/level2/branson/cpu_ref/BRANSON inputs/marshak_wave_replicated.xml --t-stop 0.05 --seed 1234 (validate.sh check C, offline mode HPCPERF_CPU_REFERENCE=1)",
   "log_bytes": 14927,
-  "log_kept_at": "/projects/kzhou6/bcui2/research/HPC-Performance-AI-results/golden-2026-10-26/validate-frozen-2026-10-27/branson/validate_marshak_cpu.log (outside the repository; with the GPU log, the offline run's output validate_offline.out (PASS) and its execve trace)",
   "log_sha256": "46d7a475e2576f8988bdfc6d116b1b4f19adeb989774b02fce87034f2ae2383e",
   "mpi_ranks": 1,
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "removed": [
+    "allocation",
+    "log_kept_at"
+   ],
+   "rule": "hpcperf-provenance-scrub-1",
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  },
   "started_utc": "2026-10-27T08:01:39Z",
   "total_transport_s": 1.670117
  },

@@ -347,10 +347,8 @@
   ],
   "provenance": {
     "made_utc": "2026-10-28T12:55:46Z",
-    "host": "dgx003.orc.gmu.edu",
     "gpu": {
       "name": "NVIDIA B200",
-      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
       "driver": "595.58.03"
     },
     "cuda_toolkit": "13.2.1",
@@ -382,6 +380,15 @@
       "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
       "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
-    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
   }
 }
