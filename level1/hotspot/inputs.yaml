@@ -113,6 +113,71 @@ inputs:
   - data/temp_512
   - data/power_512
   input_form: file
+- id: g512-p2-t21-pnoise9
+  purpose: correctness-probe
+  probe_basis: >-
+    with the vendored power map every cell changes by only 0.016-0.018 K per step (the leakage term (80 - T) * Rz_1;
+    the power term is <= 0.00096 K per step because the time step makes the maximum power density heat a cell by
+    PRECISION = 0.001 K, cuda/hotspot.cu:237-238), i.e. 5.7e-5 per step of the 1 + |T| ~ 324 K denominator of
+    max_rel1p, against 1e-3 (0.32 K, ~19 steps): a no-op passes g512-p2-t2, one skipped iteration, a dropped power
+    term and an f16-rounded output pass all three performance inputs, a stale block in the last launch passes t20 and
+    t200 (measured 2026-10-28).
+    This probe heats the vendored temp_512 with power_512 + 0..9 W of deterministic random power per cell (0..3.1 K
+    per step, different in every cell) for 21 steps (10 pyramid launches of 2 steps and a 1-step remainder). Measured
+    2026-10-28 (B200, max_rel1p against the frozen probe reference): no-op 0.147, one iteration fewer or more 6.4e-3,
+    time step +1% 1.3e-3, one stale block in the last launch 1.65e-2..1.74e-2 (centre, corner, edge block), stale
+    pyramid halo 3.4e-3, ghost zone one cell short 0.33, tiles without halo 4.1e-2, frozen or periodic boundary 0.147 /
+    3.6e-2, dropped power / leakage term 0.148 / 1.1e-3, ambient 0 instead of 80 3.4e-4, wrong neighbour 2.9e-2,
+    f16 state 3.6e-3, f16-rounded input or output field 3.5e-4 / 3.7e-4; legitimate variants (fmad off, fast math,
+    blocks 8/32, pyramid heights 1-7 and 12, f32 or f64 arithmetic, f64 state, precomputed, centre-coefficient and
+    delta forms, other summation orders, one step per launch) <= 2.7e-6. Not caught robustly: an f16-stored power map
+    (4.3e-5, 1.4x above the tolerance) and f16-rounded increments on an f32 state (1.3e-5, passes)
+  case: hotspot-2d
+  variant: case
+  source:
+    kind: derived
+    derivation: 'the vendored 512 grid: initial temperature temp_512 unchanged; power map power_512 + 9 W x u(k),
+      u(k) = lowbias32(k) / 2^32 of the row-major cell index k, written at configure time by data/gen_probe.py to
+      build/hotspot/cuda/data/power_512_pnoise9; sim_time 21 with upstream''s pyramid height 2; no source change'
+  params:
+    grid: 512
+    pyramid_height: 2
+    sim_time: 21
+    power: power_512 + 9 W x lowbias32(k) / 2^32 (data/gen_probe.py)
+  args:
+  - '512'
+  - '2'
+  - '21'
+  - level1/hotspot/data/temp_512
+  - build/hotspot/cuda/data/power_512_pnoise9
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/temp_512
+  - data/power_512
+  - data/gen_probe.py
+  input_form: file
+  golden:
+    # per-input rule (the benchmark-level spec below and the performance inputs' references are unchanged)
+    mode: data
+    cpu_check:
+      command: [python3, '{bench_dir}/verify.py', '{exe}', '{param:grid}', '{param:pyramid_height}', '{param:sim_time}', '{arg:3}', '{arg:4}']
+      pass_regex: '^PASS: hotspot output matches CPU reference'
+      fail_regex: '^FAIL'
+    outputs:
+    - name: temperature
+      dtype: f32
+      rule: {metric: max_rel1p, tol: 3.0e-5}
+      cpu: temperature.cpu
+      basis: 'the metric of verify.py''s check max |gpu - ref| / (1 + |ref|) (level1/hotspot/verify.py:53-54; upstream Rodinia
+        has no check, verify.py and its 1e-3 are this repository''s) on the binary''s float32 MatrixOut; the tolerance from
+        measurements on this probe (2026-10-28): legitimate variants <= 2.7e-6, the smallest deviations that must fail
+        3.4e-4 (ambient temperature 0), 3.5e-4 / 3.7e-4 (f16-rounded input / output field); 3e-5 is their geometric
+        mean (about 11x margin on each side), minus the B200 field''s own deviation from the CPU reference'
 golden:
   # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
   # the unmodified binary (which captures the float32 field it writes to output.out) and re-simulates the transient in
