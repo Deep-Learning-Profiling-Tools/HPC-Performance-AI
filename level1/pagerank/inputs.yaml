@@ -31,11 +31,17 @@ golden:
   outputs:
   - name: page_rank
     dtype: f32
-    rule: {metric: max_rel, tol: 1.0e-3}
+    # tightened from upstream's 1e-3 (measured 2026-10-28, B200, 500 iterations): 16 legitimate implementations stay
+    # <= 1.4e-6, an f16-stored vector (6.2e-4..7.7e-4) passes 1e-3; 3e-5 is the geometric centre (>= 20x on both sides).
+    # Iteration count and stale rows are not observable after ~12 iterations: that is the probe's job (nodes16384-m5).
+    rule: {metric: max_rel, tol: 3.0e-5}
     cpu: page_rank.cpu
-    basis: upstream Verify fails on isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) >
-      cpu_page_rank[i] / 1000 (common/pr_benchmark.cc:119-120), i.e. max |a - c| / c <= 1e-3; the check allows 1e-3
-      minus the B200 output's own deviation from the CPU reference (a NaN fails)
+    basis: 'the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i]
+      / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 3e-5 instead of 1e-3, minus the B200
+      output''s own deviation from the CPU reference (a NaN fails). Measured 2026-10-28: legitimate implementations (fmad
+      off, 4/8/32 lanes per row with shuffle trees, merge-style nonzero chunks and push atomics, cuSPARSE CSR ALG1/ALG2,
+      reverse / 4-accumulator / Kahan / f64 accumulation, f64 vectors, block sizes) <= 1.4e-6; a vector stored in f16 /
+      bf16 6.2e-4 / 4.5e-3 and matrix values rounded to f16 / bf16 / tf32 >= 6.7e-2 fail'
 check:
   kind: post_run
   run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
@@ -112,12 +118,14 @@ inputs:
   purpose: correctness-probe
   probe_basis: >-
     after ~12 power iterations the rank vector is converged to f32 rounding (the remaining signal is a global scale
-    drift of ~2.1e-8 per iteration), so the 500-iteration performance inputs cannot see how many iterations ran or
-    partial work in late iterations: 6 of 500 iterations, or 5 % of the rows left stale in the last iteration, pass
-    them (measured 2026-10-27). With 5 iterations (the same matrix, upstream's -m option) one iteration fewer deviates
-    by 6.5e-3 and 5 % stale rows by 4.5e-3 (max_rel, tolerance 1e-3), legitimate variants (fmad off, warp-per-row and
-    reverse summation, f64 accumulation, f64 vectors, block size 256) by <= 4.0e-7. Not caught at 1e-3: an f16-stored
-    vector (6.1e-4). An odd count also exercises the other parity of the final copy-back
+    drift of ~2.1e-8 per iteration from the f32 matrix's column sums), so the 500-iteration performance inputs cannot
+    see how many iterations ran or partial work in late iterations: 8 of 500 iterations (3.5e-5..5.1e-5), 12 or more
+    (<= 1.1e-5), an in-place single-buffer update (<= 4.2e-5), one row, one 64-row block or 5 % of the rows left stale
+    in the last iteration (<= 2.4e-7) pass their limit 3e-5 or exceed it by < 1.8x (measured 2026-10-28). With 5 iterations (the
+    same matrix, upstream's -m option) one iteration fewer deviates by 6.5e-3, 5 % / a block / one stale row by 4.5e-3 /
+    3.3e-3 / 4.9e-4, the in-place update by 1.7e-4..3.5e-4, an f16-stored vector by 6.1e-4, f16 / tf32 matrix values by
+    8.7e-4 / 1.1e-3, while 16 legitimate implementations stay <= 4.2e-7 (max_rel, limit 1e-5: >= 17x on the wrong side,
+    23x headroom). An odd count also exercises the other parity of the final copy-back
   case: pagerank-csr
   variant: steps
   source:
@@ -139,3 +147,18 @@ inputs:
   backends_validated:
   - cuda
   input_form: file
+  golden:
+    # this input's own spec (replaces the benchmark-level one): the same metric, the tolerance centred on the probe's
+    # own envelope (legitimate <= 4.2e-7 here vs <= 1.4e-6 after 500 iterations)
+    mode: data
+    cpu_check: {pass_regex: '^Passed\.$', fail_regex: '^Error with node'}
+    outputs:
+    - name: page_rank
+      dtype: f32
+      rule: {metric: max_rel, tol: 1.0e-5}
+      cpu: page_rank.cpu
+      basis: 'the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) >
+        cpu_page_rank[i] / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 1e-5 at 5
+        iterations, minus the B200 output''s own deviation from the CPU reference (a NaN fails). Measured 2026-10-28:
+        legitimate implementations (as for the 500-iteration inputs) <= 4.2e-7; one iteration fewer 6.5e-3, one stale
+        row in the last iteration 4.9e-4, an in-place update >= 1.7e-4, an f16 vector 6.1e-4 fail'
