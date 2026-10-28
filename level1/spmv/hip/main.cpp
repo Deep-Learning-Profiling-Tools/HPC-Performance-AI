@@ -164,15 +164,41 @@ static void kk_sparseMatrix_generate(Ordinal nrows, Ordinal ncols, Offset& nnz,
   // overwritten by generate_gold_standard before the benchmark runs)
 }
 
+// ---------------------------------------------------------------------------
+// tools/golden correctness probe (`--probe`, registry input probe-real; set-up data only: the kernel, the launch
+// heuristics, the matrix structure and the timed loop are unchanged). Upstream's data are integers (values =
+// colidx + row from generate_gold_standard, x = rand() % 40 - 20), so every product and partial sum of y is an
+// integer far below 2^53: every f64 evaluation order gives y exactly, values and x stay exact when stored in f32
+// (x even in bf16), so no output check can see their precision, and f32 arithmetic changes y by at most 46 at
+// |y| up to 5.3e8. The probe keeps the matrix structure (the same kk_sparseMatrix_generate call and rand()
+// stream) and replaces the numbers by reals with full 53-bit mantissas: values uniform in [-50, 50) -- the range
+// upstream's own kk_sparseMatrix_generate draws (getRandomBounds(50)) before generate_gold_standard overwrites
+// it -- and x uniform in [-20, 20), the range of upstream's integer x, each from its own fixed-seed splitmix64
+// stream (a project choice: upstream's Kokkos XorShift64 pool fill is not reproducible outside Kokkos).
+// ---------------------------------------------------------------------------
+static inline unsigned long long probe_next(unsigned long long& s)
+{
+  unsigned long long z = (s += 0x9E3779B97F4A7C15ull);
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+static inline Scalar probe_uniform(unsigned long long& s, double lo, double hi)
+{
+  return lo + (hi - lo) * (static_cast<double>(probe_next(s) >> 11) * 0x1.0p-53);   // 53 random mantissa bits
+}
+
 int main(int argc, char** argv)
 {
   long long int size = 110503;  // upstream default (a prime number)
   int loop           = 100;     // upstream default
   int vector_length  = -1;
   int team_size      = -1;
+  bool probe = false;            // correctness-probe set-up data (see probe_uniform); never a performance input
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "-s") && i + 1 < argc) size = atoll(argv[++i]);
     if (!strcmp(argv[i], "-l") && i + 1 < argc) loop = atoi(argv[++i]);
+    if (!strcmp(argv[i], "--probe")) probe = true;
   }
   const Ordinal numRows = static_cast<Ordinal>(size);
   const Ordinal numCols = static_cast<Ordinal>(size);
@@ -190,6 +216,12 @@ int main(int argc, char** argv)
   Scalar* h_y_compare = new Scalar[numRows];
   for (int i = 0; i < numCols; i++) h_x[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
   for (int i = 0; i < numRows; i++) h_y[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
+  // probe only; seeds = upstream's value-fill pool seed (13718) and driver srand seed (17312837)
+  unsigned long long probe_values_seed = 13718, probe_x_seed = 17312837;
+  if (probe) {
+    for (int i = 0; i < numCols; i++) h_x[i] = probe_uniform(probe_x_seed, -20.0, 20.0);
+    printf("correctness probe: real-valued matrix values in [-50, 50) and x in [-20, 20) (set-up data only)\n");
+  }
 
   // ----- upstream generate_gold_standard: overwrite values, CPU gold -----
   // (the CPU gold y is reference work: computed only when the CPU check runs; the value
@@ -198,10 +230,11 @@ int main(int argc, char** argv)
   for (int i = 0; i < numRows; i++) {
     Offset start = rowPtr[i], end = rowPtr[i + 1];
     for (Offset j = start; j < end; j++) values[j] = colInd[j] + i;
+    if (probe) for (Offset j = start; j < end; j++) values[j] = probe_uniform(probe_values_seed, -50.0, 50.0);
     if (!cpu_gold) continue;
     h_y_compare[i] = 0;
     for (Offset j = start; j < end; j++) {
-      Scalar tmp_val = colInd[j] + i;
+      Scalar tmp_val = probe ? values[j] : colInd[j] + i;   // upstream recomputes colidx + row (= values[j])
       int idx = colInd[j];
       h_y_compare[i] += tmp_val * h_x[idx];
     }

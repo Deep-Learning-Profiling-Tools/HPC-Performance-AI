@@ -47,4 +47,12 @@ if(BUILD_TESTING)
     set_tests_properties(spmv_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same kernel on real-valued set-up data on which
+    # the evaluation precision and single skipped rows are visible (`--probe`, cuda/main.cu probe_uniform); checked
+    # against its own frozen reference with its own per-element rule, never timed
+    add_test(NAME spmv_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-real --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-real)
+    set_tests_properties(spmv_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

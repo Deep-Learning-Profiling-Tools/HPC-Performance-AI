@@ -111,3 +111,53 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-real
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's data are integers (values = colidx + row, x = rand() % 40 - 20), so y is integer-valued and every
+    f64 summation order gives it exactly, while values and x stay exact even when stored in f32 (x in bf16): f32
+    arithmetic or accumulation (max |a - g| 1 / 8 / 37-46), TF32-rounded inputs (l2_rel_sq 4.1e-8), f32-stored values
+    or f32 / f16 / bf16-stored x (bit-exact) and a zeroed row (l2_rel_sq <= 4.5e-6), even 1.65 % of the rows zeroed
+    (<= 9.7e-6), pass the performance inputs' l2_rel_sq 1e-5 (measured 2026-10-28). Here values and x are reals with
+    full 53-bit mantissas on the same matrix structure: 18 legitimate variants (fmad off, vector lengths 1-32,
+    reverse, pairwise, sorted, Kahan, double-double, f64 atomics, merge-path splits, cuSPARSE CSR ALG1 / ALG2)
+    differ from the golden in 70-77 % of the elements by max |a - g| <= 1.8e-12, below the rounding bound of any
+    f64 evaluation order, 2 gamma_10 max_i sum_j |a_ij x_j| = 1.4e-11; the wrong ones by 1.5e-4 (f32-stored values)
+    to 7.4e3 (tolerance 1e-8). Not caught: how many of the 100 timed SpMVs ran (each recomputes the same y)
+  case: spmv-random
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      the default matrix (110503 rows, kk_sparseMatrix_generate seed 13721, the same rand() stream) with set-up data
+      only (`--probe`, cuda/main.cu probe_uniform): after upstream's generate_gold_standard the values are replaced by
+      reals uniform in [-50, 50) (the range of upstream kk_sparseMatrix_generate's own fill_random) and x by reals
+      uniform in [-20, 20) (the range of upstream's integer x), from fixed-seed splitmix64 streams (seeds 13718 and
+      17312837, upstream's value-fill and driver seeds); the kernel, launch heuristics, timed loop and the CPU gold
+      standard (now reading the probe values) are unchanged. Upstream has no real-valued x, hence a project choice
+  params:
+    rows: 110503
+    loop: default
+    probe_data: values uniform [-50, 50), x uniform [-20, 20) (splitmix64)
+  args:
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  golden:
+    # own rule (the benchmark-level l2_rel_sq would pass every reduced-precision variant on this probe, bf16-stored x
+    # included at 3.1e-6): a per-element bound that every f64 evaluation order meets with margin
+    mode: data
+    cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+    outputs:
+    - name: y
+      dtype: f64
+      rule: {metric: max_abs, tol: 1.0e-8}
+      cpu: y.cpu
+      basis: 'project criterion for the probe (upstream check_errors, l2_rel_sq 1e-5, still gates the one-time CPU
+        validation): |a - g| <= 1e-8 per element. Every row has 10 nonzeros and sum_j |a_ij x_j| <= 6169, so any IEEE
+        f64 evaluation order (FMA or not, any reduction tree, atomics) is within gamma_10 * 6169 = 6.8e-12 of the exact
+        y and two of them within 1.4e-11 (730x below the tolerance); storing values or x in f32 moves y by >= 1.5e-4
+        (15000x above)'
