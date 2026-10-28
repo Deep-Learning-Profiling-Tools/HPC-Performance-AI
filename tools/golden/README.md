@@ -205,7 +205,3 @@ without the CPU reference, capturing, then checks.
   solution), `graph_coloring` (validity; its valid colorings are not unique and differ run to run): property
   checks, unchanged.
 * `ao_bench`: already a frozen B200 image hash (`reference/iter100.sha256`), unchanged.
-* `binary_search` input `n134217728`: not frozen -- with `Real_t = float`, 6 of its 268435456 queries round to
-  `a[aSize-1]`, which has no `r` with `r+1 < aSize`, so upstream's `verify()` rejects every variant and no validated
-  reference exists (README "Input n134217728"); `n8388608` and `n33554432` are golden. Owner decision pending
-  (another size, or deregistering the input).
