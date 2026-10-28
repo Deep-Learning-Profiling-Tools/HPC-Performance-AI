@@ -171,7 +171,11 @@ void runTest( int argc, char** argv)
 
 	HPCPERF_ROI_END_SYNC();
     cudaMemcpy(output_itemsets, matrix_cuda, sizeof(int) * size, cudaMemcpyDeviceToHost);
-	
+	// tools/golden: the global alignment score of the two sequences, the DP cell (max_rows - 1, max_cols - 1). The
+	// upstream traceback below starts one row and one column earlier (max_rows - 2), so without this value the last DP
+	// row and column -- computed by the kernels -- would not be observed by any checked output (i32, one value)
+	hpcperf_golden_output("score", &output_itemsets[(max_rows - 1) * max_cols + (max_cols - 1)], 1, "i32");
+
 //#define TRACEBACK
 #ifdef TRACEBACK
 	

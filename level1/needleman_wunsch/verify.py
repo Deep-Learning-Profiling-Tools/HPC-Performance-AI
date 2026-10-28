@@ -5,11 +5,15 @@ The benchmark generates its sequences with glibc srand(7)/rand()%10 and (with
 TRACEBACK enabled, an upstream-provided code path) writes the traceback values
 to result.txt. This script reproduces the input with a glibc rand()
 implementation, recomputes the NW dynamic-programming matrix on the CPU
-(anti-diagonal vectorized), walks the same traceback, and compares.
+(anti-diagonal vectorized), walks the same traceback, and compares; it also
+compares the global alignment score (the DP cell (dim, dim), which the
+upstream traceback -- it starts at (dim - 1, dim - 1) -- does not contain)
+with the value the binary captures (tools/golden `score`; read from the
+HPCPERF_GOLDEN_DUMP directory, a temporary one when it is not set).
 
 Usage: verify.py <exe> <dim> <penalty>
 """
-import subprocess, sys
+import os, shutil, subprocess, sys, tempfile
 import numpy as np
 
 def glibc_rand(seed, n):
@@ -52,7 +56,16 @@ BLOSUM62 = [
 LIMIT = -999
 
 exe, dim, penalty = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-r = subprocess.run([exe, str(dim), str(penalty)], capture_output=True, text=True)
+dump = os.environ.get("HPCPERF_GOLDEN_DUMP")
+tmp = None
+if not dump:   # a run by hand: capture into a temporary directory, only to read the binary's score
+    tmp = dump = tempfile.mkdtemp(prefix="nw-verify-")
+r = subprocess.run([exe, str(dim), str(penalty)], capture_output=True, text=True,
+                   env=dict(os.environ, HPCPERF_GOLDEN_DUMP=dump))
+score_bin = os.path.join(dump, "score.bin")
+gpu_score = [int(x) for x in np.fromfile(score_bin, dtype="<i4")] if os.path.isfile(score_bin) else None
+if tmp:
+    shutil.rmtree(tmp, ignore_errors=True)
 if r.returncode != 0:
     print(f"FAIL: benchmark exited with {r.returncode}\n{r.stderr}")
     sys.exit(1)
@@ -118,4 +131,8 @@ if got != vals:
     n_bad = sum(1 for a, b in zip(got, vals) if a != b) + abs(len(got)-len(vals))
     print(f"FAIL: traceback differs ({n_bad} entries; gpu len {len(got)}, cpu len {len(vals)})")
     sys.exit(1)
-print(f"PASS: NW traceback ({len(vals)} values) matches CPU DP reference")
+cpu_score = int(M[max_rows - 1, max_cols - 1])
+if gpu_score != [cpu_score]:
+    print(f"FAIL: global alignment score (DP cell ({dim}, {dim})) differs: gpu {gpu_score}, cpu {cpu_score}")
+    sys.exit(1)
+print(f"PASS: NW traceback ({len(vals)} values) matches CPU DP reference (and the global alignment score {cpu_score})")

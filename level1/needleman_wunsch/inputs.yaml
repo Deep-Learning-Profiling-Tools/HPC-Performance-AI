@@ -13,8 +13,9 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the CUDA port prints no timer (the golden check compares the traceback)
 baseline:
-  method: 'no PASS line; the traceback values against the frozen B200 golden reference (`check:` / `golden:` below);
-    verify.py (CPU DP matrix + traceback) runs only once, offline, to validate that reference (tools/golden make)'
+  method: 'no PASS line; the traceback values and the global alignment score against the frozen B200 golden reference
+    (`check:` / `golden:` below); verify.py (CPU DP matrix + traceback) runs only once, offline, to validate that reference
+    (tools/golden make)'
   reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: no_error
@@ -82,8 +83,9 @@ inputs:
   - cuda
 golden:
   # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
-  # the unmodified binary (which captures the traceback values it writes to result.txt) and recomputes the DP matrix and
-  # the same traceback on the CPU; the capture is frozen only when verify.py printed PASS.
+  # the unmodified binary (which captures the traceback values it writes to result.txt and the global alignment score)
+  # and recomputes the DP matrix, the same traceback and the score on the CPU; the capture is frozen only when verify.py
+  # printed PASS.
   mode: data
   cpu_check:
     command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}']
@@ -96,12 +98,21 @@ golden:
     basis: verify.py compares exactly the traceback values of result.txt (first element + one per step) with its CPU DP
       traceback (level1/needleman_wunsch/verify.py:117); the same values in file order (cuda/needle.cu TRACEBACK block),
       integers -> byte-identical. The DP matrix itself is not compared (neither was it by verify.py)
+  # the global alignment score: the DP cell (dim, dim). Upstream's traceback starts at (dim - 1, dim - 1), so the last DP
+  # row and column (computed by the kernels, 2 dim + 1 cells) reach no other checked output: a sweep that skips them
+  # passes the traceback comparison
+  - name: score
+    dtype: i32
+    rule: {metric: exact}
+    basis: 'the DP cell (max_rows - 1, max_cols - 1) of the copied-back matrix (cuda/needle.cu, after the ROI), i.e. the
+      Needleman-Wunsch score of the two full sequences; verify.py compares it exactly with its CPU DP (M[dim, dim]);
+      integer -> byte-identical'
 check:
   kind: post_run
   run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
   command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
   pass_regex: '^PASS: golden check'
   fail_regex: '^FAIL: golden check'
-  basis: 'the traceback values byte-identical to the frozen B200 golden reference reference/<input_id>.json (made once and
-    validated there by verify.py''s CPU DP, exact); no CPU reference is run'
+  basis: 'the traceback values and the global alignment score byte-identical to the frozen B200 golden reference
+    reference/<input_id>.json (made once and validated there by verify.py''s CPU DP, exact); no CPU reference is run'
   covers: all
