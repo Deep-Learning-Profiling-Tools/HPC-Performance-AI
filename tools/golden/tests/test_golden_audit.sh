@@ -69,6 +69,7 @@ golden:
   cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
   outputs:
   - {name: y, dtype: f64, rule: {metric: max_abs, tol: 1.0e-8}, cpu: y.cpu, basis: fake upstream abs 1e-8}
+  - {name: y, dtype: f64, rule: {metric: rmse, tol: 1.0e-8}, cpu: y.cpu, basis: fake second rule on the same output (a gate next to an aggregate)}
   - {name: idx, dtype: i32, rule: {metric: exact}, basis: fake exact}
   - {name: small, dtype: f64, rule: {metric: max_abs, tol: 1.0e-8}, cpu: small.cpu, basis: fake abs on a tiny signal}
   - {name: flat, dtype: i32, rule: {metric: exact}, basis: fake constant output}

@@ -767,11 +767,13 @@ class Audit:
                     row["problems"].append("REFERENCE_OUTPUTS_MISMATCH")
                     self.add("HARD", "REFERENCE_OUTPUTS_MISMATCH", b, f"{rrel}: match '{o['match']}' selects {n} reference outputs, "
                              f"the spec says {o.get('count')}", input_id=iid, path=rrel)
-        spec_rule = {}
+        # an output name may carry several rules (e.g. rmse + a per-element max_abs gate): keep every spec rule per
+        # name and match a reference output to the spec rule of the same metric
+        spec_rules = {}
         for o in spec.get("outputs") or []:
             for x in names:
                 if x and ((o.get("name") and o["name"] == x) or (o.get("match") and re.fullmatch(o["match"], x))):
-                    spec_rule.setdefault(x, o)
+                    spec_rules.setdefault(x, []).append(o)
         scalar_only = bool(outs)
         for e in outs:
             name = e.get("name"); r = dict(e.get("rule") or {}); st = e.get("stats") or {}
@@ -781,7 +783,8 @@ class Audit:
             row["outputs"].append(orow)
             if (e.get("count") or 0) > 16:
                 scalar_only = False
-            so = spec_rule.get(name)
+            cands = spec_rules.get(name) or []
+            so = next((c for c in cands if (c.get("rule") or {}).get("metric") == r.get("metric")), cands[0] if cands else None)
             if so is not None:
                 base = {k: v for k, v in (so.get("rule") or {}).items()}
                 got = {k: r.get(k) for k in base}
@@ -808,7 +811,7 @@ class Audit:
                     self.add("WARN", "GOLDEN_CONSTANT", b, f"{rrel}: output {name} ({e.get('dtype')}[{e.get('count')}]) is the constant "
                              f"{st['min']}: a program that writes that constant passes", input_id=iid, path=rrel)
                 continue
-            self.audit_tolerance(b, iid, rrel, e, r, st, orow, spec_rule.get(name), ref)
+            self.audit_tolerance(b, iid, rrel, e, r, st, orow, so, ref)
         if scalar_only:
             tot = sum(int(o.get("count") or 0) for o in outs)
             row["scalar_only"] = True
