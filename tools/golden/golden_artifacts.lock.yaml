@@ -5,8 +5,8 @@ store: {layout: sha256/<aa>/<sha256>.bin, env: HPCPERF_GOLDEN_STORE, default: <r
 reference_scan:
   source: committed tree (git ls-tree), level<N>/<benchmark>/reference/**.json
   schemas_with_blobs: ['hpcperf-golden-1: outputs[].blob, sha256, bytes', 'hpcperf-nyx-frozen-reference-1: archive.sha256, size']
-  references_with_blobs: 89
-  digest: 8a8e8b9452b366db04584ccf8738ed9bb23f107fa4e3dd8010c5c53cdeb87056
+  references_with_blobs: 93
+  digest: 614e55a689f569ff68878ebde42dabb0bee3ab5a6a9affe1e53cb7d778431b99
 bundle_format:
   naming: golden-<level>-<benchmark>[-p<i>of<n>]-<members_digest[:16]>.tar.zst
   tar: {format: hpcperf-golden-tar-1, members: 'regular files sha256/<aa>/<sha256>.bin only, sorted by name, no directory entries', header: 'POSIX ustar, mode 0644, uid/gid 0, empty uname/gname, mtime 1704067200', end: 'two zero blocks, padded to 10240 bytes'}
@@ -20,7 +20,7 @@ bundle_format:
   partition: per benchmark; first-fit decreasing by blob size (ties by sha256); a part takes blobs while ZSTD_compressBound(tar size) < asset_limit_bytes
 cache: {env: HPCPERF_ARTIFACT_CACHE, default: <repo>/.artifacts, layout: sha256/<bundle sha256>.tar.zst}
 release: {provider: github-release, proposed_tag: golden-hpcperf-g1-rc1, status: unpublished}
-totals: {bundles: 30, distinct_blobs: 114, blob_bytes: 8593167916, member_entries: 117, bundle_bytes: 2761116263}
+totals: {bundles: 30, distinct_blobs: 124, blob_bytes: 8598839252, member_entries: 127, bundle_bytes: 2766112230}
 bundles:
 - name: golden-level1-adam-2371346b7b588f80.tar.zst
   group: level1/adam
@@ -316,18 +316,19 @@ bundles:
     notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
   primary: {url: null, status: unpublished}
   mirrors: []
-- name: golden-level1-hotspot-3c9958658d914de9.tar.zst
+- name: golden-level1-hotspot-ba3c29624ac370e5.tar.zst
   group: level1/hotspot
   part: 1
   parts: 1
-  sha256: ac2125ef1a4e2525e8da2aebcbf4f450f92752cbb9a68f500d4b984c6fd0eeab
-  size: 1965660
-  tar_size: 3153920
-  members_digest: 3c9958658d914de916114705f41b2d43548a82741a430ff0e7f49344cdc37a16
+  sha256: 2c9cde45ed9266ec57e80ebbba48da10450182cae264ade90c8fc9f3f76a346f
+  size: 2800478
+  tar_size: 4198400
+  members_digest: ba3c29624ac370e51715dd7bcb3379370dc1e4fb07bc0e284b371e60eb95ddf1
   members:
   - {sha256: 535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7, size: 1048576}
   - {sha256: 5a906c2265e26e60869797390e68839587175a9bfde7b5407e9b5d553b994ad4, size: 1048576}
   - {sha256: 9d70ab5147500860ac8cba3247e217eb29e504e6cebcc46f9861811e7f0847e7, size: 1048576}
+  - {sha256: a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9, size: 1048576}
   content_scan:
     archive_blobs: 0
     credential_hits: 0
@@ -337,17 +338,18 @@ bundles:
     notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
   primary: {url: null, status: unpublished}
   mirrors: []
-- name: golden-level1-hotspot_3d-0be1350770deea1f.tar.zst
+- name: golden-level1-hotspot_3d-1dde424187b70cd4.tar.zst
   group: level1/hotspot_3d
   part: 1
   parts: 1
-  sha256: b4be13d6d4f8bc649ce007d3c7d0527c6a063623ffe3f31aeac50b2563c2b021
-  size: 296627
-  tar_size: 399360
-  members_digest: 0be1350770deea1f18db49cd872bf70c194096fd8d27d3000838dc19f0304835
+  sha256: 8e2c0d749e9c47c6f67fcc9efef16958d1ee01333e6e8994489f0a96b676249b
+  size: 406920
+  tar_size: 532480
+  members_digest: 1dde424187b70cd436e5cf5851f08c44d269743b0721e89260f61c5ac44dee99
   members:
   - {sha256: 0e019e3fe6463968434be77bb496dbfa18eb7a5b4891b173ad976933929eb375, size: 131072}
   - {sha256: 1d491bf45ebdee886b5d93c73769c73f4a762dcf189bbcf0da70d6f26518ed71, size: 131072}
+  - {sha256: 5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12, size: 131072}
   - {sha256: a6bf1c8c5ba3090697164308b958a0c3310001b57b851b8c88900955f3257f13, size: 131072}
   content_scan:
     archive_blobs: 0
@@ -446,15 +448,21 @@ bundles:
     notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
   primary: {url: null, status: unpublished}
   mirrors: []
-- name: golden-level1-nbody-b1a7124cc1f0933a.tar.zst
+- name: golden-level1-nbody-a9136df9ac968bf8.tar.zst
   group: level1/nbody
   part: 1
   parts: 1
-  sha256: e35307efb91f8a4b694eba30ad615df6373e3263031520638fd25d8a162736ce
-  size: 273
-  tar_size: 10240
-  members_digest: b1a7124cc1f0933a529be32f7339bf2d67c2fedfab8b46e30d205aa48277529e
+  sha256: 4a513ba6157fa1ba921c234df3877dd05dec2d3971ab4a78f6fd1341939780be
+  size: 2435112
+  tar_size: 2703360
+  members_digest: a9136df9ac968bf8d910f420f7f41e56c126162480c6c7ef0643957a61b2faa5
   members:
+  - {sha256: 09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502, size: 384000}
+  - {sha256: 206777ada780713697b250567dee97cd8e1fadff7ead7e8eaaaaf363ce390578, size: 768000}
+  - {sha256: 28075aecc2726dd81f948c80cac5f102ac609c7d69e27407b6b6550e5b8d8a3b, size: 192000}
+  - {sha256: 333035c11fdc2daae99009857d5c7b87abbfd3791a36b05cffd517014186e5e8, size: 192000}
+  - {sha256: 4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5, size: 384000}
+  - {sha256: 56c37bb388d199008bea024cf230d7ee4ab1e73a3d8bd0f4d085c4843b0faa69, size: 768000}
   - {sha256: 65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b, size: 4}
   - {sha256: 9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04, size: 4}
   - {sha256: d2f5ffb87aa773ec98098f82dde3c05df05ff93654abff767be10d7615252c71, size: 4}
@@ -573,17 +581,18 @@ bundles:
     notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
   primary: {url: null, status: unpublished}
   mirrors: []
-- name: golden-level1-spmv-657b881bbdc5aea7.tar.zst
+- name: golden-level1-spmv-ebd8f22ef8233e96.tar.zst
   group: level1/spmv
   part: 1
   parts: 1
-  sha256: 5c195ddc00139da96b6e8edf7f4e51f1c57f9a291763916c82560d0787a02e1b
-  size: 10626249
-  tar_size: 18575360
-  members_digest: 657b881bbdc5aea702f89f0a1d34f256f0a104766b4d40ab7313ce6f8598c441
+  sha256: 40c5768157879c9d23a820f8cbe1246be1693eb1d4d71f3b013ee364c1a7d4a8
+  size: 11470086
+  tar_size: 19456000
+  members_digest: ebd8f22ef8233e9693355a0ca3c82bfd4dc21bc4fe11602308d6e41137349601
   members:
   - {sha256: 3e5f6e2a9cb65a4b1f2091909662716615b8070e6fec28767081f7606c41ab5b, size: 3536096}
   - {sha256: 996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d, size: 884024}
+  - {sha256: 9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437, size: 884024}
   - {sha256: e905134c11395b6261c6f2753816db21b0dfc8a2619dcda3bb00e780d63cd39d, size: 14144384}
   content_scan:
     archive_blobs: 0
@@ -594,18 +603,19 @@ bundles:
     notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
   primary: {url: null, status: unpublished}
   mirrors: []
-- name: golden-level1-srad_v1-d6cc20375d31bd73.tar.zst
+- name: golden-level1-srad_v1-b57aca3e43fac564.tar.zst
   group: level1/srad_v1
   part: 1
   parts: 1
-  sha256: 1b704bd088c831b0ee8df34da3ee35d6cd8d97155333bd0cda0a6929aea93e66
-  size: 2416192
-  tar_size: 2764800
-  members_digest: d6cc20375d31bd731ac1abcbe866de38570c900e8936e805f2bccdd633ebbe3f
+  sha256: e557e1a37d0d32d84c21ea4364e6b707473bea03be884356f3fd22eb524cfee4
+  size: 3188372
+  tar_size: 3686400
+  members_digest: b57aca3e43fac564801bea4caaf6f141657539dde3e04499cc637b1e2a6afce4
   members:
-  - {sha256: 6ae1a0baf840e0b10e3c010603173c1f3677745597f4d68277a6d6f7daac253e, size: 919664}
-  - {sha256: f4f62ce60b56f9767c4e7af7bd4334ba9592ba60f457656121837f1bb010b793, size: 919664}
-  - {sha256: fedd6c9138c40bf341ce9e5ac616bd151bfc57a1e31072f3fd7758f76f0bd504, size: 919664}
+  - {sha256: 3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679, size: 919664}
+  - {sha256: 4d9d3d2406b2884b9b7c25ade94d5d7027a61369d5e4a03fa32e166deb20af45, size: 919664}
+  - {sha256: 5fe05607de5d6f3838df8caea66fb8d158a1494a5849212c744de0efc2e40322, size: 919664}
+  - {sha256: 76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e, size: 919664}
   content_scan:
     archive_blobs: 0
     credential_hits: 0
@@ -869,32 +879,42 @@ references:
     json_sha256: 5f66ac66d00f122caeb5942d0186a785091b323dfee7d84a3f9a6080b3ccf776
     schema: hpcperf-golden-1
     blobs: [5a906c2265e26e60869797390e68839587175a9bfde7b5407e9b5d553b994ad4]
-    bundles: [golden-level1-hotspot-3c9958658d914de9.tar.zst]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
   level1/hotspot/reference/g512-p2-t20.json:
     json_sha256: 97334cc54b2ca3aed24b10e385920e57c79842e3e3ac4e31fdc93f1e9c3d61cc
     schema: hpcperf-golden-1
     blobs: [9d70ab5147500860ac8cba3247e217eb29e504e6cebcc46f9861811e7f0847e7]
-    bundles: [golden-level1-hotspot-3c9958658d914de9.tar.zst]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
   level1/hotspot/reference/g512-p2-t200.json:
     json_sha256: 72d5204b3f824bb354113eff3780f5a9a06c1362262c3d1bf1e2945b65c1168b
     schema: hpcperf-golden-1
     blobs: [535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7]
-    bundles: [golden-level1-hotspot-3c9958658d914de9.tar.zst]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
+  level1/hotspot/reference/g512-p2-t21-pnoise9.json:
+    json_sha256: 0ca2baae1a2ca42ae9f861471be1345abe04a98a65096162b3dabc82af6e66a9
+    schema: hpcperf-golden-1
+    blobs: [a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
   level1/hotspot_3d/reference/g64-l8-i100.json:
-    json_sha256: bfcfc289672ca041374486f0b3f77965f10ffc40d1691b49cf80e9dcec4c0d35
+    json_sha256: d359c3173204b82abfcb19db7d361edacf4044623217555e9c2148d0b7de0410
     schema: hpcperf-golden-1
     blobs: [1d491bf45ebdee886b5d93c73769c73f4a762dcf189bbcf0da70d6f26518ed71]
-    bundles: [golden-level1-hotspot_3d-0be1350770deea1f.tar.zst]
+    bundles: [golden-level1-hotspot_3d-1dde424187b70cd4.tar.zst]
   level1/hotspot_3d/reference/g64-l8-i1000.json:
-    json_sha256: 09888fc4a22926812955f56519273e8748356ae61ee56e15242a19b7eaf64ede
+    json_sha256: 8e54e5d202fb985ae639fea05072b61653579f09338dbc512011a8e45fdcc522
     schema: hpcperf-golden-1
     blobs: [0e019e3fe6463968434be77bb496dbfa18eb7a5b4891b173ad976933929eb375]
-    bundles: [golden-level1-hotspot_3d-0be1350770deea1f.tar.zst]
+    bundles: [golden-level1-hotspot_3d-1dde424187b70cd4.tar.zst]
   level1/hotspot_3d/reference/g64-l8-i10000.json:
-    json_sha256: 9f5029a89c30e3a38c9f10effe952bed3e824241c2236c8ff43bd1cbdc35ab9f
+    json_sha256: 0574e580dbb38e1291dfa40ea7f4c534ac9cf20c3a5f157f6242c4a92b5a2cfc
     schema: hpcperf-golden-1
     blobs: [a6bf1c8c5ba3090697164308b958a0c3310001b57b851b8c88900955f3257f13]
-    bundles: [golden-level1-hotspot_3d-0be1350770deea1f.tar.zst]
+    bundles: [golden-level1-hotspot_3d-1dde424187b70cd4.tar.zst]
+  level1/hotspot_3d/reference/g64-l8-i50-amp10.json:
+    json_sha256: e115c337af9e0b4771cff31063506882cc5c91ec9859352b8bf5db5f98f86058
+    schema: hpcperf-golden-1
+    blobs: [5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12]
+    bundles: [golden-level1-hotspot_3d-1dde424187b70cd4.tar.zst]
   level1/jacobi_2d/reference/size1002.json:
     json_sha256: f9f47f822c5fa10cff8869a2f0bef83fb8e458f70057bdee1d5aebeee7021610
     schema: hpcperf-golden-1
@@ -961,42 +981,42 @@ references:
     blobs: [561517f73f4f0b137f946b07ea128f6208d9e0f36cc37ba0f0d25c5eca216572]
     bundles: [golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst]
   level1/nbody/reference/n16000-s10.json:
-    json_sha256: 7ad6d788de8e73b3ad42ba6207dc0236ec3a343ddb337dc359615aa6311207b1
+    json_sha256: 905db37dea8bc0ad9ad335be5c0fd8b6478c016cb4b8a04f1272066ddbce904a
     schema: hpcperf-golden-1
-    blobs: [65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b]
-    bundles: [golden-level1-nbody-b1a7124cc1f0933a.tar.zst]
+    blobs: [28075aecc2726dd81f948c80cac5f102ac609c7d69e27407b6b6550e5b8d8a3b, 333035c11fdc2daae99009857d5c7b87abbfd3791a36b05cffd517014186e5e8, 65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
   level1/nbody/reference/n32000-s10.json:
-    json_sha256: e7488a9eff4498bb6e53b356dd9e14b21a9a7f23ff2f18447bd56cab81653fa7
+    json_sha256: 6e48885faa6927d3c2efcf29b64435cbfa7ed74eaf50af19c0f0e2d0ab781710
     schema: hpcperf-golden-1
-    blobs: [9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04]
-    bundles: [golden-level1-nbody-b1a7124cc1f0933a.tar.zst]
+    blobs: [09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502, 4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5, 9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
   level1/nbody/reference/n64000-s10.json:
-    json_sha256: 670a2f51a83e187783be2fccd3b5c719b3ea6df8280b03ddf877ec451ae35dd2
+    json_sha256: e74053cfa3dbd057bc458cdc94e189c02ecf8a92e516334a2ef0bf49a9b067de
     schema: hpcperf-golden-1
-    blobs: [d2f5ffb87aa773ec98098f82dde3c05df05ff93654abff767be10d7615252c71]
-    bundles: [golden-level1-nbody-b1a7124cc1f0933a.tar.zst]
+    blobs: [206777ada780713697b250567dee97cd8e1fadff7ead7e8eaaaaf363ce390578, 56c37bb388d199008bea024cf230d7ee4ab1e73a3d8bd0f4d085c4843b0faa69, d2f5ffb87aa773ec98098f82dde3c05df05ff93654abff767be10d7615252c71]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
   level1/nearest_neighbor/reference/cane4-k5.json:
     json_sha256: 6c048a1be36c3354c1084fdd55cbd39395045008e734278410c2135ab3ce070e
     schema: hpcperf-golden-1
     blobs: [df3813ece5587f581ed88721a41d70833cedc1bdce4a25208f504b934842523c]
     bundles: [golden-level1-nearest_neighbor-97ef1812289a27f2.tar.zst]
   level1/pagerank/reference/nodes1024.json:
-    json_sha256: 1219e2d2b03326836f1e614705dadd609a1eabd9c19d95361cfd6d16cfc32079
+    json_sha256: 5802e9fcf75aaf48fe2444e16f56d1de36d66334915cd36310958708d9c018ee
     schema: hpcperf-golden-1
     blobs: [a10eac893da8de95fc2d1a944a3d4fc77f652e7cccf4d0cfbd0ea021c333fc86]
     bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
   level1/pagerank/reference/nodes16384-m5.json:
-    json_sha256: e4d720e046d7fe5a7425b429b4b3794f8d491cf3a845307393cd12fcc7ffdad8
+    json_sha256: dbd56dbd0bddbe8209b1b65ed66e31dc5887a5a0dab8653c0cdc5be455c99504
     schema: hpcperf-golden-1
     blobs: [7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5]
     bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
   level1/pagerank/reference/nodes16384.json:
-    json_sha256: c55a026fa3175d258e9ed087892eebf99640c733707a5dae726b77a10656078b
+    json_sha256: f1cb8520af8ba06574e237967f075eb5bf5eeec5511b14a9b4b98520048dce13
     schema: hpcperf-golden-1
     blobs: [63fcdd3e17b13e6d120f391830e77801d0b3e66b918b6618a20747e0652a522e]
     bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
   level1/pagerank/reference/nodes4096.json:
-    json_sha256: dd04ef98f8429a95cdc5c3079a2bd9a76cbc4cbf447f0c1aff2ddae095ea907c
+    json_sha256: b1212b4ea26f4e5d4733f0e85552419e31ebb50018cbeaa9f8bf0cf597fbde04
     schema: hpcperf-golden-1
     blobs: [9f6a63b947ae20780d211ffaa6f5759dd2384d5ef5f156a3d9bcae6b5183a836]
     bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
@@ -1040,36 +1060,46 @@ references:
     schema: hpcperf-golden-1
     blobs: [31bf7c0c1ef61e609ab266b1d0aa2b21926a6916628e341cc36ce00fbf8f3201]
     bundles: [golden-level1-spgemm-d5bdc149e4a5af2f.tar.zst]
+  level1/spmv/reference/probe-real.json:
+    json_sha256: 3dc1a8f6d66ed45738065c9cc20143e62a15c6eddec7c1c96645c5e9dfc45752
+    schema: hpcperf-golden-1
+    blobs: [9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
   level1/spmv/reference/s110503.json:
     json_sha256: c849d3f259bb23574d1bad9a0b49b99aa382007dd9fbe2c9e3d6c1a3994919fb
     schema: hpcperf-golden-1
     blobs: [996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d]
-    bundles: [golden-level1-spmv-657b881bbdc5aea7.tar.zst]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
   level1/spmv/reference/s1768048.json:
     json_sha256: 19304be5fcf4e1ac657c1badafff3d696141240c55c974133a8fc941d6284fcd
     schema: hpcperf-golden-1
     blobs: [e905134c11395b6261c6f2753816db21b0dfc8a2619dcda3bb00e780d63cd39d]
-    bundles: [golden-level1-spmv-657b881bbdc5aea7.tar.zst]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
   level1/spmv/reference/s442012.json:
     json_sha256: c0bda2eb1d2ef7f79676362e438810bb9c6402b4ebac09b5835d26846ebc9f0a
     schema: hpcperf-golden-1
     blobs: [3e5f6e2a9cb65a4b1f2091909662716615b8070e6fec28767081f7606c41ab5b]
-    bundles: [golden-level1-spmv-657b881bbdc5aea7.tar.zst]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
   level1/srad_v1/reference/iter100.json:
-    json_sha256: 3b2f59e96a8421b37c143ea6e9b7d27762b3a22f3d66310d2208b479b896c275
+    json_sha256: de2fbfb9f65e3694a015b0c10849febe488e52d9aa6bc7511385b1179c7be4f1
     schema: hpcperf-golden-1
-    blobs: [fedd6c9138c40bf341ce9e5ac616bd151bfc57a1e31072f3fd7758f76f0bd504]
-    bundles: [golden-level1-srad_v1-d6cc20375d31bd73.tar.zst]
+    blobs: [76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
   level1/srad_v1/reference/iter2000.json:
-    json_sha256: 3e6f35a06b829a98e4b8cd2ac623c6d978099de3e1eff9de69b6d88e29cc08ca
+    json_sha256: 96cd2a9f443d0be14fd4ebaf9b42b07be5e2d4d31ad8f3b2ddd1f8d884855452
     schema: hpcperf-golden-1
-    blobs: [6ae1a0baf840e0b10e3c010603173c1f3677745597f4d68277a6d6f7daac253e]
-    bundles: [golden-level1-srad_v1-d6cc20375d31bd73.tar.zst]
+    blobs: [4d9d3d2406b2884b9b7c25ade94d5d7027a61369d5e4a03fa32e166deb20af45]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
   level1/srad_v1/reference/iter500.json:
-    json_sha256: 6b2526274d7b0467ca669b0f7257ae6c663c9f0a5c93b41a7cba2ae6152d70d1
+    json_sha256: 40f741d45875242571f2eae9434c26539133310a16054273f7a5cd5b6565d387
     schema: hpcperf-golden-1
-    blobs: [f4f62ce60b56f9767c4e7af7bd4334ba9592ba60f457656121837f1bb010b793]
-    bundles: [golden-level1-srad_v1-d6cc20375d31bd73.tar.zst]
+    blobs: [5fe05607de5d6f3838df8caea66fb8d158a1494a5849212c744de0efc2e40322]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
+  level1/srad_v1/reference/probe-edges-n20.json:
+    json_sha256: e5cbd110b5423afc88688197b583b0d8852150c954770fe53212ab7825017229
+    schema: hpcperf-golden-1
+    blobs: [3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
   level2/exacmech/reference/bcc-a-1m-1000.json:
     json_sha256: 80b1ed8d4eaf0b84317a6662720124ed03f47b198334603ac24fb4729bd8bdcf
     schema: hpcperf-golden-1
