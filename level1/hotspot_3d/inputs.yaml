@@ -48,6 +48,19 @@ golden:
     basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144,
       :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
       the CPU reference
+  # a second rule on the same array (both must hold). Not upstream: the RMSE over 32768 elements lets one element be off
+  # by up to ~1.8 K. Measured 2026-10-28 (B200): 23 legitimate variants within max |a - g| <= 3.9e-3 / 9.3e-3 / 1.13e-2 K
+  # at i100 / i1000 / i10000 (>= 4.3x below this limit; for spread deviations the RMSE rule above stays the tighter
+  # one, 6.5e-3 of 1e-2 at i10000), single-element errors >= 0.05 K fail.
+  - name: tempOut
+    dtype: f32
+    rule: {metric: max_abs, tol: 5.0e-2}
+    cpu: tempOut.cpu
+    basis: 'per-element gate next to the upstream RMSE (no upstream equivalent): max |a - g| <= 5e-2 K minus the B200
+      output''s own max deviation from computeTempCPU; legitimate implementations (FMA on/off, CPU-reference, reversed and
+      pairwise term order, two factorized forms, delta form, precomputed source term, f64 arithmetic or state, other
+      block shapes, a 3D grid, shared-memory tiles) <= 1.13e-2 K, a single element off by >= 0.05 K fails (the RMSE rule
+      alone allows ~1.8 K)'
 check:
   kind: post_run
   run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
