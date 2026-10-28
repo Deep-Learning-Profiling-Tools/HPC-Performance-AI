@@ -41,4 +41,11 @@ if(BUILD_TESTING)
     set_tests_properties(nearest_neighbor_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the default query with -r 42764 (every record), on
+    # which every record must be reported once with its own distance; checked against its own frozen reference, never timed
+    add_test(NAME nearest_neighbor_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} cane4-all --exe $<TARGET_FILE:nearest_neighbor_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe)
+    set_tests_properties(nearest_neighbor_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

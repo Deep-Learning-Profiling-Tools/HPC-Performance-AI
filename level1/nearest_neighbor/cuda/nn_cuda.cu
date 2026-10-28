@@ -183,12 +183,27 @@ int main(int argc, char* argv[])
     // (all unchecked inside the ROI, as upstream) is still pending here and fails the run instead of printing garbage
     NN_CUDA_CHECK(cudaGetLastError());
     if (hpcperf_golden_active()) {
-      // tools/golden: the checked output = the k reported distances (records[i].distance, printed below),
+      // tools/golden: the checked outputs: the k reported distances (records[i].distance, printed below),
       // sorted ascending exactly as verify.py compares them (findLowest already leaves them ascending)
       std::vector<float> hpcperf_topk(resultsCount);
       for (int g = 0; g < resultsCount; g++) hpcperf_topk[g] = records[g].distance;
       std::sort(hpcperf_topk.begin(), hpcperf_topk.end());
       hpcperf_golden_output("topk_distances", hpcperf_topk.data(), resultsCount, "f32");
+      // the identities of the k reported records (their 48-character db lines, as printed below) as a set: sorted
+      // bytewise, so neither the report order nor the order of (near-)equal distances matters; and the distance
+      // reported with each of them, in that order (the pairing record <-> distance)
+      std::vector<int> hpcperf_ord(resultsCount);
+      for (int g = 0; g < resultsCount; g++) hpcperf_ord[g] = g;
+      std::sort(hpcperf_ord.begin(), hpcperf_ord.end(), [&](int a, int b) {
+        return memcmp(records[a].recString, records[b].recString, 48) < 0; });
+      std::vector<unsigned char> hpcperf_recs((size_t)resultsCount * 48);
+      std::vector<float> hpcperf_rdist(resultsCount);
+      for (int g = 0; g < resultsCount; g++) {
+        memcpy(&hpcperf_recs[(size_t)g * 48], records[hpcperf_ord[g]].recString, 48);   // loadData: exactly 48 chars
+        hpcperf_rdist[g] = records[hpcperf_ord[g]].distance;
+      }
+      hpcperf_golden_output("topk_records", hpcperf_recs.data(), hpcperf_recs.size(), "u8");
+      hpcperf_golden_output("topk_record_distances", hpcperf_rdist.data(), resultsCount, "f32");
     }
 
     // print out results
