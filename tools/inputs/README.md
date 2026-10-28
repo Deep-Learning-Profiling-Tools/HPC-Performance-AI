@@ -93,7 +93,8 @@ inputs:
 ```
 
 `coverage.status` is checked against the number of *runnable* (materialized)
-inputs: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
+performance inputs -- correctness probes (`purpose: correctness-probe`, below) never
+count: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
 `BLOCKED` at most one (upstream offers more, the `blocker` says what is missing).
 A benchmark with two or more runnable inputs and further upstream inputs that were
 not added is `MULTI_INPUT` with `upstream_inputs_not_added`.
@@ -348,14 +349,21 @@ analytic or upstream-published results (p3_heat3d's closed-form `L2_norm`).
 
 **No CPU reference at run time (2026-10-26, decision of the project owner).** No measurement, no
 check and no optimization candidate runs a benchmark's CPU reference implementation. Where the
-correctness criterion used to be "recompute on the CPU and compare" (40 Level 1 benchmarks, Level 2
-Kripke and ExaCMech), the oracle is the frozen B200 golden reference of the input (`tools/golden`):
-the outputs of the unmodified build, frozen once after that CPU reference validated them, compared
-with the upstream metric and tolerance minus the golden's own measured deviation from the CPU
-reference (so the original criterion is not loosened). The CPU references stay in the sources for
-that one-time validation and run only with an explicit `HPCPERF_CPU_REFERENCE=1`; nothing falls back
-to them. Independent checks (analytic solutions, conservation, official reference values,
-property checks, frozen references made earlier) are unchanged.
+correctness criterion used to be "recompute on the CPU and compare" (Level 1 -- 41 benchmarks carry
+golden references now --, Level 2 Kripke and ExaCMech), the oracle is the frozen B200 golden reference
+of the input (`tools/golden`): the outputs of the unmodified build, frozen once after that CPU
+reference validated them, compared with the benchmark's metric and tolerance minus the golden's own
+measured deviation from the CPU reference (so the criterion is not loosened by the golden). The metric
+and tolerance are upstream's where upstream defines one; where upstream's check was missing or did not
+observe the output, they are project criteria fixed from measured legitimate vs wrong envelopes and
+documented per benchmark (nbody positions/velocities and KE relative 1e-4, pagerank 3e-5 / 1e-5,
+hotspot_3d's max_abs gate, spmv's probe-real, srad_v1's probe, the correctness-probe inputs). The
+validate.sh default paths of Level 2 Branson, Remhos, hipBone and Nekbone and of Level 3 Nyx (check [3])
+changed the same way: frozen references instead of a CPU/Serial rerun (per-application README,
+"Modes"). The CPU references stay in the sources for that one-time validation and run only with an
+explicit `HPCPERF_CPU_REFERENCE=1`; nothing falls back to them. Independent checks (analytic solutions,
+conservation, official reference values, property checks, frozen references made earlier) are
+unchanged.
 
 Principles (fixed for this project): upstream / native check > upstream reference > exact
 deterministic comparison > same-input unoptimized baseline (for the CPU-referenced benchmarks the
