@@ -94,6 +94,22 @@ line for line in all 55 runs where both ran)
 * A comes from `create_matrix`, not from the program's memory: a run that changed its own matrix is judged against
   the registered one (upstream compared with the program's own copy).
 
+**Why the exact residual is the intended criterion.** Upstream's criterion is a statement about the factors -- every
+element of `A - L U` within 1e-4. The float32 sum that upstream uses to evaluate `L U` adds the rounding of the checking
+loop itself (its summation order, and FMA contraction, which the current `-march=nocona` host build does not do but an
+FMA-capable host target may); that rounding is not a property of the GPU result, differs between hosts and compilers,
+and decides a verdict only inside the band |exact residual - 1e-4| <~ 1.9e-5 (about 8.1e-5 .. 1.19e-4). The float64
+evaluation (error < 1e-11 whatever the BLAS, thread count or summation order) keeps the verdict the same on every host
+and GPU architecture. No executed variant lies in that band: legitimate implementations reach at most 4.6e-5 (the
+registered s8192 run 2.78e-5), the smallest deliberate fault 2.0e-4 and every algorithmic fault >= 0.31 (table below);
+only constructed in-band perturbations (above) separate the two checks.
+
+Re-checked 2026-10-28 on the committed tree (B200; capture of a default run, then `lud_residual_check.py`; perturbed
+copies of the captured factors through `--lu`): baseline PASS at s256 / s2048 / s8192 (3.818e-6 / 9.485e-6 /
+2.776e-5); one U element (n/2, n/2+3) + 2e-4 FAILs (max 2.003e-4 / 2.021e-4 / 2.090e-4; 128 / 694 / 690 elements above
+1e-4: row i >= n/2 of column n/2+3 of `L U` shifts by `L[i][n/2] * 2e-4`, `L[n/2][n/2]` = 1), the same element + 5e-5 PASSes
+(5.06e-5 / 5.22e-5 / 5.97e-5), one NaN in U (n-1, n-1) or in L (3, 1) FAILs (non-finite factor).
+
 **Negative and legitimate variants (executed).** Fault-injection copies of these sources (scratch builds, not in the
 tree) run with `HPCPERF_CPU_REFERENCE=1` and the capture, so both checks judge the same factors. Each verdict was the
 expected one at s256 and s2048 (real upstream check, 24 variants each) and s8192 (real upstream check for 7
