@@ -202,8 +202,11 @@ input
 `python3 tools/inputs/hpcperf_inputs.py check level2/exacmech fcc-a-1m-1000 --out build/level2/exacmech/validate/frozen-reference-check`
 (that input's GPU run against its frozen B200 golden reference, `tools/golden`). A missing
 reference is a FAIL, never a fallback to the CPU/OpenMP device. The log says
-`CPU reference: skipped (default; frozen reference check instead)`. Observed 2026-10-26: FAIL in
-15.7 s -- `no frozen reference level2/exacmech/reference/fcc-a-1m-1000.json` (not made yet). The
+`CPU reference: skipped (default; frozen reference check instead)`. Observed 2026-10-26, before
+the references were made (3a4488a): FAIL in 15.7 s -- `no frozen reference
+level2/exacmech/reference/fcc-a-1m-1000.json`. Since 3a4488a the three registered inputs have frozen
+references (`reference/`); the registry check of fcc-a-1m-1000 PASSes against the reference made
+2026-10-26 (observed 2026-10-28, 12.1 s; fcc-a-350k-60 and bcc-a-1m-1000 PASS as well). The
 GPU-vs-CPU comparison described below runs only on an explicit offline request
 (`HPCPERF_CPU_REFERENCE` set to `1`, e.g. by `tools/golden/hpcperf_golden.py make`); observed then:
 PASS, max |gpu-ref| = 0, 19.8 s.
@@ -271,6 +274,8 @@ Reproduce the toolchain from the repository root: `./setup_env.sh` then
 ## Status
 
 CUDA: Working (configure + build + run + validate all passed on the B200 via `build.sh`, `run.sh`,
-`validate.sh` from a fresh shell; build 1m48s, run 9.5 s, validate PASS with max |gpu-cpu| = 0).
+`validate.sh` from a fresh shell; build 1m48s, run 9.5 s, validate PASS with max |gpu-cpu| = 0 --
+recorded when `validate.sh` still compared against the CPU/OpenMP device; the default `validate.sh`
+now checks the frozen B200 reference, see "Modes" above).
 HIP: source and build configuration present (`build.sh HIP`, `-DENABLE_HIP=ON`), untested -- no
 ROCm/hipcc on this machine, and HIP builds of RAJA/camp, Umpire and CHAI would be needed as well.
