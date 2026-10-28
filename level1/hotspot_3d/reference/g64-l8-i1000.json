@@ -25,7 +25,7 @@
       "data/temp_64x8": "6f1d1f8adf0b47ac1b86195bc8644fa51bfcd8550490d39b4b8d93af70eeb403"
     }
   },
-  "inputs_yaml_sha256": "0e34f98f145c839656f9b56d05a04c90746b749f517bf8d92163227a393c0fd8",
+  "inputs_yaml_sha256": "6ff43e35740ba0d84ce5440f3ec13837d9c6caa1d406b2df87025cedf42b4b1e",
   "spec": {
     "mode": "data",
     "outputs": [
@@ -40,6 +40,19 @@
         },
         "cpu": "tempOut.cpu",
         "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144, :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "tempOut",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.05
+        },
+        "cpu": "tempOut.cpu",
+        "basis": "per-element gate next to the upstream RMSE (no upstream equivalent): max |a - g| <= 5e-2 K minus the B200 output's own max deviation from computeTempCPU; legitimate implementations (FMA on/off, CPU-reference, reversed and pairwise term order, two factorized forms, delta form, precomputed source term, f64 arithmetic or state, other block shapes, a 3D grid, shared-memory tiles) <= 1.13e-2 K, a single element off by >= 0.05 K fails (the RMSE rule alone allows ~1.8 K)",
         "log": null
       }
     ]
@@ -66,21 +79,43 @@
         "nonfinite": 0
       },
       "blob": "sha256/0e/0e019e3fe6463968434be77bb496dbfa18eb7a5b4891b173ad976933929eb375.bin"
+    },
+    {
+      "name": "tempOut",
+      "dtype": "f32",
+      "count": 32768,
+      "bytes": 131072,
+      "sha256": "0e019e3fe6463968434be77bb496dbfa18eb7a5b4891b173ad976933929eb375",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.05,
+        "d0_vs_cpu_reference": 0.0006256103515625,
+        "d0_source": "tempOut.cpu",
+        "tol_effective": 0.0493743896484375
+      },
+      "basis": "per-element gate next to the upstream RMSE (no upstream equivalent): max |a - g| <= 5e-2 K minus the B200 output's own max deviation from computeTempCPU; legitimate implementations (FMA on/off, CPU-reference, reversed and pairwise term order, two factorized forms, delta form, precomputed source term, f64 arithmetic or state, other block shapes, a 3D grid, shared-memory tiles) <= 1.13e-2 K, a single element off by >= 0.05 K fails (the RMSE rule alone allows ~1.8 K)",
+      "stats": {
+        "min": 225.62936401367188,
+        "max": 231.8931427001953,
+        "sum": 7496520.989212036,
+        "nonfinite": 0
+      },
+      "blob": "sha256/0e/0e019e3fe6463968434be77bb496dbfa18eb7a5b4891b173ad976933929eb375.bin"
     }
   ],
   "provenance": {
-    "made_utc": "2026-10-26T06:31:15Z",
+    "made_utc": "2026-10-28T11:17:17Z",
     "host": "dgx003.orc.gmu.edu",
     "gpu": {
       "name": "NVIDIA B200",
-      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
       "driver": "595.58.03"
     },
     "cuda_toolkit": "13.2.1",
-    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "git_head": "986f4d4340043e6f3d20a0c533a19423b8352714",
     "source_clean": true,
     "binary": "build/hotspot_3d/cuda/hotspot_3d_cuda",
-    "binary_sha256": "ef90c73793867a05d4ba945d8fa924fbbe12b1ce0618f3c1a5b1e6721577cdac",
+    "binary_sha256": "c5a07363df3c7d5fa7b22da6c493cb1f1bf856879b86addfc615f115d44718dd",
     "command": [
       "python3",
       "level1/hotspot_3d/verify.py",
@@ -98,7 +133,7 @@
     },
     "cpu_validation": {
       "exit_code": 0,
-      "wall_s": 0.876,
+      "wall_s": 1.423,
       "pass_line": "PASS: accuracy vs built-in CPU reference = 1.260e-04 (threshold 1e-2)",
       "pass_regex": "^PASS: accuracy",
       "fail_regex": "^FAIL",
@@ -106,9 +141,14 @@
       "log_sha256": "95fe03fd6a5037e8ad502d41a22791707204025078b6f1b7a9188391b84afc79"
     },
     "tool_sha256": {
-      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
-      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
     "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  },
+  "replaces": {
+    "reason": "hotspot_3d criterion expanded (commit c876c84): a per-element max_abs 5e-2 K gate next to the upstream RMSE 1e-2 (the RMSE alone let one element be off by ~1.8 K); measured 2026-10-28 on 23 legitimate variants (<= 1.13e-2 K, >= 4.3x headroom). Baseline and captured data unchanged.",
+    "previous_made_utc": "2026-10-26T06:31:15Z",
+    "previous_sha256": "09888fc4a22926812955f56519273e8748356ae61ee56e15242a19b7eaf64ede"
   }
 }
