@@ -1,0 +1,116 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "hotspot",
+  "level": 1,
+  "input_id": "g512-p2-t21-pnoise9",
+  "frozen": true,
+  "workload": {
+    "input_id": "g512-p2-t21-pnoise9",
+    "params": {
+      "grid": 512,
+      "pyramid_height": 2,
+      "sim_time": 21,
+      "power": "power_512 + 9 W x lowbias32(k) / 2^32 (data/gen_probe.py)"
+    },
+    "args": [
+      "512",
+      "2",
+      "21",
+      "level1/hotspot/data/temp_512",
+      "build/hotspot/cuda/data/power_512_pnoise9",
+      "output.out"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/temp_512": "503e20bbed397d6799dd55ce928dadc300c0a7834bf7d9ad69eda73c67d23172",
+      "data/power_512": "863d922187ae70f8eefda603b71a161a9e61bc4cf7f4cc0cb2c0b8feead58471",
+      "data/gen_probe.py": "35fe9c2d496e2c3adc10b30d3b8f41988fc59d911a0143cde7f5b9f4d132c2fe"
+    }
+  },
+  "inputs_yaml_sha256": "2ace923178cea3d99ac44e2287bfc775321a8f9784431768e26f4a2eabafc395",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "temperature",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 3e-05
+        },
+        "cpu": "temperature.cpu",
+        "basis": "the metric of verify.py's check max |gpu - ref| / (1 + |ref|) (level1/hotspot/verify.py:53-54; upstream Rodinia has no check, verify.py and its 1e-3 are this repository's) on the binary's float32 MatrixOut; the tolerance from measurements on this probe (2026-10-28): legitimate variants <= 2.7e-6, the smallest deviations that must fail 3.4e-4 (ambient temperature 0), 3.5e-4 / 3.7e-4 (f16-rounded input / output field); 3e-5 is their geometric mean (about 11x margin on each side), minus the B200 field's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "temperature",
+      "dtype": "f32",
+      "count": 262144,
+      "bytes": 1048576,
+      "sha256": "a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 3e-05,
+        "d0_vs_cpu_reference": 1.76586517283891e-07,
+        "d0_source": "temperature.cpu",
+        "tol_effective": 2.9823408216304322e-05
+      },
+      "basis": "the metric of verify.py's check max |gpu - ref| / (1 + |ref|) (level1/hotspot/verify.py:53-54; upstream Rodinia has no check, verify.py and its 1e-3 are this repository's) on the binary's float32 MatrixOut; the tolerance from measurements on this probe (2026-10-28): legitimate variants <= 2.7e-6, the smallest deviations that must fail 3.4e-4 (ambient temperature 0), 3.5e-4 / 3.7e-4 (f16-rounded input / output field); 3e-5 is their geometric mean (about 11x margin on each side), minus the B200 field's own deviation from the CPU reference",
+      "stats": {
+        "min": 332.95294189453125,
+        "max": 393.6732177734375,
+        "sum": 93628403.13162231,
+        "nonfinite": 0
+      },
+      "blob": "sha256/a8/a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T10:43:19Z",
+    "host": "dgx003.orc.gmu.edu",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "2e165afb499f55d92112d03f4e61ff46de8776fe",
+    "source_clean": true,
+    "binary": "build/hotspot/cuda/hotspot_cuda",
+    "binary_sha256": "5961543d53ed170b4f4f4f03fc7f8d663c24538c7f3430c903731778c1660142",
+    "command": [
+      "python3",
+      "level1/hotspot/verify.py",
+      "build/hotspot/cuda/hotspot_cuda",
+      "512",
+      "2",
+      "21",
+      "level1/hotspot/data/temp_512",
+      "build/hotspot/cuda/data/power_512_pnoise9"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 2.629,
+      "pass_line": "PASS: hotspot output matches CPU reference (max rel err 1.522e-06)",
+      "pass_regex": "^PASS: hotspot output matches CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/hotspot/g512-p2-t21-pnoise9/run/stdout.log",
+      "log_sha256": "f8d778d8a3123d0bae689f30fd15a2673e744e9d6fdc633db031eda542692627"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "169e4f0d7da831138ad80b531bf635ac924072eda3f4141ce4f8fc59e44abc84",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}
