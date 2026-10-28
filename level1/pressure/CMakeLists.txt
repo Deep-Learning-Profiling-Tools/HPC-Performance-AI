@@ -57,4 +57,11 @@ if(BUILD_TESTING)
     set_tests_properties(pressure_probe PROPERTIES TIMEOUT 300
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # second correctness probe: set-up data on which the cut-off branches no other input decides do decide
+    # (`--probe-cutoffs`, cuda/main.cu setUp)
+    add_test(NAME pressure_probe_cutoffs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-cutoffs --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-cutoffs)
+    set_tests_properties(pressure_probe_cutoffs PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

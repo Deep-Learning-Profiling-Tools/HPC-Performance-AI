@@ -53,18 +53,22 @@ struct Data {
 };
 
 // upstream PRESSURE.cpp setUp (init order preserved)
-// probe (correctness-probe input, `--probe`; set-up only, the kernels are unchanged): upstream's data gives
-// p_new = bvc * e_old ~ 0.0117 < p_cut and vnewc >= eosvmax everywhere, so every p_new is clamped to pmin --
-// a constant fill reproduces the output. The probe initializes vnewc with upstream's own random-value helper
-// (DataUtils initDataRandValue, values in [0, 1], same init count) and scales the cut-offs p_cut and pmin by
-// 1e-2, so about a fifth of the elements (vnewc < eosvmax) keep p_new = bvc * e_old.
-static void setUp(Data& d, Index_type size, bool probe)
+// probe 1 (correctness-probe input probe-randvalue, `--probe`; set-up only, the kernels are unchanged): upstream's
+// data gives p_new = bvc * e_old ~ 0.0117 < p_cut and vnewc >= eosvmax everywhere, so every p_new is clamped to
+// pmin -- a constant fill reproduces the output. The probe initializes vnewc with upstream's own random-value
+// helper (DataUtils initDataRandValue, values in [0, 1], same init count) and scales the cut-offs p_cut and pmin
+// by 1e-2, so about a fifth of the elements (vnewc < eosvmax) keep p_new = bvc * e_old.
+// probe 2 (probe-cutoffs, `--probe-cutoffs`; set-up only): probe 1 plus e_old from initDataRandValue, so
+// p_new = bvc * e_old spreads over [0, 0.1175] and the p_cut test alone decides the elements with
+// pmin <= p_new < p_cut (no other input has one). The helper reseeds srand(4793): e_old == vnewc element-wise.
+static void setUp(Data& d, Index_type size, int probe)
 {
   resetDataInitCount();
   allocAndInitData(d.compression, size);
   allocAndInitData(d.bvc, size);
   allocAndInitDataConst(d.p_new, size, 0.0);
-  allocAndInitData(d.e_old, size);
+  if (probe == 2) allocAndInitDataRandValue(d.e_old, size);
+  else            allocAndInitData(d.e_old, size);
   if (probe) allocAndInitDataRandValue(d.vnewc, size);
   else       allocAndInitData(d.vnewc, size);
   initData(d.cls);
@@ -80,13 +84,14 @@ int main(int argc, char** argv)
   Index_type run_reps = 700;   // upstream default reps
   if (argc > 1) size = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
-  bool probe = false;          // correctness-probe set-up data (see setUp); never a performance input
+  int probe = 0;               // correctness-probe set-up data (see setUp); never a performance input
   if (argc > 3) {
-    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
-      fprintf(stderr, "usage: %s [size [reps [--probe]]]\n", argv[0]);
+    if (argc == 4 && strcmp(argv[3], "--probe") == 0)              probe = 1;
+    else if (argc == 4 && strcmp(argv[3], "--probe-cutoffs") == 0) probe = 2;
+    else {
+      fprintf(stderr, "usage: %s [size [reps [--probe|--probe-cutoffs]]]\n", argv[0]);
       return 2;
     }
-    probe = true;
   }
   const Index_type ibegin = 0;
   const Index_type iend = size;
