@@ -6,12 +6,14 @@ working directory, timeout and pass/fail regexes come from
 
     ctest --test-dir <build-root>/level1/<bm> --show-only=json-v1
 
-Nine benchmarks are wrapped by a repo-authored verify.py in their add_test()
-command. Timing those would measure the Python CPU reference, not the GPU work,
-so the table records the INNER argv the wrapper would exec. That argv is
-obtained by importing the wrapper with subprocess.run monkey-patched -- the
-wrapper performs its own argv transformation (four of them rewrite arguments),
-so nothing is guessed and the wrappers stay unmodified.
+Three benchmarks (ao_bench, gaussian_elimination, lud) are still wrapped by a
+repo-authored verify.py in their add_test() command (nine before 2026-10-26; the
+other six now run the golden runner below). Timing those would measure the
+wrapper's checks, not the GPU work, so the table records the INNER argv the
+wrapper would exec. That argv is obtained by importing the wrapper with
+subprocess.run monkey-patched -- the wrapper performs its own argv transformation
+(gaussian_elimination's rewrites its arguments), so nothing is guessed and the
+wrappers stay unmodified.
 
 Since 2026-10-26 most ctests run tools/golden/hpcperf_golden.py run <bench_dir> [<input>] --exe <binary>
 (one plain run of the registry's default input, compared with the frozen golden reference). For those

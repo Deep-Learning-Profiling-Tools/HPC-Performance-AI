@@ -286,10 +286,13 @@ tabs); `cases.py` resolves them into the rows the engine runs:
 timeout from `ctest --show-only=json-v1` of the build tree (`--check` fails on
 drift). It trusts `CMAKE_CTEST_COMMAND` from the build tree's `CMakeCache.txt`
 first, then `$HPCPERF_CTEST`, then a `PATH` ctest only if `ctest --version` works
-(on the reference node `~/.local/bin/ctest` is a broken pip shim). Nine benchmarks
-are wrapped by a repo-authored `verify.py`; their inner argv is obtained by
-importing the wrapper with `subprocess.run` intercepted, so the binary is measured
-directly and no wrapper is modified.
+(on the reference node `~/.local/bin/ctest` is a broken pip shim). Three benchmarks
+(ao_bench, gaussian_elimination, lud; nine before 2026-10-26) are wrapped by a
+repo-authored `verify.py`; their inner argv is obtained by importing the wrapper
+with `subprocess.run` intercepted, so the binary is measured directly and no
+wrapper is modified. The 41 benchmarks whose ctest runs the golden runner
+(`tools/golden/hpcperf_golden.py run`) record the binary with the registry
+input's arguments (wrapper `golden`); the rest run their binary directly.
 
 ### Registered inputs (`--registry`)
 
@@ -556,8 +559,9 @@ captured factors, `level1/lud/lud_residual_check.py`, which a measurement never 
 those on. ctest runs the golden comparison; the
 tests assert that no source enables the CPU reference by itself. NPB `is` verifies inside its timed kernels and cannot be separated
 without editing an upstream kernel: its ROI includes that check
-(`verify_vs_roi=inside`, caveated). `background_subtraction` generates frames and
-runs its CPU reference inside the frame loop; both are excluded.
+(`verify_vs_roi=inside`, caveated). `background_subtraction` generates frames inside
+the frame loop (excluded from the ROI); its CPU reference (`merge_ref`) runs there only
+with `HPCPERF_CPU_REFERENCE=1`, i.e. never in a measurement.
 
 ## Tests
 

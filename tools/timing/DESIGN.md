@@ -220,8 +220,10 @@ Placement rule and build integration: `roi/README.md`. Log format: `SCHEMA.md`.
 * Level 1: a row in `cases/level1_extra.tsv` -- `app case args env timeout_s notes`
   (the default cases come from ctest).
 * Reserved names, never settable by a case: `HPCPERF_ROI_LOG`, `HPCPERF_SKIP_VERIFY`,
-  `HPCPERF_GPUS` (use the `gpus` column), `HPCPERF_NP`, `HPCPERF_DRY_RUN`; names
-  matching the credential deny rule are refused.
+  `HPCPERF_GPUS` (use the `gpus` column), `HPCPERF_NP`, `HPCPERF_DRY_RUN`, the golden
+  switches `HPCPERF_CPU_REFERENCE`, `HPCPERF_GOLDEN_DUMP`, `HPCPERF_GOLDEN_MODE`,
+  `HPCPERF_RANDOM_SEED` and the selector's `HPCPERF_INPUT_ARGS` / `HPCPERF_INPUT_ID`
+  (full list: `RESERVED` in `cases.py`); names matching the credential deny rule are refused.
 
 ### 5.4 Adding a hardware platform
 
