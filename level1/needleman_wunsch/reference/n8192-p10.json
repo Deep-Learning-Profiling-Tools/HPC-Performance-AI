@@ -17,7 +17,7 @@
     "env": {},
     "files_sha256": {}
   },
-  "inputs_yaml_sha256": "d3b81edf3407d56e5c1a38d4ebff51a67f55a343ee671ed6e201f4aa80fe1927",
+  "inputs_yaml_sha256": "76561cd21d1a6eefa8d61dc63f6ddb092d4657ad595f559808125b646818b230",
   "spec": {
     "mode": "data",
     "outputs": [
@@ -31,6 +31,18 @@
         },
         "cpu": null,
         "basis": "verify.py compares exactly the traceback values of result.txt (first element + one per step) with its CPU DP traceback (level1/needleman_wunsch/verify.py:117); the same values in file order (cuda/needle.cu TRACEBACK block), integers -> byte-identical. The DP matrix itself is not compared (neither was it by verify.py)",
+        "log": null
+      },
+      {
+        "name": "score",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the DP cell (max_rows - 1, max_cols - 1) of the copied-back matrix (cuda/needle.cu, after the ROI), i.e. the Needleman-Wunsch score of the two full sequences; verify.py compares it exactly with its CPU DP (M[dim, dim]); integer -> byte-identical",
         "log": null
       }
     ]
@@ -52,19 +64,37 @@
         "sum": 607725.0,
         "nonfinite": 0
       }
+    },
+    {
+      "name": "score",
+      "dtype": "i32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "eb024cbf98a5283e37a0276f27ad581605a32d9f82fc84c3c6f4e55264a5ad62",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the DP cell (max_rows - 1, max_cols - 1) of the copied-back matrix (cuda/needle.cu, after the ROI), i.e. the Needleman-Wunsch score of the two full sequences; verify.py compares it exactly with its CPU DP (M[dim, dim]); integer -> byte-identical",
+      "stats": {
+        "min": 210.0,
+        "max": 210.0,
+        "sum": 210.0,
+        "nonfinite": 0
+      }
     }
   ],
   "provenance": {
-    "made_utc": "2026-10-26T06:37:27Z",
+    "made_utc": "2026-10-28T23:11:31Z",
     "gpu": {
       "name": "NVIDIA B200",
-      "driver": "595.58.03"
+      "driver": "595.58.03",
+      "compute_capability": "10.0"
     },
     "cuda_toolkit": "13.2.1",
-    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "git_head": "b3cecf9451f054a63d5b955d02d34d2798069187",
     "source_clean": true,
     "binary": "build/needleman_wunsch/cuda/needleman_wunsch_cuda",
-    "binary_sha256": "d4bb91c3e4ebbace27d36725b064f56d99dec46a5782e232d57c56512bcb2a31",
+    "binary_sha256": "ce12a33084722690c68ea36816a511e83c81c2802e197ceafa58ef1b7e977eb5",
     "command": [
       "python3",
       "level1/needleman_wunsch/verify.py",
@@ -79,26 +109,22 @@
     },
     "cpu_validation": {
       "exit_code": 0,
-      "wall_s": 14.837,
-      "pass_line": "PASS: NW traceback (8498 values) matches CPU DP reference",
+      "wall_s": 15.371,
+      "pass_line": "PASS: NW traceback (8498 values) matches CPU DP reference (and the global alignment score 210)",
       "pass_regex": "^PASS: NW traceback \\(\\d+ values\\) matches CPU DP reference",
       "fail_regex": "^FAIL",
       "log": "build/golden-make/needleman_wunsch/n8192-p10/run/stdout.log",
-      "log_sha256": "c6e49c00295bb4ba2ea1e45d0d0f626eda8b7dba6e45e233c6fd66b634fc5812"
+      "log_sha256": "1230553b32f0820bc3d8175d20e5443cb24685fe9729c3d8d3bef6dc479c82e3"
     },
     "tool_sha256": {
-      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
-      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+      "hpcperf_golden.py": "5d776c11ea848c9ed0b88705afe886209e64b7307b6f72343faec4e9a34cefe2",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
-    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
-    "scrubbed": {
-      "by": "tools/golden/scrub_provenance.py",
-      "rule": "hpcperf-provenance-scrub-1",
-      "removed": [
-        "gpu.uuid",
-        "host"
-      ],
-      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
-    }
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  },
+  "replaces": {
+    "reason": "added score (the global alignment score, DP cell (dim, dim), exact; 309fda6): upstream's traceback starts at (dim-1, dim-1), so the last DP row and column were observed by no compared output; traceback data unchanged",
+    "previous_made_utc": "2026-10-26T06:37:27Z",
+    "previous_sha256": "df1ef0b200645069684f0653e83a1c0550eee04c10c6ca6ff23013d2a336e2e5"
   }
 }
