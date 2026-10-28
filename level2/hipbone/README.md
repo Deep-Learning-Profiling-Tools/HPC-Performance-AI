@@ -270,8 +270,11 @@ norm after the fixed 100 iterations is small, quoting the Nekbone CORAL-2
 rule "results are considered correct if the reported r norm is small,
 generally less than 1e-8, after 100 conjugate gradient iterations".
 `validate.sh` runs `-nx 3 -ny 3 -nz 3 -p 14 -v` (27 elements at the CORAL-2
-polynomial degree 14, 68,921 DOFs) once with `-m CUDA` and once with OCCA's
-`-m Serial` CPU backend as reference (~12 s in total) and requires:
+polynomial degree 14, 68,921 DOFs) with `-m CUDA` and -- in offline mode
+(`HPCPERF_CPU_REFERENCE=1`) only -- once more with OCCA's `-m Serial` CPU
+backend as reference (~12 s in total), and requires (the default mode applies
+checks 1-3 to the CUDA run and replaces check 4 by the frozen-reference check,
+see "Modes" above):
 
 1. both runs exit 0 and report exactly 100 CG iterations (hipBone runs CG
    with tolerance 0 for a fixed 100 iterations; fewer means the residual
@@ -290,7 +293,7 @@ CUDA math library: the two backends solve the same operator with different
 random realisations of the same RHS distribution, so residual norms agree
 statistically (both `||r_0||` are ~sqrt(N/2)) but not bit-wise. A broken
 operator or gather-scatter shows up as a stagnating or NaN residual (checks
-1-3), which is what the script is designed to catch. Result on this machine:
+1-3), which is what the script is designed to catch. Result on this machine (offline mode):
 
 ```
 CUDA:   initial res norm 185.690385677832   it 100: r norm 9.338101836041e-10   (||r_100||/||r_0|| = 5.0e-12)
