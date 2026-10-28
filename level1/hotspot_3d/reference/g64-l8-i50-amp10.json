@@ -26,7 +26,7 @@
       "data/temp_64x8_amp10": "786f751706649ac3478cd4d1497fff0405a22fad13b8390a0c0eb9fee8cb90a5"
     }
   },
-  "inputs_yaml_sha256": "6ff43e35740ba0d84ce5440f3ec13837d9c6caa1d406b2df87025cedf42b4b1e",
+  "inputs_yaml_sha256": "a997dc1567edcef055438aa4018cb292c75e57a0030f9734ccb4e42f2c5db2f7",
   "spec": {
     "mode": "data",
     "outputs": [
@@ -40,7 +40,7 @@
           "tol": 0.01
         },
         "cpu": "tempOut.cpu",
-        "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144, :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
+        "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:149, :221), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
         "log": null
       },
       {
@@ -53,7 +53,7 @@
           "tol": 0.01
         },
         "cpu": "tempOut.cpu",
-        "basis": "probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a - g| <= 1e-2 K minus the B200 output's own max deviation from computeTempCPU; measured 2026-10-28: legitimate implementations <= 2.1e-3 K (4.4x headroom), the closest wrong one (x neighbours across a tile edge taken from the previous iterate) 1.2e-2 K, a time-consistent 2 dt run 6.1e-2 K, one skipped iteration 0.58 K",
+        "basis": "probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a - g| <= 1e-2 K minus the B200 output's own max deviation from computeTempCPU; measured 2026-10-28 on the corrected output (iterate N): legitimate implementations <= 2.1e-3 K (4.5x headroom), the closest wrong one (x neighbours across a tile edge taken from the previous iterate) 1.2e-2 K, an in-place update 1.5e-2 K, a time-consistent 2 dt run 6.3e-2 K, one skipped (also the final) iteration 0.57 K",
         "log": null
       }
     ]
@@ -64,57 +64,58 @@
       "dtype": "f32",
       "count": 32768,
       "bytes": 131072,
-      "sha256": "5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12",
+      "sha256": "8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf",
       "rule": {
         "metric": "rmse",
         "tol": 0.01,
-        "d0_vs_cpu_reference": 9.43632830818742e-05,
+        "d0_vs_cpu_reference": 9.513618327488315e-05,
         "d0_source": "tempOut.cpu",
-        "tol_effective": 0.009905636716918126
+        "tol_effective": 0.009904863816725116
       },
-      "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144, :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
+      "basis": "the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:149, :221), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from the CPU reference",
       "stats": {
-        "min": 231.45059204101562,
-        "max": 416.6465759277344,
-        "sum": 10601676.48487854,
+        "min": 231.46615600585938,
+        "max": 416.3887023925781,
+        "sum": 10597507.723205566,
         "nonfinite": 0
       },
-      "blob": "sha256/5a/5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12.bin"
+      "blob": "sha256/85/8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf.bin"
     },
     {
       "name": "tempOut",
       "dtype": "f32",
       "count": 32768,
       "bytes": 131072,
-      "sha256": "5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12",
+      "sha256": "8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf",
       "rule": {
         "metric": "max_abs",
         "tol": 0.01,
-        "d0_vs_cpu_reference": 0.000579833984375,
+        "d0_vs_cpu_reference": 0.0006103515625,
         "d0_source": "tempOut.cpu",
-        "tol_effective": 0.009420166015625
+        "tol_effective": 0.0093896484375
       },
-      "basis": "probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a - g| <= 1e-2 K minus the B200 output's own max deviation from computeTempCPU; measured 2026-10-28: legitimate implementations <= 2.1e-3 K (4.4x headroom), the closest wrong one (x neighbours across a tile edge taken from the previous iterate) 1.2e-2 K, a time-consistent 2 dt run 6.1e-2 K, one skipped iteration 0.58 K",
+      "basis": "probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a - g| <= 1e-2 K minus the B200 output's own max deviation from computeTempCPU; measured 2026-10-28 on the corrected output (iterate N): legitimate implementations <= 2.1e-3 K (4.5x headroom), the closest wrong one (x neighbours across a tile edge taken from the previous iterate) 1.2e-2 K, an in-place update 1.5e-2 K, a time-consistent 2 dt run 6.3e-2 K, one skipped (also the final) iteration 0.57 K",
       "stats": {
-        "min": 231.45059204101562,
-        "max": 416.6465759277344,
-        "sum": 10601676.48487854,
+        "min": 231.46615600585938,
+        "max": 416.3887023925781,
+        "sum": 10597507.723205566,
         "nonfinite": 0
       },
-      "blob": "sha256/5a/5a41f1f71fb4448576c4b2f0c3a14d3ca5cd5fca9d3b5ce7a2ef9917cf137b12.bin"
+      "blob": "sha256/85/8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf.bin"
     }
   ],
   "provenance": {
-    "made_utc": "2026-10-28T11:17:22Z",
+    "made_utc": "2026-10-28T23:11:16Z",
     "gpu": {
       "name": "NVIDIA B200",
-      "driver": "595.58.03"
+      "driver": "595.58.03",
+      "compute_capability": "10.0"
     },
     "cuda_toolkit": "13.2.1",
-    "git_head": "986f4d4340043e6f3d20a0c533a19423b8352714",
+    "git_head": "b3cecf9451f054a63d5b955d02d34d2798069187",
     "source_clean": true,
     "binary": "build/hotspot_3d/cuda/hotspot_3d_cuda",
-    "binary_sha256": "c5a07363df3c7d5fa7b22da6c493cb1f1bf856879b86addfc615f115d44718dd",
+    "binary_sha256": "4678f1715699df637d521f33c383b2c291396b5dd092cceb97c1b1a865d37fbf",
     "command": [
       "python3",
       "level1/hotspot_3d/verify.py",
@@ -132,26 +133,22 @@
     },
     "cpu_validation": {
       "exit_code": 0,
-      "wall_s": 1.475,
-      "pass_line": "PASS: accuracy vs built-in CPU reference = 9.436e-05 (threshold 1e-2)",
+      "wall_s": 1.477,
+      "pass_line": "PASS: accuracy vs built-in CPU reference = 9.514e-05 (threshold 1e-2)",
       "pass_regex": "^PASS: accuracy",
       "fail_regex": "^FAIL",
       "log": "build/golden-make/hotspot_3d/g64-l8-i50-amp10/run/stdout.log",
-      "log_sha256": "6f6facb836f337ac0b834029232324ccb0001328543ddcfcce5ae94777eb2815"
+      "log_sha256": "c26a64531429b9bfb7c20f8b4b372942f34c595077992158b0430eaf23187004"
     },
     "tool_sha256": {
-      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.py": "5d776c11ea848c9ed0b88705afe886209e64b7307b6f72343faec4e9a34cefe2",
       "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
-    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
-    "scrubbed": {
-      "by": "tools/golden/scrub_provenance.py",
-      "rule": "hpcperf-provenance-scrub-1",
-      "removed": [
-        "gpu.uuid",
-        "host"
-      ],
-      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
-    }
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  },
+  "replaces": {
+    "reason": "hotspot_3d fix 2026-10-28 (693bd02, requested by the owners once the semantics were confirmed): tempOut is now iterate N, the temperature after <iterations> time steps, on the GPU and in the CPU reference; upstream copied back iterate N-1 (tOut_d after the last pointer swap, cuda/opt1.cu) and computeTempCPU returned iterate N only for odd N. The new output equals the unfixed build's output at N+1 bit for bit and matches a float64 NumPy implementation of the scheme within the f32 drift (README 'Fix: final iterate'). Workload, arguments, kernel and timed region unchanged; rules unchanged (basis texts updated).",
+    "previous_made_utc": "2026-10-28T11:17:22Z",
+    "previous_sha256": "dd70bd2011ab7231fe00d2622c44c4447551fea5bcfdaff64c1985174d95f0ba"
   }
 }
