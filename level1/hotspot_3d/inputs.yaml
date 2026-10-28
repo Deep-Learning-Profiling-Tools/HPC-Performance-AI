@@ -158,3 +158,69 @@ inputs:
   - data/power_64x8
   - data/temp_64x8
   input_form: file
+- id: g64-l8-i50-amp10
+  purpose: correctness-probe
+  probe_basis: >-
+    at i10000 the field is within ~1.2 K of its steady state, and the steady state of the explicit scheme does not
+    depend on dt: one skipped iteration changes tempOut by 6.3e-4 RMSE, 15 skipped iterations by 9.5e-3, a
+    time-consistent run with 2, 4 or 8 times larger steps (N/2, N/4, N/8 launches) by <= 5.4e-3 RMSE / 8.9e-3 K max,
+    all inside the legitimate envelope (6.5e-3 RMSE / 1.13e-2 K: the golden's own f32 drift), so they pass; i100 still
+    passes the 2-step version (4.5e-3 RMSE, 1.4e-2 K) and only i1000 fails it, by 2.1x (measured 2026-10-28). Here the
+    initial fluctuations are 10x larger and 50 steps are far from steady state: one skipped iteration deviates by 0.58 K,
+    N/2 launches with 2 dt by 0.52 K (time-consistent: 0.061 K; 4 dt: 0.18 K), a top or bottom layer skipped in one launch
+    by 1.0 K, f16 / bf16 state by 5.7 / 32 K, an in-place (single-buffer) update by 0.57 K, wrong boundary or power
+    indexing by >= 0.24 K, a single element off by > 9.4e-3 K fails, while 23 legitimate variants stay <= 2.1e-3 K (max
+    |a - g|, limit 1e-2). An even step count keeps the upstream copy-back quirk consistent with the CPU reference (both
+    hold iterate N-1)
+  case: hotspot-3d
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream's 64x8 grid and power map (data/power_64x8) with 50 iterations; the initial temperature is upstream's
+      data/temp_64x8 with its fluctuations about 330 K amplified tenfold, T' = 330 + 10 (T - 330) (230-430 K), written by
+      data/gen_temp_amp10.py (exact decimal arithmetic, byte-reproducible: `--check`); no source change
+  params:
+    grid: 64
+    layers: 8
+    iterations: 50
+    initial_temperature: 330 + 10 (temp_64x8 - 330)
+  args:
+  - '64'
+  - '8'
+  - '50'
+  - level1/hotspot_3d/data/power_64x8
+  - level1/hotspot_3d/data/temp_64x8_amp10
+  - output.out
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/power_64x8
+  - data/temp_64x8_amp10
+  input_form: file
+  golden:
+    # this input's own spec (replaces the benchmark-level one): the upstream RMSE and a per-element limit of the same size
+    mode: data
+    cpu_check:
+      command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
+      pass_regex: '^PASS: accuracy'
+      fail_regex: '^FAIL'
+    outputs:
+    - name: tempOut
+      dtype: f32
+      rule: {metric: rmse, tol: 1.0e-2}
+      cpu: tempOut.cpu
+      basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144,
+        :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
+        the CPU reference
+    - name: tempOut
+      dtype: f32
+      rule: {metric: max_abs, tol: 1.0e-2}
+      cpu: tempOut.cpu
+      basis: 'probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a -
+        g| <= 1e-2 K minus the B200 output''s own max deviation from computeTempCPU; measured 2026-10-28: legitimate
+        implementations <= 2.1e-3 K (4.4x headroom), the closest wrong one (x neighbours across a tile edge taken from
+        the previous iterate) 1.2e-2 K, a time-consistent 2 dt run 6.1e-2 K, one skipped iteration 0.58 K'

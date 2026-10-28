@@ -40,4 +40,11 @@ if(BUILD_TESTING)
     set_tests_properties(hotspot_3d_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): 50 steps far from steady state (amplified initial
+    # fluctuations, data/temp_64x8_amp10), on which skipped or coarsened time steps are visible; never timed
+    add_test(NAME hotspot_3d_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} g64-l8-i50-amp10 --exe $<TARGET_FILE:hotspot_3d_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe)
+    set_tests_properties(hotspot_3d_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()
