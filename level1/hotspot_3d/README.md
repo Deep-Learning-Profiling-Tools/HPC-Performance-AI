@@ -33,7 +33,10 @@ cmake --build build/hotspot_3d/cuda
 ## Run
 
 ```bash
-python3 level1/hotspot_3d/verify.py ./build/hotspot_3d/cuda/hotspot_3d_cuda 64 8 100 level1/hotspot_3d/data/power_64x8 level1/hotspot_3d/data/temp_64x8
+./build/hotspot_3d/cuda/hotspot_3d_cuda 64 8 100 level1/hotspot_3d/data/power_64x8 level1/hotspot_3d/data/temp_64x8 output.out
+python3 tools/golden/hpcperf_golden.py run level1/hotspot_3d g64-l8-i100   # the same run, checked against its frozen reference
+# offline only (the CPU reference; what tools/golden make runs once):
+HPCPERF_CPU_REFERENCE=1 python3 level1/hotspot_3d/verify.py ./build/hotspot_3d/cuda/hotspot_3d_cuda 64 8 100 level1/hotspot_3d/data/power_64x8 level1/hotspot_3d/data/temp_64x8
 ```
 
 ## Validation
