@@ -40,4 +40,12 @@ if(BUILD_TESTING)
     set_tests_properties(srad_v1_run PROPERTIES TIMEOUT 900
         PASS_REGULAR_EXPRESSION "PASS: golden check"
         FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): small high-contrast objects (data/probe_edges.pgm) on
+    # which the SRAD diffusion coefficient matters -- plain diffusion or wrong image statistics cannot pass; checked
+    # against its own frozen reference, never timed
+    add_test(NAME srad_v1_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-edges-n20 --exe $<TARGET_FILE:srad_v1_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-edges-n20)
+    set_tests_properties(srad_v1_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()
