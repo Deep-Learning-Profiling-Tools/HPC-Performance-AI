@@ -9,6 +9,7 @@
 #include <cuda.h>
 #include "GSimulation.hpp"
 #include "GSimulationKernels.hpp"
+#include "GSimulationCapture.hpp"
 
 /* Default Constructor for the GSimulation class which sets up the default
  * values for number of particles, number of integration steps, time steo and
@@ -164,6 +165,13 @@ void GSimulation::Start() {
   // tools/golden: the checked output -- the kinetic energy of the last step (the only quantity
   // Verify() compares), after the timed loop
   hpcperf_golden_output("kenergy", &kenergy_, 1, "f32");
+  // tools/golden: the final particle state (positions, velocities), copied back from the device only when
+  // capturing (HPCPERF_GOLDEN_DUMP), after the timed loop and its timer
+  if (hpcperf_golden_active()) {
+    std::vector<Particle> state(n);
+    cudaMemcpy(state.data(), p, sizeof(Particle) * n, cudaMemcpyDeviceToHost);
+    hpcperf_capture_particle_state(state.data(), n, "pos", "vel");
+  }
 
   cudaFree(p);
   cudaFree(e);
