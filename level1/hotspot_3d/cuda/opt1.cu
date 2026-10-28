@@ -95,7 +95,10 @@ void hotspot_opt1(float *p, float *tIn, float *tOut,
     long long stop = get_time();
     float time = (float)((stop - start)/(1000.0 * 1000.0));
     printf("Time: %.3f (s)\n",time);
-    cudaMemcpy(tOut, tOut_d, s, cudaMemcpyDeviceToHost);
+    /* [HPC-Performance-AI] return the final iterate numiter: after the last pointer swap above it is in tIn_d.
+       Upstream copied back tOut_d, i.e. iterate numiter-1 (for numiter = 1 the unchanged input), so the result of the
+       final launch was never returned. Outside the timed region; same buffer size. README "Fix: final iterate". */
+    cudaMemcpy(tOut, tIn_d, s, cudaMemcpyDeviceToHost);
     cudaFree(p_d);
     cudaFree(tIn_d);
     cudaFree(tOut_d);

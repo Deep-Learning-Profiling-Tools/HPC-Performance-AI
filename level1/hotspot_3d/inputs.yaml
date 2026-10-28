@@ -32,9 +32,9 @@ baseline:
 golden:
   # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 through verify.py and freezes
   # tempOut only when verify.py printed PASS (RMSE vs the CPU reference <= 1e-2); every later run is compared with that
-  # frozen output instead. Upstream quirk (kept): hotspot_opt1 copies back tOut_d after the final pointer swap, i.e. the
-  # iterate numiter-1; for the registered (even) iteration counts the CPU reference's `answer` buffer also holds iterate
-  # numiter-1, so both sides compare the same iterate and the final one is never checked.
+  # frozen output instead. tempOut is the temperature after `iterations` time steps (iterate numiter) on both sides since
+  # the 2026-10-28 fix (README "Fix: final iterate"): upstream's hotspot_opt1 copied back iterate numiter-1 and
+  # computeTempCPU left iterate numiter (odd numiter) or numiter-1 (even numiter) in its caller's buffer.
   mode: data
   cpu_check:
     command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}', '{arg:3}', '{arg:4}']
@@ -45,13 +45,13 @@ golden:
     dtype: f32
     rule: {metric: rmse, tol: 1.0e-2}
     cpu: tempOut.cpu
-    basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144,
-      :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
+    basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:149,
+      :221), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
       the CPU reference
   # a second rule on the same array (both must hold). Not upstream: the RMSE over 32768 elements lets one element be off
-  # by up to ~1.8 K. Measured 2026-10-28 (B200): 23 legitimate variants within max |a - g| <= 3.9e-3 / 9.3e-3 / 1.13e-2 K
-  # at i100 / i1000 / i10000 (>= 4.3x below this limit; for spread deviations the RMSE rule above stays the tighter
-  # one, 6.5e-3 of 1e-2 at i10000), single-element errors >= 0.05 K fail.
+  # by up to ~1.8 K. Measured 2026-10-28 (B200, re-measured on the corrected output, iterate N): 23 legitimate variants
+  # within max |a - g| <= 3.9e-3 / 9.3e-3 / 1.13e-2 K at i100 / i1000 / i10000 (>= 4.3x below this limit; for spread
+  # deviations the RMSE rule above stays the tighter one, 6.5e-3 of 1e-2 at i10000), single-element errors >= 0.05 K fail.
   - name: tempOut
     dtype: f32
     rule: {metric: max_abs, tol: 5.0e-2}
@@ -165,13 +165,13 @@ inputs:
     depend on dt: one skipped iteration changes tempOut by 6.3e-4 RMSE, 15 skipped iterations by 9.5e-3, a
     time-consistent run with 2, 4 or 8 times larger steps (N/2, N/4, N/8 launches) by <= 5.4e-3 RMSE / 8.9e-3 K max,
     all inside the legitimate envelope (6.5e-3 RMSE / 1.13e-2 K: the golden's own f32 drift), so they pass; i100 still
-    passes the 2-step version (4.5e-3 RMSE, 1.4e-2 K) and only i1000 fails it, by 2.1x (measured 2026-10-28). Here the
-    initial fluctuations are 10x larger and 50 steps are far from steady state: one skipped iteration deviates by 0.58 K,
-    N/2 launches with 2 dt by 0.52 K (time-consistent: 0.061 K; 4 dt: 0.18 K), a top or bottom layer skipped in one launch
-    by 1.0 K, f16 / bf16 state by 5.7 / 32 K, an in-place (single-buffer) update by 0.57 K, wrong boundary or power
-    indexing by >= 0.24 K, a single element off by > 9.4e-3 K fails, while 23 legitimate variants stay <= 2.1e-3 K (max
-    |a - g|, limit 1e-2). An even step count keeps the upstream copy-back quirk consistent with the CPU reference (both
-    hold iterate N-1)
+    passes the 2-step version (4.6e-3 RMSE, 1.4e-2 K) and only i1000 fails it, by 2.1x (measured 2026-10-28 on the
+    corrected output, iterate N). Here the initial fluctuations are 10x larger and 50 steps are far from steady state: one
+    skipped iteration -- also the final one, or upstream's former copy-back of iterate N-1 -- deviates by 0.57 K, N/2
+    launches with 2 dt by 0.063 K (N/4 with 4 dt: 0.18 K), the top or bottom layer skipped in the final launch by 1.0 K,
+    f16 / bf16 state by 5.9 / 32 K, an in-place (single-buffer) update by 1.5e-2 K, wrong boundary or power indexing by
+    >= 0.25 K, a single element off by > 9.4e-3 K fails, while 23 legitimate variants stay <= 2.1e-3 K (max |a - g|,
+    limit 1e-2)
   case: hotspot-3d
   variant: parameter
   source:
@@ -213,14 +213,15 @@ inputs:
       dtype: f32
       rule: {metric: rmse, tol: 1.0e-2}
       cpu: tempOut.cpu
-      basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:144,
-        :216), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
+      basis: the built-in RMSE accuracy(tempOut, answer) = sqrt(sum (a - b)^2 / len) against computeTempCPU (cuda/3D.cu:149,
+        :221), enforced acc > 1e-2 -> FAIL by verify.py:30; the check allows 1e-2 minus the B200 output's own RMSE from
         the CPU reference
     - name: tempOut
       dtype: f32
       rule: {metric: max_abs, tol: 1.0e-2}
       cpu: tempOut.cpu
       basis: 'probe gate (no upstream equivalent): no element may deviate by more than the upstream RMSE budget, max |a -
-        g| <= 1e-2 K minus the B200 output''s own max deviation from computeTempCPU; measured 2026-10-28: legitimate
-        implementations <= 2.1e-3 K (4.4x headroom), the closest wrong one (x neighbours across a tile edge taken from
-        the previous iterate) 1.2e-2 K, a time-consistent 2 dt run 6.1e-2 K, one skipped iteration 0.58 K'
+        g| <= 1e-2 K minus the B200 output''s own max deviation from computeTempCPU; measured 2026-10-28 on the corrected
+        output (iterate N): legitimate implementations <= 2.1e-3 K (4.5x headroom), the closest wrong one (x neighbours
+        across a tile edge taken from the previous iterate) 1.2e-2 K, an in-place update 1.5e-2 K, a time-consistent
+        2 dt run 6.3e-2 K, one skipped (also the final) iteration 0.57 K'

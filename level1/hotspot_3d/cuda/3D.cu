@@ -97,6 +97,7 @@ void computeTempCPU(float *pIn, float* tIn, float *tOut,
         float Rx, float Ry, float Rz, 
         float dt, int numiter) 
 {   float ce, cw, cn, cs, ct, cb, cc;
+    float *tResult = tOut;   /* [HPC-Performance-AI] the caller's result buffer (see the end of this function) */
     float stepDivCap = dt / Cap;
     ce = cw =stepDivCap/ Rx;
     cn = cs =stepDivCap/ Ry;
@@ -129,6 +130,10 @@ void computeTempCPU(float *pIn, float* tIn, float *tOut,
         i++;
     }
     while(i < numiter);
+    /* [HPC-Performance-AI] the final iterate is in tIn after the last swap; upstream swapped only these local
+       pointers, so the caller's tOut held iterate numiter for odd numiter and numiter-1 for even numiter. Return the
+       final iterate in the caller's tOut for every numiter. README "Fix: final iterate". */
+    if (tIn != tResult) memcpy(tResult, tIn, sizeof(float) * nx * ny * nz);
 
 }
 
