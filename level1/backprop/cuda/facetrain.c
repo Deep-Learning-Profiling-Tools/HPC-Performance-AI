@@ -81,8 +81,9 @@ backprop_face()
   bpnn_train_cuda(net, &out_err, &hid_err);
   printf("Training done\n");
   /* tools/golden: the checked outputs -- the trained weights (the GPU-adjusted input weights were
-     copied back into net by bpnn_train_cuda, after its ROI). out_err / hid_err are NOT captured:
-     bpnn_train_cuda never writes *eo / *eh, so they are uninitialized (see README) */
+     copied back into net by bpnn_train_cuda, after its ROI). out_err / hid_err are NOT captured (not in
+     the golden spec); since 2026-10-27 bpnn_train_cuda returns them (*eo / *eh, see README) and only the
+     offline CPU check (HPCPERF_CPU_REFERENCE=1) compares them */
   hpcperf_golden_rows("input_weights", net->input_weights, net->input_n, net->hidden_n);
   hpcperf_golden_rows("hidden_weights", net->hidden_weights, net->hidden_n, net->output_n);
 
