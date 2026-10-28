@@ -378,13 +378,15 @@ the CPU-profile Nyx (1 rank) whenever no matching CPU run existed -- an automati
 | `1` (explicit, offline) | the previous [3] unchanged (live CPU reference, reused while deck sha256 and steps match) |
 | `1` + `HPCPERF_NYX_FREEZE_REFERENCE=1`, `HPCPERF_GPUS=1` | as `1`, then `nyx_reference.py freeze` of each case whose [3] agreed (refuses an uncommitted `level3/nyx`, an existing reference unless `HPCPERF_NYX_FREEZE_REPLACE_REASON` is set, a non-CUDA or multi-rank run, a report of another pair) |
 
-What is frozen (`nyx_reference.py freeze`): the 1-GPU run's `plt<final>/` (whole plotfile) plus
+What is frozen (`nyx_reference.py freeze`): the 1-GPU run's `plt<final>/` (the plotfile without its run log
+`job_info` -- node paths, build machine; read by no comparison of [3]; a kept text member that names the node refuses
+the freeze) plus
 `chk00000/DM` and `chk<final>/DM` (what [3] compares) as a deterministic tar in the content-addressed
 golden store (`tools/golden/hpcperf_golden.py store-put`; `$HPCPERF_GOLDEN_STORE`, default
 `<repo>/.golden-store`, never in git); the JSON (schema `hpcperf-nyx-frozen-reference-1`, committed) holds
 the workload identity (case, mode, steps, grid, decomposition, upstream deck and IC sha256), every archive
-member's size and sha256, d0 per variable / particle component, the budget, and the provenance (GPU
-name/UUID/driver, CUDA, git HEAD, binary and fingerprint sha256 of the GPU and CPU runs, sha256 of the [3]
+member's size and sha256 (and the excluded `job_info`), d0 per variable / particle component, the budget, and the
+provenance (GPU name/driver/compute capability -- no host name, GPU UUID / index or absolute path --, CUDA, git HEAD, binary and fingerprint sha256 of the GPU and CPU runs, sha256 of the [3]
 reports and the validate.sh log, tool hashes). `fetch` (the default [3]) checks the workload, gets the
 archive with `store-get` (sha256-verified), checks every member against the JSON, refuses a JSON whose
 budget is not the one derived from its own tol/d0 or whose d0 is not finite in [0, tol), refuses a JSON that is not the

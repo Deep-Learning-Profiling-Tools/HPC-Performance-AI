@@ -15,9 +15,19 @@ after its unchanged check [3] compared THIS 1-GPU run with the live CPU-profile 
   - measures d0, the frozen run's deviation from the CPU reference with the comparators' own definitions: per plotfile
     variable fcompare's norm-0 relative error ||G - C||_inf / ||C||_inf (read from the fcompare table of the [3] report)
     and per DM particle component max|G - C| / max|C| (recomputed exactly with nyx_particle_compare.py's own reader);
-  - writes a deterministic tar of plt<final>/ (the whole plotfile), chk00000/DM/ and chk<final>/DM/ (what [3] compares),
-    puts it into the content-addressed golden store (tools/golden/hpcperf_golden.py store-put) and writes the reference
-    JSON (schema hpcperf-nyx-frozen-reference-1) with the provenance and the effective tolerances.
+  - writes a deterministic tar of plt<final>/ (the plotfile without its run log job_info), chk00000/DM/ and
+    chk<final>/DM/ (what [3] compares), refuses when a text member it keeps names this node (absolute paths, $HOME,
+    the host or user name), puts it into the content-addressed golden store (tools/golden/hpcperf_golden.py
+    store-put) and writes the reference JSON (schema hpcperf-nyx-frozen-reference-1) with the provenance, the
+    excluded members and the effective tolerances. plt<final>/job_info is AMReX's run log (inputs file, output and
+    build directories, compiler paths and flags, build machine with kernel version, build and output dates,
+    CPU-hours): no comparison of [3] reads it (fcompare / fextrema read Header + Level_*/Cell_*, the DM count reads
+    plt<final>/DM/Header, nyx_particle_compare.py reads chk*/DM), so it is not archived and the archive can be
+    published. The provenance keeps what reproduces the reference -- the platform (GPU model, driver, compute
+    capability; CUDA Toolkit), git HEAD, the GPU and CPU runs' identities (run id, profile, binary / fingerprint / input
+    sha256, repository-relative run directory), the [3] reports' sha256 and the tools' sha256 -- and records no host
+    name, GPU UUID / index or absolute location of this machine. A re-freeze that replaces the reference of the same
+    GPU run keeps that run's recorded platform (gpu_source says which).
 `fetch` (the default [3]): verifies the reference JSON (committed and unmodified -- in an agent workspace byte-identical
   to the canonical repository's committed one; d0 finite in [0, tol); budget as derived), that the run is the same workload (case, mode, steps, upstream
   deck sha256, IC sha256, grid), gets the archive from the store (verified sha256; a missing or corrupted blob is an
@@ -34,13 +44,21 @@ applies ONE bound per comparison: d0 = the largest d0 over the gated variables (
 relative because fcompare prints 10 significant digits. Diagnostic variables (I_R) and identically-zero reference
 fields (exact rule) are not part of the relative budget.
 """
-import argparse, datetime, hashlib, json, math, os, re, socket, subprocess, sys, tarfile, tempfile
+import argparse, datetime, getpass, hashlib, json, math, os, re, socket, subprocess, sys, tarfile, tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 R = HERE.parent.parent
 SCHEMA = "hpcperf-nyx-frozen-reference-1"
 PRINT_MARGIN = 1e-9        # fcompare prints rel with 10 significant digits (relative rounding <= 5e-10)
+# Files of plt<final>/ that are NOT archived: read by no comparison of [3], and node-private (never published).
+EXCLUDED_PLOTFILE_FILES = {
+    "job_info": "AMReX/Nyx run log: inputs file, output and build directories, AMReX and compiler paths and flags, build "
+                "machine (host name, kernel), build and output dates, CPU-hours; read by no comparison of validate.sh [3]",
+}
+# Node-private locations in a kept TEXT member refuse the freeze (the rule of tools/hpcperf_lock.py
+# FORBIDDEN_LOCATION_RX, plus this node's own names); binary members (NUL bytes) are raw data and not scanned.
+PRIVATE_LOCATION_RX = re.compile(rb"(^|[\s\"'=:(])(/tmp/|/home/|/projects/|/scratch/|\$HOME|~/|file://|/lustre/|/gpfs/)")
 sys.path.insert(0, str(HERE))
 
 
@@ -95,24 +113,70 @@ def git(*a):
 
 
 def gpu_identity():
-    try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=index,name,uuid,driver_version", "--format=csv,noheader"],
-                             capture_output=True, text=True, timeout=20).stdout
-        dev = os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
-        for line in out.splitlines():
+    """The platform record of the GPU CUDA_VISIBLE_DEVICES names: model name, driver, compute capability. Its index and
+    UUID select the device but are not recorded (they identify one machine, not what the reference depends on); a driver
+    without the compute_cap query field gives compute_capability null."""
+    dev = os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
+    for fields in (("index", "uuid", "name", "driver_version", "compute_cap"), ("index", "uuid", "name", "driver_version")):
+        try:
+            r = subprocess.run(["nvidia-smi", f"--query-gpu={','.join(fields)}", "--format=csv,noheader"],
+                               capture_output=True, text=True, timeout=20)
+        except Exception:
+            return None
+        if r.returncode != 0:
+            continue
+        for line in r.stdout.splitlines():
             f = [x.strip() for x in line.split(",")]
-            if len(f) == 4 and (f[0] == dev or f[2] == dev):
-                return {"index": f[0], "name": f[1], "uuid": f[2], "driver": f[3]}
-    except Exception:
-        pass
+            if len(f) == len(fields) and dev in (f[0], f[1]):
+                return {"name": f[2], "driver": f[3], "compute_capability": f[4] if len(f) > 4 else None}
+        return None
     return None
+
+
+def run_dir_rel(p):
+    """A run directory as recorded: repository-relative; outside this repository (a scratch mirror of it) the part from
+    the Level 3 run tree build/level3/nyx/ on (l3_rundir's layout), never an absolute location of this machine."""
+    p = os.path.abspath(p)
+    rel = os.path.relpath(p, R)
+    if not rel.startswith(".."):
+        return rel
+    m = re.search(r"(?:^|/)(build/level3/nyx/.+)$", p)
+    return m.group(1) if m else f"<outside the repository>/{os.path.basename(p)}"
+
+
+def deck_rel(p):
+    """The deck as recorded: relative to the frozen source tree level3/nyx/src, symbolic links resolved on both sides (a
+    scratch mirror whose src/ links to the materialized tree records the same path); never an absolute location."""
+    rel = os.path.relpath(os.path.realpath(p), os.path.realpath(HERE / "src"))
+    if not rel.startswith(".."):
+        return rel
+    m = re.search(r"/level3/nyx/src/(.+)$", os.path.abspath(p))
+    return m.group(1) if m else f"<outside the source tree>/{os.path.basename(p)}"
+
+
+def portable(x):
+    """Recorded strings without an absolute location of this machine: the repository and $HOME become <repo> / <home>
+    (free text such as --note / --reason, porcelain lines, report result lines)."""
+    subs = sorted({(str(R), "<repo>"), (os.path.expanduser("~"), "<home>")}, key=lambda t: (-len(t[0]), t))
+    subs = [(a, b) for a, b in subs if os.path.isabs(a) and a.rstrip("/")]
+    if isinstance(x, str):
+        for a, b in subs:
+            x = x.replace(a, b)
+        return x
+    if isinstance(x, list):
+        return [portable(e) for e in x]
+    if isinstance(x, dict):
+        return {k: portable(e) for k, e in x.items()}
+    return x
 
 
 def members_of(run, steps):
     """The files [3] reads: plt<final>/ (fcompare / fextrema / the DM count) and the DM particle data of chk00000 and
-    chk<final> (nyx_particle_compare.py). Sorted relative paths."""
+    chk<final> (nyx_particle_compare.py). Sorted relative paths; plt<final>/job_info (EXCLUDED_PLOTFILE_FILES) is left
+    out."""
     run = Path(run); fin = f"{steps:05d}"
     roots = [run / f"plt{fin}", run / "chk00000" / "DM", run / f"chk{fin}" / "DM"]
+    skip = {f"plt{fin}/{n}" for n in EXCLUDED_PLOTFILE_FILES}
     out = []
     for r in roots:
         if not r.is_dir():
@@ -120,9 +184,44 @@ def members_of(run, steps):
         for p in sorted(r.rglob("*")):
             if p.is_symlink():
                 raise RefError(f"{p}: symbolic link inside the data to freeze")
-            if p.is_file():
+            if p.is_file() and str(p.relative_to(run)) not in skip:
                 out.append(str(p.relative_to(run)))
     return sorted(out)
+
+
+def excluded_of(run, steps):
+    """The plotfile files members_of() leaves out, as recorded in the reference JSON (path + reason, no content)."""
+    fin = f"plt{steps:05d}"
+    return [{"path": f"{fin}/{n}", "reason": why} for n, why in sorted(EXCLUDED_PLOTFILE_FILES.items())
+            if (Path(run) / fin / n).is_file()]
+
+
+def publishable_scan(run, members):
+    """Refuse to archive a text member that names this node: an absolute private location (PRIVATE_LOCATION_RX), the
+    repository or run directory, $HOME, the host name (short or qualified) or the user name. The members [3] compares
+    (Headers, Cell_H, particle Headers) carry none on dgx003; a future AMReX/Nyx that writes another log into the
+    plotfile is caught here instead of being published."""
+    names = {str(R), str(Path(run).resolve()), os.path.expanduser("~")}
+    host = socket.gethostname()
+    names |= {host, host.split(".")[0], socket.getfqdn()}
+    try:
+        names.add(getpass.getuser())
+    except Exception:  # noqa: BLE001 - no user name available: the location rule still applies
+        pass
+    needles = sorted({n.encode() for n in names if n and len(n) >= 3 and n not in ("/", "localhost")})
+    hits = []
+    for m in members:
+        data = (Path(run) / m).read_bytes()
+        if b"\0" in data:
+            continue                                   # raw particle / FAB data
+        found = [n.decode() for n in needles if n in data]
+        if PRIVATE_LOCATION_RX.search(data):
+            found.append(PRIVATE_LOCATION_RX.search(data).group(2).decode())
+        if found:
+            hits.append(f"{m} ({', '.join(found[:3])})")
+    if hits:
+        raise RefError("refused: archive member(s) name this node (paths / host / user), the archive would not be "
+                       f"publishable: {'; '.join(hits[:8])} -- add the file to EXCLUDED_PLOTFILE_FILES if no comparison reads it")
 
 
 def write_tar(run, members, dst):
@@ -229,6 +328,8 @@ def freeze(a):
     if pworst[0] > a.rel_tol:
         raise RefError(f"particle d0 {pworst} exceeds rel_tol {a.rel_tol}")
     members = members_of(run, steps)
+    excluded = excluded_of(run, steps)
+    publishable_scan(run, members)
     with tempfile.TemporaryDirectory() as td:
         tarp = Path(td) / f"nyx-{a.case}.{a.mode}.tar"
         write_tar(run, members, tarp)
@@ -239,14 +340,27 @@ def freeze(a):
         if r.returncode != 0 or put != tsha:
             raise RefError(f"store-put failed (rc={r.returncode}): {r.stdout.strip()} {r.stderr.strip()}")
     gate = lambda d: {"tol": a.rel_tol, "d0_max": d, "rel_tol_effective": tol_effective(a.rel_tol, d)}
+    old = json.loads(out.read_text()) if a.replace else None
+    # the platform record (GPU model, driver, compute capability): from nvidia-smi now, or -- when this replaces the
+    # reference of the SAME GPU run (a re-freeze of an existing run tree, e.g. to change the archived members) -- the one
+    # recorded when that run was frozen, so a re-freeze in a shell without (or with another) GPU keeps the run's platform
+    gpu, gpu_source = gpu_identity(), "nvidia-smi at freeze time (CUDA_VISIBLE_DEVICES)"
+    oprov = (old or {}).get("provenance") or {}
+    if old and (oprov.get("gpu_run") or {}).get("run_id") == mg.get("run_id") and isinstance(oprov.get("gpu"), dict):
+        og = oprov["gpu"]
+        cc = og.get("compute_capability") or ((gpu or {}).get("compute_capability") if (gpu or {}).get("name") == og.get("name") else None)
+        gpu = {"name": og.get("name"), "driver": og.get("driver"), "compute_capability": cc}
+        gpu_source = ("the replaced reference of the same GPU run (recorded when that run was frozen)"
+                      + ("; compute capability from nvidia-smi now (same GPU model)" if cc and not og.get("compute_capability") else ""))
     doc = {
         "schema": SCHEMA, "benchmark": "nyx", "level": 3, "case": a.case, "mode": a.mode, "steps": steps,
         "variant": "heatcool" if a.case == "lya_heatcool" else "adiabatic",
         "workload": {k: mg.get(k) for k in ("case", "mode", "steps", "grid", "max_grid_size", "boxes", "deck_sha256", "ic_sha256")}
-                    | {"deck": os.path.relpath(mg.get("deck", ""), HERE / "src") if mg.get("deck") else None, "ranks": 1},
+                    | {"deck": deck_rel(mg["deck"]) if mg.get("deck") else None, "ranks": 1},
         "archive": {"sha256": tsha, "size": tsize, "format": "tar (GNU, deterministic: sorted, mtime 0, uid/gid 0, mode 0644)",
                     "store": f"$HPCPERF_GOLDEN_STORE/sha256/{tsha[:2]}/{tsha}.bin (default <repo>/.golden-store; never in git)",
                     "members": [{"path": m_, "size": (run / m_).stat().st_size, "sha256": sha256_file(run / m_)} for m_ in members],
+                    "excluded": excluded,
                     "dm_particles": npart},
         "comparison": {
             "original_check": "validate.sh [3]: nyx_fcompare_check.py (AMReX fcompare -n 0 --rel_tol T) + nyx_particle_compare.py "
@@ -263,14 +377,14 @@ def freeze(a):
         },
         "provenance": {
             "made_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "host": socket.gethostname(), "gpu": gpu_identity(),
+            "gpu": gpu, "gpu_source": gpu_source,
             "cuda": (json.load(open("/usr/local/cuda/version.json"))["cuda"]["version"] if os.path.isfile("/usr/local/cuda/version.json") else None),
             "git_head": git("rev-parse", "HEAD").strip(), "harness_dirty": dirty,
             "gpu_run": {"run_id": mg.get("run_id"), "profile": mg.get("profile"), "binary": os.path.basename(mg.get("binary", "")),
                         "binary_sha256": mg.get("binary_sha256"), "fingerprint_sha256": mg.get("fingerprint_sha256"),
-                        "input_sha256": mg.get("input_sha256"), "utc": mg.get("utc"), "dir": os.path.relpath(run, R)},
+                        "input_sha256": mg.get("input_sha256"), "utc": mg.get("utc"), "dir": run_dir_rel(run)},
             "cpu_validation": {"run_id": mc.get("run_id"), "profile": mc.get("profile"), "binary_sha256": mc.get("binary_sha256"),
-                               "fingerprint_sha256": mc.get("fingerprint_sha256"), "utc": mc.get("utc"), "dir": os.path.relpath(cpu, R),
+                               "fingerprint_sha256": mc.get("fingerprint_sha256"), "utc": mc.get("utc"), "dir": run_dir_rel(cpu),
                                "fcompare_report_sha256": sha256_file(rep), "particle_report_sha256": sha256_file(prep),
                                "validate_log_sha256": sha256_file(a.validate_log) if a.validate_log else None,
                                "result": next(l for l in lines if l.startswith("RESULT:"))},
@@ -283,8 +397,9 @@ def freeze(a):
         },
     }
     if a.replace:
-        old = json.loads(out.read_text())
         doc["provenance"]["replaces"] = {"archive_sha256": old.get("archive", {}).get("sha256"), "made_utc": old.get("provenance", {}).get("made_utc"), "reason": a.reason}
+    # no host name, GPU UUID / index or absolute location of this machine in the provenance (free text included)
+    doc["provenance"] = portable(doc["provenance"])
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=1, sort_keys=False) + "\n")
     print(f"FROZEN {a.case}.{a.mode}: archive {tsha} ({tsize} bytes, {len(members)} files) -> {out}; "

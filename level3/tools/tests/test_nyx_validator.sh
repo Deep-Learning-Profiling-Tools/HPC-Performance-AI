@@ -207,6 +207,17 @@ PY
         python3 "$R/level3/nyx/nyx_particle_compare.py" "$c" "$g" 10 --rel_tol "$tl" > "$g/particle_compare.$cs.np1.vs-CPU.txt" 2>&1
     }
     freeze_report "$FR/golden/minisb.smoke.np1" "$FC/minisb.smoke.np1" minisb 1e-8
+    # a fake nvidia-smi first on PATH: the platform record (GPU model / driver / compute capability) comes from it, its UUID
+    # and index never reach the reference
+    mkdir -p "$TMP/bin"
+    cat > "$TMP/bin/nvidia-smi" <<'SMI'
+#!/bin/sh
+case "$*" in
+  *compute_cap*) echo "0, GPU-feedface-0000-1111-2222-333344445555, NVIDIA Fake GPU, 999.99, 9.9" ;;
+  *) echo "0, GPU-feedface-0000-1111-2222-333344445555, NVIDIA Fake GPU, 999.99" ;;
+esac
+SMI
+    chmod +x "$TMP/bin/nvidia-smi"; export PATH="$TMP/bin:$PATH" CUDA_VISIBLE_DEVICES=0
     frz() { python3 "$REFT" freeze --steps 10 --mode smoke --allow-dirty "$@" > "$TMP/frz.out" 2>&1; }
     frz --case minisb --gpu-run "$FR/golden/minisb.smoke.np1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/minisb.smoke.json"; rc=$?
     TE="$(python3 "$REFT" tol --rel-tol 1e-8 --d0 1e-9)"
@@ -217,6 +228,24 @@ assert m["d0_max"] == 1e-9 and m["d0_max_variable"] == "Temp" and m["zero_refere
 assert repr(m["rel_tol_effective"]) == sys.argv[2] and m["rel_tol_effective"] < 1e-8 - 1e-9, m
 assert abs(p["d0_max"] - 1e-9) < 1e-12 and p["rel_tol_effective"] < 1e-8 - p["d0_max"], p
 assert len(d["archive"]["sha256"]) == 64 and d["archive"]["dm_particles"] == 32768 and len(d["archive"]["members"]) == 6
+PY
+    python3 - "$TMP/refs/minisb.smoke.json" "$R" <<'PY' && ok "C1b: freeze provenance: platform = GPU model / driver / compute capability, no host name, no GPU UUID / index, no absolute path; run dirs repository-relative" || bad "C1b: $(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['provenance'])" "$TMP/refs/minisb.smoke.json" 2>&1 | head -c 600)"
+import json, os, socket, sys
+t = open(sys.argv[1]).read(); p = json.loads(t)["provenance"]
+assert p["gpu"] == {"name": "NVIDIA Fake GPU", "driver": "999.99", "compute_capability": "9.9"} and "host" not in p, p
+assert p["gpu_source"].startswith("nvidia-smi at freeze time") and "GPU-feedface" not in t, p
+host = socket.gethostname()
+for needle in (host, host.split(".")[0], sys.argv[2], os.path.expanduser("~") + "/"):
+    assert needle not in t, needle
+assert p["gpu_run"]["dir"].startswith("build/level3/nyx/__selftest__-frozen/") and p["cpu_validation"]["dir"].startswith("build/level3/nyx/"), p
+assert json.loads(t)["archive"]["excluded"] == []
+PY
+    python3 - "$R/level3/nyx" <<'PY' && ok "C1c: the deck is recorded relative to the source tree, symbolic links resolved (a mirror records the same path), never absolute" || bad "C1c: deck_rel"
+import os, sys; sys.argv = sys.argv[:2]; sys.path.insert(0, sys.argv[1]); import nyx_reference as n
+src = os.path.realpath(os.path.join(sys.argv[1], "src"))
+assert n.deck_rel(os.path.join(src, "Exec/LyA/inputs.rt.garuda")) == "Exec/LyA/inputs.rt.garuda"
+assert n.deck_rel("/some/other/clone/level3/nyx/src/Exec/MiniSB/inputs.32") == "Exec/MiniSB/inputs.32"
+assert n.deck_rel("/elsewhere/decks/inputs.x") == "<outside the source tree>/inputs.x"
 PY
     frz --case minisb --gpu-run "$FR/golden/minisb.smoke.np1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/minisb.smoke.json"; rc=$?
     [ $rc -ne 0 ] && /usr/bin/grep -q 'exists' "$TMP/frz.out" && ok "C2: freeze refuses to overwrite an existing reference (needs --replace --reason)" || bad "C2: rc=$rc $(cat "$TMP/frz.out")"
@@ -233,6 +262,55 @@ PY
     frz --case lya_heatcool --gpu-run "$FR/golden/lya_heatcool.smoke.np1" --cpu-run "$FC/lya_heatcool.smoke.np1" --rel-tol 5e-5 --diagnostic I_R --out "$TMP/refs/lya_heatcool.smoke.json"; rc=$?
     [ $rc -eq 0 ] && python3 -c "import json,sys; m=json.load(open(sys.argv[1]))['comparison']['mesh']; assert m['diagnostic_fields']==['I_R'] and m['d0_max_variable']=='Temp' and m['d0_max']==1e-13" "$TMP/refs/lya_heatcool.smoke.json" \
         && ok "C5: heat/cool freeze: I_R recorded as diagnostic, not part of the d0 budget" || bad "C5: rc=$rc $(cat "$TMP/frz.out")"
+    # publishable archives: plt<final>/job_info (AMReX's run log: paths, build machine) is not archived; a KEPT text member
+    # naming this node refuses the freeze; raw binary members are not scanned
+    G1="$FR/golden/minisb.smoke.np1"; sed -i 's/^deck_sha256=other$/deck_sha256=cafe/' "$FC/minisb.smoke.np1/run_manifest.txt"   # (C4 changed it)
+    printf 'inputs file: %s/inputs\nbuild machine: Linux %s\n' "$G1" "$(hostname)" > "$G1/plt00010/job_info"
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/ji.json"; rc=$?
+    [ $rc -eq 0 ] && python3 - "$TMP/refs/ji.json" "$TMP/refs/minisb.smoke.json" "$(python3 "$R/tools/golden/hpcperf_golden.py" store-get "$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['archive']['sha256'])" "$TMP/refs/ji.json")" 2>/dev/null | tail -1)" <<'PY' \
+        && ok "C23: plt00010/job_info is excluded from the archive (recorded with its reason, no content); the archive is byte-identical to the one frozen without it" || bad "C23: rc=$rc $(cat "$TMP/frz.out")"
+import json, sys, tarfile
+d, d0 = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+assert [m["path"] for m in d["archive"]["members"]] == [m["path"] for m in d0["archive"]["members"]] and "plt00010/job_info" not in str(d["archive"]["members"])
+assert [e["path"] for e in d["archive"]["excluded"]] == ["plt00010/job_info"] and "AMReX" in d["archive"]["excluded"][0]["reason"]
+assert d["archive"]["sha256"] == d0["archive"]["sha256"], "the kept members are the same bytes, so the deterministic tar is the same"
+assert "job_info" not in tarfile.open(sys.argv[3]).getnames()
+PY
+    rm -f "$G1/plt00010/job_info"
+    printf 'nyx.initial_conditions_file = /projects/someone/ic.nyx\n' > "$G1/plt00010/extra_log"
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/pv.json"; rc=$?
+    [ $rc -ne 0 ] && [ ! -f "$TMP/refs/pv.json" ] && /usr/bin/grep -q 'would not be publishable.*extra_log' "$TMP/frz.out" \
+        && ok "C24: a kept text member with a private location (/projects/...) refuses the freeze; nothing written" || bad "C24: rc=$rc $(cat "$TMP/frz.out")"
+    printf 'built on %s\n' "$(hostname -s 2>/dev/null || hostname)" > "$G1/plt00010/extra_log"
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/pv.json"; rc=$?
+    [ $rc -ne 0 ] && [ ! -f "$TMP/refs/pv.json" ] && /usr/bin/grep -q 'would not be publishable' "$TMP/frz.out" \
+        && ok "C25: a kept text member naming the host -> refused" || bad "C25: rc=$rc $(cat "$TMP/frz.out")"
+    printf '\0\0raw /projects/x %s\0' "$(hostname)" > "$G1/plt00010/extra_log"
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/pv.json"; rc=$?
+    [ $rc -eq 0 ] && ok "C26: a binary member (NUL bytes: raw FAB/particle data) is not scanned -> accepted" || bad "C26: rc=$rc $(cat "$TMP/frz.out")"
+    rm -f "$G1/plt00010/extra_log" "$TMP/refs/pv.json" "$TMP/refs/ji.json"
+    # re-freeze of the SAME GPU run with --replace: the platform recorded for that run is kept (driver carried over, an
+    # old record's UUID / index dropped); another run -> nvidia-smi now
+    python3 - "$TMP/refs/minisb.smoke.json" "$TMP/refs/old.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["provenance"]["host"] = "oldhost.example.org"
+d["provenance"]["gpu"] = {"index": "3", "name": "NVIDIA Fake GPU", "uuid": "GPU-0ld0ld00-0000-0000-0000-000000000000", "driver": "111.11"}
+open(sys.argv[2], "w").write(json.dumps(d, indent=1) + "\n")
+PY
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/old.json" --replace --reason "test: re-freeze"; rc=$?
+    [ $rc -eq 0 ] && python3 - "$TMP/refs/old.json" <<'PY' && ok "C27: --replace of the same GPU run keeps that run's recorded platform (driver 111.11; compute capability of the same model from now), drops host / UUID / index, records what it replaced" || bad "C27: rc=$rc $(cat "$TMP/frz.out")"
+import json, sys
+t = open(sys.argv[1]).read(); p = json.loads(t)["provenance"]
+assert p["gpu"] == {"name": "NVIDIA Fake GPU", "driver": "111.11", "compute_capability": "9.9"}, p["gpu"]
+assert p["gpu_source"].startswith("the replaced reference of the same GPU run") and "same GPU model" in p["gpu_source"], p["gpu_source"]
+assert "host" not in p and "oldhost" not in t and "GPU-0ld0ld00" not in t and p["replaces"]["reason"] == "test: re-freeze", p
+PY
+    sed -i 's/^run_id=selftest-CUDA$/run_id=selftest-CUDA-2/' "$G1/run_manifest.txt"
+    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); d['provenance']['gpu']['driver']='222.22'; open(sys.argv[1],'w').write(json.dumps(d, indent=1)+'\n')" "$TMP/refs/old.json"
+    frz --case minisb --gpu-run "$G1" --cpu-run "$FC/minisb.smoke.np1" --rel-tol 1e-8 --out "$TMP/refs/old.json" --replace --reason "test: another run"; rc=$?
+    [ $rc -eq 0 ] && python3 -c "import json,sys; p=json.load(open(sys.argv[1]))['provenance']; assert p['gpu']['driver']=='999.99' and p['gpu_source'].startswith('nvidia-smi'), p" "$TMP/refs/old.json" \
+        && ok "C28: --replace with ANOTHER GPU run -> the platform comes from nvidia-smi now (nothing carried over)" || bad "C28: rc=$rc $(cat "$TMP/frz.out")"
+    sed -i 's/^run_id=selftest-CUDA-2$/run_id=selftest-CUDA/' "$G1/run_manifest.txt"; rm -f "$TMP/refs/old.json"
     # validate.sh chain, default mode, synthetic candidate runs (particles compared for real; stub fcompare)
     unset HPCPERF_NYX_SKIP_PARTICLES HPCPERF_NYX_HEATCOOL
     export HPCPERF_NYX_PROFILE="${PROF}-frozen" HPCPERF_NYX_CPU_PROFILE="${PROF}-nocpu" HPCPERF_NYX_CASES=minisb HPCPERF_L3_RUN_SUBDIR="$SUB.cand"
