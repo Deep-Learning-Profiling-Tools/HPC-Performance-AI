@@ -24,7 +24,7 @@
       "data/image.pgm": "8988b14347d89515fdefe11d5bb2f2b065117be297d499e868ccc8c450438c45"
     }
   },
-  "inputs_yaml_sha256": "8e10e2bd61c7091e9e35d5e16fa62c38c51107dbc8eeb3ab1e15f738722a4ba9",
+  "inputs_yaml_sha256": "b366003f95862b126d74be8d20f43d1476bb0394c6f3d4dabe2d9a9ffa5a5733",
   "spec": {
     "mode": "data",
     "outputs": [
@@ -50,13 +50,13 @@
       "dtype": "f32",
       "count": 229916,
       "bytes": 919664,
-      "sha256": "fedd6c9138c40bf341ce9e5ac616bd151bfc57a1e31072f3fd7758f76f0bd504",
+      "sha256": "76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e",
       "rule": {
         "metric": "trunc_int",
         "tol": 3,
         "frac_tol": 0.001,
-        "d0_frac_vs_cpu_reference": 3.9144731119191355e-05,
-        "frac_tol_effective": 0.0009608552688808087,
+        "d0_frac_vs_cpu_reference": 4.34941456879904e-06,
+        "frac_tol_effective": 0.000995650585431201,
         "d0_vs_cpu_reference": 1.0,
         "d0_source": "image.cpu",
         "tol_effective": 2.0
@@ -65,25 +65,25 @@
       "stats": {
         "min": 34.26390838623047,
         "max": 251.37335205078125,
-        "sum": 24639444.24885559,
+        "sum": 24639444.31928253,
         "nonfinite": 0
       },
-      "blob": "sha256/fe/fedd6c9138c40bf341ce9e5ac616bd151bfc57a1e31072f3fd7758f76f0bd504.bin"
+      "blob": "sha256/76/76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e.bin"
     }
   ],
   "provenance": {
-    "made_utc": "2026-10-26T06:39:29Z",
+    "made_utc": "2026-10-28T11:04:27Z",
     "host": "dgx003.orc.gmu.edu",
     "gpu": {
       "name": "NVIDIA B200",
-      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
       "driver": "595.58.03"
     },
     "cuda_toolkit": "13.2.1",
-    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "git_head": "f8a4c2612724e2c825dbe9a8647e70abf2c81cb9",
     "source_clean": true,
     "binary": "build/srad_v1/cuda/srad_v1_cuda",
-    "binary_sha256": "b6c58ecf14f46184e6bc833d7a1b9eaf6e2c38eefdfcb83eaa35de83ac0ee50f",
+    "binary_sha256": "47a1912ab94baf2a06f6b9eb0536d4705acba09340d9149e0f3039652498b9dc",
     "command": [
       "python3",
       "level1/srad_v1/verify.py",
@@ -101,7 +101,7 @@
     },
     "cpu_validation": {
       "exit_code": 0,
-      "wall_s": 1.677,
+      "wall_s": 3.633,
       "pass_line": "PASS: srad output image matches CPU reference (max pixel diff 1, frac>1 0.0000%)",
       "pass_regex": "^PASS: srad output image matches CPU reference",
       "fail_regex": "^FAIL",
@@ -109,9 +109,14 @@
       "log_sha256": "b46c22e647b44fa1ceb7dbad3dcd4761db6c4bb5781dc3e7183574c967c8f231"
     },
     "tool_sha256": {
-      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
-      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+      "hpcperf_golden.py": "169e4f0d7da831138ad80b531bf635ac924072eda3f4141ce4f8fc59e44abc84",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
     "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  },
+  "replaces": {
+    "reason": "srad_v1 reduction fix (class D, cuda/reduce_kernel.cu:93-99, commit 88a5ac9): the 2026-10-26 reference froze upstream's remainder-index bug (d_sums[i] instead of d_sums[i*d_mul]; q0sqr 0.851 instead of 0.0513, c saturated to 1, output bit-identical to plain diffusion). Regenerated from the fixed build; validated 2026-10-28 against Rodinia 3.1 OpenMP srad_v1 (HPC-FAIR/rodinia_3.1@366b283, max |diff| <= 4.1e-4 grey levels), the Yu & Acton 2002 equations (per-step c 4.1e-7, image 1.5e-7) and verify.py (6.1e-5). Rule unchanged.",
+    "previous_made_utc": "2026-10-26T06:39:29Z",
+    "previous_sha256": "3b2f59e96a8421b37c143ea6e9b7d27762b3a22f3d66310d2208b479b896c275"
   }
 }
