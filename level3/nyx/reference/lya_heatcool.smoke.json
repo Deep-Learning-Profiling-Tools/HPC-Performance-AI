@@ -19,10 +19,10 @@
   "ranks": 1
  },
  "archive": {
-  "sha256": "60c3ac24ea42dc3e31b2838b9aa1ae228892fd460ef73acedb19fc3410705f67",
-  "size": 10526720,
+  "sha256": "22d5c600259a95cc641edce6ba5049a31664494f68ace8ec893c40f1779baad7",
+  "size": 10516480,
   "format": "tar (GNU, deterministic: sorted, mtime 0, uid/gid 0, mode 0644)",
-  "store": "$HPCPERF_GOLDEN_STORE/sha256/60/60c3ac24ea42dc3e31b2838b9aa1ae228892fd460ef73acedb19fc3410705f67.bin (default <repo>/.golden-store; never in git)",
+  "store": "$HPCPERF_GOLDEN_STORE/sha256/22/22d5c600259a95cc641edce6ba5049a31664494f68ace8ec893c40f1779baad7.bin (default <repo>/.golden-store; never in git)",
   "members": [
    {
     "path": "chk00000/DM/Header",
@@ -95,14 +95,15 @@
     "sha256": "8411ee92702edf2e3ca047b07f5afbdc289b96ce6ab2bd9936e43543fe3756b1"
    },
    {
-    "path": "plt00010/job_info",
-    "size": 8187,
-    "sha256": "6a00efdb51e5e644c721f753519c113c7826b4e96ef939cc58bf213fe2c0f9e5"
-   },
-   {
     "path": "plt00010/the_parameters",
     "size": 3826,
     "sha256": "fb098d02a15361f107fd40957a435e5c0f3a014eb07bb5db7f8c66a6a3f51e33"
+   }
+  ],
+  "excluded": [
+   {
+    "path": "plt00010/job_info",
+    "reason": "AMReX/Nyx run log: inputs file, output and build directories, AMReX and compiler paths and flags, build machine (host name, kernel), build and output dates, CPU-hours; read by no comparison of validate.sh [3]"
    }
   ],
   "dm_particles": 32768
@@ -260,16 +261,15 @@
   }
  },
  "provenance": {
-  "made_utc": "2026-10-27T09:25:06Z",
-  "host": "dgx003.orc.gmu.edu",
+  "made_utc": "2026-10-28T23:16:33Z",
   "gpu": {
-   "index": "1",
    "name": "NVIDIA B200",
-   "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
-   "driver": "595.58.03"
+   "driver": "595.58.03",
+   "compute_capability": "10.0"
   },
+  "gpu_source": "the replaced reference of the same GPU run (recorded when that run was frozen); compute capability from nvidia-smi now (same GPU model)",
   "cuda": "13.2.1",
-  "git_head": "2b4951fd3491e30e198e60485282e93048ff3bb6",
+  "git_head": "08f6f88ce215b6fa52f5f65733637ba8ee484c99",
   "harness_dirty": [],
   "gpu_run": {
    "run_id": "20261027T092357Z-273998-26381",
@@ -295,7 +295,7 @@
   },
   "source_tree_sha256": "71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120",
   "tool_sha256": {
-   "nyx_reference.py": "fe4b3fc7c50af3da5c00da9760c34c25c63e5312fff6c008f924731102bf4edb",
+   "nyx_reference.py": "b3935715c88d9a660c32d585a12d14d1de6f4172f7a6525d919e91720f12799e",
    "nyx_fcompare_check.py": "2c3159ad94866880742bf201e2fc59141047f929a71487190e83adef6509c877",
    "nyx_particle_compare.py": "aaa12fd4a6d0e4969e833401763e3e2e0eef19e6147b97a5b166fb48f2094daa",
    "validate.sh": "4fd2e15ba3d958fbe769ba8ed4b607879ecc966ed4c0250977e26504645ace5b",
@@ -307,6 +307,11 @@
    "validate.sh": "4fd2e15ba3d958fbe769ba8ed4b607879ecc966ed4c0250977e26504645ace5b",
    "run.sh": "e062470d946d31a0231e57327ad5fd0fee65d3fc434b03df6bd8e3596fa4af8b"
   },
-  "note": null
+  "note": null,
+  "replaces": {
+   "archive_sha256": "60c3ac24ea42dc3e31b2838b9aa1ae228892fd460ef73acedb19fc3410705f67",
+   "made_utc": "2026-10-27T09:25:06Z",
+   "reason": "round 5 (2026-10-28): re-frozen from the same run tree without plt00010/job_info (AMReX's run log: node paths, build machine; read by no comparison of [3]) and without host name / GPU UUID / GPU index in the provenance; the 15 kept members are byte-identical, d0 and tolerances unchanged"
+  }
  }
 }
