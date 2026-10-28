@@ -127,6 +127,20 @@ ln -s "$TOOLS" "$TMP/golden-tool"
 export HPCPERF_GOLDEN_STORE="$TMP/store"
 "$PY" "$G" validate "$B" | /usr/bin/grep -q 'fake: OK' && ok "2b: validate accepts the spec" || bad "2b: validate"
 
+# a fake nvidia-smi (first on PATH for every make below): the platform record must come from it, without its UUID
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/nvidia-smi" <<'SMI'
+#!/bin/sh
+case "$*" in
+  *compute_cap*) [ -n "${FAKE_SMI_OLD:-}" ] && { echo 'Field "compute_cap" is not a valid field to query.'; exit 2; }
+                 echo "0, GPU-feedface-0000-1111-2222-333344445555, NVIDIA Fake GPU, 999.99, 9.9"
+                 echo "1, GPU-feedface-0000-1111-2222-999988887777, NVIDIA Fake GPU, 999.99, 9.9" ;;
+  *) echo "0, GPU-feedface-0000-1111-2222-333344445555, NVIDIA Fake GPU, 999.99"
+     echo "1, GPU-feedface-0000-1111-2222-999988887777, NVIDIA Fake GPU, 999.99" ;;
+esac
+SMI
+chmod +x "$TMP/bin/nvidia-smi"; export PATH="$TMP/bin:$PATH"
+
 echo
 echo "=== 3: make"
 echo "// dirty" >> "$B/cuda/main.cu"; touch -d '2 hours ago' "$B/cuda/main.cu"
@@ -158,6 +172,28 @@ im = o['img']['rule']; assert im['d0_vs_cpu_reference'] == 0 and im['tol_effecti
 assert os.path.isfile(os.path.join(sys.argv[2], o['y']['blob']))
 p = r['provenance']; assert p['cpu_validation']['pass_line'] == 'PASS' and p['source_clean'] is True and p['env']['HPCPERF_CPU_REFERENCE'] == '1'
 assert r['workload']['args'] == ['1000', '0.1']
+PY
+"$PY" - "$B/reference/n1000.json" "$TMP" <<'PY' && ok "3j: provenance: platform = GPU model / driver / compute capability (no host, no GPU UUID / index), no absolute path of this machine (--workdir outside the repository -> <workdir>/...)" || bad "3j: provenance content"
+import json, os, socket, sys
+t = open(sys.argv[1]).read(); r = json.loads(t); p = r['provenance']
+assert p['gpu'] == {'name': 'NVIDIA Fake GPU', 'driver': '999.99', 'compute_capability': '9.9'}, p['gpu']
+assert 'host' not in p and 'GPU-feedface' not in t, p
+host = socket.gethostname()
+for needle in (host, host.split('.')[0], sys.argv[2], os.path.expanduser('~') + '/'):
+    assert needle not in t, needle
+assert p['cpu_validation']['log'] == '<workdir>/run/stdout.log' and p['binary'] == 'build/fake/cuda/fake' and p['command'][0] == 'build/fake/cuda/fake', p
+assert len(p['git_head']) == 40
+PY
+"$PY" - "$TOOLS" <<'PY' && ok "3k: gpu_identity: the device CUDA_VISIBLE_DEVICES names (index or UUID); a driver without compute_cap keeps name/driver (null capability); no nvidia-smi -> null" || bad "3k: gpu_identity"
+import os, sys; sys.path.insert(0, sys.argv[1]); import hpcperf_golden as g
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+assert g.gpu_identity() == {'name': 'NVIDIA Fake GPU', 'driver': '999.99', 'compute_capability': '9.9'}
+os.environ['CUDA_VISIBLE_DEVICES'] = 'GPU-feedface-0000-1111-2222-999988887777,0'
+assert g.gpu_identity()['compute_capability'] == '9.9'
+os.environ['FAKE_SMI_OLD'] = '1'
+assert g.gpu_identity() == {'name': 'NVIDIA Fake GPU', 'driver': '999.99', 'compute_capability': None}
+os.environ['PATH'] = '/nonexistent'
+assert g.gpu_identity() is None
 PY
 out="$("$PY" "$G" make "$B" n1000 --workdir "$TMP/mk" 2>&1)"; rc=$?
 [ "$rc" = 2 ] && echo "$out" | /usr/bin/grep -q 'exists (frozen)' && ok "3f: an existing reference is never replaced silently" || bad "3f: rc=$rc"
@@ -353,6 +389,12 @@ if bash "$(dirname "${BASH_SOURCE[0]}")/test_golden_artifacts.sh" > "$TMP/artifa
     ok "10a: golden_artifacts.py suite ($(grep -o '[0-9]* passed' "$TMP/artifacts.log" | tail -1))"
 else
     bad "10a: golden_artifacts.py suite: $(grep -E '^FAIL|failed' "$TMP/artifacts.log" | head -3)"
+fi
+# the provenance scrub (scrub_provenance.py) has its own CPU-only suite on fixture files
+if bash "$(dirname "${BASH_SOURCE[0]}")/test_scrub_provenance.sh" > "$TMP/scrub.log" 2>&1; then
+    ok "10c: scrub_provenance.py suite ($(grep -o '[0-9]* passed' "$TMP/scrub.log" | tail -1))"
+else
+    bad "10c: scrub_provenance.py suite: $(grep -E '^FAIL|failed' "$TMP/scrub.log" | head -3)"
 fi
 # the read-only consistency audit (hpcperf_golden_audit.py) has its own CPU-only suite on a fake repository
 if bash "$(dirname "${BASH_SOURCE[0]}")/test_golden_audit.sh" > "$TMP/audit.log" 2>&1; then

@@ -45,7 +45,7 @@ tol_effective of the golden is within (<=) the upstream tolerance of the CPU ref
 so replacing the CPU reference by the golden does not loosen the original criterion (relative metrics:
 (tol - d0) / (1 + d0), see tol_effective). A non-finite value where the golden is finite always fails.
 """
-import argparse, hashlib, json, os, re, shutil, socket, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -416,16 +416,47 @@ def git(root: Path, *a):
 
 
 def gpu_identity():
-    try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=name,uuid,driver_version", "--format=csv,noheader"],
-                             capture_output=True, text=True, timeout=20).stdout
-        dev = os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0]
-        lines = [l.strip() for l in out.splitlines() if l.strip()]
-        idx = int(dev) if dev.isdigit() and int(dev) < len(lines) else 0
-        name, uuid, drv = [x.strip() for x in lines[idx].split(",")]
-        return {"name": name, "uuid": uuid, "driver": drv}
-    except Exception:
-        return None
+    """The platform record of the reference GPU: model name, driver and compute capability (nvidia-smi) -- what a
+    reproduction needs next to cuda_toolkit, the binary's sha256 and git_head. The GPU's UUID / index and the host name
+    identify one machine, not what the reference depends on, and are not recorded (the index and UUID are read only to
+    select the device CUDA_VISIBLE_DEVICES names). A driver without the compute_cap field: compute_capability null."""
+    dev = os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
+    for fields in (("index", "uuid", "name", "driver_version", "compute_cap"), ("index", "uuid", "name", "driver_version")):
+        try:
+            r = subprocess.run(["nvidia-smi", f"--query-gpu={','.join(fields)}", "--format=csv,noheader"],
+                               capture_output=True, text=True, timeout=20)
+        except Exception:
+            return None
+        if r.returncode != 0:
+            continue
+        rows = [[x.strip() for x in l.split(",")] for l in r.stdout.splitlines() if l.strip()]
+        rows = [x for x in rows if len(x) == len(fields)]
+        if not rows:
+            return None
+        row = next((x for x in rows if dev in (x[0], x[1])), rows[0])
+        return {"name": row[2], "driver": row[3], "compute_capability": row[4] if len(row) > 4 else None}
+    return None
+
+
+def portable_provenance(x, root: Path, work: Path):
+    """The provenance with no absolute location of this machine: every occurrence of the work directory, the repository
+    or $HOME in a recorded string becomes <workdir> / <repo> / <home> (paths inside the repository are already recorded
+    repository-relative; this catches a --workdir outside it and paths a log line or command embeds)."""
+    subs = sorted({(str(Path(work).resolve()), "<workdir>"), (os.path.abspath(work), "<workdir>"), (str(Path(root).resolve()), "<repo>"),
+                   (os.path.abspath(root), "<repo>"), (os.path.expanduser("~"), "<home>")}, key=lambda t: (-len(t[0]), t))
+    subs = [(a, b) for a, b in subs if os.path.isabs(a) and a.rstrip("/")]
+
+    def walk(v):
+        if isinstance(v, str):
+            for a, b in subs:
+                v = v.replace(a, b)
+            return v
+        if isinstance(v, list):
+            return [walk(e) for e in v]
+        if isinstance(v, dict):
+            return {k: walk(e) for k, e in v.items()}
+        return v
+    return walk(x)
 
 
 def cuda_version():
@@ -648,11 +679,24 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
                 os.replace(tmp, bp)
             entry["blob"] = f"sha256/{rec['sha256'][:2]}/{rec['sha256']}.bin"
         outs.append(entry)
+
+    def rec_path(p):
+        # repository-relative inside the repository (as before); a work directory outside it is <workdir>/...
+        p = Path(os.path.abspath(p))
+        for base, tag in ((Path(os.path.abspath(root)), None), (Path(os.path.abspath(work)), "<workdir>")):
+            if p == base or base in p.parents:
+                rel = os.path.relpath(p, base)
+                return rel if tag is None else f"{tag}/{rel}"
+        return str(p)
+
+    # provenance: what reproduces and identifies the reference (GPU model / driver / compute capability, CUDA Toolkit,
+    # git HEAD, binary sha256, the repository-relative command, the CPU validation's evidence, the tool's sha256) --
+    # no host name, no GPU UUID / index, no absolute location of this machine (portable_provenance)
     ref = {"schema": REF_SCHEMA, "benchmark": doc["benchmark"], "level": doc["level"], "input_id": inp["id"],
            "frozen": True, "workload": hi.workload_identity(doc, inp), "inputs_yaml_sha256": doc["_sha256"],
            "spec": frozen_spec(spec), "outputs": outs,
-           "provenance": {
-               "made_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "host": socket.gethostname(),
+           "provenance": portable_provenance({
+               "made_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                "gpu": gpu_identity(), "cuda_toolkit": cuda_version(),
                "git_head": git(root, "rev-parse", "HEAD").strip(),
                "source_clean": not bool(dirty),
@@ -660,15 +704,15 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
                "command": [os.path.relpath(c, root) if str(c).startswith(str(root)) else c for c in cmd],
                "gpu_run": (None if not cc.get("after_run") else
                            {"command": [os.path.relpath(c, root) if str(c).startswith(str(root)) else c for c in gpu_cmd],
-                            "log": os.path.relpath(gpu_log, root), "log_sha256": hi.sha256_file(gpu_log)}),
+                            "log": rec_path(gpu_log), "log_sha256": hi.sha256_file(gpu_log)}),
                "env": {"HPCPERF_CPU_REFERENCE": "1", "HPCPERF_GOLDEN_MODE": spec.get("mode", "data")},
                "cpu_validation": {"exit_code": rc, "wall_s": round(wall, 3), "pass_line": passes[0].strip(),
                                   "pass_regex": cc["pass_regex"], "fail_regex": cc.get("fail_regex"),
-                                  "log": os.path.relpath(log, root), "log_sha256": hi.sha256_file(log)},
+                                  "log": rec_path(log), "log_sha256": hi.sha256_file(log)},
                "tool_sha256": {"hpcperf_golden.py": hi.sha256_file(HERE / "hpcperf_golden.py"),
                                "hpcperf_golden.h": hi.sha256_file(HERE / "hpcperf_golden.h")},
                "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
-           }}
+           }, root, work)}
     if args.replace:
         old = json.loads(rp.read_text()) if rp.exists() else None
         ref["replaces"] = {"reason": args.reason, "previous_made_utc": (old or {}).get("provenance", {}).get("made_utc"),
