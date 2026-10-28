@@ -52,6 +52,7 @@ Correctness = the k reported distances (`records[i].distance` after the ROI, sor
    * CUDA: a failed device query, allocation or copy, and any error of the kernel launch / copy back (checked once after the ROI, nothing added inside it), and a failed host `malloc`.
 
    Tested 2026-10-27 (45 cases; release and ASan builds): every case above gives its error and exit 1; ASan (host code, `-fsanitize=address`): no report in any case, against 9 reports (SEGV / FPE) and one hang at HEAD.
+4. The k-nearest selection (`findLowest`, inside the ROI; 2026-10-28): upstream swapped the records through a pointer to `records[i]` taken before `records[i]` was overwritten (`tempRec = &records[i]; records[i] = records[minLoc]; records[minLoc] = *tempRec;`), so `records[minLoc]` got its own value back and the record that sat at position i was lost while its distance moved to `minLoc`. Once a lost record belongs to the k nearest, the run prints a duplicate of an earlier record with the lost record's distance: on the registered data and query correct up to -r 363, one duplicate at -r 364, only 21447 distinct records at -r 42764; the distances were always right, so the distance-only check never saw it. Now a swap by value. The registered input (-r 5) prints and captures byte-identical output (and so does every -r <= 363); ROI 420.5 us vs 421.8 us before (median of 15 interleaved runs, B200).
 
 ```bash
 ctest --test-dir build/nearest_neighbor/cuda --output-on-failure   # golden run of the registry's default input

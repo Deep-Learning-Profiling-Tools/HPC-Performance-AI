@@ -308,7 +308,7 @@ void findLowest(std::vector<Record> &records,float *distances,int numRecords,int
   int i,j;
   float val;
   int minLoc;
-  Record *tempRec;
+  Record tempRec;   // [HPC-Performance-AI fix] was `Record *tempRec` (see the swap below)
   float tempDist;
 
   for(i=0;i<topN;i++) {
@@ -318,9 +318,16 @@ void findLowest(std::vector<Record> &records,float *distances,int numRecords,int
       if (val < distances[minLoc]) minLoc = j;
     }
     // swap locations and distances
-    tempRec = &records[i];
+    // [HPC-Performance-AI fix] upstream swapped through a pointer to records[i] taken before records[i] was
+    // overwritten (`tempRec = &records[i]; records[i] = records[minLoc]; records[minLoc] = *tempRec;`), so
+    // records[minLoc] got its own value back and the record that sat at position i was lost while its distance
+    // moved to minLoc: once a lost record is among the topN it is reported as a duplicate of an earlier record
+    // with the lost record's distance (cane4, -lat 30 -lng 90: correct up to -r 363; at -r 364 one duplicate, at
+    // -r 42764 only 21447 distinct records). The distances were always right. Swap by value; the k <= 363
+    // queries (the registered cane4-k5 included) print and capture byte-identical output.
+    tempRec = records[i];
     records[i] = records[minLoc];
-    records[minLoc] = *tempRec;
+    records[minLoc] = tempRec;
 
     tempDist = distances[i];
     distances[i] = distances[minLoc];
