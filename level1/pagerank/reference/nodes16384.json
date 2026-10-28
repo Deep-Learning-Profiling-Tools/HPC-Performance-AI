@@ -17,7 +17,7 @@
     "env": {},
     "files_sha256": {}
   },
-  "inputs_yaml_sha256": "f63c0eef9c8620625e7c551b45c3d18ff19335306f2b65bdb15027eda08cf94d",
+  "inputs_yaml_sha256": "1a0ec418ab9b3e5aec9d03090f237631736da4cb2db1e607a7c5cf3908171e11",
   "spec": {
     "mode": "data",
     "outputs": [
@@ -28,10 +28,10 @@
         "dtype": "f32",
         "rule": {
           "metric": "max_rel",
-          "tol": 0.001
+          "tol": 3e-05
         },
         "cpu": "page_rank.cpu",
-        "basis": "upstream Verify fails on isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000 (common/pr_benchmark.cc:119-120), i.e. max |a - c| / c <= 1e-3; the check allows 1e-3 minus the B200 output's own deviation from the CPU reference (a NaN fails)",
+        "basis": "the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 3e-5 instead of 1e-3, minus the B200 output's own deviation from the CPU reference (a NaN fails). Measured 2026-10-28: legitimate implementations (fmad off, 4/8/32 lanes per row with shuffle trees, merge-style nonzero chunks and push atomics, cuSPARSE CSR ALG1/ALG2, reverse / 4-accumulator / Kahan / f64 accumulation, f64 vectors, block sizes) <= 1.4e-6; a vector stored in f16 / bf16 6.2e-4 / 4.5e-3 and matrix values rounded to f16 / bf16 / tf32 >= 6.7e-2 fail",
         "log": null
       }
     ]
@@ -45,12 +45,12 @@
       "sha256": "63fcdd3e17b13e6d120f391830e77801d0b3e66b918b6618a20747e0652a522e",
       "rule": {
         "metric": "max_rel",
-        "tol": 0.001,
+        "tol": 3e-05,
         "d0_vs_cpu_reference": 8.828208102405802e-07,
         "d0_source": "page_rank.cpu",
-        "tol_effective": 0.0009991162971491004
+        "tol_effective": 2.911715348453039e-05
       },
-      "basis": "upstream Verify fails on isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000 (common/pr_benchmark.cc:119-120), i.e. max |a - c| / c <= 1e-3; the check allows 1e-3 minus the B200 output's own deviation from the CPU reference (a NaN fails)",
+      "basis": "the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 3e-5 instead of 1e-3, minus the B200 output's own deviation from the CPU reference (a NaN fails). Measured 2026-10-28: legitimate implementations (fmad off, 4/8/32 lanes per row with shuffle trees, merge-style nonzero chunks and push atomics, cuSPARSE CSR ALG1/ALG2, reverse / 4-accumulator / Kahan / f64 accumulation, f64 vectors, block sizes) <= 1.4e-6; a vector stored in f16 / bf16 6.2e-4 / 4.5e-3 and matrix values rounded to f16 / bf16 / tf32 >= 6.7e-2 fail",
       "stats": {
         "min": 9.771788427315187e-06,
         "max": 0.00013636922813020647,
@@ -61,18 +61,18 @@
     }
   ],
   "provenance": {
-    "made_utc": "2026-10-26T06:37:24Z",
+    "made_utc": "2026-10-28T11:17:24Z",
     "host": "dgx003.orc.gmu.edu",
     "gpu": {
       "name": "NVIDIA B200",
-      "uuid": "GPU-a543dc0a-5b1e-800b-4eac-7bcf48e4600e",
+      "uuid": "GPU-2d984b7b-0791-8424-1cab-ef5af5de26d5",
       "driver": "595.58.03"
     },
     "cuda_toolkit": "13.2.1",
-    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "git_head": "986f4d4340043e6f3d20a0c533a19423b8352714",
     "source_clean": true,
     "binary": "build/pagerank/cuda/pagerank_cuda",
-    "binary_sha256": "a257733db4f32bede396a2dfad0bdecd8a060968f9aab029bb499f78ea359e2f",
+    "binary_sha256": "d71cddd96e496dc79ce6429b20c36e87f96bbe89a219aa246752765f1b170845",
     "command": [
       "build/pagerank/cuda/pagerank_cuda",
       "-i",
@@ -85,17 +85,22 @@
     },
     "cpu_validation": {
       "exit_code": 0,
-      "wall_s": 0.686,
+      "wall_s": 1.475,
       "pass_line": "Passed.",
       "pass_regex": "^Passed\\.$",
       "fail_regex": "^Error with node",
       "log": "build/golden-make/pagerank/nodes16384/run/stdout.log",
-      "log_sha256": "82a455641359c4381087697d8d10ab887d6f2738179103ffddeb74079d81d289"
+      "log_sha256": "45e55e49c45a7f264c8da14dda33cae3e55977cc6423ffcb6a5914b79f0b5cf0"
     },
     "tool_sha256": {
-      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
-      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
     },
     "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  },
+  "replaces": {
+    "reason": "pagerank criterion tightened (commit 986f4d4): max_rel 3e-5 on the 500-iteration inputs and 1e-5 on the -m 5 probe instead of upstream Verify 1e-3, which passed an f16-stored rank vector (6.2e-4 - 7.7e-4); measured 2026-10-28 on 16 legitimate variants (<= 1.39e-6 / 4.17e-7, >= 20x headroom). Baseline and captured data unchanged.",
+    "previous_made_utc": "2026-10-26T06:37:24Z",
+    "previous_sha256": "c55a026fa3175d258e9ed087892eebf99640c733707a5dae726b77a10656078b"
   }
 }
