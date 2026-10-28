@@ -145,3 +145,36 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+- id: probe-cutoffs
+  purpose: correctness-probe
+  probe_basis: >-
+    no other registered input decides body 4's e_cut / emin clamps, body 6's q_cut and its delvc <= 0 guard or the ssc
+    floor of bodies 2, 5, 6: a candidate dropping any one of them passes the performance inputs and probe-randsign with
+    error 0 (measured 2026-10-28). Here delvc and pbvc come from upstream's own initDataRandSign (both helpers reseed
+    srand(4793), so pbvc < 0 exactly where delvc < 0 and ssc <= 0 occurs), pHalfStep and qq_old from initDataRandValue;
+    the cut-offs keep their upstream values. Elements whose output changes when the branch is dropped: body 4 e_cut
+    9.5%, emin 27.0%; body 6 q_cut 19.6% (q_new is 0 on 69.6%, 0.196-0.5 elsewhere), delvc guard 49.9%; ssc floor of
+    body 2 / 5 / 6 13.7% / 50.1% / 50.1% (NaN without it); each such candidate fails (max rel err 0.134, 0.134, 0.196,
+    1.11, non-finite), --fmad=false passes (1.6e-16)
+  case: energy-eos
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (1000000, 130); set-up data only (`--probe-cutoffs`, cuda/main.cu setUp): delvc
+      and pbvc are initialized with upstream DataUtils initDataRandSign, pHalfStep and qq_old with initDataRandValue
+      instead of initData (same init count); rho0, e_cut, emin and q_cut keep their upstream values; the six Base_CUDA
+      kernels and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000000
+    reps: 130
+    probe_data: delvc, pbvc initDataRandSign; pHalfStep, qq_old initDataRandValue; cut-offs unscaled
+  args:
+  - '1000000'
+  - '130'
+  - --probe-cutoffs
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda

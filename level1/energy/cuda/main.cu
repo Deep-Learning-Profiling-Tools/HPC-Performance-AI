@@ -162,13 +162,17 @@ struct Data {
 };
 
 // upstream ENERGY.cpp setUp (init order preserved)
-// probe (correctness-probe input, `--probe`; set-up only, the kernels are unchanged): upstream's data gives
-// delvc > 0 everywhere, so the delvc <= 0 branches of ENERGY_BODY2/5/6 never run, q_new stays 0 and every
-// e_new (0.167-0.170) falls below e_cut and is clamped to emin -- a constant fill reproduces the output.
+// probe 1 (correctness-probe input probe-randsign, `--probe`; set-up only, the kernels are unchanged): upstream's
+// data gives delvc > 0 everywhere, so the delvc <= 0 branches of ENERGY_BODY2/5/6 never run, q_new stays 0 and
+// every e_new (0.167-0.170) falls below e_cut and is clamped to emin -- a constant fill reproduces the output.
 // The probe initializes delvc with upstream's own random-sign helper (DataUtils initDataRandSign, same
 // factor, same init count) and scales the cut-offs e_cut and emin by 1e-2, so both branches run and no
 // e_new is clamped.
-static void setUp(Data& d, Index_type size, bool probe)
+// probe 2 (probe-cutoffs, `--probe-cutoffs`; set-up only): the branches no other input decides -- body 4's e_cut
+// / emin clamps, body 6's q_cut and delvc <= 0 guard, the ssc floor of bodies 2, 5, 6. delvc and pbvc from
+// initDataRandSign (both helpers reseed srand(4793): pbvc < 0 exactly where delvc < 0, so ssc can be <= 0),
+// pHalfStep and qq_old from initDataRandValue (values in [0, 1]); upstream's cut-offs, unscaled.
+static void setUp(Data& d, Index_type size, int probe)
 {
   resetDataInitCount();
   allocAndInitDataConst(d.e_new, size, 0.0);
@@ -181,17 +185,20 @@ static void setUp(Data& d, Index_type size, bool probe)
   allocAndInitData(d.q_old, size);
   allocAndInitData(d.work, size);
   allocAndInitData(d.compHalfStep, size);
-  allocAndInitData(d.pHalfStep, size);
+  if (probe == 2) allocAndInitDataRandValue(d.pHalfStep, size);
+  else            allocAndInitData(d.pHalfStep, size);
   allocAndInitData(d.bvc, size);
-  allocAndInitData(d.pbvc, size);
+  if (probe == 2) allocAndInitDataRandSign(d.pbvc, size);
+  else            allocAndInitData(d.pbvc, size);
   allocAndInitData(d.ql_old, size);
-  allocAndInitData(d.qq_old, size);
+  if (probe == 2) allocAndInitDataRandValue(d.qq_old, size);
+  else            allocAndInitData(d.qq_old, size);
   allocAndInitData(d.vnewc, size);
   initData(d.rho0);
   initData(d.e_cut);
   initData(d.emin);
   initData(d.q_cut);
-  if (probe) { d.e_cut *= 1.0e-2; d.emin *= 1.0e-2; }
+  if (probe == 1) { d.e_cut *= 1.0e-2; d.emin *= 1.0e-2; }
 }
 
 int main(int argc, char** argv)
@@ -200,13 +207,14 @@ int main(int argc, char** argv)
   Index_type run_reps = 130;   // upstream default reps
   if (argc > 1) size = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
-  bool probe = false;          // correctness-probe set-up data (see setUp); never a performance input
+  int probe = 0;               // correctness-probe set-up data (see setUp); never a performance input
   if (argc > 3) {
-    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
-      fprintf(stderr, "usage: %s [size [reps [--probe]]]\n", argv[0]);
+    if (argc == 4 && strcmp(argv[3], "--probe") == 0)              probe = 1;
+    else if (argc == 4 && strcmp(argv[3], "--probe-cutoffs") == 0) probe = 2;
+    else {
+      fprintf(stderr, "usage: %s [size [reps [--probe|--probe-cutoffs]]]\n", argv[0]);
       return 2;
     }
-    probe = true;
   }
   const Index_type ibegin = 0;
   const Index_type iend = size;

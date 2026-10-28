@@ -61,9 +61,29 @@ ctest --test-dir build/energy/cuda --output-on-failure
 |---|---|---|---|---|
 | performance inputs (1e6, 4e6, 16e6) | 0% | 100% | 100% | 0% |
 | `probe-randsign` | 50.08% | 0% | 0% | 50.08% (0.1989-0.2057) |
+| `probe-cutoffs` (below) | 50.08% | 32.40% | 32.40% | 30.45% (0.1958-0.5) |
 | not registered: `initDataRandSign` without the scaling | 50.08% | 49.92% (exactly the `delvc > 0` elements) | 49.92% | 50.08% |
 
-Never taken on any registered input, so omitting them is not detectable by any output check here: body 4's `e_cut` / `emin` clamps, body 6's `q_cut` (the probe's smallest non-zero `q_new`, 0.1989, is just above `q_cut` = 0.1958), and the `ssc` floor of bodies 2, 5 and 6. The kernels and the timed loop are unchanged by the probe (CUDA and HIP sources diffed against the commit before it); the CPU reference calls the same `setUp(cd, size, probe)` and passes on the probe (8.8e-17 / 4.6e-17, re-run 2026-10-28; the probe's golden check also PASSes).
+**Second correctness probe (`probe-cutoffs`, 2026-10-28).** On the performance inputs and `probe-randsign`, body 4's `e_cut` / `emin` clamps, body 6's `q_cut` (the smallest non-zero `q_new` of `probe-randsign`, 0.1989, is just above `q_cut` = 0.1958) and its `delvc <= 0` guard (body 6 run on every element: `q_cut` zeroes the extra `q_new`), and the `ssc` floor of bodies 2, 5 and 6 never decide an output, so a candidate that drops any of them passes all four inputs with error 0. The registry's second correctness-probe input `probe-cutoffs` (`energy_cuda 1000000 130 --probe-cutoffs`; ctest `energy_probe_cutoffs`, reference `reference/probe-cutoffs.json`) changes set-up data only: `delvc` and `pbvc` from upstream's `initDataRandSign` (both helpers reseed `srand(4793)`, so `pbvc < 0` exactly where `delvc < 0` and the `ssc` numerator can be negative), `pHalfStep` and `qq_old` from `initDataRandValue` (values in [0, 1]); unlike `probe-randsign` the cut-offs keep their upstream values. Share of the elements whose `e_new` or `q_new` changes when one branch is dropped (the same host replica with one branch removed at a time; the unmodified replica is bit-identical to the GPU capture of all five inputs):
+
+| branch dropped | performance inputs (1e6, 4e6, 16e6) | `probe-randsign` | `probe-cutoffs` |
+|---|---|---|---|
+| body 2 `delvc > 0` -> `q_new = 0` | 100% | 49.92% | 49.92% |
+| body 2 `delvc <= 0` formula | 0% | 50.08% | 40.58% |
+| body 2 `ssc` floor | 0% | 0% | 13.72% (NaN) |
+| body 4 `e_cut` -> 0 | 0% | 0% | 9.50% |
+| body 4 `emin` clamp | 0% | 0% | 27.02% |
+| body 5 `delvc > 0` -> `q_tilde = 0` | 0% | 49.92% | 27.02% |
+| body 5 `delvc <= 0` formula | 0% | 50.08% | 40.58% |
+| body 5 `ssc` floor | 0% | 0% | 50.08% (NaN) |
+| body 5 `e_cut` -> 0 | 100% | 0% | 32.40% |
+| body 5 `emin` clamp | 100% | 0% | 32.40% |
+| body 6 (whole `delvc <= 0` body) | 0% | 50.08% | 50.08% |
+| body 6 `delvc <= 0` guard (body on every element) | 0% | 0% | 49.92% |
+| body 6 `ssc` floor | 0% | 0% | 50.08% (NaN) |
+| body 6 `q_cut` -> 0 | 0% | 0% | 19.63% |
+
+Measured on the B200 against a scratch reference (2026-10-28): each candidate that drops body 4's `e_cut` test, its `emin` clamp, both, body 6's `q_cut`, body 6's `delvc <= 0` guard, or the `ssc` floor of body 2, 5 or 6 passes `size1000000` and `probe-randsign` with error 0 and fails `probe-cutoffs` (max rel err 0.134, 0.134, 0.134, 0.196, 1.11, non-finite x 3); `--fmad=false` passes (1.6e-16), the CPU reference's deviation is 1.6e-16 (`e_new`) / 0 (`q_new`). No element sits near a decision boundary: the smallest body-2 `|ssc|` is 9.9e-7 (no rounding amplification by `sqrt`) and `qq_old` stays at least 6.2e-8 (relative) away from `q_cut`. Replacing the floor by `sqrt(fmax(ssc, 0))` also passes, by construction: 0.3333333e-18 * `ql_old` is below the rounding of `q = ssc * ql_old + qq_old`, so the floor's constant is not observable in any output -- what is checked is that `ssc <= 0` gives `q = qq_old` (then zeroed by `q_cut` where `qq_old < q_cut`) instead of NaN. The kernels and the timed loop are unchanged by both probes (CUDA and HIP sources diffed against the commit before them; the captures of the three performance inputs and of `probe-randsign` are byte-identical to their committed references); the CPU reference calls the same `setUp(cd, size, probe)` and passes on both probes.
 
 **Correctness switch.** By default the CPU reference is skipped: the benchmark prints `SKIP_VERIFY` (never PASS) and exits 0, so ctest, `tools/inputs` and `tools/timing` never run it and nothing falls back to it. `HPCPERF_CPU_REFERENCE=1` runs it (offline only; `HPCPERF_SKIP_VERIFY=1` still forces the skip); `HPCPERF_GOLDEN_DUMP=<dir>` captures the outputs ([tools/golden/hpcperf_golden.h](../../tools/golden/hpcperf_golden.h)).
 
