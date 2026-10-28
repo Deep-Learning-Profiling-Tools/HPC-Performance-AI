@@ -96,17 +96,21 @@ inputs:
   backends_validated:
   - cuda
 - id: n134217728
-  # NO GOLDEN YET (2026-10-27, decision pending): Real_t is float, so above 2^24 a[i] = i and z = rand() % N are
-  # rounded; at this size 6 of the 268435456 queries round to a[aSize-1] = 134217728, for which no r with
-  # r+1 < aSize satisfies verify()'s a[r] <= z < a[r+1] -- verify() reports "incorrect result" for all four
-  # variants (bs1/bs2 return N-1, bs3/bs4 return N), so `make` refuses this input (README "Input n134217728").
-  # Since verify() runs by default, a plain run, ctest-style golden run and the registry check of this input FAIL
-  # (exit 1); HPCPERF_SKIP_VERIFY=1 (timing) still runs it to completion.
+  # Queries from the corrected generator (2026-10-28, README "Input n134217728"). Real_t is float, so above 2^24
+  # a[i] = i and z = rand() % N are rounded; upstream's generator rounds 6 of this input's 268435456 queries (the
+  # integers 2^27-4 .. 2^27-2) to a[aSize-1] = 2^27, for which no r with r+1 < aSize satisfies verify()'s
+  # a[r] <= z < a[r+1] (verify() FAILed all four variants: bs1/bs2 returned N-1, bs3/bs4 N). cuda/main.cu now moves
+  # such a query to the largest float below a[aSize-1] (134217720; its one answer is r = N-4) -- upstream's intent
+  # "upper = n-1" in float. Same element count, rand() stream, a[] and every other query (bit-identical); params
+  # and args unchanged: the correction is part of the benchmark's generator (a no-op for n8388608 and n33554432,
+  # whose queries never reach a[aSize-1]), not an input knob. verify() PASS for all four variants (2026-10-28).
   case: binary-search
   variant: size
   source:
     kind: derived
-    derivation: elements x16
+    derivation: 'elements x16; the 6 of 268435456 queries that upstream''s float generator rounds to a[aSize-1] (no
+      valid answer) are moved to the largest float below it (cuda/main.cu query-range correction, README "Input
+      n134217728")'
   params:
     elements: 134217728
     repeat: 100

@@ -1,5 +1,6 @@
 #include "hpcperf_roi.h"
 #include "hpcperf_golden.h"
+#include <cmath>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -223,7 +224,8 @@ void bs4 ( const size_t aSize,
 // the comparison of the captured results of bs1..bs4 (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with
 // the frozen B200 golden reference (tools/golden), and a failure ends the run with exit code 1.
 // HPCPERF_SKIP_VERIFY=1 (tools/timing/measure_level1.sh sets it) turns it off for timing; a -DDEBUG build
-// runs it regardless, as upstream. No kernel, data initialization, tolerance or algorithm is touched.
+// runs it regardless, as upstream. No kernel, tolerance or algorithm is touched; the data initialization only by
+// the query-range correction in main() (the queries no r brackets, README "Input n134217728").
 static bool hpcperf_skip_verify() {
 #ifdef DEBUG
   return false;
@@ -246,11 +248,17 @@ bool verify(Real_t *a, Real_t *z, size_t *r, size_t aSize, size_t zSize, std::st
     {
       std::cout << msg << ": incorrect result:" << std::endl;
       std::cout << "index = " << i << " r[index] = " << r[i] << std::endl;
-      if (r[i] < aSize - 1)   // [HPC-Performance-AI] upstream printed a[r[i]], a[r[i]+1] also out of range
-        std::cout << a[r[i]] << " <= " << z[i] << " < " << a[r[i] + 1] << std::endl;
+      // [HPC-Performance-AI] upstream printed a[r[i]], a[r[i]+1] also out of range, and with cout's 6 significant
+      // digits, which above 10^6 shows a violated bracket as satisfied (1.34218e+08 <= 1.34218e+08 < 1.34218e+08)
+      char vals[192];
+      if (r[i] < aSize - 1)
+        snprintf(vals, sizeof vals, "%.1f <= %.1f < %.1f", (double)a[r[i]], (double)z[i], (double)a[r[i] + 1]);
       else
-        std::cout << "r[index] is not below aSize - 1 = " << aSize - 1 << " (z[index] = " << z[i] << ")" << std::endl;
-      if (!(z[i] < a[aSize - 1])) {   // [HPC-Performance-AI] diagnostic only: such a query has no valid r at all
+        snprintf(vals, sizeof vals, "r[index] is not below aSize - 1 = %zu (z[index] = %.1f)", aSize - 1, (double)z[i]);
+      std::cout << vals << std::endl;
+      // [HPC-Performance-AI] diagnostic only: such a query has no valid r at all (the query generator in main()
+      // excludes it since 2026-10-28; upstream's generator produced 6 of them at 2^27 elements)
+      if (!(z[i] < a[aSize - 1])) {
         char why[256];
         snprintf(why, sizeof why, "z[index] = %.1f is not below a[aSize-1] = %.1f: no r with r+1 < aSize satisfies "
                  "a[r] <= z < a[r+1] (README \"Input n134217728\")", (double)z[i], (double)a[aSize - 1]);
@@ -285,6 +293,12 @@ int main(int argc, char* argv[])
 
   size_t numElem = atol(argv[1]);
   uint repeat = atoi(argv[2]);
+  // [HPC-Performance-AI] at least 2 elements: N = numElem-1 is the modulus of the query generator (rand() % 0, a
+  // SIGFPE, for 1) and the kernels' n; 0 wrapped N to SIZE_MAX with zSize = 0 queries and a vacuous verify() PASS
+  if (numElem < 2) {
+    std::cout << "number of elements must be at least 2\n";
+    return 1;
+  }
 
   srand(2);
   size_t aSize = numElem;
@@ -303,6 +317,19 @@ int main(int argc, char* argv[])
 
   // lower = 0, upper = n-1
   for (size_t i = 0; i < zSize; i++) z[i] = rand() % N;
+
+  // [HPC-Performance-AI] query-range correction (README "Input n134217728"). Upstream's intent above -- every query
+  // integer at most n-1, i.e. strictly below a[N] = a[aSize-1], so that verify()'s a[r] <= z < a[r+1], r+1 < aSize
+  // has exactly one solution -- holds only in exact arithmetic. With Real_t = float, a[i] = i and the query integer
+  // are rounded to float above 2^24, and when aSize-2 and aSize-1 round to the same float a query integer can round
+  // to a[N] itself, which no r brackets: at 2^27 elements the integers 2^27-4 .. 2^27-2 round to 2^27 = a[N], 6 of
+  // the 268435456 queries for this rand() stream. Such a query (and only such a query) is moved to the largest
+  // Real_t below a[N] -- the smallest change that gives it its one valid answer (2^27-8 at 2^27 elements, the value
+  // these integers round down to; r = N-4). The rand() stream, a[] and every other query are unchanged: at 2^23
+  // and 2^25 elements no query reaches a[N] and the input is byte-identical to upstream's; with -DReal_t=double a
+  // no-op. A pure insertion after upstream's generator; outside every timed region / ROI.
+  for (size_t i = 0; i < zSize; i++)
+    if (!(z[i] < a[N])) z[i] = std::nextafter(a[N], (Real_t)0);
 
   Real_t* d_a;
   Real_t* d_z;
