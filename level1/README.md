@@ -5,10 +5,12 @@ repackaged so each one can be configured, built, run, and validated
 independently of its original suite framework. Extraction preserves upstream
 algorithms and workloads; the deliberate exceptions (each documented in the benchmark's README and
 commit) are bug fixes -- srad_v1's reduction index (class D), binary_search's query range at
-2^27 elements, bezier_surface's kernel guard and input handling, nearest_neighbor's and backprop's host
-code -- and correctness criteria that replace upstream checks shown to pass wrong results or reject
-legitimate ones (nbody, pagerank, hotspot_3d's per-element gate, lud's residual evaluation,
-binary_search's verify() on by default).
+2^27 elements, bezier_surface's kernel guard and input handling, hotspot_3d's final iterate (the output is
+now the temperature after N steps, upstream returned step N-1), nearest_neighbor's k-nearest selection
+(upstream lost records from k = 364 on) and input handling, backprop's host code -- and correctness
+criteria that replace upstream checks shown to pass wrong results or reject legitimate ones (nbody,
+pagerank, hotspot_3d's per-element gate, lud's residual evaluation, binary_search's verify() on by
+default, nearest_neighbor's record identities, needleman_wunsch's alignment score).
 
 Build and validate (per benchmark, after `source hpcperf_env.sh`):
 
