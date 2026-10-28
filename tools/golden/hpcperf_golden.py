@@ -516,8 +516,11 @@ def make_one(doc, inp, root: Path, bench_dir: Path, args) -> int:
               f"(a copy -- e.g. an optimization candidate -- never makes a golden reference)"); return 2
     # the benchmark directory (sources, registry) and the tool files that capture / compare / time the outputs; other
     # files of tools/golden (e.g. the distribution tool, an audit tool, a regenerated lock) do not affect a reference
-    dirty = git(root, "status", "--porcelain", "--", rel_bench, *GOLDEN_TOOL_FILES, "tools/timing/roi").strip()
-    dirty = "\n".join(l for l in dirty.splitlines() if not l[3:].startswith(f"{rel_bench}/reference/"))
+    # porcelain lines are "XY path": never strip() the whole output -- that removes the leading blank of an
+    # unstaged " M path" line and the reference/ exclusion below then misses it (a replaced reference of one
+    # input made the next input's make refuse)
+    dirty = git(root, "status", "--porcelain", "--", rel_bench, *GOLDEN_TOOL_FILES, "tools/timing/roi")
+    dirty = "\n".join(l for l in dirty.splitlines() if l.strip() and not l[3:].startswith(f"{rel_bench}/reference/"))
     if dirty and not args.allow_dirty_for_tests:
         print(f"REFUSED: {tag}: uncommitted changes under {rel_bench} / tools/golden / tools/timing/roi -- a golden "
               f"reference comes only from committed, unmodified sources:\n{dirty}"); return 2

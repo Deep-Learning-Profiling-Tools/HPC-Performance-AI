@@ -217,6 +217,10 @@ out="$("$PY" "$G" make "$B" n1000 --replace --reason "test" --workdir "$TMP/mk" 
     && ok "5d: make --replace --reason records what it replaced" || bad "5d: rc=$rc $out"
 out="$("$PY" "$G" run "$B" --workdir "$TMP/rn5" 2>&1)"; rc=$?
 [ "$rc" = 1 ] && echo "$out" | /usr/bin/grep -q 'modified relative to HEAD' && ok "5e: a replaced but uncommitted reference is not trusted until committed" || bad "5e: rc=$rc $out"
+touch "$FR/build/fake/cuda/fake"
+out="$("$PY" "$G" make "$B" n1000 --replace --reason "test again" --workdir "$TMP/mk2" 2>&1)"; rc=$?
+[ "$rc" = 0 ] && ! echo "$out" | /usr/bin/grep -q 'uncommitted changes' \
+    && ok "5f: a replaced (modified, uncommitted) reference does not make the next make refuse (reference/ is excluded from the dirty check)" || bad "5f: rc=$rc $out"
 ( cd "$FR" && git -c user.email=t@t -c user.name=t add level1/fake/reference && git -c user.email=t@t -c user.name=t commit -qm ref2 )
 
 echo
