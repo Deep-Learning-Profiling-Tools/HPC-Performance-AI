@@ -8,14 +8,16 @@ fallback). This tool distributes the store as a small set of deterministic bundl
 distributes its source artifacts (`level3/EXTERNAL_ARTIFACT_DESIGN.md`): local staging outside the worktree,
 a committed lock, GitHub Release assets once the maintainer publishes, sha256 verification at every step.
 
-State on 2026-10-27 (HEAD `cb5f78f`): 82 committed references name 103 distinct blobs, 8,550,402,964 bytes,
-packed into **30 bundles, 2,747,748,740 bytes** (zstd -3, 31.5 % of the 8,718,643,200 tar bytes).
+State on 2026-10-28 (lock commit `0cd9e53`): 96 of the committed references (132 `hpcperf-golden-1` + 4 Nyx) name
+130 distinct blobs, 8,623,140,424 bytes, packed into **30 bundles, 2,776,023,525 bytes** (zstd -3, 31.6 % of the
+8,791,398,400 tar bytes); every bundle `primary: {url: null, status: unpublished}`, redistribution `review`.
 
 ## User workflow: clone, fetch, verify, run
 
 ```bash
 git clone ... && cd HPC-Performance-AI && source hpcperf_env.sh
-python3 tools/golden/golden_artifacts.py fetch                      # every committed reference (2.7 GB download, 8.6 GB store)
+python3 tools/golden/golden_artifacts.py fetch                      # every committed reference (2.8 GB download, 8.6 GB store)
+python3 tools/golden/golden_artifacts.py fetch --from "$HPCPERF_ARTIFACT_STAGING/golden"   # until published: from the maintainer's staging
 python3 tools/golden/golden_artifacts.py fetch level1/adam level3/nyx   # or only what some benchmarks need
 python3 tools/golden/golden_artifacts.py verify                     # every named blob present, size + sha256 correct
 cmake --build build/adam/cuda && ctest ...                          # the golden checks now find their blobs
@@ -121,10 +123,11 @@ name and sha256 are unchanged.
    every staged bundle was read back member by member) and the lock. 20 s for the whole store on dgx003.
 3. `golden_artifacts.py lock-check` must PASS; commit the lock (with the references or right after them).
 4. Redistribution review: every bundle starts as `review`; the maintainer sets `cleared` (or `blocked`) in the
-   lock. The pack notes what it found: the 4 Nyx archives carry `plt00010/job_info` text with node-private
-   build/run paths (`/projects/...`, build directory, compiler paths) and the build host name. They are part of
-   the frozen bytes (changing them means regenerating the Nyx references), so the choice is: publish as is,
-   regenerate without them, or keep the Nyx bundle unpublished.
+   lock. The pack notes what it found in archive blobs (node-private locations, credentials). The Nyx archives
+   used to carry `plt00010/job_info` (AMReX's run log: node paths, build machine); since 2026-10-28
+   `nyx_reference.py freeze` leaves it out (no comparison reads it) and refuses a kept text member that names the
+   node, and the 4 references were re-frozen from the same run trees: the 15 kept members are byte-identical, the
+   content scan finds 0 node-private members.
 5. `golden_artifacts.py plan --tag <tag> --commit <40-hex> --json ...` lists PLAN/REFUSE per bundle (staged file
    verified, redistribution cleared, lock current, not already published) with the planned
    `https://github.com/<owner>/<repo>/releases/download/<tag>/<bundle>` URLs and SHA256SUMS lines.
@@ -134,13 +137,14 @@ name and sha256 are unchanged.
    published}` per bundle in a separate reviewed commit. Published names are immutable: a new member set is
    always a new name, so a later round uploads only the bundles whose names changed.
 
-## Proposed integration (not applied; files owned elsewhere)
+## Proposed integration (partly applied)
+
+Applied (5600ae1): the fetch hint in `hpcperf_golden.py` (the "golden blob ... missing" FAIL line and `status`
+BLOB-MISSING) and `tests/run_all.sh` running `test_golden_artifacts.sh`. Not applied (files owned elsewhere):
 
 * `tools/prepare_benchmark.sh`: accept `golden [SELECTION...] [--from DIR] [--offline]` and exec
   `golden_artifacts.py fetch`; `level1|level2 <b>` could fetch that benchmark's bundle, and
   `level3 nyx` could fetch `level3/nyx` after materializing the source.
-* `tools/golden/hpcperf_golden.py`: in the "golden blob ... missing" FAIL line and in `status` BLOB-MISSING, add
-  the hint `fetch it: python3 tools/golden/golden_artifacts.py fetch <level>/<benchmark>`.
 * `tools/artifacts/artifact_catalog.yaml`: a `golden_store:` block (lock path, naming, staging layout
   `$HPCPERF_ARTIFACT_STAGING/golden/<bundle>`, proposed tag, publish requirements = lock-check PASS,
   staged sha256/size == lock, redistribution cleared, not yet published).
@@ -149,8 +153,8 @@ name and sha256 are unchanged.
   `golden/<filename>`, no manifest, the lock as an extra asset.
 * `tools/artifacts/remote_fetch_check.sh`: a `golden` mode (clean clone, empty store and cache, no credentials,
   `golden_artifacts.py fetch` + `verify`, then `hpcperf_golden.py status`).
-* `tools/golden/tests/run_all.sh`: run `test_golden_artifacts.sh`; once the lock is committed, a
-  `golden_artifacts.py lock-check` line makes a reference committed without a re-pack visible.
+* `tools/golden/tests/run_all.sh`: a `golden_artifacts.py lock-check` line, which makes a reference committed
+  without a re-pack visible (needs the real repository, so it is a release-checklist step for now).
 
 ## Limits
 

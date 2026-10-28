@@ -37,11 +37,12 @@ line in order>}` (all matching lines, f64). `cpu:` names the CPU-reference captu
 log written by the one-time CPU validation (`cpu: {log: {file: <template>, regex: <default: the same>}}`).
 `cpu_check.after_run: true` = make runs the plain GPU command first and then cpu_check.command (templated,
 {log} = that GPU run's log; `env:` templated) as the one-time CPU validation of that very output.
-Each tolerance is the benchmark's own upstream tolerance for its GPU-vs-CPU check. make measures
+Each tolerance is the benchmark's own tolerance for its GPU-vs-CPU check (upstream's, or a documented project
+criterion where upstream's check was missing or blind; cited in `basis`). make measures
 d0 = the same metric between the B200 output and the CPU reference, and the check uses
 tol_effective = tol - d0 for absolute metrics, (tol - d0) / (1 + d0) for relative ones, ((sqrt tol - sqrt d0) /
 (1 + sqrt d0))^2 for l2_rel_sq (see tol_effective): by the triangle inequality a candidate within
-tol_effective of the golden is within (<=) the upstream tolerance of the CPU reference,
+tol_effective of the golden is within (<=) that tolerance of the CPU reference,
 so replacing the CPU reference by the golden does not loosen the original criterion (relative metrics:
 (tol - d0) / (1 + d0), see tol_effective). A non-finite value where the golden is finite always fails.
 """

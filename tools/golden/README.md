@@ -8,11 +8,15 @@ reference implementations that many benchmarks carry (a serial host re-implement
 capture -- never on a default path (a plain run, ctest, `tools/inputs` measure/check,
 `tools/timing`, the optimization loop), and never as an automatic fallback.
 
-The same frozen B200 reference is the oracle on every other platform (H200, MI355X, ...); the
-tolerances are the benchmarks' own upstream tolerances for their GPU-vs-CPU checks, so a
-legitimate implementation on another architecture (another FMA contraction, libm, summation
-order) passes exactly when it would have passed the original CPU comparison (see "Tolerance
-budget").
+The same frozen B200 reference is meant to be the oracle on every other platform (H200, MI355X,
+...; none of them tested yet). The tolerances are the benchmarks' own tolerances for their GPU-vs-CPU
+checks -- upstream's where upstream defines one; where upstream's check was missing, too loose to
+see a wrong result, or did not observe the output, a project criterion fixed from measured
+legitimate vs wrong implementations and documented in the benchmark's README and `basis` (nbody
+positions / velocities and kinetic energy, pagerank, hotspot_3d's max_abs gate, the correctness
+probes, e.g. spmv's probe-real and srad_v1's probe-edges-n20). A legitimate implementation on another
+architecture (another FMA contraction, libm, summation order) therefore passes exactly when it
+would have passed the CPU comparison at that tolerance (see "Tolerance budget").
 
 | file | what |
 |---|---|
@@ -20,6 +24,7 @@ budget").
 | `hpcperf_golden_capture.py` | the Python twin of the capture (for `verify.py` CPU arrays) |
 | `hpcperf_golden.py` | `make` (one-time, CPU-validated freeze), `check` (compare a capture), `run` (ctest entry), `status`, `validate` |
 | `golden_artifacts.py` | distribution of the store: `pack` (deterministic bundles of the blobs the committed references name), `fetch` (verified install into the store), `verify`, `lock-check`, `plan` -- see [DISTRIBUTION.md](DISTRIBUTION.md) |
+| `scrub_provenance.py` | `plan` / `apply` / `verify --against REV`: removes machine identity (host name, GPU UUID / index, batch job, private log location) from the provenance of the reference schemas it knows, deterministic and idempotent; every key outside the provenance stays byte-identical (`verify` proves it against git); unknown schemas and reformatted files are refused |
 | `hpcperf_golden_audit.py` | read-only consistency audit: every reference vs its registry input (spec, args, workload, provenance ancestry, sources changed since freezing, blobs), every golden benchmark's ctest and registry check vs the golden run, non-golden mechanisms, Level 2/3 `validate.sh` CPU gating, tolerance vs d0 / rounding; JSON + table, exit 1 on a HARD finding |
 | `golden_artifacts.lock.yaml` | the committed lock of the bundles (sha256, size, members; `status: unpublished` until the maintainer publishes) |
 | `tests/run_all.sh` | CPU-only tests (fake repository and benchmarks; no GPU); also runs `tests/test_golden_artifacts.sh` |
@@ -70,14 +75,14 @@ check:                            # the registry's correctness check (tools/inpu
   covers: all
 ```
 
-Rules (each reproduces the benchmark's existing check, metric and tolerance, cited in `basis`):
+Rules (each reproduces the benchmark's existing check -- metric and tolerance -- or a documented project criterion where that check was missing or blind; the source is cited in `basis`):
 
 | metric | value | used for |
 |---|---|---|
 | `exact` | sha256 equality | integers, permutations, bitwise-checked outputs (memcmp / ==) |
-| `max_abs` | max \|a - g\| | e.g. adam, bilateral_filter, black_scholes, burgers_equation |
+| `max_abs` | max \|a - g\| | e.g. adam, bilateral_filter, black_scholes, burgers_equation, nbody positions / velocities, hotspot_3d's gate |
 | `max_rel1p` | max \|a - g\| / (1 + \|g\|) | RAJAPerf `compareArrays`, spadd, spgemm, backprop, hotspot, nearest_neighbor |
-| `max_rel` | max \|a - g\| / \|g\| | pagerank, Kripke |
+| `max_rel` | max \|a - g\| / \|g\| | pagerank, Kripke, nbody kinetic energy |
 | `max_relabs` | max \|a - g\| / (rtol \|g\| + atol), tol 1 | ExaCMech |
 | `l1_rel` | Σ\|a - g\| / Σ\|g\| | bezier_surface |
 | `l2_rel_sq` | Σ(a - g)² / Σg² | spmv |
@@ -92,8 +97,8 @@ capture whose bytes do not match its recorded sha256 fails; a missing golden blo
 `make` also captures the CPU reference's own array (`cpu:`) and records
 `d0 = metric(B200 golden, CPU reference)`. The check allows `tol_effective`, chosen so that by the
 triangle inequality a candidate within `tol_effective` of the golden is within (<=) the
-upstream tolerance of the CPU reference -- replacing the CPU reference by the golden does not loosen
-the original criterion:
+benchmark's tolerance (upstream's or the documented project criterion) of the CPU reference --
+replacing the CPU reference by the golden does not loosen the criterion:
 
 | metric | tol_effective |
 |---|---|
@@ -124,16 +129,20 @@ reference's pass line, exit 0 and no fail line, measures d0 per output and write
 
 * `<bench_dir>/reference/<input_id>.json` (schema `hpcperf-golden-1`, **committed**): the workload
   identity of the input, the frozen spec, per output dtype / count / sha256 / statistics / rule with
-  `d0_vs_cpu_reference` and `tol_effective`, and the provenance (host, GPU name + UUID + driver,
-  CUDA Toolkit, git HEAD, binary + sha256, command, the CPU validation's pass line and log sha256,
-  the tool's own sha256);
+  `d0_vs_cpu_reference` and `tol_effective`, and the provenance (the platform: GPU name, driver and
+  compute capability, CUDA Toolkit; git HEAD, binary + sha256, the repository-relative command, the CPU
+  validation's pass line and log sha256, the tool's own sha256). No host name, GPU UUID / index or
+  absolute path of the machine is recorded (a `--workdir` outside the repository is `<workdir>/...`);
+  the references made before 2026-10-28 had host and GPU UUID removed by `scrub_provenance.py`, which
+  records `provenance.scrubbed` (what was removed, never the value) and leaves every other byte as is;
 * for tolerance-compared outputs, the raw bytes in the content-addressed store
   `$HPCPERF_GOLDEN_STORE/sha256/<aa>/<sha256>.bin` (**never in git**; large).
 
 After committing new or replaced references: `python3 tools/golden/golden_artifacts.py pack --staging
 $HPCPERF_ARTIFACT_STAGING/golden` and commit the regenerated `golden_artifacts.lock.yaml` (`lock-check` must say
 CURRENT); bundles of unchanged benchmarks keep their names and bytes. A fresh clone has no store: `python3
-tools/golden/golden_artifacts.py fetch [level1/<b> ...]` installs the verified blobs (DISTRIBUTION.md); until then a
+tools/golden/golden_artifacts.py fetch [level1/<b> ...]` installs the verified blobs (DISTRIBUTION.md) -- until the
+bundles are published only with `--from <the maintainer's staging directory>` or a filled cache; until then a
 tolerance-rule check FAILs with "golden blob ... missing" (never a fallback).
 
 ## The correctness gate (optimization candidates)
@@ -196,7 +205,7 @@ prints `PASS: golden check <bench>/<input> ...` or `FAIL: golden check ...` (exi
 runs a CPU reference and never writes a reference. `run` (the ctest entry) runs the binary once
 without the CPU reference, capturing, then checks.
 
-## What is not (or not yet) a golden comparison
+## What is not a golden comparison
 
 * NPB `cg ep ft is mg`: official class reference values (unchanged).
 * `lud`: reference-free, the captured factors' residual max |A - L*U| <= 1e-4 (upstream's criterion, evaluated in
