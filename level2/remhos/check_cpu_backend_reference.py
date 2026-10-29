@@ -22,18 +22,20 @@ tolerances (README "Validation", "Modes").
                                     [--launch TEXT] [--mode TEXT] [--log-kept-at TEXT] [--note TEXT] [--force]
         CONSTRUCTION TIME ONLY (never called by validate.sh): reads DIR/validate-NAME-cpu.log, written by an
         offline validate.sh run of the CPU backend, and writes the frozen file with its provenance (binary path,
-        sha256 and mtime, MFEM config.mk sha256, git HEAD and whether the Remhos sources were clean, host, CPU
-        model, Slurm job, launch line, per case the exact CPU command, mesh sha256, mass / max / mass loss /
+        sha256 and mtime, MFEM config.mk sha256, git HEAD and whether the Remhos sources were clean, CPU
+        model, launch line, per case the exact CPU command, mesh sha256, mass / max / mass loss /
         kernel time, the log's sha256, size and mtime). Refuses a log that is not a finished CPU-backend run
         of that configuration (no "Device configuration: cpu", another solver combination, no -pa, no final
         mass / max) and an existing file (--force overwrites).
 """
-import hashlib, json, math, os, platform, re, subprocess, sys, time
+import hashlib, json, math, os, re, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SCHEMA = "hpcperf-remhos-cpu-backend-reference-1"
 NUM = r"([-+]?[0-9.]+(?:[eE][-+]?[0-9]+)?)"
+# an absolute path (/projects/..., /home/..., /tmp/..., ~/...) in free text: a location private to one machine
+ABS_PATH = re.compile(r"(?:^|[\s(\[{=:,;'\"])(?:~|/[A-Za-z0-9._-]+)/")
 
 
 def sha256_file(path):
@@ -196,6 +198,11 @@ def freeze(argv):
         cpu_model = next(l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name"))
     except (OSError, StopIteration):
         pass
+    kept = opts.get("log_kept_at")
+    if kept and ABS_PATH.search(kept):
+        print("note: --log-kept-at names an absolute path -- not recorded (give it relative to the results directory or "
+              "the repository)")
+        kept = None
     est = os.stat(exe)
     ref = {
         "schema": SCHEMA, "benchmark": "remhos",
@@ -214,11 +221,10 @@ def freeze(argv):
             "build": "level2/remhos/build.sh CUDA (upstream makefile, MFEM v4.10 .deps/install/mfem)",
             "mfem_config_mk_sha256": sha256_file(config_mk) if os.path.isfile(config_mk) else None,
             "git_head": git("rev-parse", "HEAD"), "remhos_sources_clean": (dirty == "") if dirty is not None else None,
-            "host": platform.node().split(".")[0], "cpu_model": cpu_model,
-            "slurm_job": os.environ.get("SLURM_JOB_ID"),
+            "cpu_model": cpu_model,     # no host name / batch job: machine identity (scrub_provenance.py)
             "mode": opts.get("mode"), "launch": opts.get("launch"),
             "started_utc": opts.get("started"), "finished_utc": opts.get("finished"),
-            "log_kept_at": opts.get("log_kept_at")},
+            "log_kept_at": kept},
         "cases": frozen,
         "generated_utc": utc(time.time()),
         "generated_by": "level2/remhos/check_cpu_backend_reference.py freeze (construction-time; from the offline run's logs, no rerun)",

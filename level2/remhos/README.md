@@ -332,8 +332,8 @@ written once by `check_cpu_backend_reference.py freeze` from the CPU logs of
 the offline run of 2026-10-27; the file records per case the exact command,
 the mesh sha256, the values with their printed digits, mass loss, kernel time
 and the log's sha256 / size / mtime, plus the binary path / sha256 / mtime,
-MFEM `config.mk` sha256, git HEAD, host, CPU model, Slurm job, launch line and
-where the logs are kept):
+MFEM `config.mk` sha256, git HEAD, CPU model and launch line; no host name,
+batch job or absolute log location):
 
 | case (`... -ho 3 -lo 5 -fct 2 -pa -d cpu`) | final mass | max | CPU log sha256 |
 | --- | --- | --- | --- |
@@ -342,7 +342,7 @@ where the logs are kept):
 | periodic-cube `-p 0 -rs 1 -o 2 -dt 0.014 -tf 8` | 0.9607429525 | 0.637056438 | 9182c1d4... |
 | cube01_hex remap `-p 10 -rs 1 -o 2 -dt 0.02 -tf 0.8` | 0.1191358858 | 0.9996101564 | 4362447d... |
 
-Run 2026-10-27 07:59:29Z..08:00:34Z on dgx003 (Slurm job 2956114) by
+Run 2026-10-27 07:59:29Z..08:00:34Z by
 `HPCPERF_CPU_REFERENCE=1 validate.sh CUDA` with `build/level2/remhos/cuda/remhos`
 sha256 6d3e339e... (`build.sh CUDA` of 2026-10-27 from the committed sources);
 logs kept outside the repository in
