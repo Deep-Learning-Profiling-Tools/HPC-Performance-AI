@@ -1,7 +1,17 @@
 {
  "schema": "hpcperf-hipbone-reference-1",
  "input_id": "coral2-nx24-p14",
- "note": "CPU reference run 2026-09-30 on dgx003 (Slurm job 1397595), the same build/level2/hipbone/cuda/hipBone binary, OCCA OpenMP backend (8 threads, cores 100-107), exact registered arguments; Serial not run at this size (single-threaded cost 8+ h)",
+ "note": "CPU reference run 2026-09-30, the same build/level2/hipbone/cuda/hipBone binary, OCCA OpenMP backend (8 threads, cores 100-107), exact registered arguments; Serial not run at this size (single-threaded cost 8+ h)",
+ "scrubbed": {
+  "by": "tools/golden/scrub_provenance.py",
+  "rule": "hpcperf-provenance-scrub-1",
+  "removed": [],
+  "redacted_text": [
+   "note: batch job",
+   "note: host name"
+  ],
+  "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+ },
  "dofs": 37595375,
  "cg_iterations": 100,
  "r_norm_initial": 4335.69691288481,

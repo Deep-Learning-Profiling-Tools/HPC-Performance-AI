@@ -11,8 +11,18 @@
   "log_sha256": "0c31a66e979525016c23768c8c663d40d939ed901a13a830d50ff83c2f41349d",
   "binary": "lanl/PENNANT master 617414f (v0.6, 2014-02-28) CPU build: conda GCC 13.3.0 mpicxx -O3 -fopenmp, 1 MPI rank",
   "omp_threads": 32,
-  "host": "dgx003.orc.gmu.edu",
-  "note": "upstream cuda-branch deck test/leblancbig/leblancbig.pnt run to tstop=6.0 (3775 cycles) on dgx003, 2026-10-20"
+  "note": "upstream cuda-branch deck test/leblancbig/leblancbig.pnt run to tstop=6.0 (3775 cycles), 2026-10-20",
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "rule": "hpcperf-provenance-scrub-1",
+   "removed": [
+    "host"
+   ],
+   "redacted_text": [
+    "note: host name"
+   ],
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  }
  },
  "rule": {
   "rel_tol": 1e-05,

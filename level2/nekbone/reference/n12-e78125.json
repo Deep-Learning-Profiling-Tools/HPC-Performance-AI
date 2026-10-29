@@ -7,9 +7,19 @@
   "data_rea_sha256": "81012991b09f81b9bc73b7415c313c1c3b2248fffb34e9b62665b94fd75ccbe7",
   "log": "n12-e78125.cpu.log",
   "log_sha256": "3526105d966320e3b63048199d600fd68a1c33eeb0d3c17f655f509cb7e4f44a",
-  "binary": "CPU build of the same source (build.sh CPU: upstream makenek.mpi code path, nvfortran 25.7 -O2/-O3, no -acc/-cuda), one rank on dgx003",
-  "host": "dgx003.orc.gmu.edu",
-  "note": "Solve Time =   0.3034E+03"
+  "binary": "CPU build of the same source (build.sh CPU: upstream makenek.mpi code path, nvfortran 25.7 -O2/-O3, no -acc/-cuda), one rank",
+  "note": "Solve Time =   0.3034E+03",
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "rule": "hpcperf-provenance-scrub-1",
+   "removed": [
+    "host"
+   ],
+   "redacted_text": [
+    "binary: host name"
+   ],
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  }
  },
  "rule": {
   "r0_tol": 0.0001,

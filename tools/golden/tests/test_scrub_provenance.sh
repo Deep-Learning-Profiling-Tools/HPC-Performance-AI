@@ -184,6 +184,27 @@ for f in files:
 print(f"   committed references: {n['scrub']} would change, {n['clean']} already clean, {n['no rule']} of another schema (not touched)")
 PY
 [ "$rc" = 0 ] && ok "4a: every committed reference of a known schema scrubs without refusal, idempotently, nothing outside the provenance changes" || bad "4a: rc=$rc"
+"$PY" - "$REPO" "$TOOLS" <<'PY'; rc=$?
+import subprocess, sys
+R, T = sys.argv[1:3]
+sys.path.insert(0, T); import scrub_provenance as sp
+files = [l for l in subprocess.run(["git", "-C", R, "ls-files", "level*/*/reference/*.json", "level*/*/reference/*/*.json"],
+                                   capture_output=True, text=True).stdout.split() if l]
+n = {"fixed point": 0, "no rule": 0}
+for f in files:
+    raw = open(f"{R}/{f}").read()
+    try:
+        out = sp.scrub_text(raw, f, [])[0]
+    except sp.Refused as ex:
+        if "has no scrub rule" in str(ex):
+            n["no rule"] += 1; continue
+        print("REFUSED", ex); sys.exit(1)
+    if out != raw:
+        print(f"   {f}: a scrub would still change it (machine identity left in its provenance)"); sys.exit(1)
+    n["fixed point"] += 1
+print(f"   working-tree references: {n['fixed point']} of a known schema already scrubbed, {n['no rule']} of another schema")
+PY
+[ "$rc" = 0 ] && ok "4b: every working-tree reference of a known schema is a fixed point of the scrub (no host / batch job / absolute log location left)" || bad "4b: rc=$rc"
 
 echo
 echo "=== 5: the Level 2 CPU references made before the golden work (hipBone, miniWeather, NekBone, PENNANT, Branson cases)"

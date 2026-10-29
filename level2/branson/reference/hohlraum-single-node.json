@@ -25,7 +25,6 @@
   10748998
  ],
  "reference_run": {
-  "allocation": "dgx003, Slurm job 1324397 (the 2026-09-28/29 round)",
   "binary_sha256": "392c0d0c32a06e5574b63f14393b9e6b537f0bc039ee600de62052c3420c7337",
   "build_options": "cmake -DCMAKE_BUILD_TYPE=Release -DUSE_GPU=OFF -DUSE_CUDA=OFF -DUSE_HIP=OFF -DUSE_UMPIRE=OFF -DUSE_CALIPER=OFF -DBUILD_TESTING=OFF on level2/branson/src (the GPU build's sources; project toolchain hpcperf_env.sh, Open MPI 5.0.10; CPATH tools/timing/roi)",
   "finished_utc": "2026-09-29T07:43:04Z",
@@ -36,6 +35,14 @@
   "log_kept_at": "results directory repro-2026-09-28/correctness/runs-attempts/pass2-branson_hohlraum-single-node_reference-Te-criterion-artifact/run/cpu_ref.log (outside the repository; reused by the PASS verdict of 2026-09-29, runs/branson/hohlraum-single-node/reference/check.log)",
   "log_sha256": "172ccab52b5c751b97c8bf0447d20a5fe1d18064c7b419a5c547d5df64238c4c",
   "mpi_ranks": 1,
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "removed": [
+    "allocation"
+   ],
+   "rule": "hpcperf-provenance-scrub-1",
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  },
   "started_utc": "2026-09-29T02:59:17Z",
   "total_transport_s": 17010.5
  },

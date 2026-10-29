@@ -5,7 +5,17 @@
  "nz": 1024,
  "sim_time": 1000,
  "data_spec": "DATA_SPEC_COLLISION",
- "note": "CPU reference 2026-09-30 on dgx003 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; 4304 s",
+ "note": "CPU reference 2026-09-30: build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; 4304 s",
+ "scrubbed": {
+  "by": "tools/golden/scrub_provenance.py",
+  "rule": "hpcperf-provenance-scrub-1",
+  "removed": [],
+  "redacted_text": [
+   "note: batch job",
+   "note: host name"
+  ],
+  "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+ },
  "d_mass": 2.365396e-13,
  "d_te": 0.0008383598,
  "d_te_spread_abs": 0.0,

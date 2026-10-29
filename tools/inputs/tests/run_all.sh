@@ -1251,14 +1251,15 @@ BR="$R/level2/branson"; BGPU="$FX/branson_lb_hohlraum_gpu.log"; BCPU="$FX/branso
     && ok "branson frozen check: lb-hohlraum's saved GPU log vs reference/lb-hohlraum.json -> PASS on the final step (photons 251243835 vs 251242903), nothing written to the cwd" \
     || bad "branson frozen replay rc=$rc: $(tail -2 "$P4/replay.out" | tr '\n' '|')"
 # 17.2 provenance is in the artifact and printed by the check
-python3 - "$BR/reference/lb-hohlraum.json" "$BCPU" "$BDECK" <<'PY' && ok "branson reference/lb-hohlraum.json: schema, deck sha256 (= the committed deck), seed, upstream commit, CPU binary sha256, 24 ranks, launch, allocation, start/finish, CPU log sha256 (= the fixture log), final-step quantities, rule + basis, generation date" || bad "branson reference provenance"
+python3 - "$BR/reference/lb-hohlraum.json" "$BCPU" "$BDECK" <<'PY' && ok "branson reference/lb-hohlraum.json: schema, deck sha256 (= the committed deck), seed, upstream commit, CPU binary sha256, 24 ranks, launch, start/finish, CPU log sha256 (= the fixture log) and where it is kept, final-step quantities, rule + basis, generation date; the batch allocation (host, Slurm job) scrubbed and recorded as removed" || bad "branson reference provenance"
 import hashlib, json, re, sys
 d = json.load(open(sys.argv[1])); sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
 assert d["schema"] == "hpcperf-branson-reference-1" and d["benchmark"] == "branson" and d["input_id"] == "lb-hohlraum"
 assert d["deck"] == "inputs/3D_lb_hohlraum.xml" and d["deck_sha256"] == sha(sys.argv[3]) and d["seed"] == 14706
 assert re.fullmatch(r"[0-9a-f]{40}", d["upstream"]["commit"]) and d["upstream"]["repo"] == "lanl/branson"
 r = d["reference_run"]; assert re.fullmatch(r"[0-9a-f]{64}", r["binary_sha256"]) and r["mpi_ranks"] == 24 and "USE_GPU=OFF" in r["build_options"]
-assert r["launch"].startswith("taskset") and "mpirun -np 24" in r["launch"] and "1397595" in r["allocation"]
+assert r["launch"].startswith("taskset") and "mpirun -np 24" in r["launch"]
+assert "allocation" not in r and "allocation" in r["scrubbed"]["removed"] and "Slurm job" not in json.dumps(d)  # scrub_provenance.py: machine identity gone, named in the record
 assert r["started_utc"] == "2026-09-30T21:59:11Z" and r["finished_utc"] == "2026-10-01T00:54:59Z" and r["log_sha256"] == sha(sys.argv[2]) and "results directory" in r["log_kept_at"]
 f = d["final_step"]; assert f["photons_transported"] == 251242903 and abs(f["post_mat_e"] - 1.7737e-02) < 1e-12 and f["t_e"] is None and d["steps"] == 5
 assert d["per_step_photons_transported"][0] == 250694250 and d["per_step_photons_transported"][-1] == 251242903

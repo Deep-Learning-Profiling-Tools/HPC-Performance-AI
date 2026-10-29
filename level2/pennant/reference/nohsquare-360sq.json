@@ -11,8 +11,18 @@
   "log_sha256": "da6e7d8483f55710a091ed1f1a7d8c7827a6948f28b0a6da3bb2ff81fe81d6d9",
   "binary": "lanl/PENNANT master 617414f (v0.6, 2014-02-28) CPU build: conda GCC 13.3.0 mpicxx -O3 -fopenmp, 1 MPI rank",
   "omp_threads": 32,
-  "host": "dgx003.orc.gmu.edu",
-  "note": "upstream cuda-branch deck test/nohsquare/nohsquare.pnt run to tstop=0.6 (7677 cycles) on dgx003, 2026-10-20"
+  "note": "upstream cuda-branch deck test/nohsquare/nohsquare.pnt run to tstop=0.6 (7677 cycles), 2026-10-20",
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "rule": "hpcperf-provenance-scrub-1",
+   "removed": [
+    "host"
+   ],
+   "redacted_text": [
+    "note: host name"
+   ],
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  }
  },
  "rule": {
   "rel_tol": 1e-05,

@@ -5,7 +5,17 @@
  "nz": 1024,
  "sim_time": 1000,
  "data_spec": "DATA_SPEC_GRAVITY_WAVES",
- "note": "CPU reference 2026-09-30 on dgx003 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; d_te at this grid is round-off: the fast-math CUDA build gives +3.16e-8, this build -7.84e-9",
+ "note": "CPU reference 2026-09-30: build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; d_te at this grid is round-off: the fast-math CUDA build gives +3.16e-8, this build -7.84e-9",
+ "scrubbed": {
+  "by": "tools/golden/scrub_provenance.py",
+  "rule": "hpcperf-provenance-scrub-1",
+  "removed": [],
+  "redacted_text": [
+   "note: batch job",
+   "note: host name"
+  ],
+  "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+ },
  "d_mass": -9.210783e-13,
  "d_te": -7.842791e-09,
  "d_te_spread_abs": 0.0,
