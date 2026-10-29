@@ -366,12 +366,19 @@ conservation, official reference values, property checks, frozen references made
 unchanged.
 
 **Correctness coverage of the inputs without a registered check (reviewed 2026-10-29).** `check` exits 2
-("has no correctness check") for eight Level 2 inputs: exampm `dambreak-0.005`; quicksilver
-`p1-profile-8c-100k-20s`, `coral2-p1-1rank`, `coral2-p2-1rank`, `cts2-1rank`; shaw `prem-1000x5000`,
-`prem-200x1000-demo1`, `prem-500x2500`. Exit 2 means only that no post-run checker is registered: their
-evidence is `compare` against a working baseline of the unmodified build (PASS for all eight on the
-2026-09-28 baselines and on fresh 2026-10-29 runs), and those `baseline.quantities` verify less than a
-correctness check:
+("has no correctness check") for 54 of the 99 Level 2 inputs: 8 say `check: {kind: none}` with a reason,
+46 have no `check:` block at all. Exit 2 means only that no single-run checker is registered: their
+evidence is `compare` of a candidate's log against a working baseline of the unmodified build, through the
+`baseline.quantities` rules (every one of the 54 has at least one required quantity that is not `record`,
+so none rests on execution success or a FOM alone). What those rules verify, by application:
+
+| class | inputs | what `compare` verifies |
+|---|---|---|
+| upstream or analytic criterion | cloverleaf 5, tealeaf 5 (upstream PASS against the expected energy), minibude 3 (upstream reference-energy validation), gamess_ri_mp2 3 (upstream `passed`), p3_heat3d 3 (closed-form L2 norm, `near` 1e-3), sw4lite 2 (error norms against the exact point-source solution), quicksilver 4 (below) | an independent reference, plus exact / relative rules against the baseline |
+| self-baseline regression only | amg2023 5 (iteration count exact), laghos 6 (final step / dt exact, energy rel 1e-8), remhos 5 (final mass / max rel 1e-8), miniem 4 (EM energy rel 1e-4, solution norm rel 1e-8), xsbench 2 (checksum exact), cabanapic 3 (final step exact, field energies rel 0.1), shaw 3 (below) | agreement with the unmodified build; the independent evidence is each application's validate.sh, on its own (usually smaller) deck |
+| conservation / bounds | exampm `dambreak-0.005` (below) | particle count, bounds, volume |
+
+The eight with an explicit `check: none`:
 * exampm `dambreak-0.005`: conservation and bounds of the final state only (particle count equal to the
   baseline's, positions inside [-0.02, 1.02], sum(J)/N0 within 1 %). A frozen (never evolved) or
   y-asymmetric final state satisfies these rules, and how far the column collapses has no reference.
@@ -389,9 +396,9 @@ correctness check:
   upstream `fomInnerDomain` regression (CPU gold data, atol 1e-13 / 1e-10), runs the same kernels on a
   21x51 single-layer mesh with a sinusoidal source, not on the registered PREM / Ricker workloads.
 
-No registered workload of these three applications has an analytic or upstream reference value. None of
-the eight relies on execution success or FOM alone, but none has an independent correctness reference. A
-follow-up with exact, implementation-independent checks for five of them (Quicksilver per-cycle event
+No registered workload of these three applications has an analytic or upstream reference value; none of
+the eight relies on execution success or FOM alone, but only Quicksilver's statistical markers are
+independent of the baseline. A follow-up with exact, implementation-independent checks for five of them (Quicksilver per-cycle event
 accounting identities; ExaMPM deck particle count, y-mirror symmetry, centre of mass below its initial
 height) is prepared outside this branch; SHAW needs an owners' decision (a mirrored-source probe with a
 tolerance, or energy instrumentation). Related finding: exampm `dambreak-0.01` ends with 1,919,998 of
