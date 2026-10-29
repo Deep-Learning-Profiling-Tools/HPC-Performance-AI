@@ -214,3 +214,53 @@ without the CPU reference, capturing, then checks.
   solution), `graph_coloring` (validity; its valid colorings are not unique and differ run to run): property
   checks, unchanged.
 * `ao_bench`: already a frozen B200 image hash (`reference/iter100.sha256`), unchanged.
+
+## Known limitations (2026-10-28)
+
+Nothing below is a failing check: on the branch head every ctest, registry check and validate.sh default path listed
+in the per-level READMEs passes (Nyx heat/cool stays PENDING, exit 3, as before). These are the limits of what the
+checks can see, and what has not been run.
+
+Limits of the checks (by design or not closable by a tolerance):
+
+* **Repetition counts.** A benchmark that repeats an idempotent kernel for timing (most RAJAPerf / HeCBench ports,
+  pagerank's timed repetitions, binary_search's variants) is checked on the output of the last repetition; running it
+  fewer times leaves the output unchanged. The golden check validates the computation, not the amount of repeated
+  work (no launch-count or grid requirements, by policy); a fixed workload is the measurement protocol's job
+  (`tools/timing`: fixed arguments, the benchmark's own timer / ROI), and is not audited here.
+* **Converged or near-steady-state inputs.** Where the registered performance input has converged (pagerank after
+  ~12 of 500 iterations, hotspot_3d at 10000 steps where one step is 6.3e-4 RMSE, below the legitimate f32 envelope),
+  a skipped late iteration is invisible in that input; the correctness probes (`purpose: correctness-probe`:
+  pagerank `nodes16384-m5`, hotspot_3d `g64-l8-i50-amp10`, hotspot `g512-p2-t21-pnoise9`, ...) catch it, the
+  performance input does not.
+* **Accepted gray cases.** pagerank: renormalising every iteration or using exact 1/outdegree values differs from the
+  defined (unnormalised) output only by a uniform factor 1 + ~1e-5 and passes (level1/pagerank/README.md, "Scale-only
+  variants"); whether the scale is part of the contract is the owners' call. hotspot_3d: a stale halo (1.2e-2 K) or a
+  uniform offset below 1e-2 K passes the performance inputs (the probe catches the halo). needleman_wunsch: a skipped
+  top-right tile reaches no optimal path and leaves the output identical; the DP matrix is not compared. block_scan:
+  the check is the scan of the whole input, independent of the block / grid configuration -- per-block tile
+  semantics would need a redesign (future work, class E).
+* **Exact rules define tie-breaking.** Outputs compared exactly (needleman_wunsch traceback with upstream's tie
+  order, block_scan, the integer outputs) reject an implementation that resolves ties differently even when it is
+  valid; nearest_neighbor refuses a registered query tied at the k-th distance instead.
+* **Coverage of inputs.** References exist for the registered inputs only; sizes outside them are not validated
+  (bezier_surface refuses `-n` outside 2..13377; binary_search's float query correction is general, its references
+  are the three registered sizes). color_histogram x16777216 has a near-constant golden and no probe.
+
+Not run (untested, never claimed):
+
+* Other GPUs: every reference was made on one B200 node (CUDA 13.2, driver 595.58.03). Cross-architecture headroom is
+  estimated from legitimate variants run on the B200 (fmad off, fast-math, f64 / Kahan accumulation, other block
+  sizes, cuSPARSE), not measured on H200, MI355X or any other device.
+* HIP: no ROCm on the node; every HIP port is edited in step with CUDA where a fix applied and never compiled.
+* Publication: the bundles are packed and locked (`unpublished`, redistribution `review`); a fresh clone restores the
+  store only with `fetch --from <staging>` until the owners publish them.
+
+Open items for the owners (findings, not failures):
+
+* Upstream reports not filed: srad_v1's reduction bug, hotspot3D's N-1 final iterate and nearest_neighbor's
+  findLowest lost-record swap are fixed here (class D, per-benchmark README) and could be reported upstream.
+* Pre-branch Level 2 references (nekbone, pennant, picongpu, vpic, hipbone, miniweather, branson cases) still name the
+  node in `host` / notes; `level2/branson/check_log.py` and `level2/remhos/check_cpu_backend_reference.py` would
+  record host data in a future re-freeze.
+* `level3/nyx/validate.sh` in offline mode rewrites `<run>/.np_final` (same value) inside historical run directories.
