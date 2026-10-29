@@ -217,9 +217,12 @@ without the CPU reference, capturing, then checks.
 
 ## Known limitations (2026-10-28)
 
-Nothing below is a failing check: on the branch head every ctest, registry check and validate.sh default path listed
-in the per-level READMEs passes (Nyx heat/cool stays PENDING, exit 3, as before). These are the limits of what the
-checks can see, and what has not been run.
+Nothing below is a failing check of this branch's changes: on the branch head every ctest, registry check and
+validate.sh default path listed in the per-level READMEs passed in the final sweeps (Nyx heat/cool stays PENDING, exit 3,
+as before) -- with one intermittent exception found on 2026-10-29 in a Level 2 check this branch did not change:
+PENNANT `nohpoly-hex251-6000cycles` FAILs about one run in seven of the unmodified build, because the GPU build is not
+run-to-run deterministic on that deck (level2/pennant/README.md, "Run-to-run variation"). These are the limits of what
+the checks can see, and what has not been run.
 
 Limits of the checks (by design or not closable by a tolerance):
 
