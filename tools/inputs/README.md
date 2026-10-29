@@ -365,6 +365,40 @@ explicit `HPCPERF_CPU_REFERENCE=1`; nothing falls back to them. Independent chec
 conservation, official reference values, property checks, frozen references made earlier) are
 unchanged.
 
+**Correctness coverage of the inputs without a registered check (reviewed 2026-10-29).** `check` exits 2
+("has no correctness check") for eight Level 2 inputs: exampm `dambreak-0.005`; quicksilver
+`p1-profile-8c-100k-20s`, `coral2-p1-1rank`, `coral2-p2-1rank`, `cts2-1rank`; shaw `prem-1000x5000`,
+`prem-200x1000-demo1`, `prem-500x2500`. Exit 2 means only that no post-run checker is registered: their
+evidence is `compare` against a working baseline of the unmodified build (PASS for all eight on the
+2026-09-28 baselines and on fresh 2026-10-29 runs), and those `baseline.quantities` verify less than a
+correctness check:
+* exampm `dambreak-0.005`: conservation and bounds of the final state only (particle count equal to the
+  baseline's, positions inside [-0.02, 1.02], sum(J)/N0 within 1 %). A frozen (never evolved) or
+  y-asymmetric final state satisfies these rules, and how far the column collapses has no reference.
+  validate.sh's analytic check uses the FreeFall deck (periodic box, no walls); its dam-break dump check
+  needs evolved dumps, which this input does not write (1990 CFL-limited steps < write_freq 2000; the
+  `check.reason` text says 250 steps, the conclusion holds).
+* quicksilver (all four): upstream's statistical coralBenchmark checks (the four `PASS::` lines, no
+  `FAIL::`) and the last-cycle scalar flux compared exactly with the reference build. The exact rule rests
+  on determinism (the deck seed is not used; each particle's random stream derives from its source index;
+  the flux is printed with 7 digits), so a correct candidate that consumes random numbers differently
+  fails it; no statistical envelope exists. validate.sh runs only the default deck.
+* shaw (all three): the 2-norms of the final velocity and stress states compared exactly with the
+  reference build -- a regression check of the same floating-point arithmetic, not an independent result;
+  a correct candidate that reorders floating-point work fails it. The independent evidence, validate.sh's
+  upstream `fomInnerDomain` regression (CPU gold data, atol 1e-13 / 1e-10), runs the same kernels on a
+  21x51 single-layer mesh with a sinusoidal source, not on the registered PREM / Ricker workloads.
+
+No registered workload of these three applications has an analytic or upstream reference value. None of
+the eight relies on execution success or FOM alone, but none has an independent correctness reference. A
+follow-up with exact, implementation-independent checks for five of them (Quicksilver per-cycle event
+accounting identities; ExaMPM deck particle count, y-mirror symmetry, centre of mass below its initial
+height) is prepared outside this branch; SHAW needs an owners' decision (a mirrored-source probe with a
+tolerance, or energy instrumentation). Related finding: exampm `dambreak-0.01` ends with 1,919,998 of
+1,920,000 particles in both 2026-09-28 runs of the unmodified build -- validate.sh's own "count constant"
+criterion would reject that, but the exact count rule compares with a baseline that carries the same loss
+(cause not established; suspected particles leaving the non-periodic box).
+
 Principles (fixed for this project): upstream / native check > upstream reference > exact
 deterministic comparison > same-input unoptimized baseline (for the CPU-referenced benchmarks the
 frozen B200 golden above, CPU-validated at freeze time, takes the place of the run-time CPU reference); a tolerance needs an upstream or
