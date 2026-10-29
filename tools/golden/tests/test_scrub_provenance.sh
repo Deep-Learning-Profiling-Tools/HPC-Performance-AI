@@ -3,7 +3,9 @@
 # temporary git repository (and, read-only, on the repository's committed references): only the declared provenance
 # fields go, every key outside the provenance is byte-identical, the result is deterministic and idempotent, `scrubbed`
 # names what was removed but never a removed value, unknown schemas / reformatted files / malformed blocks are refused
-# untouched, and `verify --against` catches any change outside the declared fields.
+# untouched, and `verify --against` catches any change outside the declared fields. Section 5: the Level 2 CPU reference
+# schemas made before the golden work (hipBone / miniWeather without a provenance block, NekBone / PENNANT with in-block
+# free text, PENNANT's own writer, Branson's relative vs absolute log_kept_at), each in its real serialisation.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS="$(cd "$HERE/.." && pwd)"
@@ -182,6 +184,127 @@ for f in files:
 print(f"   committed references: {n['scrub']} would change, {n['clean']} already clean, {n['no rule']} of another schema (not touched)")
 PY
 [ "$rc" = 0 ] && ok "4a: every committed reference of a known schema scrubs without refusal, idempotently, nothing outside the provenance changes" || bad "4a: rc=$rc"
+
+echo
+echo "=== 5: the Level 2 CPU references made before the golden work (hipBone, miniWeather, NekBone, PENNANT, Branson cases)"
+R2="$TMP/repo2"; mkdir -p "$R2"; GIT2() { git -C "$R2" -c user.email=t@t -c user.name=t "$@"; }
+"$PY" - "$R2" <<'PY'
+import json, os, re, sys
+R = sys.argv[1]
+def put(rel, text):
+    os.makedirs(os.path.dirname(f"{R}/{rel}"), exist_ok=True); open(f"{R}/{rel}", "w").write(text)
+hb = {"schema": "hpcperf-hipbone-reference-1", "input_id": "nx9-p14",
+      "note": "CPU reference run 2026-09-30 on node17 (Slurm job 1397595), the same build/x/hipBone binary, OCCA OpenMP backend (8 threads, cores 100-107), exact registered arguments",
+      "dofs": 1953125, "cg_iterations": 100, "r_norm_initial": 988.576225155911, "r_norm_final": 7.619353900899e-09,
+      "runs": [{"log": "nx9.OpenMP.1.log", "sha256": "9c" * 32, "dofs": 1953125, "r_norm_final": 7.619353900899e-09}],
+      "rule": {"r_norm_final": "|log10 ratio| <= 0.1", "dofs": "exact"}}
+put("level2/hipbone/reference/nx9-p14.json", json.dumps(hb, indent=1))                       # json.dump: no newline
+mw = {"schema": "hpcperf-miniweather-reference-1", "key": "thermal-64x32-10s", "nx": 64, "nz": 32, "sim_time": 10, "data_spec": "DATA_SPEC_THERMAL",
+      "note": "CPU reference 2026-09-30 on node17 (Slurm job 1397595): build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; 4304 s",
+      "d_mass": -9.210783e-13, "d_te": -7.842791e-09, "runs": [{"log": "t.openmp.1.log", "sha256": "ab" * 32}], "rule": {"d_te": "abs diff to reference <= 1e-07"}}
+put("level2/miniweather/reference/thermal-64x32-10s.json", json.dumps(mw, indent=1))
+nk = {"schema": "hpcperf-nekbone-cg-reference-1", "input_id": "n12-e78125",
+      "provenance": {"made_utc": "2026-10-21T03:18:21Z", "SIZE_sha256": "60" * 32, "log": "n12.cpu.log", "log_sha256": "35" * 32,
+                     "binary": "CPU build of the same source (build.sh CPU, nvfortran 25.7 -O2/-O3, no -acc/-cuda), one rank on node17",
+                     "host": "node17.example.org", "note": "Solve Time =   0.3034E+03"},
+      "rule": {"r0_tol": 0.0001, "x_tol": 1e-10, "text": "timed solve"},
+      "run": {"solves": [{"r0": 5911.8, "iter": 101, "rN": 1.35e-07}], "xnorm": 7329.375063369254, "xf": 28422761.905461155, "nelt": 78125}}
+put("level2/nekbone/reference/n12-e78125.json", json.dumps(nk, indent=1))
+pn = {"schema": "hpcperf-pennant-reference-1", "input_id": "sedov-64",
+      "provenance": {"made_utc": "2026-10-20T23:59:55Z", "deck": "sedov.pnt", "deck_sha256": "27" * 32, "log": "run.log", "log_sha256": "a9" * 32,
+                     "binary": "lanl/PENNANT master 617414f CPU build, 1 MPI rank", "omp_threads": 32, "host": "node17.example.org",
+                     "note": "upstream deck test/sedov/sedov.pnt run to tstop=1.0 (3882 cycles) on node17, 2026-10-20"},
+      "rule": {"rel_tol": 1e-05, "zero_floor": 1e-08},
+      "columns": {"zr": {"n": 4096, "scale": 1.0, "sum": 4.5e3, "sample_stride": 113, "samples": [[1, 1.0], [114, 0.5], [227, -2.5e-07]]}}}
+put("level2/pennant/reference/sedov-64.json",                                               # check_xy.py's writer
+    re.sub(r'\[\s*(\d+),\s*(-?[0-9.eE+-]+)\s*\]', r'[\1, \2]', json.dumps(pn, indent=1)) + "\n")
+br = {"schema": "hpcperf-branson-reference-1", "benchmark": "branson", "input_id": "lb", "note": "24-rank run: 2 h 56 min wall",
+      "final_step": {"photons_transported": 251242903, "post_mat_e": 0.017737}, "tolerances": {"energy_rel": 0.05},
+      "reference_run": {"allocation": "node17, Slurm job 1397595 (24 of its 32 cores)", "binary_sha256": "39" * 32,
+                        "launch": "taskset -c 16-31,96-99,108-111 mpirun -np 24", "log_sha256": "95" * 32, "mpi_ranks": 24,
+                        "log_kept_at": "results directory r-2026-09-30/branson/lb/cpu.log (outside the repository)"}}
+put("level2/branson/reference/lb.json", json.dumps(br, indent=1, sort_keys=True) + "\n")
+br2 = json.loads(json.dumps(br)); br2["input_id"] = "lb2"; br2["reference_run"]["log_kept_at"] = "/home/someone/results/cpu.log (outside the repository)"
+put("level2/branson/reference/lb2.json", json.dumps(br2, indent=1, sort_keys=True) + "\n")
+PY
+( cd "$R2" && git init -q && GIT2 add -A && GIT2 commit -qm fixtures ) && ok "5.0: fixture repository (5 Level 2 schemas, 3 serialisations) committed" || bad "5.0: git"
+N=("$R2"/level2/*/reference/*.json); declare -A N0; for f in "${N[@]}"; do N0[$f]="$(sha "$f")"; done
+out="$("$PY" "$S" apply --host node17 "${N[@]}" 2>&1)"; rc=$?
+"$PY" - "$R2" <<'PY' && [ "$rc" = 0 ] && ok "5a: apply --host node17: host gone, ' on node17' / '(Slurm job N)' dropped from note / binary, all else verbatim (core lists, dates, run times); relative log_kept_at kept, absolute removed; record after note (no block) or last in the block" || bad "5a: rc=$rc $out"
+import json, sys
+R = sys.argv[1]; L = lambda p: json.load(open(f"{R}/level2/{p}"))
+hb = L("hipbone/reference/nx9-p14.json")
+assert hb["note"] == "CPU reference run 2026-09-30, the same build/x/hipBone binary, OCCA OpenMP backend (8 threads, cores 100-107), exact registered arguments", hb["note"]
+assert list(hb)[:4] == ["schema", "input_id", "note", "scrubbed"], list(hb)
+assert hb["scrubbed"]["removed"] == [] and hb["scrubbed"]["redacted_text"] == ["note: batch job", "note: host name"], hb["scrubbed"]
+mw = L("miniweather/reference/thermal-64x32-10s.json")
+assert mw["note"] == "CPU reference 2026-09-30: build.sh OPENMP (YAKL OpenMP, -O3, no fast-math), 4 threads on cores 108-111; 4304 s", mw["note"]
+nk = L("nekbone/reference/n12-e78125.json")["provenance"]
+assert "host" not in nk and nk["binary"].endswith("no -acc/-cuda), one rank") and nk["note"] == "Solve Time =   0.3034E+03", nk
+assert list(nk)[-1] == "scrubbed" and nk["scrubbed"]["removed"] == ["host"] and nk["scrubbed"]["redacted_text"] == ["binary: host name"]
+pn = L("pennant/reference/sedov-64.json")["provenance"]
+assert "host" not in pn and pn["note"] == "upstream deck test/sedov/sedov.pnt run to tstop=1.0 (3882 cycles), 2026-10-20" and pn["omp_threads"] == 32, pn
+br = L("branson/reference/lb.json")["reference_run"]
+assert "allocation" not in br and br["log_kept_at"].startswith("results directory") and br["launch"].startswith("taskset -c 16-31,96-99,108-111")
+assert br["scrubbed"]["removed"] == ["allocation"] and "redacted_text" not in br["scrubbed"]
+br2 = L("branson/reference/lb2.json")["reference_run"]
+assert "log_kept_at" not in br2 and br2["scrubbed"]["removed"] == ["allocation", "log_kept_at"], br2
+import glob
+for f in glob.glob(f"{R}/level2/*/reference/*.json"):
+    t = open(f).read()
+    for needle in ("node17", "example.org", "1397595", "Slurm", "/home/someone"):
+        assert needle not in t, (f, needle)
+t = open(f"{R}/level2/pennant/reference/sedov-64.json").read()
+assert '    [114, 0.5],\n' in t and t.endswith("}\n"), "pennant: one sample per line and the trailing newline kept"
+assert not open(f"{R}/level2/hipbone/reference/nx9-p14.json").read().endswith("\n"), "hipbone: still no trailing newline"
+PY
+"$PY" - "$R2" <<'PY' && ok "5b: independent raw-byte check: every top-level value outside the provenance set is the identical byte string, same order, same framing" || bad "5b"
+import json, re, subprocess, sys
+R = sys.argv[1]; dec = json.JSONDecoder(); ws = re.compile(r"[ \t\n\r]*")
+def spans(raw):
+    i = raw.index("{") + 1; out = []
+    while True:
+        i = ws.match(raw, i).end()
+        if raw[i] == "}":
+            return out, raw[i:]
+        k, i = dec.raw_decode(raw, i); i = ws.match(raw, i).end() + 1; i = ws.match(raw, i).end()
+        _, j = dec.raw_decode(raw, i); out.append((k, raw[i:j])); i = ws.match(raw, j).end(); i += raw[i] == ","
+prov = {"hipbone": {"note", "scrubbed"}, "miniweather": {"note", "scrubbed"}, "nekbone": {"provenance"}, "pennant": {"provenance"},
+        "branson": {"reference_run", "note"}}
+for f in subprocess.run(["git", "-C", R, "ls-files"], capture_output=True, text=True).stdout.split():
+    old = subprocess.run(["git", "-C", R, "show", f"HEAD:{f}"], capture_output=True, text=True).stdout; new = open(f"{R}/{f}").read()
+    p = prov[f.split("/")[1]]
+    (so, to), (sn, tn) = spans(old), spans(new)
+    assert [x for x in so if x[0] not in p] == [x for x in sn if x[0] not in p], f
+    assert to == tn and old[:2] == new[:2], f
+PY
+declare -A N1; for f in "${N[@]}"; do N1[$f]="$(sha "$f")"; done
+out="$("$PY" "$S" apply --host node17 "${N[@]}" 2>&1)"; rc=$?
+same=1; for f in "${N[@]}"; do [ "$(sha "$f")" = "${N1[$f]}" ] || same=0; done
+[ "$rc" = 0 ] && [ "$same" = 1 ] && echo "$out" | /usr/bin/grep -q 'changed 0, unchanged 6' && ok "5c: idempotent: a second apply changes no byte" || bad "5c: rc=$rc $out"
+mkdir -p "$TMP/det2"; for f in "${N[@]}"; do GIT2 show "HEAD:${f#$R2/}" > "$TMP/det2/$(basename "$f")"; done
+"$PY" "$S" apply --host node17 "$TMP/det2"/*.json > /dev/null 2>&1
+same=1; for f in "${N[@]}"; do [ "$(sha "$TMP/det2/$(basename "$f")")" = "${N1[$f]}" ] || same=0; done
+[ "$same" = 1 ] && ok "5d: deterministic: scrubbing copies of the originals elsewhere gives the same bytes" || bad "5d: copies differ"
+out="$("$PY" "$S" verify --host node17 --against HEAD "${N[@]}" 2>&1)"; rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$out" | /usr/bin/grep -c '^ok ')" = 6 ] && ok "5e: verify --host node17 --against HEAD: 6 files ok" || bad "5e: rc=$rc $out"
+out="$("$PY" "$S" verify --against HEAD "${N[@]}" 2>&1)"; rc=$?
+[ "$rc" = 1 ] && [ "$(echo "$out" | /usr/bin/grep -c '^FAIL ')" = 2 ] && echo "$out" | /usr/bin/grep -q '^FAIL .*hipbone' && echo "$out" | /usr/bin/grep -q '^FAIL .*miniweather' \
+    && ok "5f: verify without --host: hipBone / miniWeather FAIL (their host is named only in the note, so the same --host is part of the proof); NekBone / PENNANT / Branson ok" || bad "5f: rc=$rc $out"
+GIT2 show HEAD:level2/pennant/reference/sedov-64.json | sed 's/^    \[114, 0.5\],$/    [114,  0.5],/' > "$TMP/pn-bad.json"
+h="$(sha "$TMP/pn-bad.json")"; out="$("$PY" "$S" apply --host node17 "$TMP/pn-bad.json" 2>&1)"; rc=$?
+[ "$rc" = 2 ] && [ "$(sha "$TMP/pn-bad.json")" = "$h" ] && echo "$out" | /usr/bin/grep -q 'not the exact json.dumps output' \
+    && ok "5g: a PENNANT reference with one sample line not in check_xy.py's form -> refused, untouched" || bad "5g: rc=$rc $out"
+"$PY" -c "import json;open('$TMP/hb-job.json','w').write(json.dumps({'schema':'hpcperf-hipbone-reference-1','note':'run in Slurm job 1397595 on cores 1-8','dofs':1},indent=1))"
+h="$(sha "$TMP/hb-job.json")"; out="$("$PY" "$S" apply "$TMP/hb-job.json" 2>&1)"; rc=$?
+[ "$rc" = 2 ] && [ "$(sha "$TMP/hb-job.json")" = "$h" ] && echo "$out" | /usr/bin/grep -q 'does not remove cleanly' \
+    && ok "5h: a batch-job mention the tool cannot drop cleanly ('in Slurm job N') -> refused, untouched (never a half-redacted sentence)" || bad "5h: rc=$rc $out"
+"$PY" -c "import json;open('$TMP/nk-bin.json','w').write(json.dumps({'schema':'hpcperf-nekbone-cg-reference-1','provenance':{'host':'node17','binary':42},'run':{}},indent=1))"
+out="$("$PY" "$S" apply "$TMP/nk-bin.json" 2>&1)"; rc=$?
+[ "$rc" = 2 ] && /usr/bin/grep -q node17 "$TMP/nk-bin.json" && echo "$out" | /usr/bin/grep -q "'provenance.binary' is not free text" && ok "5i: an in-block free-text field that is not a string -> refused" || bad "5i: rc=$rc $out"
+"$PY" -c "import json;open('$TMP/hb-rec.json','w').write(json.dumps({'schema':'hpcperf-hipbone-reference-1','note':'run on node17','scrubbed':'by hand','dofs':1},indent=1))"
+out="$("$PY" "$S" apply --host node17 "$TMP/hb-rec.json" 2>&1)"; rc=$?
+[ "$rc" = 2 ] && /usr/bin/grep -q node17 "$TMP/hb-rec.json" && ok "5j: a foreign top-level 'scrubbed' (schema without a block) -> refused" || bad "5j: rc=$rc $out"
 
 echo
 echo "scrub tests: $pass passed, $fail failed"
