@@ -137,6 +137,50 @@ name and sha256 are unchanged.
    published}` per bundle in a separate reviewed commit. Published names are immutable: a new member set is
    always a new name, so a later round uploads only the bundles whose names changed.
 
+## Redistribution review (2026-10-29; every bundle stays `review`)
+
+What a bundle holds: the raw output blobs named by the committed references -- 126 headerless f32/f64 arrays
+(each blob's size is exactly `count x itemsize` of its reference output; sampled first/last MiB: no text, no path or
+credential pattern) and 4 Nyx tar archives. The Nyx text members are AMReX plotfile/particle headers (`Header`,
+`Cell_H`, `Particle_H`, `precision`, `comoving_a`) and the ParmParse dump `the_parameters` (deck values; file
+names only relative -- `32.nyx`, `64sssss_20mpc.nyx`, `ic_sb_32.ascii`, `TREECOOL_middle`, and `zhi.bin`, which is not read since `nyx.inhomo_reion = 0`; one
+machine-derived value, `amrex.the_pinned_arena_release_threshold = 95747735552` = B200 device memory / 2); the
+binary members carry only AMReX `FAB ((8, (64 11 52 ...` descriptors. `job_info` is excluded; content scan 0
+credential hits, 0 node-private members. No bundle involves GEOS or ParMETIS (groups: 26 Level 1, Level 2 kripke
+and exacmech, Level 3 nyx; none of them builds METIS/ParMETIS). Program outputs are not copies of the code; the
+license column says whose notice the repository must carry for the code that produced them.
+
+Each bundle's lock entry carries the one-line result in `redistribution.notes`; `status` changes only by the
+owners' decision (`cleared` is never set by a tool).
+
+| group (bundles) | code: upstream @ commit | license (file in this repo) | input the outputs come from | recommendation |
+|---|---|---|---|---|
+| level1/adam (1) | HeCBench @ 23714d9, src/adam-cuda | Apache-2.0 (Colossal-AI) + MIT notice (DeepSpeed), `LICENSE` | generated in-program (rand) | cleared-candidate |
+| level1/backprop (1) | Rodinia 3.1 (HPC-FAIR/rodinia_3.1) @ 366b283, cuda/backprop | UVA BSD-style + citation request, `LICENSE` | generated in-program (rand, seed 7; probes dpn1) | cleared-candidate |
+| level1/bezier_surface (1) | HeCBench @ 23714d9 | BSD-3-Clause (ANL/ORNL), `LICENSE` | `data/control.txt` = upstream `input/control.txt`, in git on origin/main | cleared-candidate |
+| level1/bilateral_filter (1) | HeCBench @ 23714d9 | BSD-3-Clause (ANL/ORNL), `LICENSE` | synthetic image, generated in-program (srand 123) | cleared-candidate |
+| level1/black_scholes (1) | Hetero-Mark @ aa685e0, src/bs | NCSA-style (Northeastern Univ. NUCAR), `LICENSE` | generated in-program (rand_r, seed = option count) | cleared-candidate |
+| level1/burgers_equation (2) | HeCBench @ 23714d9, src/burger-cuda | upstream dir: **MIT, (c) 2020 Soumya Sen**; `LICENSE` here is only HeCBench's BSD-3 | generated in-program (formula) | needs-owner-check: add upstream `src/burger-cuda/LICENSE` (MIT) to `level1/burgers_equation` |
+| level1/daxpy, del_dot_vec_2d, energy, fdtd_2d, floyd_warshall, jacobi_2d, ltimes, mat_mat_shared, matvec_3d_stencil, pressure (10) | RAJAPerf @ b0f1cd3 | BSD-3-Clause (LLNS), `LICENSE` (RAJAPerf `COPYRIGHT` "Additional BSD Notice", LLNL-CODE-738930, not shipped) | generated in-program (RAJAPerf DataUtils initData*) | cleared-candidate (repo follow-up: ship RAJAPerf `COPYRIGHT`) |
+| level1/fir (1) | Hetero-Mark @ aa685e0, src/fir | NCSA-style, `LICENSE` | generated in-program (rand_r, seed 1) | cleared-candidate |
+| level1/hotspot (1) | Rodinia 3.1 @ 366b283, cuda/hotspot | UVA BSD-style, `LICENSE` | `data/temp_512`, `power_512` = Rodinia `data/hotspot` ("real data", no data-specific terms), in git on origin/main; pnoise9 probe from `data/gen_probe.py` | needs-owner-check: confirm the Rodinia LICENSE covers `data/hotspot` (same question as the copy on origin/main) |
+| level1/hotspot_3d (1) | Rodinia 3.1 @ 366b283, cuda/hotspot3D | UVA BSD-style, `LICENSE` | `data/power_64x8`, `temp_64x8` = Rodinia `data/hotspot3D` (uniform random values), in git on origin/main; amp10 probe from `data/gen_temp_amp10.py` | cleared-candidate |
+| level1/nbody (1) | HeCBench @ 23714d9, src/nbody-cuda | MIT (Intel), `LICENSE` | generated in-program (random particles) | cleared-candidate |
+| level1/nearest_neighbor (1) | Rodinia 3.1 @ 366b283, cuda/nn | UVA BSD-style, `LICENSE` | `data/cane4_0..3.db` = Rodinia `data/nn`, synthetic (`inputGen/hurricanegen.c`, rand), in git on origin/main | cleared-candidate |
+| level1/pagerank (1) | Hetero-Mark @ aa685e0, src/pr | NCSA-style, `LICENSE` | generated at configure time by `data/gen_input.py` (seeded random graph) | cleared-candidate |
+| level1/spadd, spgemm, spmv (3) | Kokkos Kernels @ 23a699f, perf_test ports | Apache-2.0 WITH LLVM-exception (NTESS): **no LICENSE in these directories** (also on origin/main) | generated in-program (kk_sparseMatrix_generate, srand 13721) | needs-owner-check: add kokkos-kernels `LICENSE` + `Copyright.txt` to each |
+| level1/srad_v1 (1) | Rodinia 3.1 @ 366b283, cuda/srad/srad_v1 | UVA BSD-style, `LICENSE` | `data/image.pgm` = Rodinia `data/srad` ultrasound frame (Heart Wall data, no data-specific terms), in git on origin/main; outputs are images derived from it; probe image synthetic (`data/make_probe_edges.py`) | needs-owner-check: confirm the Rodinia LICENSE covers `data/srad/image.pgm` (same question as the copy on origin/main) |
+| level2/exacmech (1) | ExaCMech v0.4.3 @ 9ca5913 | BSD-3-Clause (LLNL), `LICENSE` + `NOTICE` | orientations generated in-program (minstd_rand0, seed 42); `miniapp/cases/props.txt` vendored, in git on origin/main | cleared-candidate |
+| level2/kripke (1) | Kripke @ 1b35d13 | BSD-3-Clause, LLNL-CODE-775068, `LICENSE` + `NOTICE` + `COPYRIGHT` | built-in Kobayashi 3i problem (run.sh size knobs) | cleared-candidate |
+| level3/nyx (1) | Nyx @ e06eabc, AMReX @ a52ca73, SUNDIALS @ 5c53be8 | BSD-3-Clause-LBNL / BSD-3-Clause; texts in the published source artifact `nyx-hpcperf-l3-v1`, listed in `provenance/LICENSES.md` | IC/UVB files `Exec/LyA/32.nyx`, `64sssss_20mpc.nyx`, `TREECOOL_middle`, `Exec/MiniSB/ic_sb_32.ascii`: upstream Nyx repository files (sha256 = reference `ic_sha256`), in that artifact | cleared-candidate |
+
+Summary: 23 bundles (23 groups) cleared-candidate, 7 bundles (6 groups) needs-owner-check, 0 blocked. None of the
+open checks concerns the bundles' content: three are missing license files next to code already on origin/main
+(burgers_equation, spadd/spgemm/spmv), two ask whether the Rodinia software license also covers two upstream
+data files the repository already redistributes (hotspot, srad_v1). Release-level item for the owners: the
+repository has no top-level LICENSE, so the golden release carries no terms of its own; its release notes should
+point to the per-benchmark `LICENSE` files (and Rodinia's / Hetero-Mark's citation requests).
+
 ## Proposed integration (partly applied)
 
 Applied (5600ae1): the fetch hint in `hpcperf_golden.py` (the "golden blob ... missing" FAIL line and `status`

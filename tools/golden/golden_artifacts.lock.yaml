@@ -40,7 +40,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/adam-cuda, Apache-2.0 (Colossal-AI) + MIT notice (DeepSpeed), in level1/adam/LICENSE; input generated in-program (rand); outputs f32 arrays only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-backprop-bdbcbceba121b3d2.tar.zst
@@ -68,7 +68,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1 (HPC-FAIR/rodinia_3.1@366b283) cuda/backprop, UVA BSD-style + citation request, in LICENSE; input generated in-program (rand, seed 7; probes dpn1); f32 weights only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-bezier_surface-f68b18e562e4251a.tar.zst
@@ -88,7 +88,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/bezier-surface-cuda, BSD-3-Clause (ANL/ORNL), in LICENSE; input data/control.txt = upstream input/control.txt, in git on origin/main; f32 surface only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-bilateral_filter-734bab48e9f486cb.tar.zst
@@ -112,7 +112,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/bilateral-cuda, BSD-3-Clause (ANL/ORNL), in LICENSE; input synthetic image generated in-program (srand 123); f32 images only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-black_scholes-9e3034dc11795dcb.tar.zst
@@ -136,7 +136,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/bs, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input random batch generated in-program (rand_r, seed = number of options); f32 prices only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-burgers_equation-p1of2-b152706108e70ad8.tar.zst
@@ -157,7 +157,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/burger-cuda, whose own LICENSE is MIT (c) 2020 Soumya Sen, while level1/burgers_equation/LICENSE has only HeCBench''s BSD-3; input generated in-program (formula); f64 fields only -> needs-owner-check: add upstream src/burger-cuda/LICENSE (MIT) to level1/burgers_equation']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-burgers_equation-p2of2-d2dde53ad7ff055c.tar.zst
@@ -177,7 +177,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/burger-cuda, whose own LICENSE is MIT (c) 2020 Soumya Sen, while level1/burgers_equation/LICENSE has only HeCBench''s BSD-3; input generated in-program (formula); f64 fields only -> needs-owner-check: add upstream src/burger-cuda/LICENSE (MIT) to level1/burgers_equation']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-daxpy-3be167eae7c1babf.tar.zst
@@ -198,7 +198,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/basic/DAXPY, BSD-3-Clause (LLNS), in LICENSE (RAJAPerf COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-del_dot_vec_2d-ef5086a7e5cdd0c8.tar.zst
@@ -219,7 +219,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/DEL_DOT_VEC_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-energy-a5dd928704ea9d2a.tar.zst
@@ -247,7 +247,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/ENERGY, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-fdtd_2d-81168f97981a511f.tar.zst
@@ -274,7 +274,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_FDTD_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-fir-2e7ee4a5d2741056.tar.zst
@@ -295,7 +295,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/fir, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input generated in-program (rand_r, seed 1); f32 output only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-floyd_warshall-1f98b08f87ca7998.tar.zst
@@ -315,7 +315,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_FLOYD_WARSHALL, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-hotspot-ba3c29624ac370e5.tar.zst
@@ -337,7 +337,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/hotspot, UVA BSD-style, in LICENSE; input data/temp_512 + power_512 = Rodinia data/hotspot (''real data'', no data-specific terms), in git on origin/main; pnoise9 probe derived by data/gen_probe.py; f32 temperatures only -> needs-owner-check: confirm the Rodinia LICENSE covers data/hotspot (same question as the copy already on origin/main)']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-hotspot_3d-f444bc202246975d.tar.zst
@@ -359,7 +359,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/hotspot3D, UVA BSD-style, in LICENSE; input data/power_64x8 + temp_64x8 = Rodinia data/hotspot3D (uniform random values), in git on origin/main; amp10 probe derived by data/gen_temp_amp10.py; f32 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-jacobi_2d-18ea47bbb5d66898.tar.zst
@@ -383,7 +383,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_JACOBI_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-ltimes-48237d6112fde49e.tar.zst
@@ -404,7 +404,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/LTIMES, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst
@@ -426,7 +426,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/basic/MAT_MAT_SHARED, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst
@@ -447,7 +447,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/MATVEC_3D_STENCIL, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-nbody-a9136df9ac968bf8.tar.zst
@@ -474,7 +474,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/nbody-cuda (GSimulation), MIT (Intel), in LICENSE; input generated in-program (random particles); f32 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-nearest_neighbor-47ea5707dda207a6.tar.zst
@@ -496,7 +496,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/nn, UVA BSD-style, in LICENSE; input data/cane4_0..3.db = Rodinia data/nn synthetic records (inputGen/hurricanegen.c, rand), in git on origin/main; f32 distances only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-pagerank-777730839711bfde.tar.zst
@@ -518,7 +518,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/pr, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input generated at configure time by data/gen_input.py (seeded random graph; upstream data server offline); f32 ranks only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-pressure-d9c5db18d5189d9a.tar.zst
@@ -544,7 +544,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/PRESSURE, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-spadd-a4b5ceebc18085ed.tar.zst
@@ -564,7 +564,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spadd, Apache-2.0 WITH LLVM-exception (NTESS), but level1/spadd has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721); f64 values only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spadd']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-spgemm-d5bdc149e4a5af2f.tar.zst
@@ -584,7 +584,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spgemm (KKMEM), Apache-2.0 WITH LLVM-exception (NTESS), but level1/spgemm has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721); f64 values only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spgemm']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-spmv-ebd8f22ef8233e96.tar.zst
@@ -606,7 +606,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spmv, Apache-2.0 WITH LLVM-exception (NTESS), but level1/spmv has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721; probe splitmix64); f64 only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spmv']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level1-srad_v1-b57aca3e43fac564.tar.zst
@@ -628,7 +628,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/srad/srad_v1, UVA BSD-style, in LICENSE; input data/image.pgm = Rodinia data/srad ultrasound frame (Heart Wall data, no data-specific terms), in git on origin/main; probe_edges.pgm synthetic (data/make_probe_edges.py); outputs are f32 images derived from it -> needs-owner-check: confirm the Rodinia LICENSE covers data/srad/image.pgm (same question as the copy already on origin/main)']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level2-exacmech-5b42e72fc6e6eaf9.tar.zst
@@ -649,7 +649,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: ExaCMech v0.4.3@9ca5913 (LLNL), BSD-3-Clause, LICENSE + NOTICE in level2/exacmech; input orientations generated in-program (minstd_rand0, seed 42), props = vendored upstream miniapp/cases/props.txt (in git on origin/main); f64 stresses only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level2-kripke-aea264dd042a7a9d.tar.zst
@@ -670,7 +670,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Kripke@1b35d13 (LLNL), BSD-3-Clause LLNL-CODE-775068, LICENSE + NOTICE + COPYRIGHT in level2/kripke; input = built-in Kobayashi 3i problem, sized by run.sh knobs; f64 particle counts only -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 - name: golden-level3-nyx-fb533b75ce220cbc.tar.zst
@@ -692,7 +692,7 @@ bundles:
     node_private_members: []
   redistribution:
     status: review
-    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references)]
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Nyx@e06eabc + AMReX@a52ca73 (+ SUNDIALS@5c53be8), BSD-3-Clause-LBNL / BSD-3-Clause, texts in the published source artifact nyx-hpcperf-l3-v1 (level3/nyx/provenance/LICENSES.md); input 32.nyx, 64sssss_20mpc.nyx, ic_sb_32.ascii, TREECOOL_middle = upstream Nyx repo files (in that artifact); 4 tars of AMReX plotfile/particle data + headers + parameter dump, no node-private text (job_info excluded) -> cleared-candidate']
   primary: {url: null, status: unpublished}
   mirrors: []
 references:
