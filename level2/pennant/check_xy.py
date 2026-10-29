@@ -193,7 +193,7 @@ def main():
                "provenance": {"made_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "deck": os.path.basename(a.deck),
                               "deck_sha256": sha256(a.deck), "profile": os.path.basename(a.run), "profile_sha256": sha256(a.run),
                               "log": os.path.basename(a.log), "log_sha256": sha256(a.log), "binary": a.binary,
-                              "omp_threads": a.omp_threads, "host": os.uname().nodename, "note": a.note},
+                              "omp_threads": a.omp_threads, "note": a.note},   # no host name (machine identity)
                "rule": {"rel_tol": a.rel_tol, "zero_floor": a.zero_floor,
                         "text": "populated zones (|ref| >= zero_floor * max|ref|): |run - ref| <= rel_tol * |ref|; other zones: |run - ref| <= zero_floor * max|ref|; sum rel_tol; min/max by magnitude"},
                "columns": {c: column_summary(run[c], a.samples) for c in COLS}}
