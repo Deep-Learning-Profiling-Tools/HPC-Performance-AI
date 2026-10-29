@@ -201,7 +201,7 @@ records the command-line seed) from the CPU-only run of one explicit offline run
 
 Provenance (in the file): CPU-only binary `build/level2/branson/cpu_ref/BRANSON` sha256 4b29fd33...
 (configured and built by that offline run from the unmodified `src/`, git HEAD 9544e6e), launch
-`mpirun -np 1 --bind-to none`, dgx003 / Slurm job 2956114, run 2026-10-27T08:01:39Z..08:01:47Z, CPU log sha256
+`mpirun -np 1 --bind-to none`, run 2026-10-27T08:01:39Z..08:01:47Z, CPU log sha256
 46d7a475... (kept outside the repository in
 `HPC-Performance-AI-results/golden-2026-10-26/validate-frozen-2026-10-27/branson/` with the GPU log, the offline
 run's output and its execve trace), deck sha256 9519455d..., per-step photon counts, upstream commit. Every
@@ -272,17 +272,17 @@ an implementation independent of the GPU transport kernel) on the same deck, see
 Its result is frozen in `reference/<input-id>.json`: the final completed step's Post mat / Absorption / Exit
 energies, transported photon count and T_e table (where the deck prints one), the per-step photon counts, the
 deck's sha256 and seed, the upstream commit, the CPU binary's sha256 and build options, the rank count, launch
-line, allocation, start / finish, the CPU log's sha256 and where it is kept (the results directory, outside the
+line, start / finish, the CPU log's sha256 and where it is kept (the results directory, outside the
 repository -- the raw logs are not committed), the comparison rule with its basis and the generation date.
 `generate_reference.sh <input-id> [--ranks N]` builds and runs the CPU-only Branson and freezes the result;
 `--from-cpu-log` freezes an already finished run. Neither is ever run by a correctness check.
 
 | input | reference run | CPU log sha256 | final step: Post mat E / Absorption E / Exit E / photons transported |
 |---|---|---|---|
-| hohlraum-single-node | 1 rank, 17 027 s, 2026-09-29 (Slurm job 1324397) | 172ccab5... | 1.30705e-02 / 4.17457e-05 / 2.61773e-06 / 10 748 998 (5 steps) |
-| marshak-wave-replicated | 1 rank, 7 s, 2026-09-29 (job 1324397) | 04de6b59... | 6.86634e-05 / 4.955529e-05 / 5.916541e-05 / 50 015 (1 step; 25-cell T_e table) |
-| hohlraum-multi-node | 1 rank, 2 655 s, 2026-09-29 (job 1324397) | 2d821e2b... | 1.77404e-02 / 4.53535e-04 / 2.31897e-07 / 252 973 234 (20 steps) |
-| lb-hohlraum | 24 ranks, 2 h 56 min, 2026-09-30/10-01 (job 1397595) | 95b075a1... | 1.77370e-02 / 1.08273e-03 / 1.58954e-06 / 251 242 903 (5 steps) |
+| hohlraum-single-node | 1 rank, 17 027 s, 2026-09-29 | 172ccab5... | 1.30705e-02 / 4.17457e-05 / 2.61773e-06 / 10 748 998 (5 steps) |
+| marshak-wave-replicated | 1 rank, 7 s, 2026-09-29 | 04de6b59... | 6.86634e-05 / 4.955529e-05 / 5.916541e-05 / 50 015 (1 step; 25-cell T_e table) |
+| hohlraum-multi-node | 1 rank, 2 655 s, 2026-09-29 | 2d821e2b... | 1.77404e-02 / 4.53535e-04 / 2.31897e-07 / 252 973 234 (20 steps) |
+| lb-hohlraum | 24 ranks, 2 h 56 min, 2026-09-30/10-01 | 95b075a1... | 1.77370e-02 / 1.08273e-03 / 1.58954e-06 / 251 242 903 (5 steps) |
 
 All four were frozen on 2026-10-01 from the logs that produced the PASS verdicts of 2026-09-29 (three decks)
 and 2026-10-01 (lb-hohlraum), without a rerun; one CPU-only binary (sha256 392c0d0c...) produced all four.

@@ -13,6 +13,7 @@
 #       directory afterwards: the frozen JSON names it by sha256.
 #   generate_reference.sh <input-id> --from-cpu-log LOG --ranks N --binary-sha256 SHA [--launch TEXT]
 #                         [--allocation TEXT] [--started UTC] [--finished UTC] [--log-kept-at TEXT] [--note TEXT] [--force]
+#       (--allocation is accepted but not recorded; --log-kept-at only when relative -- check_log.py freeze)
 #       freezes an already finished CPU-only run (no build, no run): the four references of 2026-09-29..10-01 were
 #       frozen this way from the logs that produced the PASS verdicts (the runs predate this script).
 # Exit 0 with the JSON written; 2 on a usage, build or run error. An existing reference is kept unless --force.
