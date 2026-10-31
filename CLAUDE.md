@@ -270,6 +270,38 @@ Design, changed files and extension interfaces: `tools/timing/DESIGN.md`.
   --publish`), and only when the user wants it shown. `bash tools/timing/tests/run_all.sh`
   is CPU-only. Formats: `tools/timing/SCHEMA.md`.
 
+## Correctness oracle: frozen golden references (since 2026-10-26)
+
+Details: `tools/golden/README.md` (workflow, tolerance budget, Known limitations), `tools/golden/DISTRIBUTION.md`.
+- **What it is.** Each registered input of 41 Level 1 benchmarks, Kripke and ExaCMech has a frozen B200 reference
+  `level<N>/<b>/reference/<input>.json` (schema `hpcperf-golden-1`, committed: workload identity, frozen rule, sha256,
+  `d0`, `tol_effective`, provenance); tolerance-compared bytes live in the content-addressed store
+  `$HPCPERF_GOLDEN_STORE` (default `.golden-store/`, git-ignored). Nyx [3] uses `level3/nyx/nyx_reference.py` the same
+  way; Branson / Remhos / hipBone / Nekbone validate against committed frozen values.
+- **Retrieve.** A fresh clone has no store, and every tolerance-rule check FAILs with "golden blob ... missing" (never a
+  fallback): `python3 tools/golden/golden_artifacts.py fetch [level1/<b> ...]` (until the bundles are published:
+  `fetch --from $HPCPERF_ARTIFACT_STAGING/golden`), then `golden_artifacts.py verify`.
+- **Normal runs.** ctest (`hpcperf_golden.py run`), `tools/inputs/hpcperf_inputs.py check` and default `validate.sh`
+  capture the outputs (`HPCPERF_GOLDEN_DUMP`) and compare them with the committed, unmodified reference
+  (`hpcperf_golden.py check`); no CPU reference runs, and measurements never capture or compare.
+- **CPU references** run only offline with `HPCPERF_CPU_REFERENCE=1`: inside `hpcperf_golden.py make` (the one-time
+  validation of a new reference) or a deliberate offline `validate.sh`. Never in ctest, registry checks, `tools/timing`
+  (a reserved case variable) or an agent loop.
+- **Regenerate** only after a justified baseline correction (a class D fix with independent evidence, or an owner-approved
+  criterion change): commit the source fix alone, rebuild, then `hpcperf_golden.py make <bench_dir> <input> --replace
+  --reason "<what changed, the evidence>"` (refuses a dirty benchmark dir or golden tool; records `replaces`), commit the
+  references separately, re-pack (`golden_artifacts.py pack --staging $HPCPERF_ARTIFACT_STAGING/golden`), check
+  `lock-check` CURRENT and commit the lock. Nyx: `nyx_reference.py freeze --replace --reason` (validate.sh freeze mode).
+  Metadata or documentation changes never justify regenerating numbers.
+- **Never silently replace a reference.** It is the oracle: re-making it from the current build would accept whatever
+  that build computes and hide the regression it should catch. `check` refuses a modified or uncommitted reference and a
+  rule changed after freezing; references record their `git_head`, so never squash or rebase the history they name.
+- **Integrity and provenance.** `golden_artifacts.py verify` / `lock-check` (blob and bundle sha256 and sizes),
+  `hpcperf_golden.py status`, `tools/golden/hpcperf_golden_audit.py` (exit 1 on a HARD finding). Provenance records GPU
+  model, driver, compute capability, CUDA, `git_head`, binary and tool sha256 and the CPU validation's pass line and log
+  sha256 -- no host name, GPU UUID or absolute path (`tools/golden/scrub_provenance.py verify` proves a scrub
+  changed only those fields). Uploading bundles needs the user's explicit `HPCPERF_CONFIRM_UPLOAD=yes`.
+
 ## Validation principles
 
 - Official small scientific workflows (upstream decks, verbatim or with a

@@ -19,19 +19,36 @@ timing:
     key: repeat
     offset: 0
 baseline:
-  method: 'built-in element-wise comparison with the upstream CPU reference (reference.h): PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the output p against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    CPU reference (reference.h) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes p only when
+  # the upstream check printed PASS; every later run is compared with that frozen output instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: p
+    dtype: f32
+    rule: {metric: max_abs, tol: 1.0e-3}
+    cpu: p.cpu
+    basis: upstream's element-wise check |r[i] - p[i]| <= 1e-3 against the CPU reference (cuda/main.cu, reference.h);
+      the check allows 1e-3 minus the B200 output's own deviation from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'p against the frozen B200 golden reference reference/<input_id>.json (max |a - g| <= 1e-3 - d0, d0 = the
+    golden''s deviation from the upstream CPU reference measured when it was frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger vector sizes through the benchmark's own size parameter

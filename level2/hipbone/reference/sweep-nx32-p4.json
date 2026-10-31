@@ -1,7 +1,17 @@
 {
  "schema": "hpcperf-hipbone-reference-1",
  "input_id": "sweep-nx32-p4",
- "note": "CPU reference runs 2026-09-30 on dgx003 (Slurm job 1397595), the same build/level2/hipbone/cuda/hipBone binary, OCCA Serial and OpenMP (8 threads, cores 100-107) backends, exact registered arguments",
+ "note": "CPU reference runs 2026-09-30, the same build/level2/hipbone/cuda/hipBone binary, OCCA Serial and OpenMP (8 threads, cores 100-107) backends, exact registered arguments",
+ "scrubbed": {
+  "by": "tools/golden/scrub_provenance.py",
+  "rule": "hpcperf-provenance-scrub-1",
+  "removed": [],
+  "redacted_text": [
+   "note: batch job",
+   "note: host name"
+  ],
+  "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+ },
  "dofs": 2048383,
  "cg_iterations": 100,
  "r_norm_initial": 1012.346403441495,

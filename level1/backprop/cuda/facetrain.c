@@ -3,16 +3,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "backprop.h"
 #include "omp.h"
+#include "hpcperf_golden.h"
 
-/* HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-   HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-   reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-   does. No kernel, data initialization, tolerance or algorithm is touched. */
+/* HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+   explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+   once to validate the frozen golden reference); by default it is skipped and correctness is
+   judged by comparing the captured outputs (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+   frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+   algorithm is touched. */
 static int hpcperf_skip_verify(void) {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != NULL && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
+}
+
+/* tools/golden: capture a weight matrix stored as row pointers, rows 0..m x columns 0..n
+   (the index ranges the check below compares), streamed row by row */
+static void hpcperf_golden_rows(const char *name, float **w, int m, int n)
+{
+  hpcperf_golden_stream s;
+  int i;
+  hpcperf_golden_begin(&s, name, "f32");
+  for (i = 0; i <= m; i++) hpcperf_golden_append(&s, w[i], (size_t)(n + 1));
+  hpcperf_golden_end(&s);
 }
 
 
@@ -66,12 +80,23 @@ backprop_face()
   printf("Starting training kernel\n");
   bpnn_train_cuda(net, &out_err, &hid_err);
   printf("Training done\n");
+  /* tools/golden: the checked outputs -- the trained weights (the GPU-adjusted input weights were
+     copied back into net by bpnn_train_cuda, after its ROI). out_err / hid_err are NOT captured (not in
+     the golden spec); since 2026-10-27 bpnn_train_cuda returns them (*eo / *eh, see README) and only the
+     offline CPU check (HPCPERF_CPU_REFERENCE=1) compares them */
+  hpcperf_golden_rows("input_weights", net->input_weights, net->input_n, net->hidden_n);
+  hpcperf_golden_rows("hidden_weights", net->hidden_weights, net->hidden_n, net->output_n);
 
   if (hpcperf_skip_verify()) {
+    /* default: the CPU reference training step is skipped; correctness = the captured outputs
+       against the frozen golden reference (tools/golden) */
     printf("SKIP_VERIFY\n");
   } else {
     /* CPU reference training step (upstream bpnn_train) and comparison */
     bpnn_train(ref, &out_err_ref, &hid_err_ref);
+    /* the CPU reference (golden make only) */
+    hpcperf_golden_rows("input_weights.cpu", ref->input_weights, ref->input_n, ref->hidden_n);
+    hpcperf_golden_rows("hidden_weights.cpu", ref->hidden_weights, ref->hidden_n, ref->output_n);
     max_err = rel_diff(out_err, out_err_ref);
     e = rel_diff(hid_err, hid_err_ref); if (e > max_err) max_err = e;
     for (i = 0; i <= net->input_n; i++)
@@ -101,8 +126,12 @@ char *argv[];
 	
   int seed;
 
+  /* [HPC-Performance-AI] `--probe` selects the correctness-probe set-up (backprop.c bpnn_probe_init) */
+  if (argc == 3 && strcmp(argv[2], "--probe") == 0) {
+    bpnn_probe_init = 1;
+  } else
   if (argc!=2){
-  fprintf(stderr, "usage: backprop <num of input elements>\n");
+  fprintf(stderr, "usage: backprop <num of input elements> [--probe]\n");
   exit(0);
   }
   layer_size = atoi(argv[1]);

@@ -61,14 +61,13 @@ cmake --build build/spadd/cuda
 
 ## Validation
 
-Added check (upstream perf_test has none): C recomputed on the CPU with the identical merge order; structure compared exactly and values at rel tol 1e-13. Prints PASS/FAIL.
+Correctness = C (copied back after the ROI: nnzC, row pointers, column indices exact; values within max |a - g| / (1 + |g|) <= 1e-13 - d0) against the frozen B200 golden reference `reference/<input_id>.json` (rule in `inputs.yaml` `golden:`). The added CPU check (upstream perf_test has none: C recomputed on the CPU with the identical merge order, structure exact, values rel tol 1e-13, prints PASS/FAIL) validated that reference once and runs only on request (below).
 
 ```bash
-ctest --test-dir build/spadd/cuda --output-on-failure
+ctest --test-dir build/spadd/cuda --output-on-failure   # golden run of the registry's default input
 ```
 
-
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Correctness switch.** By default the host-side CPU check is skipped and the benchmark prints `SKIP_VERIFY` (tools/timing relies on it); a plain run, ctest, `tools/inputs` and `tools/timing` never run the CPU reference and nothing falls back to it. `HPCPERF_CPU_REFERENCE=1` runs the original CPU check (offline only: `tools/golden/hpcperf_golden.py make` uses it once to validate the golden reference); `HPCPERF_SKIP_VERIFY=1` still forces it off. `HPCPERF_GOLDEN_DUMP=<dir>` makes the run capture its outputs. See [tools/golden/README.md](../../tools/golden/README.md) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: symbolic + numeric, all repetitions. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

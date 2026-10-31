@@ -34,6 +34,8 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
+#include <limits.h>   // INT_MAX: the -n guard in main()
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
@@ -86,8 +88,15 @@ struct Params {
         default:
             fprintf(stderr, "\nUnrecognized option!\n");
             usage();
-            exit(0);
+            exit(1);   // [HPC-Performance-AI] upstream exited 0 on an unrecognized option
       }
+    }
+    // [HPC-Performance-AI] input checks: upstream divided by a zero work-group size (-g 0: SIGFPE) and accepted
+    // non-positive sizes; the output resolution -n is checked in main()
+    if(work_group_size < 1 || in_size_i < 1) {
+      fprintf(stderr, "error: -g (work-group size) and -m (input size) must be >= 1 (got -g %d -m %d)\n",
+              work_group_size, in_size_i);
+      exit(1);
     }
   }
 
@@ -123,16 +132,36 @@ void read_input(XYZ *in, const Params &p) {
 
 
   // Store points from input file to array
+  // [HPC-Performance-AI] bounded: upstream read any number of points into the stack array v[10000] (an overflow
+  // beyond 10000) and used v[0..15] (k cycles mod 16) even when the file held fewer than 16 points
+  // (uninitialized values); both are refused now. A valid file reads exactly as before.
   int k = 0, ic = 0;
   XYZ v[10000];
 #if DOUBLE_PRECISION
-  while(fscanf(f, "%lf,%lf,%lf", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
+  while(ic < 10000 && fscanf(f, "%lf,%lf,%lf", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
 #else
-    while(fscanf(f, "%f,%f,%f", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
+    while(ic < 10000 && fscanf(f, "%f,%f,%f", &v[ic].x, &v[ic].y, &v[ic].z) == 3)
 #endif
     {
       ic++;
     }
+  if(ic == 10000) {
+    XYZ extra;
+#if DOUBLE_PRECISION
+    if(fscanf(f, "%lf,%lf,%lf", &extra.x, &extra.y, &extra.z) == 3) {
+#else
+    if(fscanf(f, "%f,%f,%f", &extra.x, &extra.y, &extra.z) == 3) {
+#endif
+      fprintf(stderr, "error: %s holds more than 10000 control points\n", p.file_name);
+      exit(1);
+    }
+  }
+  fclose(f);
+  if(ic < 16) {
+    fprintf(stderr, "error: %s holds %d control points; at least 16 are needed (the surface uses v[0..15])\n",
+            p.file_name, ic);
+    exit(1);
+  }
   for(int i = 0; i <= p.in_size_i; i++) {
     for(int j = 0; j <= p.in_size_j; j++) {
       in[i * (p.in_size_j + 1) + j].x = v[k].x;
@@ -223,7 +252,10 @@ void BezierGPU(const XYZ *inp, XYZ *outp, const int NI, const int NJ, const int 
   FLOAT   mui, muj, bi, bj;
 
   i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i > RESOLUTIONI) return;
+  // [HPC-Performance-AI fix, class D] was `i > RESOLUTIONI`, which let thread i == RESOLUTIONI write row
+  // RESOLUTIONI, one row past outp (compute-sanitizer memcheck at -n 300: invalid __global__ write after the
+  // 1,080,000-byte allocation); upstream's own SYCL port has `i >= out_size_i`, its OpenMP port `i < out_size_i`
+  if (i >= RESOLUTIONI) return;
 
   mui = i / (FLOAT)(RESOLUTIONI - 1);
   for(j = 0; j < RESOLUTIONJ; j++) {
@@ -250,12 +282,14 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   XYZ *cpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
   XYZ *gpu_out = (XYZ *)malloc(out_size_i * out_size_j * sizeof(XYZ));
 
-  // CPU run
+  // CPU run -- reference for the verification below; runs only with HPCPERF_CPU_REFERENCE=1 (golden make)
+  if (hpcperf_cpu_reference_enabled()) {
   auto start = std::chrono::steady_clock::now();
   BezierCPU(in, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
   auto end = std::chrono::steady_clock::now();
   auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::cout << "host execution time: " << time << " ms" << std::endl;
+  }
 
   // Device run
 
@@ -285,10 +319,21 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
   std::cout << "kernel execution time: " << ktime << " ms" << std::endl;
 
   hipMemcpy(gpu_out, d_out, out_size, hipMemcpyDeviceToHost);
+  // tools/golden: the checked output, the XYZ surface as a flat array of 3 * out_size_i * out_size_j FLOATs
+  hpcperf_golden_output("surface", gpu_out, sizeof(XYZ) / sizeof(FLOAT) * (size_t)out_size_i * out_size_j,
+                        sizeof(FLOAT) == 8 ? "f64" : "f32");
 
-  // Verify
-  int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
-  printf("%s\n", (status == 0) ? "PASS" : "FAIL");
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference (BezierCPU) was skipped; correctness = the captured surface
+    // against the frozen golden reference (tools/golden)
+    printf("SKIP_VERIFY\n");
+  } else {
+    hpcperf_golden_output("surface.cpu", cpu_out, sizeof(XYZ) / sizeof(FLOAT) * (size_t)out_size_i * out_size_j,
+                          sizeof(FLOAT) == 8 ? "f64" : "f32");   // the CPU reference (golden make only)
+    // Verify
+    int status = compare_output(gpu_out, cpu_out, in_size_i, in_size_j, out_size_i, out_size_j);
+    printf("%s\n", (status == 0) ? "PASS" : "FAIL");
+  }
 
   free(cpu_out);
   free(gpu_out);
@@ -299,6 +344,17 @@ void run(XYZ *in, int in_size_i, int in_size_j, int out_size_i, int out_size_j, 
 int main(int argc, char **argv) {
 
   const Params p(argc, argv);
+  // [HPC-Performance-AI guard] run() sizes the buffers with int arithmetic (int out_size = out_size_i * out_size_j *
+  // sizeof(XYZ), passed to the device allocation and copies; the point index i * RESOLUTIONJ + j is int as well) and
+  // evaluates mu = i / (RESOLUTION - 1): refuse an output resolution for which that wraps (n * n * sizeof(XYZ) >
+  // INT_MAX: n >= 13378 in float) or divides by zero (n < 2) instead of computing on a wrapped size. Every accepted
+  // n (the registered inputs: 300, 8192) runs unchanged.
+  const int hpcperf_n_max = (int)floor(sqrt((double)INT_MAX / sizeof(XYZ)));
+  if (p.out_size_i < 2 || p.out_size_i > hpcperf_n_max || p.out_size_j < 2 || p.out_size_j > hpcperf_n_max) {
+    fprintf(stderr, "error: unsupported output resolution -n %d: this port needs 2 <= n <= %d (n * n * %d bytes must "
+                    "fit its int buffer size)\n", p.out_size_i, hpcperf_n_max, (int)sizeof(XYZ));
+    return 1;
+  }
   int in_size   = (p.in_size_i + 1) * (p.in_size_j + 1) * sizeof(XYZ);
   //int out_size  = p.out_size_i * p.out_size_j * sizeof(XYZ);
 

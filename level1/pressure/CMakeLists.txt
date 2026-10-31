@@ -37,10 +37,31 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/hpcperf_golden.h)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
-    add_test(NAME pressure_run COMMAND ${_hpcperf_target})
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    # one plain run of the registry's default input (no CPU reference), its outputs compared with
+    # the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME pressure_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(pressure_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
-        FAIL_REGULAR_EXPRESSION "FAIL")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the same kernels on set-up data on which a
+    # constant fill or a skipped kernel cannot pass (`--probe`, cuda/main.cu setUp); checked against its own
+    # frozen reference, never timed
+    add_test(NAME pressure_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-randvalue --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-randvalue)
+    set_tests_properties(pressure_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # second correctness probe: set-up data on which the cut-off branches no other input decides do decide
+    # (`--probe-cutoffs`, cuda/main.cu setUp)
+    add_test(NAME pressure_probe_cutoffs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-cutoffs --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-cutoffs)
+    set_tests_properties(pressure_probe_cutoffs PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

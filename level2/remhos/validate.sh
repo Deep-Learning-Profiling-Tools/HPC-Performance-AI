@@ -43,6 +43,19 @@
 #        initial data (all four problems start with 0 <= u <= 1).
 #
 # Everything runs with mpirun -np 1. Total ~1.5 min on a B200 node.
+#
+# Two modes (project decision: no CPU reference computation on a default path):
+#   default  (HPCPERF_CPU_REFERENCE unset or 0) -- runs NOTHING with -d cpu. Part B runs its four GPU cases
+#     with all four checks; check 2 compares the GPU mass / max with the FROZEN CPU-backend values of the same
+#     four commands (reference/validate/cpu-backend-pa.json: the -pa -d cpu results of one explicit offline run
+#     of this script, frozen once with their provenance -- binary sha256, command, date, log sha256 -- by
+#     check_cpu_backend_reference.py freeze) at the same tolerances 1e-8 / 1e-6; the frozen file is refused when its
+#     recorded CPU command, mesh sha256 or tolerances differ from this script's. Part A is skipped: it runs
+#     README rows whose solver combinations abort with "Wrong GPU setup." on a device (remhos.cpp:399-405
+#     MFEM_VERIFY; re-checked 2026-10-27 for rows 1, 3, 5, 7, 13 with -d cuda, exit 1), i.e. it validates the
+#     CPU backend only and executes no device code.
+#   offline  (HPCPERF_CPU_REFERENCE set to 1: an explicit request only) -- Part A and Part B with the live
+#     -pa -d cpu run of check 2, unchanged.
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
@@ -73,6 +86,11 @@ TOL_REF=1e-8      # Part A: vs README table (reproduced exactly here)
 TOL_MASS=1e-8     # Part B: GPU vs CPU mass
 TOL_MAX=1e-6      # Part B: GPU vs CPU max
 TOL_REFMASS=1e-7  # Part B: GPU mass vs README reference mass (transport)
+FROZEN_CPU="$HERE/reference/validate/cpu-backend-pa.json"   # Part B check 2, default mode
+case "${HPCPERF_CPU_REFERENCE:-}" in
+    ''|0*) CPU_REF=0; CPU_SRC="frozen cpu-backend reference" ;;
+    *)     CPU_REF=1; CPU_SRC="cpu backend" ;;
+esac
 fail=0
 
 # rel_ok a b tol : |a-b| <= tol*max(|b|,1e-300)
@@ -117,11 +135,22 @@ check_ref() {
     echo "  -> ok (matches the README reference within $TOL_REF)"
 }
 
+if [ "$CPU_REF" -eq 1 ]; then
+echo "=== CPU reference: offline mode (HPCPERF_CPU_REFERENCE requested): Part A (-d cpu) and Part B check 2 with the live -pa -d cpu run"
 check_ref  1 0.3888354875 0.9333315791 -m "$DATA/periodic-hexagon.mesh" -p 0 -rs 2 -dt 0.005 -tf 10 -ho 1 -lo 2 -fct 2
 check_ref  3 3.5982222    0.9995717563 -m "$DATA/disc-nurbs.mesh" -p 1 -rs 3 -dt 0.005 -tf 3 -ho 1 -lo 2 -fct 2
 check_ref  5 0.1623263888 0.7676354393 -m "$DATA/periodic-square.mesh" -p 5 -rs 3 -dt 0.005 -tf 0.8 -ho 1 -lo 2 -fct 2
 check_ref  7 0.9607429525 0.7678305756 -m "$DATA/periodic-cube.mesh" -p 0 -rs 1 -o 2 -dt 0.014 -tf 8 -ho 1 -lo 4 -fct 2
 check_ref 13 0.3182739921 1            -m "$DATA/inline-quad.mesh" -p 6 -rs 2 -o 1 -dt 0.01 -tf 20 -mono 1 -si 1
+else
+echo "=== CPU reference: skipped (default; Part B check 2 uses the frozen CPU-backend values instead)"
+echo "=== Part A skipped: README rows 1,3,5,7,13 (-ho 1 -lo 2|4 -fct 2, -mono 1) run on the CPU backend only; they abort with 'Wrong GPU setup.' on a device"
+if ! FROZEN_DESC="$(python3 "$HERE/check_cpu_backend_reference.py" describe "$FROZEN_CPU")"; then
+    echo "  -> FAIL: $FROZEN_DESC"; fail=1
+else
+    echo "=== $FROZEN_DESC"
+fi
+fi
 
 # ---------------------------------------------------------------------------
 # Part B: GPU configuration vs the CPU backend (+ reference mass for transport).
@@ -147,22 +176,39 @@ check_gpu() {
         echo "  -> FAIL: no finite final mass / max in $glog"; fail=1; return
     fi
 
+    local cmass cmax
+    if [ "$CPU_REF" -eq 1 ]; then
     run_remhos "$clog" "$@" -ho 3 -lo 5 -fct 2 -pa -d cpu
     rc=$?
     if [ "$rc" -ne 0 ]; then
         echo "  -> FAIL: cpu reference run exited with $rc; last lines of $clog:"
         tail -5 "$clog" | sed 's/^/    /'; fail=1; return
     fi
-    local cmass cmax; cmass="$(get_mass "$clog")"; cmax="$(get_max "$clog")"
+    cmass="$(get_mass "$clog")"; cmax="$(get_max "$clog")"
     echo "    cpu:  mass ${cmass:-<missing>}  max ${cmax:-<missing>}  $(grep -m1 '^Total kernel time' "$clog" || true)"
     if ! is_number "$cmass" || ! is_number "$cmax"; then
         echo "  -> FAIL: no finite final mass / max in $clog"; fail=1; return
     fi
+    else
+    # default: the frozen values of exactly the command the offline branch above would run (mesh paths
+    # relative to level2/remhos, as recorded in the frozen file)
+    local cargs="$* -ho 3 -lo 5 -fct 2 -pa -d cpu" frozen
+    cargs="${cargs//"$DATA/"/data/}"
+    if ! frozen="$(python3 "$HERE/check_cpu_backend_reference.py" get "$FROZEN_CPU" "$name" --args "$cargs" \
+                   --tol-mass "$TOL_MASS" --tol-max "$TOL_MAX")"; then
+        echo "  -> FAIL: $CPU_SRC: ${frozen:-<no output>}"; fail=1; return
+    fi
+    read -r cmass cmax <<< "$frozen"
+    echo "    cpu (frozen, $cargs):  mass ${cmass:-<missing>}  max ${cmax:-<missing>}"
+    if ! is_number "$cmass" || ! is_number "$cmax"; then
+        echo "  -> FAIL: no finite final mass / max in $FROZEN_CPU"; fail=1; return
+    fi
+    fi
     if ! rel_ok "$gmass" "$cmass" "$TOL_MASS"; then
-        echo "  -> FAIL: $DEVICE mass differs from the cpu backend by more than $TOL_MASS"; fail=1; return
+        echo "  -> FAIL: $DEVICE mass differs from the $CPU_SRC by more than $TOL_MASS"; fail=1; return
     fi
     if ! rel_ok "$gmax" "$cmax" "$TOL_MAX"; then
-        echo "  -> FAIL: $DEVICE max differs from the cpu backend by more than $TOL_MAX"; fail=1; return
+        echo "  -> FAIL: $DEVICE max differs from the $CPU_SRC by more than $TOL_MAX"; fail=1; return
     fi
     if [ "$ref_mass" != "-" ] && ! rel_ok "$gmass" "$ref_mass" "$TOL_REFMASS"; then
         echo "  -> FAIL: $DEVICE mass $gmass differs from the README reference mass $ref_mass by more than $TOL_REFMASS"
@@ -171,10 +217,11 @@ check_gpu() {
     if ! awk -v m="$gmax" 'BEGIN{exit !(m <= 1 + 1e-12)}'; then
         echo "  -> FAIL: $DEVICE max $gmax exceeds the initial bound 1"; fail=1; return
     fi
+    local cpu_word="cpu"; [ "$CPU_REF" -eq 1 ] || cpu_word="frozen cpu"
     if [ "$ref_mass" != "-" ]; then
-        echo "  -> ok ($DEVICE = cpu within $TOL_MASS/$TOL_MAX; mass = README $ref_mass within $TOL_REFMASS; max <= 1)"
+        echo "  -> ok ($DEVICE = $cpu_word within $TOL_MASS/$TOL_MAX; mass = README $ref_mass within $TOL_REFMASS; max <= 1)"
     else
-        echo "  -> ok ($DEVICE = cpu within $TOL_MASS/$TOL_MAX; max <= 1)"
+        echo "  -> ok ($DEVICE = $cpu_word within $TOL_MASS/$TOL_MAX; max <= 1)"
     fi
 }
 
@@ -190,7 +237,11 @@ check_gpu cube01_hex-remap -              -m "$DATA/cube01_hex.mesh" -p 10 -rs 1
 
 echo "----------------------------------------------------------------"
 if [ "$fail" -eq 0 ]; then
+    if [ "$CPU_REF" -eq 1 ]; then
     echo "PASS: remhos $BACKEND (README rows 1,3,5,7,13 reproduced on the CPU; 4 GPU runs of -ho 3 -lo 5 -fct 2 -pa -d $DEVICE match the CPU backend and the README reference masses)"
+    else
+    echo "PASS: remhos $BACKEND (CPU reference skipped (default): 4 GPU runs of -ho 3 -lo 5 -fct 2 -pa -d $DEVICE match the frozen CPU-backend values and the README reference masses; README rows 1,3,5,7,13 (CPU backend only) run offline only)"
+    fi
     exit 0
 else
     echo "FAIL: remhos $BACKEND (see $LOG_DIR/validate-*.log)"

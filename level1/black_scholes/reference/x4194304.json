@@ -1,0 +1,142 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "black_scholes",
+  "level": 1,
+  "input_id": "x4194304",
+  "frozen": true,
+  "workload": {
+    "input_id": "x4194304",
+    "params": {
+      "options": 4194304
+    },
+    "args": [
+      "-x",
+      "4194304"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "13adac4d46e94f3cb6fff0101401678ec1bb8b1c22999995e5d6617ab517e88e",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "call_price",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.0001
+        },
+        "cpu": "call_price.cpu",
+        "basis": "upstream Verify fails on fabs(verify_call_price_[y] - call_price_[y]) > 1e-4f for every padded element (num_tiles_ * tile_size_; common/bs_benchmark.cc:168); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      },
+      {
+        "name": "put_price",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.0001
+        },
+        "cpu": "put_price.cpu",
+        "basis": "upstream Verify fails on fabs(verify_put_price_[y] - put_price_[y]) > 1e-4f (common/bs_benchmark.cc:175); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "call_price",
+      "dtype": "f32",
+      "count": 4194304,
+      "bytes": 16777216,
+      "sha256": "52d30140b55cd80189d455938cc55af62ab660a95c1699a5224f8cc899631820",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 2.288818359375e-05,
+        "d0_source": "call_price.cpu",
+        "tol_effective": 7.711181640625e-05
+      },
+      "basis": "upstream Verify fails on fabs(verify_call_price_[y] - call_price_[y]) > 1e-4f for every padded element (num_tiles_ * tile_size_; common/bs_benchmark.cc:168); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.10779330879449844,
+        "max": 39.93980026245117,
+        "sum": 52688813.0531375,
+        "nonfinite": 0
+      },
+      "blob": "sha256/52/52d30140b55cd80189d455938cc55af62ab660a95c1699a5224f8cc899631820.bin"
+    },
+    {
+      "name": "put_price",
+      "dtype": "f32",
+      "count": 4194304,
+      "bytes": 16777216,
+      "sha256": "7aef7ea39f3172e2080cbd0c5c3ae592916d324cd1e78cce5af229bbe959e94d",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 1.2516975402832031e-05,
+        "d0_source": "put_price.cpu",
+        "tol_effective": 8.748302459716797e-05
+      },
+      "basis": "upstream Verify fails on fabs(verify_put_price_[y] - put_price_[y]) > 1e-4f (common/bs_benchmark.cc:175); the check allows 1e-4 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.008289657533168793,
+        "max": 0.5928869247436523,
+        "sum": 1274233.9520514822,
+        "nonfinite": 0
+      },
+      "blob": "sha256/7a/7aef7ea39f3172e2080cbd0c5c3ae592916d324cd1e78cce5af229bbe959e94d.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:17:36Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/black_scholes/cuda/black_scholes_cuda",
+    "binary_sha256": "40c345d113a294b8a9e6ab75cb7dae321445a8474782119d1aca262a27dc6041",
+    "command": [
+      "build/black_scholes/cuda/black_scholes_cuda",
+      "-x",
+      "4194304"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.225,
+      "pass_line": "Passed.",
+      "pass_regex": "^Passed\\.$",
+      "fail_regex": "^Verification failed",
+      "log": "build/golden-make/black_scholes/x4194304/run/stdout.log",
+      "log_sha256": "f51381be763803f78e7eb5ceffeeebfe16f2a9e54f9caa3ad3db9f0f82b5a1f5"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

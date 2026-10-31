@@ -1,0 +1,186 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "histogram",
+  "level": 1,
+  "input_id": "w1920-h1080",
+  "frozen": true,
+  "workload": {
+    "input_id": "w1920-h1080",
+    "params": {
+      "width": 1920,
+      "height": 1080,
+      "iterations": 100
+    },
+    "args": [
+      "--i=100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "fc68dec09ddcdf92d245d50965dfcb5495e4fc5a05b7d6c15b1d2275b531f774",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": null,
+        "match": "hist\\.(uchar1|uchar4|float4)\\.(smem|gmem)",
+        "count": 6,
+        "dtype": "u32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "hist.float4.gmem",
+      "dtype": "u32",
+      "count": 768,
+      "bytes": 3072,
+      "sha256": "e7099f85e009dac2967962885ed844681cc710a18b92085ca7f3e5f8efee4503",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 7839.0,
+        "max": 8416.0,
+        "sum": 6220800.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "hist.float4.smem",
+      "dtype": "u32",
+      "count": 768,
+      "bytes": 3072,
+      "sha256": "e7099f85e009dac2967962885ed844681cc710a18b92085ca7f3e5f8efee4503",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 7839.0,
+        "max": 8416.0,
+        "sum": 6220800.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "hist.uchar1.gmem",
+      "dtype": "u32",
+      "count": 256,
+      "bytes": 1024,
+      "sha256": "6618599c3268dc151cee1a6f2f0f88c776c0014512276b9bf852d4378e9b7749",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 0.0,
+        "max": 18347.0,
+        "sum": 2073600.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "hist.uchar1.smem",
+      "dtype": "u32",
+      "count": 256,
+      "bytes": 1024,
+      "sha256": "6618599c3268dc151cee1a6f2f0f88c776c0014512276b9bf852d4378e9b7749",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 0.0,
+        "max": 18347.0,
+        "sum": 2073600.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "hist.uchar4.gmem",
+      "dtype": "u32",
+      "count": 768,
+      "bytes": 3072,
+      "sha256": "e7099f85e009dac2967962885ed844681cc710a18b92085ca7f3e5f8efee4503",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 7839.0,
+        "max": 8416.0,
+        "sum": 6220800.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "hist.uchar4.smem",
+      "dtype": "u32",
+      "count": 768,
+      "bytes": 3072,
+      "sha256": "e7099f85e009dac2967962885ed844681cc710a18b92085ca7f3e5f8efee4503",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison CompareDeviceResults(h_hist, d_hist) of each variant's histogram (the verification launch before the timed iterations) against HistogramGold (cuda/histogram_compare.cu:439, element-wise != in cuda/test_util.h:545); integer bin counts, compared byte for byte",
+      "stats": {
+        "min": 7839.0,
+        "max": 8416.0,
+        "sum": 6220800.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:30:35Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/histogram/cuda/histogram_cuda",
+    "binary_sha256": "6bf59f8ddbe5219bf1c17c9d3f3430cfb368e770a60d17fa0779ef128804e6a0",
+    "command": [
+      "build/histogram/cuda/histogram_cuda",
+      "--i=100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.774,
+      "pass_line": "Shared memory atomics \tPASS",
+      "pass_regex": "\\sPASS$",
+      "fail_regex": "\\sFAIL$|INCORRECT",
+      "log": "build/golden-make/histogram/w1920-h1080/run/stdout.log",
+      "log_sha256": "5d65f58001be90e8e63df5f2f70ced44ddebd6ff870d75c3c65d9eb865d7e409"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

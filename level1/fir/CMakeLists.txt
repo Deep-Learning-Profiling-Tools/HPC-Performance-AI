@@ -45,9 +45,16 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
-    add_test(NAME fir_run COMMAND ${_hpcperf_target} -y 1024 -x 4096)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    # one plain run of the registry's default input (no CPU reference, the fixed default seed), its
+    # output compared with the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME fir_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:${_hpcperf_target}> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(fir_run PROPERTIES TIMEOUT 600
-        PASS_REGULAR_EXPRESSION "Passed")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

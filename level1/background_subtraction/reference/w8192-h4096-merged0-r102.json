@@ -1,0 +1,138 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "background_subtraction",
+  "level": 1,
+  "input_id": "w8192-h4096-merged0-r102",
+  "frozen": true,
+  "workload": {
+    "input_id": "w8192-h4096-merged0-r102",
+    "params": {
+      "width": 8192,
+      "height": 4096,
+      "merged": 0,
+      "repeat": 102,
+      "seed": 123
+    },
+    "args": [
+      "8192",
+      "4096",
+      "0",
+      "102"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "ea0f9bd4c426fa5fe4f97711d7628ed36bfcff84516c04afc0c37be29fdf7a4e",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "Tn",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's max |Tn[i] - Tn_ref[i]| over all pixels must be 0 (max_error == 0 -> PASS) against the per-frame CPU reference merge_ref (cuda/main.cu:201-212, common/reference.h); unsigned char, exact",
+        "log": null
+      },
+      {
+        "name": "Bn",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's max |Bn[i] - Bn_ref[i]| over all pixels must be 0, same check (cuda/main.cu:206-212); unsigned char, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "Tn",
+      "dtype": "u8",
+      "count": 33554432,
+      "bytes": 33554432,
+      "sha256": "f4db0d5eceb594a8fa5ab1ca72e22e06d271d561ad15c9f4a24c1508da5cde2f",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's max |Tn[i] - Tn_ref[i]| over all pixels must be 0 (max_error == 0 -> PASS) against the per-frame CPU reference merge_ref (cuda/main.cu:201-212, common/reference.h); unsigned char, exact",
+      "stats": {
+        "min": 0.0,
+        "max": 195.0,
+        "sum": 1108483371.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "Bn",
+      "dtype": "u8",
+      "count": 33554432,
+      "bytes": 33554432,
+      "sha256": "180d074a26aeac237db3448f2579d5a94e5f274224a1208af41f7c747d3bed6a",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's max |Bn[i] - Bn_ref[i]| over all pixels must be 0, same check (cuda/main.cu:206-212); unsigned char, exact",
+      "stats": {
+        "min": 30.0,
+        "max": 237.0,
+        "sum": 4652716164.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:16:24Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/background_subtraction/cuda/background_subtraction_cuda",
+    "binary_sha256": "2bfad1625972a40f89f7e1c990ad5386fad80c570850d2f63e617dbda65c40ab",
+    "command": [
+      "build/background_subtraction/cuda/background_subtraction_cuda",
+      "8192",
+      "4096",
+      "0",
+      "102"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 26.689,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/background_subtraction/w8192-h4096-merged0-r102/run/stdout.log",
+      "log_sha256": "60224cae8bb5709068e994a77d89672900b3aa5de9f178b04c2fbc227fafa033"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

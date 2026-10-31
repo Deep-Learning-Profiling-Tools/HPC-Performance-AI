@@ -11,10 +11,12 @@ entry:
 timing:
   kind: none
   status: NEEDS_TIMING_SUPPORT
-  reason: the CUDA port prints no timer (results checked by ctest verify.py)
+  reason: the CUDA port prints no timer (results checked by the golden check)
 baseline:
-  method: no PASS line; ctest's verify.py recomputes the distances on the CPU (not wired into the registry)
-  reference: this build's first measured run (self baseline); see method
+  method: 'no PASS line; the k reported records and their distances against the frozen B200 golden reference (`check:` /
+    `golden:` below); verify.py (CPU distances, sort, k-nearest set) runs only once, offline, to validate that reference
+    (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: no_error
     role: required
@@ -63,3 +65,90 @@ inputs:
   - data/cane4_2.db
   - data/cane4_3.db
   input_form: file
+- id: cane4-all
+  purpose: correctness-probe
+  probe_basis: >-
+    with -r 5 the check sees 5 of the 42764 records: a record block left out of the search (e.g. the last, partial
+    256-record block, or any block without one of the 5 nearest), a dropped exact-tie record or a selection that loses
+    records once k is large (upstream's findLowest lost the record at position i: wrong records from -r 364 on) give
+    the registered query's output unchanged. With -r 42764 (every record, upstream's -r option) the output is the full
+    ranking: every record must be reported once, with its own distance
+  case: nearest-neighbor-hurricane
+  variant: parameter
+  source:
+    kind: derived
+    derivation: 'the default record set and query (filelist_4, -lat 30 -lng 90) with -r 42764: every record of the four
+      upstream files is reported; no source change'
+  params:
+    db_files: 4
+    records: 4 x cane4_*.db
+    k: 42764
+    lat: 30
+    lng: 90
+  args:
+  - build/nearest_neighbor/cuda/filelist_4
+  - -r
+  - '42764'
+  - -lat
+  - '30'
+  - -lng
+  - '90'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+  files:
+  - data/cane4_0.db
+  - data/cane4_1.db
+  - data/cane4_2.db
+  - data/cane4_3.db
+  input_form: file
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures the k distances it reports, sorted ascending, and the k reported records with
+  # their distances) and recomputes every record's distance on the CPU (the k smallest captured as topk_distances.cpu,
+  # the reported records' own distances as topk_record_distances.cpu); the capture is frozen only when verify.py printed
+  # PASS (distances, identities, pairing, k-nearest set, no tie at the k-th distance).
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{param:k}', '{param:lat}', '{param:lng}']
+    pass_regex: '^PASS: top-\d+ nearest-neighbor distances match CPU reference'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: topk_distances
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-4}
+    cpu: topk_distances.cpu
+    basis: verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU
+      distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu,
+      records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation
+  # the identities of the reported neighbours (Rodinia nn's output is the k nearest RECORDS with their distances; the
+  # distances alone pass a run that reports the wrong records, e.g. a record paired with its neighbour's distance):
+  # the k reported 48-character db lines sorted bytewise (a set: the report order is not part of the output, Rodinia's
+  # OpenMP nn prints its neighbours in slot order) and each one's reported distance in that order
+  - name: topk_records
+    dtype: u8
+    rule: {metric: exact}
+    basis: 'the k reported records (cuda/nn_cuda.cu, records[i].recString after the ROI, the 48 characters printed before
+      " --> Distance="), sorted bytewise, byte-identical. Exact is sound only because the registered queries have no tie at
+      the k-th distance (verify.py fails a query whose k-th and (k+1)-th distances are within 2x the tolerance: cane4-k5
+      0.608 / 0.707; cane4-all reports every record), so every correct implementation reports the same set; verify.py
+      checks that the set is a k-nearest set of db records (level1/nearest_neighbor/verify.py)'
+  - name: topk_record_distances
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-4}
+    cpu: topk_record_distances.cpu
+    basis: 'the distance reported with each record of topk_records (records[i].distance, same order), within verify.py''s
+      |g - e| <= 1e-4 (1 + |e|) of that record''s own CPU distance (the pairing record <-> distance); tol minus the B200
+      values'' own deviation'
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the k reported distances (sorted ascending), the k reported records (sorted, exact) and each record''s reported
+    distance against the frozen B200 golden reference reference/<input_id>.json (max |a - g| / (1 + |g|) <= 1e-4 - d0, d0 =
+    the golden''s deviation from verify.py''s CPU distances measured when it was frozen); no CPU reference is run'
+  covers: all

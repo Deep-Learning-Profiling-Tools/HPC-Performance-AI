@@ -13,19 +13,46 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the standalone port prints only PASS/FAIL; upstream RAJAPerf's kernel timer is not ported
 baseline:
-  method: 'added driver: upstream Base_Seq CPU variant compared element-wise (rel tol 1e-10): PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the outputs e_new and q_new against the frozen B200 golden reference (`check:` / `golden:` below); the added
+    driver''s upstream Base_Seq CPU reference (element-wise, rel tol 1e-10) runs only once, offline, to validate that
+    reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes e_new and q_new only when the
+  # driver's CPU check printed PASS; every later run is compared with those frozen outputs instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: e_new
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: e_new.cpu
+    basis: the driver's element-wise check of e_new (f64[size]) against the upstream Base_Seq CPU reference,
+      max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:270); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU reference
+  - name: q_new
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: q_new.cpu
+    basis: the driver's element-wise check of q_new (f64[size]) against the upstream Base_Seq CPU reference,
+      max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:271); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'e_new and q_new against the frozen B200 golden reference reference/<input_id>.json (max |a - g| / (1 + |g|) <= 1e-10
+    - d0 per output, d0 = the golden''s deviation from the upstream Base_Seq CPU reference measured when it was
+    frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream default size plus larger sizes through the port's size argument (upstream --size)
@@ -83,6 +110,69 @@ inputs:
   args:
   - '16000000'
   - '130'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-randsign
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's set-up data (initData) gives delvc > 0 for every element, so the delvc <= 0 branches of ENERGY_BODY2/5/6
+    never run, q_new stays 0 and every e_new (0.167-0.170) falls below e_cut and is clamped to emin: a constant fill
+    (e_new = emin, q_new = 0) passes every performance input with error 0 (measured 2026-10-27). Here
+    delvc comes from upstream's own initDataRandSign (about half the elements negative) and e_cut, emin are scaled by
+    1e-2: q_new is non-zero on 50.1% of the elements (0.199-0.206), no e_new is clamped (0.168-0.266), so constant
+    fills, skipped kernels and a skipped delvc <= 0 branch fail
+  case: energy-eos
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (1000000, 130); set-up data only (`--probe`, cuda/main.cu setUp): delvc is
+      initialized with upstream DataUtils initDataRandSign instead of initData (same factor, same init count), e_cut
+      and emin are multiplied by 1e-2; the six Base_CUDA kernels and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000000
+    reps: 130
+    probe_data: delvc initDataRandSign; e_cut and emin x 1e-2
+  args:
+  - '1000000'
+  - '130'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-cutoffs
+  purpose: correctness-probe
+  probe_basis: >-
+    no other registered input decides body 4's e_cut / emin clamps, body 6's q_cut and its delvc <= 0 guard or the ssc
+    floor of bodies 2, 5, 6: a candidate dropping any one of them passes the performance inputs and probe-randsign with
+    error 0 (measured 2026-10-28). Here delvc and pbvc come from upstream's own initDataRandSign (both helpers reseed
+    srand(4793), so pbvc < 0 exactly where delvc < 0 and ssc <= 0 occurs), pHalfStep and qq_old from initDataRandValue;
+    the cut-offs keep their upstream values. Elements whose output changes when the branch is dropped: body 4 e_cut
+    9.5%, emin 27.0%; body 6 q_cut 19.6% (q_new is 0 on 69.6%, 0.196-0.5 elsewhere), delvc guard 49.9%; ssc floor of
+    body 2 / 5 / 6 13.7% / 50.1% / 50.1% (NaN without it); each such candidate fails (max rel err 0.134, 0.134, 0.196,
+    1.11, non-finite), --fmad=false passes (1.6e-16)
+  case: energy-eos
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      upstream default size and reps (1000000, 130); set-up data only (`--probe-cutoffs`, cuda/main.cu setUp): delvc
+      and pbvc are initialized with upstream DataUtils initDataRandSign, pHalfStep and qq_old with initDataRandValue
+      instead of initData (same init count); rho0, e_cut, emin and q_cut keep their upstream values; the six Base_CUDA
+      kernels and the Base_Seq CPU reference are unchanged
+  params:
+    size: 1000000
+    reps: 130
+    probe_data: delvc, pbvc initDataRandSign; pHalfStep, qq_old initDataRandValue; cut-offs unscaled
+  args:
+  - '1000000'
+  - '130'
+  - --probe-cutoffs
   runtime_config:
     gpus: 1
   build_config: null

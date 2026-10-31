@@ -16,6 +16,14 @@
 
 #define ABS(x)          (((x) > 0.0) ? (x) : (-(x)))
 
+/* [HPC-Performance-AI] correctness probe (set by facetrain.c setup() for `--probe`, set-up only): with
+   upstream's weights in [0, 1] every hidden sum is ~in/4, all 16 hidden units saturate to exactly 1.0f,
+   hidden_delta = 0 and the input-weight update is exactly 0 -- skipping bpnn_adjust_weights_cuda, or the
+   whole training step, reproduces the output. The probe uses upstream's own commented-out alternative,
+   symmetric weights dpn1() in [-1, 1] (bpnn_randomize_weights), with a small input layer, so the hidden
+   units do not saturate. 0 = upstream initialisation. */
+int bpnn_probe_init = 0;
+
 #define fastcopy(to,from,len)\
 {\
   register char *_to,*_from;\
@@ -97,6 +105,9 @@ int m, n;
 
   for (i = 0; i <= m; i++) {
     for (j = 0; j <= n; j++) {
+     if (bpnn_probe_init)    /* [HPC-Performance-AI] correctness probe (--probe): upstream's commented-out line below */
+       w[i][j] = dpn1();
+     else
      w[i][j] = (float) rand()/RAND_MAX;
     //  w[i][j] = dpn1();
     }

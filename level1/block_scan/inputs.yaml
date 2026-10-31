@@ -13,24 +13,41 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: two scan variants each print 'Average kernel time'; no total
 baseline:
-  method: 'built-in: ''Output items: PASS'' and ''Aggregate: PASS'' per variant'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the scan output (1024 exclusive prefix sums + the aggregate) of each of the 18 BlockScan variants, after
+    its timed launches (bit-identical to the first warm-up launch upstream checks), against the frozen B200 golden
+    reference (`check:` / `golden:` below); the upstream
+    check (memcmp with the host prefix sums from Initialize) runs only once, offline, to validate that reference
+    (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: output_pass
-    role: required
-    regex: '^\s*Output items: PASS'
-    compare:
-      rule: present
-  - name: aggregate_pass
-    role: required
-    regex: '^\s*Aggregate: PASS'
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: FAIL
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the 18 scan
+  # outputs only when every upstream check printed PASS; every later run is compared with them instead.
+  mode: data
+  cpu_check: {pass_regex: '^\s*(Output items|Aggregate): PASS$', fail_regex: '^\s*(Output items|Aggregate): FAIL'}
+  outputs:
+  - match: 'scan\..+'
+    count: 18
+    dtype: i32
+    rule: {metric: exact}
+    basis: 'scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first
+      warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate
+      from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream
+      neither)'
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 18 scan outputs byte-identical (sha256) to the frozen B200 golden reference
+    reference/<input_id>.json (upstream compares them exactly with memcmp); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: ctest run line plus a 4x grid
@@ -67,6 +84,45 @@ inputs:
   args:
   - '8908416'
   - '100'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-randsigned
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's tile h_in[i] = i % 17 is a fixed pattern of small non-negative values (prefix sums <= 8166), scanned by
+    all 18 variants and by every one of the grid_size blocks: a scan that never reads d_in (the closed form of the
+    pattern), the 1025 frozen output values written as constants, a scan in f32 (exact to 2^24) or in 16-bit integers
+    (exact to 32767), and one scan copied into all 18 outputs reproduce every output of the performance inputs byte
+    for byte (measured 2026-10-28). The probe gives each variant its own tile of signed values uniform in
+    [-2^21, 2^21) (prefix sums -6.2e7 .. 6.6e7, 33 to 961 of the 1024 beyond 2^24 per variant, no int overflow
+    possible): those five fail (all 18 variants; the copy 17), as do an inclusive or shifted scan, a missing or short
+    aggregate, a half tile and a dropped last item; warp-local stitching fails the 15 variants with more than one warp
+    and per-thread stitching the 15 with more than one item per thread (both also on the performance inputs), while
+    8 legitimate variants (the other CUB scan algorithm, inclusive scan minus the item, a 64-bit scan, a serial and a
+    Hillis-Steele shared-memory scan, cub::DeviceScan, a single block instead of grid_size) pass. Exact comparison is
+    sound: integer addition is associative, so every correct evaluation order gives the same bits. Not caught by any
+    output check: how many of the grid_size blocks or of the timed launches ran (all write the same 1025 ints)
+  case: block-scan
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      the default run line (2227104 blocks, 100 timed launches) with set-up data only (`--probe`, cuda/main.cu
+      InitializeProbe): each variant's tile is filled from a splitmix64 stream (seed 0x5EED5CA9 xor algorithm << 32
+      xor threads) with values uniform in [-2^21, 2^21) instead of i % 17, and the host reference prefix sums are
+      computed from it as in upstream's Initialize; the 18 kernels, the launches and the capture are unchanged.
+      Upstream has no other tile, hence a project choice
+  params:
+    grid_size: 2227104
+    repeat: 100
+    probe_data: per-variant tiles, values uniform in [-2^21, 2^21) (splitmix64)
+  args:
+  - '2227104'
+  - '100'
+  - --probe
   runtime_config:
     gpus: 1
   build_config: null

@@ -15,19 +15,44 @@ timing:
   regex: ^Total kernel execution time (?P<value>[0-9.eE+-]+) \(s\)
   select: only
 baseline:
-  method: 'built-in comparison with the CPU implementation: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the outputs du/dv against the frozen B200 golden reference (`check:` / `golden:` below); the upstream
+    serial CPU solver (cuda/main.cu) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes du/dv only
+  # when the upstream check printed PASS; every later run is compared with those frozen outputs instead.
+  # Each output is grid_elems = dim_x * dim_y doubles (531 MB per output for the default input).
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: du
+    dtype: f64
+    rule: {metric: max_abs, tol: 1.0e-6}
+    cpu: du.cpu
+    basis: upstream's element-wise check fabs(du - u) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:208);
+      the check allows 1e-6 minus the B200 output's own deviation from the CPU reference
+  - name: dv
+    dtype: f64
+    rule: {metric: max_abs, tol: 1.0e-6}
+    cpu: dv.cpu
+    basis: upstream's element-wise check fabs(dv - v) > 1e-6 -> FAIL against the serial CPU solver (cuda/main.cu:209);
+      the check allows 1e-6 minus the B200 output's own deviation from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'du and dv against the frozen B200 golden reference reference/<input_id>.json (max |a - g| <= 1e-6 - d0 per
+    output, d0 = the golden''s deviation from the upstream CPU solver measured when it was frozen); no CPU reference
+    is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus a larger grid and a longer integration
@@ -87,6 +112,38 @@ inputs:
   - '8200'
   - '8100'
   - '1000'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-x820-y810-t100
+  purpose: correctness-probe
+  probe_basis: >-
+    upstream's initial condition gives u and v the same hat and the two equations are identical when u == v, so du ==
+    dv bit for bit on every performance input: computing u and copying it to v (half the work) or swapping u and v in
+    the cross-advection terms passes them (measured 2026-10-27). Here v's hat is moved by +0.25 in x (set-up only), so
+    max |du - dv| = 1 and the cross terms couple two different fields; on a 1/10-per-axis grid of the upstream run
+    (820 x 810, 100 steps) the fields move by up to 0.20 (u) and 0.22 (v) from the initial condition (tolerance 1e-6)
+  case: burgers-2d
+  variant: parameter
+  source:
+    kind: custom
+    derivation: >-
+      upstream's run line scaled to 1/10 per axis (820 810 100); set-up data only (`--probe`, cuda/main.cu
+      probe_initial_v): after upstream's initialisation v (and v_new) is reset to 1 with the hat 2 on 0.75 < x < 1.25,
+      0.5 < y < 1 (u unchanged); the four kernels and the serial CPU solver are unchanged. Upstream has no
+      non-symmetric initial condition, hence custom
+  params:
+    dim_x: 820
+    dim_y: 810
+    steps: 100
+    probe_data: v hat moved to 0.75 < x < 1.25, 0.5 < y < 1
+  args:
+  - '820'
+  - '810'
+  - '100'
+  - --probe
   runtime_config:
     gpus: 1
   build_config: null

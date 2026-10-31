@@ -1,0 +1,111 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "adam",
+  "level": 1,
+  "input_id": "n10000-t200",
+  "frozen": true,
+  "workload": {
+    "input_id": "n10000-t200",
+    "params": {
+      "vector_size": 10000,
+      "time_steps": 200,
+      "repeat": 100
+    },
+    "args": [
+      "10000",
+      "200",
+      "100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "3001f6ee609d14cf97154b249ecc11cc953bc9f3e236368fa6c297ff20e3e740",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "p",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.001
+        },
+        "cpu": "p.cpu",
+        "basis": "upstream's element-wise check |r[i] - p[i]| <= 1e-3 against the CPU reference (cuda/main.cu, reference.h); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "p",
+      "dtype": "f32",
+      "count": 10000,
+      "bytes": 40000,
+      "sha256": "0e8acb580e2fd554c70efbca6c2cc35c5e5325e8f26511a3fd21f291b6cefd99",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 1.7344951629638672e-05,
+        "d0_source": "p.cpu",
+        "tol_effective": 0.0009826550483703613
+      },
+      "basis": "upstream's element-wise check |r[i] - p[i]| <= 1e-3 against the CPU reference (cuda/main.cu, reference.h); the check allows 1e-3 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": -0.6026850342750549,
+        "max": -0.002183374483138323,
+        "sum": -5785.630211979849,
+        "nonfinite": 0
+      },
+      "blob": "sha256/0e/0e8acb580e2fd554c70efbca6c2cc35c5e5325e8f26511a3fd21f291b6cefd99.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:15:32Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/adam/cuda/adam_cuda",
+    "binary_sha256": "752740e44d8c5e06be8f8eb231abf3a52c7c3a8269a89355d3ebe7fdaa06d332",
+    "command": [
+      "build/adam/cuda/adam_cuda",
+      "10000",
+      "200",
+      "100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 6.15,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/adam/n10000-t200/run/stdout.log",
+      "log_sha256": "2bfd98171292be1167135284786c2e34aadafc4f26f971c8bebe1386c656b527"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

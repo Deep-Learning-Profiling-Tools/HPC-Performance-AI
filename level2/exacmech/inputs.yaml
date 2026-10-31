@@ -19,8 +19,9 @@ baseline:
   method: upstream ships no reference; validate.sh compares GPU vs CPU on the upstream CPU deck. The registry keeps
     the final volume-averaged stress components, compared with the same-input baseline at validate.sh's RTOL 1e-5
     (print precision; the GPU and CPU paths differ only by summation order; ATOL 1e-6 MPa is negligible at the
-    registered stress levels). The registry check (check_reference.sh) makes the same comparison against the
-    OpenMP/CPU execution path of the same miniapp for the registered deck.
+    registered stress levels). The registry check compares the whole stress history with the frozen B200 golden
+    reference (tools/golden); the comparison against the OpenMP/CPU path (check_reference.sh) runs only once, offline,
+    to validate it.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: stress_s11_final
@@ -115,17 +116,36 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+golden:
+  binary: build/level2/exacmech/cuda/bin/orientation_evolution     # what run.sh launches (provenance; rebuilt sources refuse a stale binary)
+  # tools/golden/README.md. The stress history of the B200 GPU run (run.sh through the input: every step x 6
+  # components) is frozen once, after the one-time reference cross-check of the same configuration passed
+  # (check_reference.sh: GPU and OpenMP paths of the same miniapp, run only by `hpcperf_golden.py make` with
+  # HPCPERF_CPU_REFERENCE=1); every later run is compared with the frozen history.
+  cpu_check:
+    after_run: true
+    command: [bash, '{bench_dir}/check_reference.sh', '{param:nqpts}', '{param:nsteps}', '{param:model}', CUDA]
+    env: {EXACMECH_REF_DEVICE: OpenMP}
+    pass_regex: '^ExaCMech CUDA reference check \(.*\): PASS'
+    fail_regex: '^ExaCMech CUDA reference check \(.*\): FAIL'
+  outputs:
+  - name: stress
+    dtype: f64
+    log: {regex: '^Step# \d+ Stress: (\S+) (\S+) (\S+) (\S+) (\S+) (\S+)\s*$'}
+    rule: {metric: max_relabs, rtol: 1.0e-5, atol: 1.0e-6, tol: 1}
+    cpu: {log: {file: '{repo}/build/level2/exacmech/check/{param:model}_{param:nqpts}_{param:nsteps}/ref.out'}}
+    basis: 'check_reference.sh / validate.sh: |gpu - ref| <= RTOL |ref| + ATOL with RTOL 1e-5, ATOL 1e-6 MPa for every
+      step and stress component (6 printed significant digits); normalised to |a - g| / (1e-5 |g| + 1e-6) <= 1 minus
+      the frozen history''s own deviation from the OpenMP reference'
 check:
-  # check_reference.sh generates the registered deck (points, steps, model) twice -- device GPU and the reference
-  # execution path -- runs both and compares all steps x 6 stress components (validate.sh's comparison, generalised
-  # from upstream's CPU deck to the registered configuration).
-  kind: standalone
-  command: [bash, '{bench_dir}/check_reference.sh', '{param:nqpts}', '{param:nsteps}', '{param:model}', CUDA]
-  env: {EXACMECH_REF_DEVICE: OpenMP}
-  pass_regex: '^ExaCMech CUDA reference check \(.*\): PASS'
-  fail_regex: '^ExaCMech CUDA reference check \(.*\): FAIL'
-  basis: '|gpu - ref| <= 1e-5 |ref| + 1e-6 MPa for every step and component (validate.sh RTOL/ATOL = print precision);
-    the reference is the OpenMP path of the same sources on the same random orientations (seed 42), an independent
-    execution path, not a stored result'
+  # the GPU run of the registered deck (run.sh through the input); every step's 6 stress components against the
+  # frozen B200 golden reference (reference/<input_id>.json). No OpenMP / CPU reference run.
+  kind: post_run
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture', --log, '{log}']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'nsteps x 6 stress components against the frozen B200 golden reference reference/<input_id>.json: |a - g| <=
+    (1e-5 |g| + 1e-6 MPa) (1 - d0), d0 = the golden''s normalised deviation from the OpenMP reference when it was
+    frozen (check_reference.sh''s criterion); the number of steps must match; no CPU reference run'
   covers: all
   timeout: 14400

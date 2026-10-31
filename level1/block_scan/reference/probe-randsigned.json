@@ -1,0 +1,394 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "block_scan",
+  "level": 1,
+  "input_id": "probe-randsigned",
+  "frozen": true,
+  "workload": {
+    "input_id": "probe-randsigned",
+    "params": {
+      "grid_size": 2227104,
+      "repeat": 100,
+      "probe_data": "per-variant tiles, values uniform in [-2^21, 2^21) (splitmix64)"
+    },
+    "args": [
+      "2227104",
+      "100",
+      "--probe"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "4623ee2757c5c2a45f5c89864060fa19a8fa38b82c8dc30b5e87449e1e517108",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": null,
+        "match": "scan\\..+",
+        "count": 18,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "scan.raking.t1024.i1",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "25d0e962d000cb02217f825c6973aae66389779d081073745fec938761b4f58a",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -28146976.0,
+        "max": 16996611.0,
+        "sum": -4881477608.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking.t128.i8",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "a95e1b4dc003fedd694ff9f9c2d1b02f7a31003cb5dc524ed99e4155776e5e9f",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -27002148.0,
+        "max": 20026397.0,
+        "sum": -4378382253.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking.t256.i4",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "a581a251f7637ca233253b71156eb89ab3c4f69a8cfc1b298ee15021d97465da",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -2549199.0,
+        "max": 44727557.0,
+        "sum": 23010849879.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking.t32.i32",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "6b7f0a01501eaa92e116dc475c306bef56a132d9d7058a35bff52114ff1c6294",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -37785811.0,
+        "max": 36634265.0,
+        "sum": 8990783408.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking.t512.i2",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "1d870960f18d0928e8ea287d6825a4894eb042f75d1d9de36b0e44efdfbf6520",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -59213323.0,
+        "max": 5283827.0,
+        "sum": -35502407151.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking.t64.i16",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "55b816b55679f9d58bf8eaf8306b72121a05000e32baf5f9f2dce0e00f4fafae",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -40095430.0,
+        "max": 28377348.0,
+        "sum": -508133198.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t1024.i1",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "bae2fbcc15f33187ef9a0af2b2a9c5773f020061ccfd6a3e7ad3e605f33d48f8",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -601491.0,
+        "max": 50861573.0,
+        "sum": 21909683521.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t128.i8",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "86c13120f03089226872cf4872bca5f9dc3fca29f87da800bb00c7a14b9fb033",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -62133722.0,
+        "max": 1053877.0,
+        "sum": -25794042662.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t256.i4",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "051daa0809261a7384d061613e7f6112dc57ed920e84d4de267874af299fc35e",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -26824142.0,
+        "max": 12484684.0,
+        "sum": -4005573923.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t32.i32",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "e42a97b661beb67395b05d2846f78d50045eed0255580616300ff1058c577d35",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -43126321.0,
+        "max": 14993544.0,
+        "sum": -15875079715.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t512.i2",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "51f6cc5417fce0e4e08103eef304e8f134b466fa7c8e2d7126c43551fa334fd4",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -44863761.0,
+        "max": 66421496.0,
+        "sum": 13372095793.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.raking_memoize.t64.i16",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "5d19b42dd8fb2e4625118b3564cfb1e10fa1154e01e1c62946d460802d4f27c0",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -16350530.0,
+        "max": 34912052.0,
+        "sum": 2907776681.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t1024.i1",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "7b0453437206f22227084ecd7ac7507c4608ad857f1af4aa8264b86ec3a674a9",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -31284360.0,
+        "max": 18505532.0,
+        "sum": -8232724043.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t128.i8",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "ce5b633f134233d5e93d57e3bd068d8f0b663fca04b1da9c67354f62ba338c7a",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -546286.0,
+        "max": 61082694.0,
+        "sum": 38186323853.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t256.i4",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "b501c2b776f1c34b504bdf9d700fbe20faa98b372dc00abc167d5e70d3d812fc",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -19452590.0,
+        "max": 37545617.0,
+        "sum": 5325877252.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t32.i32",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "2b814bcff5cc47f71f67e4f4478732e2c8051c7b0c0b2866feebdb73223e43a6",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -8363326.0,
+        "max": 21258582.0,
+        "sum": 3424885034.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t512.i2",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "068f2539f754348c7ce550ddce89432d13769a4de48c6b33ccceb47d8b0f058b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -58756296.0,
+        "max": 883801.0,
+        "sum": -34009778972.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "scan.warp_scans.t64.i16",
+      "dtype": "i32",
+      "count": 1025,
+      "bytes": 4100,
+      "sha256": "2cbe69011a9f31886e63dc612faca9149f61bff4a48ffe309443a9e6d9709a6a",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "scan.<algorithm>.t<threads>.i<items>: d_out (TILE_SIZE = 1024 prefix sums + 1 aggregate) after the first warm-up launch of each variant, exactly what upstream memcmps with the host exclusive prefix sum and aggregate from Initialize (cuda/main.cu:74, :219, :224); integer, exact. The timed launches are not checked (upstream neither)",
+      "stats": {
+        "min": -40093550.0,
+        "max": 86308.0,
+        "sum": -18392067649.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T12:55:46Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "48b77642c703a63fc9a294321076e413548a5a13",
+    "source_clean": true,
+    "binary": "build/block_scan/cuda/block_scan_cuda",
+    "binary_sha256": "600dff33b75cec7d51c0b06ec7bf2d465d1db4345b7239a8368d5d13407453ff",
+    "command": [
+      "build/block_scan/cuda/block_scan_cuda",
+      "2227104",
+      "100",
+      "--probe"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 96.709,
+      "pass_line": "Output items: PASS",
+      "pass_regex": "^\\s*(Output items|Aggregate): PASS$",
+      "fail_regex": "^\\s*(Output items|Aggregate): FAIL",
+      "log": "build/golden-make/block_scan/probe-randsigned/run/stdout.log",
+      "log_sha256": "f44515a849c27102cba5659e8546ad08182727b832e99e1708d31d7fa1bd5f23"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

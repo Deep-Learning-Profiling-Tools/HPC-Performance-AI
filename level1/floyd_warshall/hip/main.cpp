@@ -6,6 +6,7 @@
 // data initialization. Validation: element-wise comparison of pout.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream POLYBENCH_FLOYD_WARSHALL.hpp
@@ -64,28 +65,38 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(pout, d_pout, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("pout", pout, len, "f64");   // tools/golden: the checked output
   cudaFree(d_pin); cudaFree(d_pout);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr pin_ref; Real_ptr pout_ref;
-  allocAndInitDataRandSign(pin_ref, len);
-  allocAndInitDataConst(pout_ref, len, 0.0);
-  {
-    Real_ptr pin = pin_ref; Real_ptr pout = pout_ref;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type k = 0; k < N; ++k) {
-        for (Index_type i = 0; i < N; ++i) {
-          for (Index_type j = 0; j < N; ++j) {
-            POLYBENCH_FLOYD_WARSHALL_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr pin_ref; Real_ptr pout_ref;
+    allocAndInitDataRandSign(pin_ref, len);
+    allocAndInitDataConst(pout_ref, len, 0.0);
+    {
+      Real_ptr pin = pin_ref; Real_ptr pout = pout_ref;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type k = 0; k < N; ++k) {
+          for (Index_type i = 0; i < N; ++i) {
+            for (Index_type j = 0; j < N; ++j) {
+              POLYBENCH_FLOYD_WARSHALL_BODY;
+            }
           }
         }
       }
     }
-  }
+    hpcperf_golden_output("pout.cpu", pout_ref, len, "f64");   // the CPU reference (golden make only)
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("pout", pout_ref, pout, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("pout", pout_ref, pout, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

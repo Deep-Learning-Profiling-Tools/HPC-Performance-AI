@@ -14,19 +14,46 @@ timing:
   reason: two kernel variants each print their own 'Average kernel execution time'; no total, and the data size
     is a compile-time constant
 baseline:
-  method: 'built-in comparison with the CPU result: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the distance matrices of the three kernels (k1, k2, k3) against the frozen B200 golden reference (`check:` /
+    `golden:` below); the upstream CPU reference (CPU() + one memcmp per kernel) runs only once, offline, to validate
+    that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the three
+  # matrices only when every upstream check printed PASS; every later run is compared with those frozen outputs instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: distance.k1
+    dtype: i32
+    rule: {metric: exact}
+    basis: upstream's memcmp of the INSTANCES x INSTANCES (224 x 224) int distance matrix of kernel k1 (registers +
+      atomics) with the CPU result CPU() (cuda/main.cu:273); integer, exact
+  - name: distance.k2
+    dtype: i32
+    rule: {metric: exact}
+    basis: upstream's memcmp of the distance matrix of kernel k2 (shared-memory tree reduction) with CPU()
+      (cuda/main.cu:297); integer, exact
+  - name: distance.k3
+    dtype: i32
+    rule: {metric: exact}
+    basis: upstream's memcmp of the distance matrix of kernel k3 (CUB BlockReduce) with CPU() (cuda/main.cu:321);
+      integer, exact
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the k1/k2/k3 distance matrices byte-identical (sha256) to the frozen B200 golden reference
+    reference/<input_id>.json (upstream compares each exactly with memcmp); no CPU reference is run'
+  covers: all
 coverage:
   status: SINGLE_INPUT
   reason: the only runtime parameter is the repeat count (timing repetitions are not inputs); the problem size is

@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -6,13 +7,14 @@
 #include <chrono>
 #include "reference.h"
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -139,11 +141,14 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r3", h_dst, img_size, "f32");   // tools/golden: the checked output of the 3x3 filter
 
-  // verify
+  // verify (HPCPERF_CPU_REFERENCE=1 only, golden make; default: the captured outputs against the
+  // frozen golden reference, tools/golden)
   bool ok = true;
   if (!hpcperf_skip_verify()) {
   reference<3>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r3.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;
@@ -167,9 +172,11 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r6", h_dst, img_size, "f32");   // tools/golden: the checked output of the 6x6 filter
 
   if (!hpcperf_skip_verify()) {
   reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r6.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;
@@ -193,9 +200,11 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
   cudaMemcpy(h_dst, d_dst, img_size * sizeof(float), cudaMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r9", h_dst, img_size, "f32");   // tools/golden: the checked output of the 9x9 filter
 
   if (!hpcperf_skip_verify()) {
   reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r9.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;

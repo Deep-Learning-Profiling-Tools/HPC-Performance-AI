@@ -28,14 +28,24 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(srad_v1_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(srad_v1_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    # verify.py runs the benchmark and validates its output against a
-    # CPU reference (see verify.py header for details)
-    add_test(NAME srad_v1_run COMMAND ${Python3_EXECUTABLE}
-             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:srad_v1_cuda> 100 0.5 502 458 ${CMAKE_CURRENT_SOURCE_DIR}/data/image.pgm)
+    # one plain run of the registry's default input (no CPU reference: verify.py is used only once, offline,
+    # by hpcperf_golden.py make), its output compared with the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME srad_v1_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:srad_v1_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(srad_v1_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
-        FAIL_REGULAR_EXPRESSION "FAIL")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): small high-contrast objects (data/probe_edges.pgm) on
+    # which the SRAD diffusion coefficient matters -- plain diffusion or wrong image statistics cannot pass; checked
+    # against its own frozen reference, never timed
+    add_test(NAME srad_v1_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} probe-edges-n20 --exe $<TARGET_FILE:srad_v1_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe-edges-n20)
+    set_tests_properties(srad_v1_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

@@ -15,19 +15,37 @@ timing:
   regex: '^Total kernel execution time: (?P<value>[0-9.eE+-]+) \(ms\)'
   select: only
 baseline:
-  method: 'built-in sortedness/reference check: PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the sorted array against the frozen B200 golden reference (`check:` / `golden:` below), compared by
+    sha256; the upstream CPU reference (serial BitonicSort + memcmp) runs only once, offline, to validate that
+    reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the sorted
+  # array only when the upstream check printed PASS. mode hash: the output is compared exactly and is 128 MB (exp25)
+  # to 512 MB (exp27), so only its sha256 is recorded (no bytes are written).
+  mode: hash
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: sorted
+    dtype: i32
+    rule: {metric: exact}
+    basis: upstream's memcmp of the 2^n sorted ints with the serial host BitonicSort of the same input
+      (cuda/main.cu:237-240); integer, exact
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture', HPCPERF_GOLDEN_MODE: hash}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the sorted array byte-identical (sha256) to the frozen B200 golden reference reference/<input_id>.json
+    (upstream compares it exactly with memcmp); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two other array sizes via the exponent parameter

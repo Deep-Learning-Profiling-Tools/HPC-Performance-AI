@@ -195,9 +195,22 @@ sharing the GPU (verified: identical particle counts).
 
 ## Validation
 
+**Modes (2026-10-26; no CPU reference computation on a default path).** By default
+(`HPCPERF_CPU_REFERENCE` unset or `0`) `validate.sh` runs nothing on the CPU: the small problem
+below runs once with `--arch CUDA` (exit 0, `Solver terminated`/`END`, 10 finite positive counts),
+then the frozen-reference check of the registered default input
+`python3 tools/inputs/hpcperf_inputs.py check level2/kripke z32-g64-q128 --out build/level2/kripke/validate/frozen-reference-check`
+compares that input's GPU run with its frozen B200 golden reference (`tools/golden`; a missing
+reference or golden store is a FAIL, never a fallback to `--arch Sequential`). The log says
+`CPU reference: skipped (default; frozen reference check instead)`. Observed 2026-10-26: PASS in
+12.7 s (max_rel 0 against the reference made the same day); with the golden store absent the
+check FAILs (`blob missing`) and so does `validate.sh`. The GPU-vs-Sequential comparison described
+below runs only on an explicit offline request (`HPCPERF_CPU_REFERENCE` set to `1`, e.g. by
+`tools/golden/hpcperf_golden.py make`); observed then: PASS, max relative difference 0, 21 s.
+
 Kripke 1.2.8 has no built-in reference check or `--test` mode (upstream CI only runs the
 default problem). Every `kripke.exe` always contains the Sequential (host) RAJA architecture
-next to the GPU one, so `validate.sh` runs the same small problem
+next to the GPU one, so `validate.sh` (offline mode) runs the same small problem
 `--layout GDZ --groups 32 --legendre 4 --quad 32 --zones 16,16,16 --gset 1 --dset 8 --zset 1,1,1 --niter 10`
 (4,194,304 unknowns) twice, `--arch CUDA` and `--arch Sequential`, and compares the
 `iter N: particle count=<P>` value of every one of the 10 iterations. The particle count is

@@ -14,7 +14,14 @@
 # i.e. agree to the printed 6 significant digits (the two paths differ only by summation
 # order). Both runs must complete all nsteps steps and exit 0. Prints PASS/FAIL, exit 0/1.
 # Outputs: $R/build/level2/exacmech/check/<model>_<nqpts>_<nsteps>/{gpu,ref}.out
+#
+# OFFLINE ONLY (tools/golden): this is the CPU reference of the registered inputs. It runs only on an explicit
+# request (HPCPERF_CPU_REFERENCE=1), which `tools/golden/hpcperf_golden.py make` sets once per input to validate
+# the frozen golden reference; the registry check compares with that reference and never calls this script.
 set -uo pipefail
+case "${HPCPERF_CPU_REFERENCE:-}" in
+  ''|0*) echo "check_reference.sh: the OpenMP/CPU reference runs only on an explicit request (HPCPERF_CPU_REFERENCE=1); correctness checks use the frozen golden reference (tools/golden)" >&2; exit 2 ;;
+esac
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SRC_DIR}/../.." && pwd)"

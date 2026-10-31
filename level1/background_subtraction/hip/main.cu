@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -165,6 +166,7 @@ int main(int argc, char* argv[]) {
         time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
       }
       HPCPERF_ROI_EXCLUDE_BEGIN();  // the CPU reference is not the computation
+      if (hpcperf_cpu_reference_enabled())   // HPCPERF_CPU_REFERENCE=1 only (golden make)
       merge_ref ( imgSize, Img, Img1, Img2, Tn_ref, Bn_ref );
       HPCPERF_ROI_EXCLUDE_END();
     }
@@ -176,7 +178,14 @@ int main(int argc, char* argv[]) {
 
   hipMemcpy(Tn, d_Tn, imgSize_bytes, hipMemcpyDeviceToHost);
   hipMemcpy(Bn, d_Bn, imgSize_bytes, hipMemcpyDeviceToHost);
+  hpcperf_golden_output("Tn", Tn, imgSize, "u8");   // tools/golden: the checked outputs
+  hpcperf_golden_output("Bn", Bn, imgSize, "u8");
 
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference (merge_ref every frame) was skipped; correctness = the captured
+    // Tn/Bn against the frozen golden reference (tools/golden)
+    printf("SKIP_VERIFY\n");
+  } else {
   // verification
   int max_error = 0;
   for (int i = 0; i < imgSize; i++) {
@@ -190,6 +199,7 @@ int main(int argc, char* argv[]) {
   printf("Max error is %d\n", max_error);
 
   printf("%s\n", max_error ? "FAIL" : "PASS");
+  }
 
   free(Img);
   free(Img1);

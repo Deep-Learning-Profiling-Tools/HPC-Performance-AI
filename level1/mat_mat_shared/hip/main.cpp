@@ -7,7 +7,9 @@
 // Validation: element-wise comparison of C.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
+#include <cstring>
 
 constexpr Index_type TL_SZ = 16;  // upstream tile size
 
@@ -73,14 +75,32 @@ int main(int argc, char** argv)
   Index_type run_reps = 5;  // upstream default reps
   if (argc > 1) N = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
+  // probe (correctness-probe input, `--probe`; set-up only, the kernel is unchanged): upstream's set-up
+  // A = B = 1 makes every C element equal to N -- a constant fill reproduces the output, and so does any
+  // tiling / indexing / operand-order error that preserves the sum of N ones. The probe initializes A and
+  // B with upstream's own random helpers (DataUtils initDataRandValue for A, values in [0, 1];
+  // initDataRandSign for B, +-0.1-ish with random sign), so A != B and B != A^T.
+  bool probe = false;          // never a performance input
+  if (argc > 3) {
+    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
+      fprintf(stderr, "usage: %s [N [reps [--probe]]]\n", argv[0]);
+      return 2;
+    }
+    probe = true;
+  }
   const Index_type len = N * N;
   const size_t bytes = len * sizeof(Real_type);
 
   // ------------------------- GPU (upstream Base_CUDA) ----------------------
   resetDataInitCount();
   Real_ptr A; Real_ptr B; Real_ptr C;
-  allocAndInitDataConst(A, len, 1.0);   // upstream setUp order
-  allocAndInitDataConst(B, len, 1.0);
+  if (probe) {                          // upstream setUp order
+    allocAndInitDataRandValue(A, len);
+    allocAndInitDataRandSign(B, len);
+  } else {
+    allocAndInitDataConst(A, len, 1.0);
+    allocAndInitDataConst(B, len, 1.0);
+  }
   allocAndInitDataConst(C, len, 0.0);
 
   Real_ptr dA, dB, dC;
@@ -104,51 +124,66 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("C", C, len, "f64");   // tools/golden: the checked output
   cudaFree(dA); cudaFree(dB); cudaFree(dC);
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  resetDataInitCount();
-  Real_ptr A_r; Real_ptr B_r; Real_ptr C_r;
-  allocAndInitDataConst(A_r, len, 1.0);
-  allocAndInitDataConst(B_r, len, 1.0);
-  allocAndInitDataConst(C_r, len, 0.0);
-  {
-    Real_ptr A = A_r; Real_ptr B = B_r; Real_ptr C = C_r;
-    const Index_type Nx = RP_DIVIDE_CEILING_INT(N, TL_SZ);
-    const Index_type Ny = RP_DIVIDE_CEILING_INT(N, TL_SZ);
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type by = 0; by < Ny; ++by) {
-        for (Index_type bx = 0; bx < Nx; ++bx) {
-          MAT_MAT_SHARED_BODY_0_CPU(TL_SZ)
-          for (Index_type ty = 0; ty < TL_SZ; ++ty) {
-            for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-              MAT_MAT_SHARED_BODY_1(TL_SZ)
-            }
-          }
-          for (Index_type k = 0; k < (TL_SZ + N - 1) / TL_SZ; ++k) {
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    resetDataInitCount();
+    Real_ptr A_r; Real_ptr B_r; Real_ptr C_r;
+    if (probe) {
+      allocAndInitDataRandValue(A_r, len);
+      allocAndInitDataRandSign(B_r, len);
+    } else {
+      allocAndInitDataConst(A_r, len, 1.0);
+      allocAndInitDataConst(B_r, len, 1.0);
+    }
+    allocAndInitDataConst(C_r, len, 0.0);
+    {
+      Real_ptr A = A_r; Real_ptr B = B_r; Real_ptr C = C_r;
+      const Index_type Nx = RP_DIVIDE_CEILING_INT(N, TL_SZ);
+      const Index_type Ny = RP_DIVIDE_CEILING_INT(N, TL_SZ);
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type by = 0; by < Ny; ++by) {
+          for (Index_type bx = 0; bx < Nx; ++bx) {
+            MAT_MAT_SHARED_BODY_0_CPU(TL_SZ)
             for (Index_type ty = 0; ty < TL_SZ; ++ty) {
               for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-                MAT_MAT_SHARED_BODY_2(TL_SZ)
+                MAT_MAT_SHARED_BODY_1(TL_SZ)
+              }
+            }
+            for (Index_type k = 0; k < (TL_SZ + N - 1) / TL_SZ; ++k) {
+              for (Index_type ty = 0; ty < TL_SZ; ++ty) {
+                for (Index_type tx = 0; tx < TL_SZ; ++tx) {
+                  MAT_MAT_SHARED_BODY_2(TL_SZ)
+                }
+              }
+              for (Index_type ty = 0; ty < TL_SZ; ++ty) {
+                for (Index_type tx = 0; tx < TL_SZ; ++tx) {
+                  MAT_MAT_SHARED_BODY_3(TL_SZ)
+                }
               }
             }
             for (Index_type ty = 0; ty < TL_SZ; ++ty) {
               for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-                MAT_MAT_SHARED_BODY_3(TL_SZ)
+                MAT_MAT_SHARED_BODY_4(TL_SZ)
               }
-            }
-          }
-          for (Index_type ty = 0; ty < TL_SZ; ++ty) {
-            for (Index_type tx = 0; tx < TL_SZ; ++tx) {
-              MAT_MAT_SHARED_BODY_4(TL_SZ)
             }
           }
         }
       }
     }
-  }
+    hpcperf_golden_output("C.cpu", C_r, len, "f64");   // the CPU reference (golden make only)
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("C", C_r, C, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("C", C_r, C, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

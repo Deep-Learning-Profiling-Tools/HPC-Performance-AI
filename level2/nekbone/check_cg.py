@@ -113,7 +113,7 @@ def main():
             print(f"refusing to overwrite the existing reference {a.out}", file=sys.stderr); return 2
         ref = {"schema": SCHEMA, "input_id": a.make_reference,
                "provenance": {"made_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "SIZE_sha256": sha256(a.size), "data_rea_sha256": sha256(a.rea),
-                              "log": os.path.basename(a.run), "log_sha256": sha256(a.run), "binary": a.binary, "host": os.uname().nodename, "note": a.note},
+                              "log": os.path.basename(a.run), "log_sha256": sha256(a.run), "binary": a.binary, "note": a.note},   # no host name (machine identity)
                "rule": {"r0_tol": a.r0_tol, "x_tol": a.x_tol, "reduction_factor": a.reduction_factor, "basis": a.basis,
                         "text": "timed solve: r0 within r0_tol relative, xnorm and xf within x_tol relative, rN/r0 <= reduction_factor x the reference's rN/r0; nelt / np / nx1 / iteration count equal"},
                "run": run}

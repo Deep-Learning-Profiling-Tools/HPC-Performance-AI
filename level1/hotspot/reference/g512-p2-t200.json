@@ -1,0 +1,121 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "hotspot",
+  "level": 1,
+  "input_id": "g512-p2-t200",
+  "frozen": true,
+  "workload": {
+    "input_id": "g512-p2-t200",
+    "params": {
+      "grid": 512,
+      "pyramid_height": 2,
+      "sim_time": 200
+    },
+    "args": [
+      "512",
+      "2",
+      "200",
+      "level1/hotspot/data/temp_512",
+      "level1/hotspot/data/power_512",
+      "output.out"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/temp_512": "503e20bbed397d6799dd55ce928dadc300c0a7834bf7d9ad69eda73c67d23172",
+      "data/power_512": "863d922187ae70f8eefda603b71a161a9e61bc4cf7f4cc0cb2c0b8feead58471"
+    }
+  },
+  "inputs_yaml_sha256": "1fa3f572469151f529f63f2f2ee511d5234d33406223da0a3e8759885f5bc9e5",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "temperature",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.001
+        },
+        "cpu": "temperature.cpu",
+        "basis": "verify.py's check max |gpu - ref| / (1 + |ref|) <= 1e-3 against its numpy float32 re-simulation (level1/hotspot/verify.py:53-54), here on the binary's float32 MatrixOut (cuda/hotspot.cu, after the final copy-back) instead of output.out's %g text; the check allows 1e-3 minus the B200 field's own deviation from that CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "temperature",
+      "dtype": "f32",
+      "count": 262144,
+      "bytes": 1048576,
+      "sha256": "535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.001,
+        "d0_vs_cpu_reference": 1.9018406774812934e-07,
+        "d0_source": "temperature.cpu",
+        "tol_effective": 0.0009998096257843902
+      },
+      "basis": "verify.py's check max |gpu - ref| / (1 + |ref|) <= 1e-3 against its numpy float32 re-simulation (level1/hotspot/verify.py:53-54), here on the binary's float32 MatrixOut (cuda/hotspot.cu, after the final copy-back) instead of output.out's %g text; the check allows 1e-3 minus the B200 field's own deviation from that CPU reference",
+      "stats": {
+        "min": 319.76678466796875,
+        "max": 340.5115661621094,
+        "sum": 84424837.19677734,
+        "nonfinite": 0
+      },
+      "blob": "sha256/53/535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:31:05Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/hotspot/cuda/hotspot_cuda",
+    "binary_sha256": "d12aa081d82a7a56b850ed76bd46b4f807fe7f88c44043c26db3ae0ad1ed1e26",
+    "command": [
+      "python3",
+      "level1/hotspot/verify.py",
+      "build/hotspot/cuda/hotspot_cuda",
+      "512",
+      "2",
+      "200",
+      "level1/hotspot/data/temp_512",
+      "level1/hotspot/data/power_512"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 2.23,
+      "pass_line": "PASS: hotspot output matches CPU reference (max rel err 1.707e-06)",
+      "pass_regex": "^PASS: hotspot output matches CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/hotspot/g512-p2-t200/run/stdout.log",
+      "log_sha256": "10b1e41bfa5c576dfc9444a15ec3f1ad008368a791747bfa712006838cf28660"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "exacmech",
+  "level": 2,
+  "input_id": "bcc-a-1m-1000",
+  "frozen": true,
+  "workload": {
+    "input_id": "bcc-a-1m-1000",
+    "params": {
+      "model": "evptn_BCC_A",
+      "nqpts": 1000000,
+      "nsteps": 1000,
+      "dt": 0.00025
+    },
+    "args": [],
+    "env": {
+      "EXACMECH_MODEL": "evptn_BCC_A",
+      "EXACMECH_NQPTS": "1000000",
+      "EXACMECH_NSTEPS": "1000"
+    },
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "1b42346533e280101ef26375bda074646fc664b47c9c4b641879f4ce05abfa14",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "stress",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_relabs",
+          "rtol": 1e-05,
+          "atol": 1e-06,
+          "tol": 1
+        },
+        "cpu": {
+          "log": {
+            "file": "{repo}/build/level2/exacmech/check/{param:model}_{param:nqpts}_{param:nsteps}/ref.out"
+          }
+        },
+        "basis": "check_reference.sh / validate.sh: |gpu - ref| <= RTOL |ref| + ATOL with RTOL 1e-5, ATOL 1e-6 MPa for every step and stress component (6 printed significant digits); normalised to |a - g| / (1e-5 |g| + 1e-6) <= 1 minus the frozen history's own deviation from the OpenMP reference",
+        "log": {
+          "regex": "^Step# \\d+ Stress: (\\S+) (\\S+) (\\S+) (\\S+) (\\S+) (\\S+)\\s*$"
+        }
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "stress",
+      "dtype": "f64",
+      "count": 6000,
+      "bytes": 48000,
+      "sha256": "93e3ad1021082b15a36bdff1f7461e71f55da57503a394807613c4c54d500033",
+      "rule": {
+        "metric": "max_relabs",
+        "rtol": 1e-05,
+        "atol": 1e-06,
+        "tol": 1,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "stress.cpu",
+        "tol_effective": 1.0
+      },
+      "basis": "check_reference.sh / validate.sh: |gpu - ref| <= RTOL |ref| + ATOL with RTOL 1e-5, ATOL 1e-6 MPa for every step and stress component (6 printed significant digits); normalised to |a - g| / (1e-5 |g| + 1e-6) <= 1 minus the frozen history's own deviation from the OpenMP reference",
+      "stats": {
+        "min": -116.546,
+        "max": 232.923,
+        "sum": -52.715637084599564,
+        "nonfinite": 0
+      },
+      "blob": "sha256/93/93e3ad1021082b15a36bdff1f7461e71f55da57503a394807613c4c54d500033.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T09:10:21Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "2521d8988e711ee41310758da75c64b2f504cf4c",
+    "source_clean": true,
+    "binary": "build/level2/exacmech/cuda/bin/orientation_evolution",
+    "binary_sha256": "094b5ffff2898cce2605b36be1a35fe59c76022ffb7fbc909c4914fdeb4c1058",
+    "command": [
+      "bash",
+      "level2/exacmech/check_reference.sh",
+      "1000000",
+      "1000",
+      "evptn_BCC_A",
+      "CUDA"
+    ],
+    "gpu_run": {
+      "command": [
+        "bash",
+        "level2/exacmech/run.sh",
+        "CUDA"
+      ],
+      "log": "build/golden-make/exacmech/bcc-a-1m-1000/run/gpu_run.log",
+      "log_sha256": "36b7a839f0822bbe1716460fd2ccef255592f246b4ace4f9620fbe9bc9070bc5"
+    },
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 5104.578,
+      "pass_line": "ExaCMech CUDA reference check (evptn_BCC_A, 1000000 points, 1000 steps, ref OpenMP): PASS",
+      "pass_regex": "^ExaCMech CUDA reference check \\(.*\\): PASS",
+      "fail_regex": "^ExaCMech CUDA reference check \\(.*\\): FAIL",
+      "log": "build/golden-make/exacmech/bcc-a-1m-1000/run/stdout.log",
+      "log_sha256": "cafa7f0d979a449e42a29b8af42002413c6d8ca9661d7d698d52731a2c6eed97"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

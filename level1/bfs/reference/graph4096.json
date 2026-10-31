@@ -1,0 +1,103 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "bfs",
+  "level": 1,
+  "input_id": "graph4096",
+  "frozen": true,
+  "workload": {
+    "input_id": "graph4096",
+    "params": {
+      "nodes": 4096
+    },
+    "args": [
+      "level1/bfs/data/graph4096.txt"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/graph4096.txt": "b695d07bbea389989fc8ba4ed1f44eea3425d810c096e150ca4774525ebb8100"
+    }
+  },
+  "inputs_yaml_sha256": "6b967e6890a028ef4b1892c1ce94e1ea21047045db2810745370f9ace8f4353e",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "cost",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "verify.py's exact comparison of every node's hop count (result.txt, written from this buffer) with a CPU BFS of the same graph (level1/bfs/verify.py:44-56; cuda/bfs.cu h_cost after the final copy-back); integers -> byte-identical",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "cost",
+      "dtype": "i32",
+      "count": 4096,
+      "bytes": 16384,
+      "sha256": "ae1d0fc585932395e1f805e6e0d71c1945ffc19b3f84451b77825fd3062b5cfc",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "verify.py's exact comparison of every node's hop count (result.txt, written from this buffer) with a CPU BFS of the same graph (level1/bfs/verify.py:44-56; cuda/bfs.cu h_cost after the final copy-back); integers -> byte-identical",
+      "stats": {
+        "min": 0.0,
+        "max": 7.0,
+        "sum": 18368.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:16:40Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/bfs/cuda/bfs_cuda",
+    "binary_sha256": "d9738cb3bb0d8a69d6e19a822cc68fde7baf2239101a65b94a9a233e53ba3105",
+    "command": [
+      "python3",
+      "level1/bfs/verify.py",
+      "build/bfs/cuda/bfs_cuda",
+      "level1/bfs/data/graph4096.txt"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 0.726,
+      "pass_line": "PASS: all 4096 BFS costs match the CPU reference",
+      "pass_regex": "^PASS: all \\d+ BFS costs match the CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/bfs/graph4096/run/stdout.log",
+      "log_sha256": "506a6b09775f9ef615c73b386f7df51343f4711e148d5674d186106e284397c3"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

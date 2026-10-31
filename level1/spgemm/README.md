@@ -67,14 +67,13 @@ cmake --build build/spgemm/cuda
 
 ## Validation
 
-Added check: C = A*A recomputed on the CPU with a dense accumulator; per-row sorted entries compared (columns exact, values rel tol 1e-10). Prints PASS/FAIL.
+Correctness = C against the frozen B200 golden reference `reference/<input_id>.json` (rule in `inputs.yaml` `golden:`): the host row pointers and the column indices exact, the values within max |a - g| / (1 + |g|) <= 1e-10 - d0. The GPU's in-row order is nondeterministic (hash accumulator), so each captured row is first sorted by column on the host, the order the check compares in (a canonicalization of the GPU output, done only when capturing). The added CPU check (C = A*A recomputed with a dense accumulator; per-row sorted entries compared, columns exact, values rel tol 1e-10; prints PASS/FAIL) validated that reference once and runs only on request (below).
 
 ```bash
-ctest --test-dir build/spgemm/cuda --output-on-failure
+ctest --test-dir build/spgemm/cuda --output-on-failure   # golden run of the registry's default input
 ```
 
-
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Correctness switch.** By default the host-side CPU check is skipped and the benchmark prints `SKIP_VERIFY` (tools/timing relies on it); a plain run, ctest, `tools/inputs` and `tools/timing` never run the CPU reference and nothing falls back to it. `HPCPERF_CPU_REFERENCE=1` runs the original CPU check (offline only: `tools/golden/hpcperf_golden.py make` uses it once to validate the golden reference); `HPCPERF_SKIP_VERIFY=1` still forces it off. `HPCPERF_GOLDEN_DUMP=<dir>` makes the run capture its outputs. See [tools/golden/README.md](../../tools/golden/README.md) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: the GPU numeric phase (the symbolic phase is a host substitute, excluded). Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

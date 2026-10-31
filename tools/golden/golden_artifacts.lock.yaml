@@ -1,0 +1,1178 @@
+schema: hpcperf-golden-lock-1
+schema_version: 1
+about: bundles of the golden store (frozen reference blobs); the committed references are the root of trust, this lock gives the bundle identities and locations (tools/golden/DISTRIBUTION.md)
+store: {layout: sha256/<aa>/<sha256>.bin, env: HPCPERF_GOLDEN_STORE, default: <repo>/.golden-store}
+reference_scan:
+  source: committed tree (git ls-tree), level<N>/<benchmark>/reference/**.json
+  schemas_with_blobs: ['hpcperf-golden-1: outputs[].blob, sha256, bytes', 'hpcperf-nyx-frozen-reference-1: archive.sha256, size']
+  references_with_blobs: 96
+  digest: cf24b35bc91d748c6086b5c6591daf8c711319f3f4d1a3155c1c5480a0730de4
+bundle_format:
+  naming: golden-<level>-<benchmark>[-p<i>of<n>]-<members_digest[:16]>.tar.zst
+  tar: {format: hpcperf-golden-tar-1, members: 'regular files sha256/<aa>/<sha256>.bin only, sorted by name, no directory entries', header: 'POSIX ustar, mode 0644, uid/gid 0, empty uname/gname, mtime 1704067200', end: 'two zero blocks, padded to 10240 bytes'}
+  compression:
+    tool: zstd
+    level: 3
+    flags: [--single-thread]
+    input: stdin stream
+    version: 1.5.7
+  asset_limit_bytes: 2147483648
+  partition: per benchmark; first-fit decreasing by blob size (ties by sha256); a part takes blobs while ZSTD_compressBound(tar size) < asset_limit_bytes
+cache: {env: HPCPERF_ARTIFACT_CACHE, default: <repo>/.artifacts, layout: sha256/<bundle sha256>.tar.zst}
+release: {provider: github-release, proposed_tag: golden-hpcperf-g1-rc1, status: unpublished}
+totals: {bundles: 30, distinct_blobs: 130, blob_bytes: 8623140424, member_entries: 133, bundle_bytes: 2776023525}
+bundles:
+- name: golden-level1-adam-2371346b7b588f80.tar.zst
+  group: level1/adam
+  part: 1
+  parts: 1
+  sha256: 5ce2022d6bed5c58623719ae103e9fa7c0a735c3092c2ac02177d676b56c361c
+  size: 3443515
+  tar_size: 4444160
+  members_digest: 2371346b7b588f80455173750ffa612571c294248f22a069c462d852040ddc7b
+  members:
+  - {sha256: 0e8acb580e2fd554c70efbca6c2cc35c5e5325e8f26511a3fd21f291b6cefd99, size: 40000}
+  - {sha256: 27501fec459e16309c7b0588360b4340d604bbe26160ab2def7e6003bee0e889, size: 4000000}
+  - {sha256: 4b9b03d1205b886dc00d8f7e29041da7f15e412b7347fbe733cdd4d018658dd1, size: 400000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/adam-cuda, Apache-2.0 (Colossal-AI) + MIT notice (DeepSpeed), in level1/adam/LICENSE; input generated in-program (rand); outputs f32 arrays only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-backprop-bdbcbceba121b3d2.tar.zst
+  group: level1/backprop
+  part: 1
+  parts: 1
+  sha256: d96c6d1f3a425aa69417112a748bf79e0c8614fb792229f2dd65ae09cacfce7b
+  size: 51912462
+  tar_size: 58019840
+  members_digest: bdbcbceba121b3d23bbea67d36f2de18a78d5c6e5edeb4ba9c1b38b9e25418d9
+  members:
+  - {sha256: 2769c34b56e0b89ca0268cf1d4ef9f7af37f91422b263fb3a8b4f68e70eee116, size: 136}
+  - {sha256: 716525be6dd89ecc421fb2dfb76aedacf67bd11f043765cdd1a749cfb3e613ba, size: 136}
+  - {sha256: 74be1a8a868eb484bac29ee774602ee0cf36700bda340556c4992c450b077125, size: 69700}
+  - {sha256: 82dcdb80351106f27b3fb6e10f960efefa69517f8dcd91d3f54f7718333cc5a5, size: 136}
+  - {sha256: 868bce1a54c314b89e8a12ab5beff90eeeda75f6f4e0b7263741a11151f5a568, size: 136}
+  - {sha256: 88db4cb568c3d6a4313f73496fe07a52477ea45fb02a90d5842cff7c3fc9867f, size: 2244}
+  - {sha256: 890bacccc74c8aac7c7c8afa007b9c4ed7132b2bb9288967264a55e1a5cd9e50, size: 4456516}
+  - {sha256: 8cc7a8daecdf8f73b869aa7a0d04a53e20a00ecfa89b696403023b68e5682ea4, size: 17825860}
+  - {sha256: d02cedf3659e18f0952c47521a4b070af0700ff1ce4d16cf44503e58e4890052, size: 136}
+  - {sha256: d73115d0cbde27afbcaa5ed3b7fefc9375f1ff33b4808d9f201a3fe90788edd9, size: 35651652}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1 (HPC-FAIR/rodinia_3.1@366b283) cuda/backprop, UVA BSD-style + citation request, in LICENSE; input generated in-program (rand, seed 7; probes dpn1); f32 weights only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-bezier_surface-f68b18e562e4251a.tar.zst
+  group: level1/bezier_surface
+  part: 1
+  parts: 1
+  sha256: 8bf2a2aa4fc59610bfbc432fb3efded80fcf36df2a64383b00a14348c00a2eef
+  size: 723012051
+  tar_size: 806389760
+  members_digest: f68b18e562e4251a9cb8d82d464d025954ed9bdc8477d1bcf0edf9edc437e023
+  members:
+  - {sha256: 5658f0cddb1b4c937907d5e61992a1a5fd020a2a947b0162338433101c444fa0, size: 1080000}
+  - {sha256: 7c129b8a5165a6341d8939b2c44e82ec1efda848e862f56278023d878306173f, size: 805306368}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/bezier-surface-cuda, BSD-3-Clause (ANL/ORNL), in LICENSE; input data/control.txt = upstream input/control.txt, in git on origin/main; f32 surface only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-bilateral_filter-734bab48e9f486cb.tar.zst
+  group: level1/bilateral_filter
+  part: 1
+  parts: 1
+  sha256: bbbbd253f70e169884b0912927cf7682ddd22b8e6a635c78fcefce28fbed526b
+  size: 152658462
+  tar_size: 255754240
+  members_digest: 734bab48e9f486cbf299a7c92ef8699e9c037f59211f2d8e4e32b06c18d8a79e
+  members:
+  - {sha256: 0aa6323d4d00dc68860082fd9cadc66122dfc741caac6eb3c65d7f5dfbdf9e63, size: 68198400}
+  - {sha256: 2d1f0046ca67388cfb9ed87e625f6a4dca267bb0628fc3b099d4d5cdac72c5bf, size: 17049600}
+  - {sha256: 373e799f6cc5c1c85eb6547c6236f021393689b1550795db09a9716702f115da, size: 68198400}
+  - {sha256: 4c7288d051a1a3d34a5be4b4a50c537de71b6ea3f0a0e0b0f4994f53626ba1ab, size: 68198400}
+  - {sha256: 9ae7bba783ebd3a467dd276655c3ac0777f727c31c7a83f2e7ad34cf7d5337f0, size: 17049600}
+  - {sha256: dcc572e5ffa1bf1af3c208685d793d316cbd59b857eb7ceaf63575e747955f1e, size: 17049600}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/bilateral-cuda, BSD-3-Clause (ANL/ORNL), in LICENSE; input synthetic image generated in-program (srand 123); f32 images only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-black_scholes-9e3034dc11795dcb.tar.zst
+  group: level1/black_scholes
+  part: 1
+  parts: 1
+  sha256: 5ee21793c147859bfe466dabc57d9d60c41589d4c394bb39d0a152ad9ce34c0d
+  size: 159639681
+  tar_size: 176168960
+  members_digest: 9e3034dc11795dcbb14ea82757c005c78e389237c5f114bfad3d0968b7462cae
+  members:
+  - {sha256: 1ca7b1afaa9e02449258d1cb80944ea0cc3d0c6307097cad4aa0fa0d4ddd169c, size: 67108864}
+  - {sha256: 52d30140b55cd80189d455938cc55af62ab660a95c1699a5224f8cc899631820, size: 16777216}
+  - {sha256: 7aef7ea39f3172e2080cbd0c5c3ae592916d324cd1e78cce5af229bbe959e94d, size: 16777216}
+  - {sha256: 7b8ec8ae185e6f4eb6fea9ea176eb469e73b7ef8e332d807269dc1477306c8bb, size: 67108864}
+  - {sha256: af1fa9180a7519eb0851725f38c8c147c4a9138efc182c7a4dd8145f58f29087, size: 4194304}
+  - {sha256: d8f46f97afc8e4dd0bc4bac01da470a15e472e99083065c636eac88d6378cf62, size: 4194304}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/bs, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input random batch generated in-program (rand_r, seed = number of options); f32 prices only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-burgers_equation-p1of2-b152706108e70ad8.tar.zst
+  group: level1/burgers_equation
+  part: 1
+  parts: 2
+  sha256: 8e4bba55ad1732e008176346f7a6643019b280db2b45f680b2c7f48684c554ee
+  size: 210243
+  tar_size: 2136074240
+  members_digest: b152706108e70ad83408045740330136be933a0c38df753abf6ed76fbe0c55b9
+  members:
+  - {sha256: 4ce4ea918492ec0e5d351906fc5bb1d816e614e4f86655224b3e4e6bb8491763, size: 5313600}
+  - {sha256: 53bc59a93f77339dc5a4815f5e99e8a4fc4fc2da5e97ec20ec9739279d73a1f5, size: 5313600}
+  - {sha256: 630d67cd2f61ddb5a66dcf0a988da5cb64848093e49f81f53e99f55afee758d4, size: 2125440000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/burger-cuda, whose own LICENSE is MIT (c) 2020 Soumya Sen, while level1/burgers_equation/LICENSE has only HeCBench''s BSD-3; input generated in-program (formula); f64 fields only -> needs-owner-check: add upstream src/burger-cuda/LICENSE (MIT) to level1/burgers_equation']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-burgers_equation-p2of2-d2dde53ad7ff055c.tar.zst
+  group: level1/burgers_equation
+  part: 2
+  parts: 2
+  sha256: 2befb83a7406a4e434238667e4abd465946946c13541c834c4fb86d6d09d6cf3
+  size: 117771
+  tar_size: 1062727680
+  members_digest: d2dde53ad7ff055cb73261a655cc13b82f085e9659f1c447eb97cc2180925cce
+  members:
+  - {sha256: 445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e, size: 531360000}
+  - {sha256: 9704d2736e5baf6ababeabaf053d60383f41616ee64399cc6a7d724c4995fc34, size: 531360000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/burger-cuda, whose own LICENSE is MIT (c) 2020 Soumya Sen, while level1/burgers_equation/LICENSE has only HeCBench''s BSD-3; input generated in-program (formula); f64 fields only -> needs-owner-check: add upstream src/burger-cuda/LICENSE (MIT) to level1/burgers_equation']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-daxpy-3be167eae7c1babf.tar.zst
+  group: level1/daxpy
+  part: 1
+  parts: 1
+  sha256: c658a9615ead772d3eff1775c9b6d570cb974cfd6236f1a8c61e5cf68effa82c
+  size: 17589248
+  tar_size: 168007680
+  members_digest: 3be167eae7c1babfe22cb183c9be7d62504ff9552d38dc72667d5ff1d09cca9d
+  members:
+  - {sha256: 3aee0384b03a0e795f69e086ef32d98588dca2407c4f819ee44ecd3ac7d6f6d2, size: 128000000}
+  - {sha256: e80f5b802b09d8768747a3244846f11a81143e05192da3128a749232cbaf37d7, size: 32000000}
+  - {sha256: f38cecf0eb53960a91dbb0b601a3a3ac76fe18e597eb58fdadc538912476fd74, size: 8000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/basic/DAXPY, BSD-3-Clause (LLNS), in LICENSE (RAJAPerf COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-del_dot_vec_2d-ef5086a7e5cdd0c8.tar.zst
+  group: level1/del_dot_vec_2d
+  part: 1
+  parts: 1
+  sha256: e61a9705190c0532df0f9db11c48e08551c46e45bfda12b71f17ce6693e7e2c6
+  size: 43158915
+  tar_size: 168458240
+  members_digest: ef5086a7e5cdd0c8b076423c85f25f550f1c4b4be394b704d15ac46679d04501
+  members:
+  - {sha256: 34e282f49361aa1ae47b20f19e98a8aa5c675d83f007c45b29878392474d7860, size: 128256128}
+  - {sha256: 4d8405ef659ddf23780e6cbf5f666fc65c035e22d2e6d4b9796c61b9167c921b, size: 8064128}
+  - {sha256: 84fd6697560272093b88532625a5166387da722bf740306a91115714aa1fabfe, size: 32128128}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/DEL_DOT_VEC_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-energy-a5dd928704ea9d2a.tar.zst
+  group: level1/energy
+  part: 1
+  parts: 1
+  sha256: 2286e2befc30627838ba8f32267f71c60d70d26162dced39756d383ef7bf18ab
+  size: 12593301
+  tar_size: 368015360
+  members_digest: a5dd928704ea9d2ad2f9be90e582e1483bf0a83f93df2c87360559b1f126b475
+  members:
+  - {sha256: 129cc85d9b7f97c0d709914d318292033de1ca1f5c3aa2a932f01674cef99156, size: 8000000}
+  - {sha256: 1a100baed95a65f66d01cd08644b28e134783fd0c52ac7e35ad52a452e8b90b2, size: 32000000}
+  - {sha256: 4205277f361c3352c753814b6078621120da108b86f5c8a679b46cbd9f63297b, size: 8000000}
+  - {sha256: 6506614505e113daab08b3f894ca46d4d61867c7b007c413b47a669abe8aae67, size: 8000000}
+  - {sha256: 71d3c8d14c4b5b09a96e824e4c84a4b8af3e70addc757f56c95ed9ddf9a76944, size: 8000000}
+  - {sha256: 82cb7cd0654397f68ee8c2688a8ad7a0fd32f8951b5de87c49b2530079d677fd, size: 128000000}
+  - {sha256: 8c55c7d221afc017363a1a308df2228936a0ceff078893f8f9b8ccf26bbc771f, size: 32000000}
+  - {sha256: a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6, size: 128000000}
+  - {sha256: b2cc34363fb1717f4bb4714893204acf6e68dc97bffaaa7bfb19d341a0b21664, size: 8000000}
+  - {sha256: d0db9b0342fe44b38146c126dbf7941e7db4761d8499db23e16331703a5c0db6, size: 8000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/ENERGY, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-fdtd_2d-81168f97981a511f.tar.zst
+  group: level1/fdtd_2d
+  part: 1
+  parts: 1
+  sha256: a69654ea60d8b355c4401423061aa7891a0677cf29d832d38e5b2497fe912cad
+  size: 146555937
+  tar_size: 504012800
+  members_digest: 81168f97981a511ff80a56e83efc7d10ff5f08be079e9073c5217080f217e662
+  members:
+  - {sha256: 0d8e2a67b8fd28d67e5d38f823a21df8f6a9c580ce4e4259b336c75a77b0a9f4, size: 8000000}
+  - {sha256: 38a68ff4e52d8ef098aa6cc9258b2f3f42358faa39777b8bdfd696e3945514f2, size: 32000000}
+  - {sha256: 4e8036cf8904c0c764975aee170ea00cd274c9afaac7456f0f1ed7cd66413806, size: 32000000}
+  - {sha256: 6d2ef9056401538ac05864161c2759a8a1381827c25cf6c33c5fa7a6b8acdf2e, size: 32000000}
+  - {sha256: 79e3b086125360e2588d481f7cf206d2057655f1509d772094a5f0858e8c2f13, size: 128000000}
+  - {sha256: c2e4bb0ab4cf3ef9d69cf46d1790bd21a87f7caee91af6d70ce42062f8f64b12, size: 128000000}
+  - {sha256: e19893879d3d9b1b093f7b9bd1698f78e50fdc17304c4c9fd3242b2e7bd9d4cb, size: 128000000}
+  - {sha256: eddd058d8757b9994434c0b059478364a8f42a4cb7b2c609eff2e0a0c4f4b668, size: 8000000}
+  - {sha256: f359ee3b7715e5d5667cb00d10df98cd141d33c75743050df7a8df7eb309ec66, size: 8000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_FDTD_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-fir-2e7ee4a5d2741056.tar.zst
+  group: level1/fir
+  part: 1
+  parts: 1
+  sha256: 738553a5297c464fbb1192cdc6de681b53d1caf3ad7900df544c0efe8131bbcc
+  size: 296494353
+  tar_size: 352327680
+  members_digest: 2e7ee4a5d27410566b2cad191aed803d91a88036ba8d2ba6f03fc0965e6231df
+  members:
+  - {sha256: 20fafcbd3922a3c9ac7aeb935bdf5291de7d8e3d9861457869ba8395528272fe, size: 67108864}
+  - {sha256: 8560bf86151153db0dfc3aaa3c41ccdb085c94ce21d9662243a9d93daced15b1, size: 268435456}
+  - {sha256: bb9128f8411dea33debd22fbda6e5f0fc3a1c0797367eb60b10f98221b80bf1b, size: 16777216}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/fir, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input generated in-program (rand_r, seed 1); f32 output only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-floyd_warshall-1f98b08f87ca7998.tar.zst
+  group: level1/floyd_warshall
+  part: 1
+  parts: 1
+  sha256: 909872c7a0426684792b6c95b3f3b5cd7ee7eb342b45d127538839da6cb07be9
+  size: 16102223
+  tar_size: 40007680
+  members_digest: 1f98b08f87ca7998d58cf54a1481ad11686d91c84704e5cc7f17eae76d70d4c5
+  members:
+  - {sha256: e2b2c2b8bb060a00ef81205f99235e1d78fac669659366fcd930fe58230aeef5, size: 32000000}
+  - {sha256: f2ccfce39a8d5048e6b088f5e7d579677e601f799afd76f5aaf801c3ea6cbfb8, size: 8000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_FLOYD_WARSHALL, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-hotspot-ba3c29624ac370e5.tar.zst
+  group: level1/hotspot
+  part: 1
+  parts: 1
+  sha256: 2c9cde45ed9266ec57e80ebbba48da10450182cae264ade90c8fc9f3f76a346f
+  size: 2800478
+  tar_size: 4198400
+  members_digest: ba3c29624ac370e51715dd7bcb3379370dc1e4fb07bc0e284b371e60eb95ddf1
+  members:
+  - {sha256: 535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7, size: 1048576}
+  - {sha256: 5a906c2265e26e60869797390e68839587175a9bfde7b5407e9b5d553b994ad4, size: 1048576}
+  - {sha256: 9d70ab5147500860ac8cba3247e217eb29e504e6cebcc46f9861811e7f0847e7, size: 1048576}
+  - {sha256: a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9, size: 1048576}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/hotspot, UVA BSD-style, in LICENSE; input data/temp_512 + power_512 = Rodinia data/hotspot (''real data'', no data-specific terms), in git on origin/main; pnoise9 probe derived by data/gen_probe.py; f32 temperatures only -> needs-owner-check: confirm the Rodinia LICENSE covers data/hotspot (same question as the copy already on origin/main)']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-hotspot_3d-f444bc202246975d.tar.zst
+  group: level1/hotspot_3d
+  part: 1
+  parts: 1
+  sha256: df90b3ce0e32e735dbb9f0dc8885180cf700df77b5da6559aee324669dc85315
+  size: 406903
+  tar_size: 532480
+  members_digest: f444bc202246975d9266cb9e37dfea851f5f0822c668b4ff358843d0cec08e99
+  members:
+  - {sha256: 2a502a352ae96a3a294e1d692c2b6a1755a954a59d08603f2931f4b5472f5dd1, size: 131072}
+  - {sha256: 797ccd35af7f8475377c8f6db3853081d7265504d055edac0e85cff866fb1f76, size: 131072}
+  - {sha256: 8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf, size: 131072}
+  - {sha256: f49d2505e759a4fdc690732471323f70984eb369da4f1798b1ce82d2299ddbb5, size: 131072}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/hotspot3D, UVA BSD-style, in LICENSE; input data/power_64x8 + temp_64x8 = Rodinia data/hotspot3D (uniform random values), in git on origin/main; amp10 probe derived by data/gen_temp_amp10.py; f32 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-jacobi_2d-18ea47bbb5d66898.tar.zst
+  group: level1/jacobi_2d
+  part: 1
+  parts: 1
+  sha256: 7cb4f97617bc15a2fed4cec86aa672b989e41f7937e9f0fe319fa29d9d149316
+  size: 82101503
+  tar_size: 337356800
+  members_digest: 18ea47bbb5d6689856fc7d6e15a0841488df610c3e14eea846ad2c0a4beda35f
+  members:
+  - {sha256: 366fc4fd1f2a38d3708f73bf5d6270dd8556aea377ff21911c89daf8d17825f7, size: 128512512}
+  - {sha256: 609246cb7b1335108d339d7f88cc7325ca8a750d65b72ac469f068163fd7a538, size: 128512512}
+  - {sha256: 7e818c2f1ae2d205859d4e9cfb70a27db4fdf9c455ca1a0d31ae073ac9c5e36e, size: 8032032}
+  - {sha256: cc9b87dcd0e510e93d8385e8859f47c06ee32dea4dbbb2fecb362f88944a7e9b, size: 32128128}
+  - {sha256: d98267ff1a531410f0236978d285a7581cb0961a1a2dc50945f2318025538838, size: 32128128}
+  - {sha256: fcbee8dab992a018649606a8504d34a507391a99c5afbdfeab72c01b54594b85, size: 8032032}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/polybench/POLYBENCH_JACOBI_2D, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-ltimes-48237d6112fde49e.tar.zst
+  group: level1/ltimes
+  part: 1
+  parts: 1
+  sha256: f9f1dc23806167dbf6315d401557dc339591b323548d2cdac6e6ddfe65973d4b
+  size: 130230193
+  tar_size: 700006400
+  members_digest: 48237d6112fde49e65a3fa988dc73aa7d5b18a39945c994f85d06ac9e4c4b5ee
+  members:
+  - {sha256: 716de4465a2bcbf0a497d83267e10dbee9851f95db5ee63d63936c3c928bb0d7, size: 133331200}
+  - {sha256: 7fe161d063c1b32a655ce8dd595ce20f4ced6f69151c4df4a0dbf3f068ac9f3e, size: 33331200}
+  - {sha256: c3d2965d0a3f6d3deaba5edd2393abc50a9133a288f698dca2eca73d3723a8b1, size: 533331200}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/LTIMES, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst
+  group: level1/mat_mat_shared
+  part: 1
+  parts: 1
+  sha256: 4643da6511f7f8ed628b7eb21a2ffbd7ccb8977b3f7ea80f578f4404edb09f03
+  size: 7753013
+  tar_size: 176005120
+  members_digest: 998c69fe8217633d6194cfb08dd48572b3648023382693f9fc699838dcf83151
+  members:
+  - {sha256: 36127b4f470ca8edf8b9e62132b7049914e5fa6cdd3dd29fb2c5f14ae3483118, size: 8000000}
+  - {sha256: 3bd7364dd5413770d8bb890efed330e8eb5dc83867d14eaa840cdb881d8864a2, size: 8000000}
+  - {sha256: 74b86723233b5337a899870cd8271c2af0c591247ff4f342e7f3c09a54cd8430, size: 32000000}
+  - {sha256: a801892822e4ba8878f509e73a08765e7b8ec93db39c4452235885dfb7d573bd, size: 128000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/basic/MAT_MAT_SHARED, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst
+  group: level1/matvec_3d_stencil
+  part: 1
+  parts: 1
+  sha256: 6a9da24be6deae74f288a99bccbe6612ffd9d2456cd64bd797ade93a148bde44
+  size: 37378067
+  tar_size: 177039360
+  members_digest: ea8ef622693bd04e3c1956903d3b9abf47c560fe993b2244e5f740cc511fcf57
+  members:
+  - {sha256: 0555db051527d6406edfba66d1c18f58940e55cf114a1018b89be79e2240bf64, size: 133691384}
+  - {sha256: 561517f73f4f0b137f946b07ea128f6208d9e0f36cc37ba0f0d25c5eca216572, size: 34432112}
+  - {sha256: 63afac87181466400ec57b7626f50ec6c5c158fb2f1b120c46e1652c8c7b749e, size: 8911544}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/MATVEC_3D_STENCIL, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-nbody-a9136df9ac968bf8.tar.zst
+  group: level1/nbody
+  part: 1
+  parts: 1
+  sha256: 4a513ba6157fa1ba921c234df3877dd05dec2d3971ab4a78f6fd1341939780be
+  size: 2435112
+  tar_size: 2703360
+  members_digest: a9136df9ac968bf8d910f420f7f41e56c126162480c6c7ef0643957a61b2faa5
+  members:
+  - {sha256: 09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502, size: 384000}
+  - {sha256: 206777ada780713697b250567dee97cd8e1fadff7ead7e8eaaaaf363ce390578, size: 768000}
+  - {sha256: 28075aecc2726dd81f948c80cac5f102ac609c7d69e27407b6b6550e5b8d8a3b, size: 192000}
+  - {sha256: 333035c11fdc2daae99009857d5c7b87abbfd3791a36b05cffd517014186e5e8, size: 192000}
+  - {sha256: 4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5, size: 384000}
+  - {sha256: 56c37bb388d199008bea024cf230d7ee4ab1e73a3d8bd0f4d085c4843b0faa69, size: 768000}
+  - {sha256: 65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b, size: 4}
+  - {sha256: 9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04, size: 4}
+  - {sha256: d2f5ffb87aa773ec98098f82dde3c05df05ff93654abff767be10d7615252c71, size: 4}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: HeCBench@23714d9 src/nbody-cuda (GSimulation), MIT (Intel), in LICENSE; input generated in-program (random particles); f32 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-nearest_neighbor-47ea5707dda207a6.tar.zst
+  group: level1/nearest_neighbor
+  part: 1
+  parts: 1
+  sha256: c83399ada46bd633b523712b453287e008ab9da7a96d7f08b38007b2b20e3897
+  size: 298328
+  tar_size: 348160
+  members_digest: 47ea5707dda207a6cb68c30d13521f8e960b58a7e1cf696f8953590a264bc12f
+  members:
+  - {sha256: 33e9234bf83e88df27add3febfb4b57096e60d2b13c6e0977b0d70f125973cc3, size: 171056}
+  - {sha256: 9712b5e60ba5eec6f96a5a7891f1f7b2b4913201594bd089176ee5f589bee225, size: 20}
+  - {sha256: cb191f50e4fefee5ed8da7eedd446cfbd112ea7438bc39cb92f1da2243f2e9e8, size: 171056}
+  - {sha256: df3813ece5587f581ed88721a41d70833cedc1bdce4a25208f504b934842523c, size: 20}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/nn, UVA BSD-style, in LICENSE; input data/cane4_0..3.db = Rodinia data/nn synthetic records (inputGen/hurricanegen.c, rand), in git on origin/main; f32 distances only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-pagerank-777730839711bfde.tar.zst
+  group: level1/pagerank
+  part: 1
+  parts: 1
+  sha256: 35c6d437a075d93b2ed595127c66923f47ab23c93d0c5ee978ea05f8cc875bd2
+  size: 130313
+  tar_size: 163840
+  members_digest: 777730839711bfde82fe2883741c0f49a2a4b24410179427df905e35c528013a
+  members:
+  - {sha256: 63fcdd3e17b13e6d120f391830e77801d0b3e66b918b6618a20747e0652a522e, size: 65536}
+  - {sha256: 7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5, size: 65536}
+  - {sha256: 9f6a63b947ae20780d211ffaa6f5759dd2384d5ef5f156a3d9bcae6b5183a836, size: 16384}
+  - {sha256: a10eac893da8de95fc2d1a944a3d4fc77f652e7cccf4d0cfbd0ea021c333fc86, size: 4096}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Hetero-Mark@aa685e0 src/pr, NCSA-style (Northeastern Univ. NUCAR), in LICENSE; input generated at configure time by data/gen_input.py (seeded random graph; upstream data server offline); f32 ranks only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-pressure-d9c5db18d5189d9a.tar.zst
+  group: level1/pressure
+  part: 1
+  parts: 1
+  sha256: d6f74e5c19521b3a5d7e4de2546172364929629b6b30f1954f7b6b8c156884e0
+  size: 19149098
+  tar_size: 352010240
+  members_digest: d9c5db18d5189d9afaae1b05e7ce1908672a3268642fdcbb351dbfa1bc868490
+  members:
+  - {sha256: 0f827db1cb145d6df17d79d9857d007b35d8478a1d5c6b12c96b150d6c41c33c, size: 128000000}
+  - {sha256: 27578a3c7b8753d548c4ccd0bf0e5c873952188f4bbbd4590e3989060ffe12ee, size: 8000000}
+  - {sha256: 2c038bae7d25acd05ca91ee858bb8f70843241ba8548877d6c1a2177af7e042e, size: 32000000}
+  - {sha256: 8c55c7d221afc017363a1a308df2228936a0ceff078893f8f9b8ccf26bbc771f, size: 32000000}
+  - {sha256: a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6, size: 128000000}
+  - {sha256: ace3b0b22886ca5e77d446cc79fef1bf46868d294656c8d1cce734b9b8a58cbe, size: 8000000}
+  - {sha256: af3c137e9ab763ad7037c9c1fdeebf3221489f7b92f37172eb389897194d52b8, size: 8000000}
+  - {sha256: d0db9b0342fe44b38146c126dbf7941e7db4761d8499db23e16331703a5c0db6, size: 8000000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: RAJAPerf@b0f1cd3 src/apps/PRESSURE, BSD-3-Clause (LLNS), in LICENSE (COPYRIGHT DOE notice not shipped: repo follow-up); input generated in-program (RAJAPerf DataUtils initData*); f64 only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-spadd-a4b5ceebc18085ed.tar.zst
+  group: level1/spadd
+  part: 1
+  parts: 1
+  sha256: d8734d22bd52ca20a0e21483fddcc02e192ec96e3e9fa85c920624cd59e19563
+  size: 25164569
+  tar_size: 26408960
+  members_digest: a4b5ceebc18085ed78c102e04ced77a30e6f7a41671360fc534c56855134307f
+  members:
+  - {sha256: 70895a5dee86e1b84dbc0c53554176c13d260f91387c21e186697e8277ceebd4, size: 24000000}
+  - {sha256: 98a807e22187e1cfd74ad92218698dd20aff9588b640149415df39f8080ba927, size: 2400000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spadd, Apache-2.0 WITH LLVM-exception (NTESS), but level1/spadd has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721); f64 values only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spadd']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-spgemm-d5bdc149e4a5af2f.tar.zst
+  group: level1/spgemm
+  part: 1
+  parts: 1
+  sha256: 80730838c0477f921ab87af836ced09b8c974736341d65e2f7734459594be7ac
+  size: 745910567
+  tar_size: 779909120
+  members_digest: d5bdc149e4a5af2f792b0eff69cf99998320e9ef55d0ba751fdaffced3f104da
+  members:
+  - {sha256: 31bf7c0c1ef61e609ab266b1d0aa2b21926a6916628e341cc36ce00fbf8f3201, size: 713774256}
+  - {sha256: aaa03cebd65c6afbf5d533950eca3cbe125ba2a87b5ca72cc42b76e3d58ccc75, size: 66128104}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spgemm (KKMEM), Apache-2.0 WITH LLVM-exception (NTESS), but level1/spgemm has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721); f64 values only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spgemm']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-spmv-ebd8f22ef8233e96.tar.zst
+  group: level1/spmv
+  part: 1
+  parts: 1
+  sha256: 40c5768157879c9d23a820f8cbe1246be1693eb1d4d71f3b013ee364c1a7d4a8
+  size: 11470086
+  tar_size: 19456000
+  members_digest: ebd8f22ef8233e9693355a0ca3c82bfd4dc21bc4fe11602308d6e41137349601
+  members:
+  - {sha256: 3e5f6e2a9cb65a4b1f2091909662716615b8070e6fec28767081f7606c41ab5b, size: 3536096}
+  - {sha256: 996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d, size: 884024}
+  - {sha256: 9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437, size: 884024}
+  - {sha256: e905134c11395b6261c6f2753816db21b0dfc8a2619dcda3bb00e780d63cd39d, size: 14144384}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: port of Kokkos Kernels@23a699f perf_test spmv, Apache-2.0 WITH LLVM-exception (NTESS), but level1/spmv has no LICENSE (also on origin/main); input generated in-program (kk_sparseMatrix_generate, srand 13721; probe splitmix64); f64 only -> needs-owner-check: add kokkos-kernels LICENSE + Copyright.txt to level1/spmv']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level1-srad_v1-b57aca3e43fac564.tar.zst
+  group: level1/srad_v1
+  part: 1
+  parts: 1
+  sha256: e557e1a37d0d32d84c21ea4364e6b707473bea03be884356f3fd22eb524cfee4
+  size: 3188372
+  tar_size: 3686400
+  members_digest: b57aca3e43fac564801bea4caaf6f141657539dde3e04499cc637b1e2a6afce4
+  members:
+  - {sha256: 3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679, size: 919664}
+  - {sha256: 4d9d3d2406b2884b9b7c25ade94d5d7027a61369d5e4a03fa32e166deb20af45, size: 919664}
+  - {sha256: 5fe05607de5d6f3838df8caea66fb8d158a1494a5849212c744de0efc2e40322, size: 919664}
+  - {sha256: 76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e, size: 919664}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Rodinia 3.1@366b283 cuda/srad/srad_v1, UVA BSD-style, in LICENSE; input data/image.pgm = Rodinia data/srad ultrasound frame (Heart Wall data, no data-specific terms), in git on origin/main; probe_edges.pgm synthetic (data/make_probe_edges.py); outputs are f32 images derived from it -> needs-owner-check: confirm the Rodinia LICENSE covers data/srad/image.pgm (same question as the copy already on origin/main)']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level2-exacmech-5b42e72fc6e6eaf9.tar.zst
+  group: level2/exacmech
+  part: 1
+  parts: 1
+  sha256: 7745af6a75a42d9df3231fd9b5e479f51dec72647093c5e5e665ad2d7d256fbe
+  size: 75852
+  tar_size: 102400
+  members_digest: 5b42e72fc6e6eaf9132eeb12eebfeab6ce50fa8e6c3806a34f2b518c881d5327
+  members:
+  - {sha256: 93e3ad1021082b15a36bdff1f7461e71f55da57503a394807613c4c54d500033, size: 48000}
+  - {sha256: acfd65640aa7b2795d971f9f0bf19acd1afdd93a06cb38aee2277e4a2fc6cda7, size: 2880}
+  - {sha256: ba94c9d1c6a08ba0f0042a47d00e50316d74c7f4738cd282a6869b6d019136fd, size: 48000}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: ExaCMech v0.4.3@9ca5913 (LLNL), BSD-3-Clause, LICENSE + NOTICE in level2/exacmech; input orientations generated in-program (minstd_rand0, seed 42), props = vendored upstream miniapp/cases/props.txt (in git on origin/main); f64 stresses only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level2-kripke-aea264dd042a7a9d.tar.zst
+  group: level2/kripke
+  part: 1
+  parts: 1
+  sha256: 99bb195d814049850e7b7e0af5bc6444ff510fa15b2244e31188b5e6800511a0
+  size: 419
+  tar_size: 10240
+  members_digest: aea264dd042a7a9d6dcacf5d505e2511c35d48ac5600cc02a4b50ccc2800f0a4
+  members:
+  - {sha256: 12f70eff1758c8432bb0f2c154d265e34afa5cd4de83c9fdb31d2a8f8123ba2d, size: 80}
+  - {sha256: 2edb9e487f4b14f39002fab1bba53900242be32ea9492228eb790baa0cf01dcd, size: 80}
+  - {sha256: 5612ceb055a7139ac22a62296b5bda2b55707a61699881a8199a5c73098530af, size: 80}
+  content_scan:
+    archive_blobs: 0
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Kripke@1b35d13 (LLNL), BSD-3-Clause LLNL-CODE-775068, LICENSE + NOTICE + COPYRIGHT in level2/kripke; input = built-in Kobayashi 3i problem, sized by run.sh knobs; f64 particle counts only -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+- name: golden-level3-nyx-fb533b75ce220cbc.tar.zst
+  group: level3/nyx
+  part: 1
+  parts: 1
+  sha256: 3155a29871702fd1949ac78f619508217c62c39eacaa48a61e1d7232e0c57306
+  size: 84042490
+  tar_size: 111052800
+  members_digest: fb533b75ce220cbc6540a0619e8f7566188e8a317c764f185069ef0d642884a3
+  members:
+  - {sha256: 22d5c600259a95cc641edce6ba5049a31664494f68ace8ec893c40f1779baad7, size: 10516480}
+  - {sha256: 3a3df750f4c0e011b7f17f91f2938f8d347312d1871524633faf00ae153d16bf, size: 10496000}
+  - {sha256: 4c295484e962727f72ed66b95a32709b16a5833ad85f81746522d7370db344a2, size: 79779840}
+  - {sha256: f60a0b2036f9da15cccfbcce8216e1d7bd644f06670eb0012e453d4d7337e800, size: 10250240}
+  content_scan:
+    archive_blobs: 4
+    credential_hits: 0
+    node_private_members: []
+  redistribution:
+    status: review
+    notes: [frozen B200 outputs of this project's benchmarks (raw arrays / archives named by committed references), 'review 2026-10-29: Nyx@e06eabc + AMReX@a52ca73 (+ SUNDIALS@5c53be8), BSD-3-Clause-LBNL / BSD-3-Clause, texts in the published source artifact nyx-hpcperf-l3-v1 (level3/nyx/provenance/LICENSES.md); input 32.nyx, 64sssss_20mpc.nyx, ic_sb_32.ascii, TREECOOL_middle = upstream Nyx repo files (in that artifact); 4 tars of AMReX plotfile/particle data + headers + parameter dump, no node-private text (job_info excluded) -> cleared-candidate']
+  primary: {url: null, status: unpublished}
+  mirrors: []
+references:
+  level1/adam/reference/n10000-t200.json:
+    json_sha256: ad8aabc111929cbf1cc06af7d95bfa6848d5313cc973067a91566e93a4faa166
+    schema: hpcperf-golden-1
+    blobs: [0e8acb580e2fd554c70efbca6c2cc35c5e5325e8f26511a3fd21f291b6cefd99]
+    bundles: [golden-level1-adam-2371346b7b588f80.tar.zst]
+  level1/adam/reference/n100000-t200.json:
+    json_sha256: 10036d20f5f0a566a1201c70c94d27aec44193c6490c020a775f0c1ced2b89be
+    schema: hpcperf-golden-1
+    blobs: [4b9b03d1205b886dc00d8f7e29041da7f15e412b7347fbe733cdd4d018658dd1]
+    bundles: [golden-level1-adam-2371346b7b588f80.tar.zst]
+  level1/adam/reference/n1000000-t200.json:
+    json_sha256: d2f7a698d0ffc003e91d5d56061a21fe69147eecc50257edefbec5800a1ed9dd
+    schema: hpcperf-golden-1
+    blobs: [27501fec459e16309c7b0588360b4340d604bbe26160ab2def7e6003bee0e889]
+    bundles: [golden-level1-adam-2371346b7b588f80.tar.zst]
+  level1/backprop/reference/n262144.json:
+    json_sha256: 9979d295ba93b50f60019039bef42f1ab892bd4d3c408dbe998234eef4789e29
+    schema: hpcperf-golden-1
+    blobs: [82dcdb80351106f27b3fb6e10f960efefa69517f8dcd91d3f54f7718333cc5a5, 8cc7a8daecdf8f73b869aa7a0d04a53e20a00ecfa89b696403023b68e5682ea4]
+    bundles: [golden-level1-backprop-bdbcbceba121b3d2.tar.zst]
+  level1/backprop/reference/n524288.json:
+    json_sha256: e1a05cfeceec7902f89767c78fff2378a0e0a254aec2308d15923e5fba9dd2f2
+    schema: hpcperf-golden-1
+    blobs: [868bce1a54c314b89e8a12ab5beff90eeeda75f6f4e0b7263741a11151f5a568, d73115d0cbde27afbcaa5ed3b7fefc9375f1ff33b4808d9f201a3fe90788edd9]
+    bundles: [golden-level1-backprop-bdbcbceba121b3d2.tar.zst]
+  level1/backprop/reference/n65536.json:
+    json_sha256: 0ed0d8ca848d54217b2d84a8e98198f109eda57e230dc04edded773086eca580
+    schema: hpcperf-golden-1
+    blobs: [2769c34b56e0b89ca0268cf1d4ef9f7af37f91422b263fb3a8b4f68e70eee116, 890bacccc74c8aac7c7c8afa007b9c4ed7132b2bb9288967264a55e1a5cd9e50]
+    bundles: [golden-level1-backprop-bdbcbceba121b3d2.tar.zst]
+  level1/backprop/reference/probe-dpn1-n1024.json:
+    json_sha256: 67061cc09dbc445b39cbb8c06b792702360724cd80955cc47b7af82804490019
+    schema: hpcperf-golden-1
+    blobs: [716525be6dd89ecc421fb2dfb76aedacf67bd11f043765cdd1a749cfb3e613ba, 74be1a8a868eb484bac29ee774602ee0cf36700bda340556c4992c450b077125]
+    bundles: [golden-level1-backprop-bdbcbceba121b3d2.tar.zst]
+  level1/backprop/reference/probe-dpn1-n32.json:
+    json_sha256: 58f74bdbff50a1682aa584b99dd60f852ebe4225ae69fb6cee3e3a645d3c2af2
+    schema: hpcperf-golden-1
+    blobs: [88db4cb568c3d6a4313f73496fe07a52477ea45fb02a90d5842cff7c3fc9867f, d02cedf3659e18f0952c47521a4b070af0700ff1ce4d16cf44503e58e4890052]
+    bundles: [golden-level1-backprop-bdbcbceba121b3d2.tar.zst]
+  level1/bezier_surface/reference/n300.json:
+    json_sha256: 3d002c5c973b93af3b633b53ce063df2b740d713fde3f3dfb4d0297947364371
+    schema: hpcperf-golden-1
+    blobs: [5658f0cddb1b4c937907d5e61992a1a5fd020a2a947b0162338433101c444fa0]
+    bundles: [golden-level1-bezier_surface-f68b18e562e4251a.tar.zst]
+  level1/bezier_surface/reference/n8192.json:
+    json_sha256: 2a6d6368c7e2f62aaad74fc9451753fe901d792ecb4e4d963c9eed8cc55a3722
+    schema: hpcperf-golden-1
+    blobs: [7c129b8a5165a6341d8939b2c44e82ec1efda848e862f56278023d878306173f]
+    bundles: [golden-level1-bezier_surface-f68b18e562e4251a.tar.zst]
+  level1/bilateral_filter/reference/w2960-h1440.json:
+    json_sha256: c88ac1e3eb476c7aece5a900abfd07fd8412b61ab9cfe1edc6e138ee10ca30e7
+    schema: hpcperf-golden-1
+    blobs: [2d1f0046ca67388cfb9ed87e625f6a4dca267bb0628fc3b099d4d5cdac72c5bf, 9ae7bba783ebd3a467dd276655c3ac0777f727c31c7a83f2e7ad34cf7d5337f0, dcc572e5ffa1bf1af3c208685d793d316cbd59b857eb7ceaf63575e747955f1e]
+    bundles: [golden-level1-bilateral_filter-734bab48e9f486cb.tar.zst]
+  level1/bilateral_filter/reference/w5920-h2880.json:
+    json_sha256: 17dbd69f2c11f8c705b530c2f8a713a82ed21eeaaf372daa08cd855ccc9ca3e1
+    schema: hpcperf-golden-1
+    blobs: [0aa6323d4d00dc68860082fd9cadc66122dfc741caac6eb3c65d7f5dfbdf9e63, 373e799f6cc5c1c85eb6547c6236f021393689b1550795db09a9716702f115da, 4c7288d051a1a3d34a5be4b4a50c537de71b6ea3f0a0e0b0f4994f53626ba1ab]
+    bundles: [golden-level1-bilateral_filter-734bab48e9f486cb.tar.zst]
+  level1/black_scholes/reference/x1048576.json:
+    json_sha256: 08f69856ff0a06169b34e0bc6519c9ea642df800ff976290b58a48136c4854cd
+    schema: hpcperf-golden-1
+    blobs: [af1fa9180a7519eb0851725f38c8c147c4a9138efc182c7a4dd8145f58f29087, d8f46f97afc8e4dd0bc4bac01da470a15e472e99083065c636eac88d6378cf62]
+    bundles: [golden-level1-black_scholes-9e3034dc11795dcb.tar.zst]
+  level1/black_scholes/reference/x16777216.json:
+    json_sha256: 9b8ca7b47bf629710dbf87527de06782f429a84686179d815c1aada93daf98a9
+    schema: hpcperf-golden-1
+    blobs: [1ca7b1afaa9e02449258d1cb80944ea0cc3d0c6307097cad4aa0fa0d4ddd169c, 7b8ec8ae185e6f4eb6fea9ea176eb469e73b7ef8e332d807269dc1477306c8bb]
+    bundles: [golden-level1-black_scholes-9e3034dc11795dcb.tar.zst]
+  level1/black_scholes/reference/x4194304.json:
+    json_sha256: e78e36038e224cda812bc5bae25836300b14ac4db8353a3189665063706dc662
+    schema: hpcperf-golden-1
+    blobs: [52d30140b55cd80189d455938cc55af62ab660a95c1699a5224f8cc899631820, 7aef7ea39f3172e2080cbd0c5c3ae592916d324cd1e78cce5af229bbe959e94d]
+    bundles: [golden-level1-black_scholes-9e3034dc11795dcb.tar.zst]
+  level1/burgers_equation/reference/probe-x820-y810-t100.json:
+    json_sha256: 93bbf47029c52eec74bc396563fb276ab794749660cb964792a7e00ece51d73f
+    schema: hpcperf-golden-1
+    blobs: [4ce4ea918492ec0e5d351906fc5bb1d816e614e4f86655224b3e4e6bb8491763, 53bc59a93f77339dc5a4815f5e99e8a4fc4fc2da5e97ec20ec9739279d73a1f5]
+    bundles: [golden-level1-burgers_equation-p1of2-b152706108e70ad8.tar.zst]
+  level1/burgers_equation/reference/x16400-y16200-t100.json:
+    json_sha256: 152095ec3b604a74bb8a724b2f722bbce6772c0dc7aafa489d003f06f29e3d03
+    schema: hpcperf-golden-1
+    blobs: [630d67cd2f61ddb5a66dcf0a988da5cb64848093e49f81f53e99f55afee758d4]
+    bundles: [golden-level1-burgers_equation-p1of2-b152706108e70ad8.tar.zst]
+  level1/burgers_equation/reference/x8200-y8100-t100.json:
+    json_sha256: cc72d6e546178e512a7b0afe018710d01521b6d57f0ef4f7d27006814fc558f0
+    schema: hpcperf-golden-1
+    blobs: [445a0103920ed53d529d4b18a26d36a79c2bfbca395080f776ec30cc5aaa081e]
+    bundles: [golden-level1-burgers_equation-p2of2-d2dde53ad7ff055c.tar.zst]
+  level1/burgers_equation/reference/x8200-y8100-t1000.json:
+    json_sha256: b9f9d2ee1c67328e7749a7dc28c8179783714018244027db024d1f13e61b782b
+    schema: hpcperf-golden-1
+    blobs: [9704d2736e5baf6ababeabaf053d60383f41616ee64399cc6a7d724c4995fc34]
+    bundles: [golden-level1-burgers_equation-p2of2-d2dde53ad7ff055c.tar.zst]
+  level1/daxpy/reference/size1000000.json:
+    json_sha256: 15c038897e49b21786046d15ae4e0437c1f143e64897c14e25ca207b52e1e163
+    schema: hpcperf-golden-1
+    blobs: [f38cecf0eb53960a91dbb0b601a3a3ac76fe18e597eb58fdadc538912476fd74]
+    bundles: [golden-level1-daxpy-3be167eae7c1babf.tar.zst]
+  level1/daxpy/reference/size16000000.json:
+    json_sha256: ec3c072895116ec0ab7c22fc952dc13ff469d7a95ce7f7ba852d067ce87b3820
+    schema: hpcperf-golden-1
+    blobs: [3aee0384b03a0e795f69e086ef32d98588dca2407c4f819ee44ecd3ac7d6f6d2]
+    bundles: [golden-level1-daxpy-3be167eae7c1babf.tar.zst]
+  level1/daxpy/reference/size4000000.json:
+    json_sha256: ae71908b5f10f1ea672c7511f36d1281fb4009a6d56060cbfc51d35676b3073c
+    schema: hpcperf-golden-1
+    blobs: [e80f5b802b09d8768747a3244846f11a81143e05192da3128a749232cbaf37d7]
+    bundles: [golden-level1-daxpy-3be167eae7c1babf.tar.zst]
+  level1/del_dot_vec_2d/reference/size1000000.json:
+    json_sha256: bbaa2c168eaafbee4e36dcde9c4424099341e7d409a7d817800d8ec297df96f8
+    schema: hpcperf-golden-1
+    blobs: [4d8405ef659ddf23780e6cbf5f666fc65c035e22d2e6d4b9796c61b9167c921b]
+    bundles: [golden-level1-del_dot_vec_2d-ef5086a7e5cdd0c8.tar.zst]
+  level1/del_dot_vec_2d/reference/size16000000.json:
+    json_sha256: d45e5919f6121ace7fb06acb02a494f6331aa14f24fb741b0666ffce3cabcc3d
+    schema: hpcperf-golden-1
+    blobs: [34e282f49361aa1ae47b20f19e98a8aa5c675d83f007c45b29878392474d7860]
+    bundles: [golden-level1-del_dot_vec_2d-ef5086a7e5cdd0c8.tar.zst]
+  level1/del_dot_vec_2d/reference/size4000000.json:
+    json_sha256: 85f8a6bed57d8adcc2c6e1012316867bb43a6d376a17a3deb9bc24e0aa3a466d
+    schema: hpcperf-golden-1
+    blobs: [84fd6697560272093b88532625a5166387da722bf740306a91115714aa1fabfe]
+    bundles: [golden-level1-del_dot_vec_2d-ef5086a7e5cdd0c8.tar.zst]
+  level1/energy/reference/probe-cutoffs.json:
+    json_sha256: 2bbbc3dd8a1e477eca85762a9ac5096410aad96de0fa6e5b250319b5619b795a
+    schema: hpcperf-golden-1
+    blobs: [129cc85d9b7f97c0d709914d318292033de1ca1f5c3aa2a932f01674cef99156, b2cc34363fb1717f4bb4714893204acf6e68dc97bffaaa7bfb19d341a0b21664]
+    bundles: [golden-level1-energy-a5dd928704ea9d2a.tar.zst]
+  level1/energy/reference/probe-randsign.json:
+    json_sha256: c0f7edf8290ca06fedb28f31a149e31d5cb20ba3a50e3cfa2ed0a0eda2598b2f
+    schema: hpcperf-golden-1
+    blobs: [4205277f361c3352c753814b6078621120da108b86f5c8a679b46cbd9f63297b, 71d3c8d14c4b5b09a96e824e4c84a4b8af3e70addc757f56c95ed9ddf9a76944]
+    bundles: [golden-level1-energy-a5dd928704ea9d2a.tar.zst]
+  level1/energy/reference/size1000000.json:
+    json_sha256: 7794e3fd43d291f2cda879f9abb33fdde0dfa120bf0bd60fc644dfab7b61d82b
+    schema: hpcperf-golden-1
+    blobs: [6506614505e113daab08b3f894ca46d4d61867c7b007c413b47a669abe8aae67, d0db9b0342fe44b38146c126dbf7941e7db4761d8499db23e16331703a5c0db6]
+    bundles: [golden-level1-energy-a5dd928704ea9d2a.tar.zst]
+  level1/energy/reference/size16000000.json:
+    json_sha256: 6e2e55d62209ced3db0b63d68a4896c59d930f4feaa8e4c1540ef2241c38c7a0
+    schema: hpcperf-golden-1
+    blobs: [82cb7cd0654397f68ee8c2688a8ad7a0fd32f8951b5de87c49b2530079d677fd, a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6]
+    bundles: [golden-level1-energy-a5dd928704ea9d2a.tar.zst]
+  level1/energy/reference/size4000000.json:
+    json_sha256: dd217d531faaad2a0efb0e6720a383d3bcf6524f155fb56e4098ccc7b94d2d4d
+    schema: hpcperf-golden-1
+    blobs: [1a100baed95a65f66d01cd08644b28e134783fd0c52ac7e35ad52a452e8b90b2, 8c55c7d221afc017363a1a308df2228936a0ceff078893f8f9b8ccf26bbc771f]
+    bundles: [golden-level1-energy-a5dd928704ea9d2a.tar.zst]
+  level1/fdtd_2d/reference/size1000.json:
+    json_sha256: 95524f8e3b2f72e56ddba83f85ae492a5442582046e5c8c6b8ed77d54a2deba7
+    schema: hpcperf-golden-1
+    blobs: [0d8e2a67b8fd28d67e5d38f823a21df8f6a9c580ce4e4259b336c75a77b0a9f4, eddd058d8757b9994434c0b059478364a8f42a4cb7b2c609eff2e0a0c4f4b668, f359ee3b7715e5d5667cb00d10df98cd141d33c75743050df7a8df7eb309ec66]
+    bundles: [golden-level1-fdtd_2d-81168f97981a511f.tar.zst]
+  level1/fdtd_2d/reference/size2000.json:
+    json_sha256: 9bdaf578e482db050da02966f980217701391413ce0fdaac2ee26dfe50dc32b5
+    schema: hpcperf-golden-1
+    blobs: [38a68ff4e52d8ef098aa6cc9258b2f3f42358faa39777b8bdfd696e3945514f2, 4e8036cf8904c0c764975aee170ea00cd274c9afaac7456f0f1ed7cd66413806, 6d2ef9056401538ac05864161c2759a8a1381827c25cf6c33c5fa7a6b8acdf2e]
+    bundles: [golden-level1-fdtd_2d-81168f97981a511f.tar.zst]
+  level1/fdtd_2d/reference/size4000.json:
+    json_sha256: 93719d6cc09dfb5a41cd354419f01bd94feeb4818c62b5d5396b61ee37a554cd
+    schema: hpcperf-golden-1
+    blobs: [79e3b086125360e2588d481f7cf206d2057655f1509d772094a5f0858e8c2f13, c2e4bb0ab4cf3ef9d69cf46d1790bd21a87f7caee91af6d70ce42062f8f64b12, e19893879d3d9b1b093f7b9bd1698f78e50fdc17304c4c9fd3242b2e7bd9d4cb]
+    bundles: [golden-level1-fdtd_2d-81168f97981a511f.tar.zst]
+  level1/fir/reference/y1024-x4096.json:
+    json_sha256: 60129457840c63a05e288ec90b208994c8e6641be67bfc2e45cc573a762bf129
+    schema: hpcperf-golden-1
+    blobs: [bb9128f8411dea33debd22fbda6e5f0fc3a1c0797367eb60b10f98221b80bf1b]
+    bundles: [golden-level1-fir-2e7ee4a5d2741056.tar.zst]
+  level1/fir/reference/y16384-x4096.json:
+    json_sha256: 0734aed5063e256d6982fce6e7a59657be63e77acf2aa71c12c90a89c79ebaa8
+    schema: hpcperf-golden-1
+    blobs: [8560bf86151153db0dfc3aaa3c41ccdb085c94ce21d9662243a9d93daced15b1]
+    bundles: [golden-level1-fir-2e7ee4a5d2741056.tar.zst]
+  level1/fir/reference/y4096-x4096.json:
+    json_sha256: 9a3fc76455df06606371f31f459145cb2d4d23f9fc6c94f5510a92241609f85a
+    schema: hpcperf-golden-1
+    blobs: [20fafcbd3922a3c9ac7aeb935bdf5291de7d8e3d9861457869ba8395528272fe]
+    bundles: [golden-level1-fir-2e7ee4a5d2741056.tar.zst]
+  level1/floyd_warshall/reference/size1000.json:
+    json_sha256: 66ccf7bef5823f931a558f7ff8e452ef294233275654ce825b4e2d8435302291
+    schema: hpcperf-golden-1
+    blobs: [f2ccfce39a8d5048e6b088f5e7d579677e601f799afd76f5aaf801c3ea6cbfb8]
+    bundles: [golden-level1-floyd_warshall-1f98b08f87ca7998.tar.zst]
+  level1/floyd_warshall/reference/size2000.json:
+    json_sha256: 137c1f1d60dfa580b786be966bee1c3b1b7ff0f0db26e733a7ee6dd1d749109f
+    schema: hpcperf-golden-1
+    blobs: [e2b2c2b8bb060a00ef81205f99235e1d78fac669659366fcd930fe58230aeef5]
+    bundles: [golden-level1-floyd_warshall-1f98b08f87ca7998.tar.zst]
+  level1/hotspot/reference/g512-p2-t2.json:
+    json_sha256: 5bab19bc16d31cacc60c0dd8f9d395f557633d19c3dcd12d7557f62322f0bba6
+    schema: hpcperf-golden-1
+    blobs: [5a906c2265e26e60869797390e68839587175a9bfde7b5407e9b5d553b994ad4]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
+  level1/hotspot/reference/g512-p2-t20.json:
+    json_sha256: 0aaad52a2dc4a650b6381f7627dd6b2830a16f9ed1e6ebddae488fc695c7c769
+    schema: hpcperf-golden-1
+    blobs: [9d70ab5147500860ac8cba3247e217eb29e504e6cebcc46f9861811e7f0847e7]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
+  level1/hotspot/reference/g512-p2-t200.json:
+    json_sha256: 3b7583c84f9faf8d861a3ff71068b064feee7c496c1910a13f6508887298d051
+    schema: hpcperf-golden-1
+    blobs: [535589a804e95041d8d86bee74068cf65240f9220e722c7217062485aa6008a7]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
+  level1/hotspot/reference/g512-p2-t21-pnoise9.json:
+    json_sha256: 05ba7de3772482bf73366f41cf3cfc75070d59c1dd361253f8aaedd5b4402790
+    schema: hpcperf-golden-1
+    blobs: [a8c686896108bfa8316d98d6f5b532f67ebd706c6af7b189bed8a7d57a3d17f9]
+    bundles: [golden-level1-hotspot-ba3c29624ac370e5.tar.zst]
+  level1/hotspot_3d/reference/g64-l8-i100.json:
+    json_sha256: 7f689a7c8c5912906f8469e56565d7092b02624cecef9893cf6cd34c7e6e8c79
+    schema: hpcperf-golden-1
+    blobs: [2a502a352ae96a3a294e1d692c2b6a1755a954a59d08603f2931f4b5472f5dd1]
+    bundles: [golden-level1-hotspot_3d-f444bc202246975d.tar.zst]
+  level1/hotspot_3d/reference/g64-l8-i1000.json:
+    json_sha256: 720b319831cf5578c2b2dfea350de12cedc953baca23378de4441131ed6c2bdf
+    schema: hpcperf-golden-1
+    blobs: [f49d2505e759a4fdc690732471323f70984eb369da4f1798b1ce82d2299ddbb5]
+    bundles: [golden-level1-hotspot_3d-f444bc202246975d.tar.zst]
+  level1/hotspot_3d/reference/g64-l8-i10000.json:
+    json_sha256: 1c6cb2c4d6b9f83b0f4ba745ac1783ca2b70b74f7a3540ba5637f55c31c13bf7
+    schema: hpcperf-golden-1
+    blobs: [797ccd35af7f8475377c8f6db3853081d7265504d055edac0e85cff866fb1f76]
+    bundles: [golden-level1-hotspot_3d-f444bc202246975d.tar.zst]
+  level1/hotspot_3d/reference/g64-l8-i50-amp10.json:
+    json_sha256: 329f88796f0d9a4d505bec74fdb06e9e14d11dfd14c23e89c590e834cc75cfba
+    schema: hpcperf-golden-1
+    blobs: [8593477ecacd9c27d122ae896e460cd07bae4a0c79842deb87512df2aa538bbf]
+    bundles: [golden-level1-hotspot_3d-f444bc202246975d.tar.zst]
+  level1/jacobi_2d/reference/size1002.json:
+    json_sha256: 39fec56331b5305b1990bda5f1dd79c30e82096b5622a4f8f670c2395b6e4a34
+    schema: hpcperf-golden-1
+    blobs: [7e818c2f1ae2d205859d4e9cfb70a27db4fdf9c455ca1a0d31ae073ac9c5e36e, fcbee8dab992a018649606a8504d34a507391a99c5afbdfeab72c01b54594b85]
+    bundles: [golden-level1-jacobi_2d-18ea47bbb5d66898.tar.zst]
+  level1/jacobi_2d/reference/size2004.json:
+    json_sha256: 10a9de454ecf5dfd6680a85416c47b25aded9ac4d2340bf73c3ef64eedeaf6b7
+    schema: hpcperf-golden-1
+    blobs: [cc9b87dcd0e510e93d8385e8859f47c06ee32dea4dbbb2fecb362f88944a7e9b, d98267ff1a531410f0236978d285a7581cb0961a1a2dc50945f2318025538838]
+    bundles: [golden-level1-jacobi_2d-18ea47bbb5d66898.tar.zst]
+  level1/jacobi_2d/reference/size4008.json:
+    json_sha256: bc480b95f270bda5f937f16bbfa9515fbd6f8d5b9d91fbf421142dce342502e7
+    schema: hpcperf-golden-1
+    blobs: [366fc4fd1f2a38d3708f73bf5d6270dd8556aea377ff21911c89daf8d17825f7, 609246cb7b1335108d339d7f88cc7325ca8a750d65b72ac469f068163fd7a538]
+    bundles: [golden-level1-jacobi_2d-18ea47bbb5d66898.tar.zst]
+  level1/ltimes/reference/size1000000.json:
+    json_sha256: 169e3afa4b0082918dd70a74134c62bed708b799e34f1b7fb185b408e10a9366
+    schema: hpcperf-golden-1
+    blobs: [7fe161d063c1b32a655ce8dd595ce20f4ced6f69151c4df4a0dbf3f068ac9f3e]
+    bundles: [golden-level1-ltimes-48237d6112fde49e.tar.zst]
+  level1/ltimes/reference/size16000000.json:
+    json_sha256: 76e3fa814549d86023717fb38c2c7dec50aac4098e2e0339ea32abbdd7e18fd7
+    schema: hpcperf-golden-1
+    blobs: [c3d2965d0a3f6d3deaba5edd2393abc50a9133a288f698dca2eca73d3723a8b1]
+    bundles: [golden-level1-ltimes-48237d6112fde49e.tar.zst]
+  level1/ltimes/reference/size4000000.json:
+    json_sha256: 3eaf9172e64184abff899c91a84d693eb22de7b9865195a3b58c41d64ef3b95e
+    schema: hpcperf-golden-1
+    blobs: [716de4465a2bcbf0a497d83267e10dbee9851f95db5ee63d63936c3c928bb0d7]
+    bundles: [golden-level1-ltimes-48237d6112fde49e.tar.zst]
+  level1/mat_mat_shared/reference/probe-rand.json:
+    json_sha256: 36e23af60d7a033e6bb173108057b58b320b1acc069f9cfc9bd1f183546652b4
+    schema: hpcperf-golden-1
+    blobs: [3bd7364dd5413770d8bb890efed330e8eb5dc83867d14eaa840cdb881d8864a2]
+    bundles: [golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst]
+  level1/mat_mat_shared/reference/size1000.json:
+    json_sha256: 787cc533e9e3beaa979c8ea57f8ff78e9dbfd0b7f5e225dd0acb09a2b3f1eb68
+    schema: hpcperf-golden-1
+    blobs: [36127b4f470ca8edf8b9e62132b7049914e5fa6cdd3dd29fb2c5f14ae3483118]
+    bundles: [golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst]
+  level1/mat_mat_shared/reference/size2000.json:
+    json_sha256: bcca3a4f48e1cac63d1fbca3d9d413137d78b3bc762f55276d13274282334323
+    schema: hpcperf-golden-1
+    blobs: [74b86723233b5337a899870cd8271c2af0c591247ff4f342e7f3c09a54cd8430]
+    bundles: [golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst]
+  level1/mat_mat_shared/reference/size4000.json:
+    json_sha256: 74b562c81df3a23178f6dde9f98c63e96d41446ad51c74029e0d7a0ce609c8b7
+    schema: hpcperf-golden-1
+    blobs: [a801892822e4ba8878f509e73a08765e7b8ec93db39c4452235885dfb7d573bd]
+    bundles: [golden-level1-mat_mat_shared-998c69fe8217633d.tar.zst]
+  level1/matvec_3d_stencil/reference/size1000000.json:
+    json_sha256: 22f6e30c8da0dbbff6f875a197096ef1bd159bffcc696826870a88608bf342f2
+    schema: hpcperf-golden-1
+    blobs: [63afac87181466400ec57b7626f50ec6c5c158fb2f1b120c46e1652c8c7b749e]
+    bundles: [golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst]
+  level1/matvec_3d_stencil/reference/size16000000.json:
+    json_sha256: c2f4f716c7b0dbe93a69ea1fb58cd44df2630522cbe8031f6b4a989ed24608a9
+    schema: hpcperf-golden-1
+    blobs: [0555db051527d6406edfba66d1c18f58940e55cf114a1018b89be79e2240bf64]
+    bundles: [golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst]
+  level1/matvec_3d_stencil/reference/size4000000.json:
+    json_sha256: dd9721b6047c2161c7fb5e8a44d5c73564fc8307c9ddb9d2a912ecd7c07b2774
+    schema: hpcperf-golden-1
+    blobs: [561517f73f4f0b137f946b07ea128f6208d9e0f36cc37ba0f0d25c5eca216572]
+    bundles: [golden-level1-matvec_3d_stencil-ea8ef622693bd04e.tar.zst]
+  level1/nbody/reference/n16000-s10.json:
+    json_sha256: bd0862ec9db0e12f0e7fc64ff78f386ed8bb7f554fbb463f75b8c5ed87036dc0
+    schema: hpcperf-golden-1
+    blobs: [28075aecc2726dd81f948c80cac5f102ac609c7d69e27407b6b6550e5b8d8a3b, 333035c11fdc2daae99009857d5c7b87abbfd3791a36b05cffd517014186e5e8, 65f21c5333a642492db46929e198199ff5165c7e0998de23b37045fe211fff6b]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
+  level1/nbody/reference/n32000-s10.json:
+    json_sha256: 24bd46add187f8c35d5aa12e158f429c53ac821a27c0e933d2cf050d33f39aaf
+    schema: hpcperf-golden-1
+    blobs: [09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502, 4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5, 9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
+  level1/nbody/reference/n64000-s10.json:
+    json_sha256: 7dea8b07f962343a7e2ba6bff421e65e7053c20b5bbf7184a7ad716e8015eda0
+    schema: hpcperf-golden-1
+    blobs: [206777ada780713697b250567dee97cd8e1fadff7ead7e8eaaaaf363ce390578, 56c37bb388d199008bea024cf230d7ee4ab1e73a3d8bd0f4d085c4843b0faa69, d2f5ffb87aa773ec98098f82dde3c05df05ff93654abff767be10d7615252c71]
+    bundles: [golden-level1-nbody-a9136df9ac968bf8.tar.zst]
+  level1/nearest_neighbor/reference/cane4-all.json:
+    json_sha256: 5c27d4037d660512b740229f0cc43ac0e5cb77cbdc96b8653d01d3dd76b2acc2
+    schema: hpcperf-golden-1
+    blobs: [33e9234bf83e88df27add3febfb4b57096e60d2b13c6e0977b0d70f125973cc3, cb191f50e4fefee5ed8da7eedd446cfbd112ea7438bc39cb92f1da2243f2e9e8]
+    bundles: [golden-level1-nearest_neighbor-47ea5707dda207a6.tar.zst]
+  level1/nearest_neighbor/reference/cane4-k5.json:
+    json_sha256: c023adfb4ce2d6f41f91ab598a65462bdeed5002e1c7cd2cdb864a7d3c92d8b4
+    schema: hpcperf-golden-1
+    blobs: [9712b5e60ba5eec6f96a5a7891f1f7b2b4913201594bd089176ee5f589bee225, df3813ece5587f581ed88721a41d70833cedc1bdce4a25208f504b934842523c]
+    bundles: [golden-level1-nearest_neighbor-47ea5707dda207a6.tar.zst]
+  level1/pagerank/reference/nodes1024.json:
+    json_sha256: 433a09d9e263ad715c5d2ab8095ee5f54f9409dc5c793332368e72c14d868224
+    schema: hpcperf-golden-1
+    blobs: [a10eac893da8de95fc2d1a944a3d4fc77f652e7cccf4d0cfbd0ea021c333fc86]
+    bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
+  level1/pagerank/reference/nodes16384-m5.json:
+    json_sha256: d0715edf7b9eef98ed90168e07f2b391fd4fd949807066eca8a797f1be22e8cf
+    schema: hpcperf-golden-1
+    blobs: [7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5]
+    bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
+  level1/pagerank/reference/nodes16384.json:
+    json_sha256: 4da64afe2ade24f3d4c1a379e114507b337db0f5e73705d3eb77de4598a11810
+    schema: hpcperf-golden-1
+    blobs: [63fcdd3e17b13e6d120f391830e77801d0b3e66b918b6618a20747e0652a522e]
+    bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
+  level1/pagerank/reference/nodes4096.json:
+    json_sha256: 74bf593b3e6d62e123bcf6821568da15427601e5c3d7032d1c23916179e04f75
+    schema: hpcperf-golden-1
+    blobs: [9f6a63b947ae20780d211ffaa6f5759dd2384d5ef5f156a3d9bcae6b5183a836]
+    bundles: [golden-level1-pagerank-777730839711bfde.tar.zst]
+  level1/pressure/reference/probe-cutoffs.json:
+    json_sha256: 022e5c43a5401870c10a3e2553478f33f35b03f968c209963e85efda5db777e5
+    schema: hpcperf-golden-1
+    blobs: [27578a3c7b8753d548c4ccd0bf0e5c873952188f4bbbd4590e3989060ffe12ee, af3c137e9ab763ad7037c9c1fdeebf3221489f7b92f37172eb389897194d52b8]
+    bundles: [golden-level1-pressure-d9c5db18d5189d9a.tar.zst]
+  level1/pressure/reference/probe-randvalue.json:
+    json_sha256: c1c50160bd47ad70f9fbff34fd1ee84a7a3ca77b60edb4fbc1832f27aba8b8f2
+    schema: hpcperf-golden-1
+    blobs: [ace3b0b22886ca5e77d446cc79fef1bf46868d294656c8d1cce734b9b8a58cbe, af3c137e9ab763ad7037c9c1fdeebf3221489f7b92f37172eb389897194d52b8]
+    bundles: [golden-level1-pressure-d9c5db18d5189d9a.tar.zst]
+  level1/pressure/reference/size1000000.json:
+    json_sha256: 5f0053c622d32d8c06f766be008c6a3646da22d1efba8e472b59dfdc3d36d71c
+    schema: hpcperf-golden-1
+    blobs: [af3c137e9ab763ad7037c9c1fdeebf3221489f7b92f37172eb389897194d52b8, d0db9b0342fe44b38146c126dbf7941e7db4761d8499db23e16331703a5c0db6]
+    bundles: [golden-level1-pressure-d9c5db18d5189d9a.tar.zst]
+  level1/pressure/reference/size16000000.json:
+    json_sha256: 6e06602256462828cc14212835cf0fdf02e33c24b8acad1fd407a4c4c8a6f355
+    schema: hpcperf-golden-1
+    blobs: [0f827db1cb145d6df17d79d9857d007b35d8478a1d5c6b12c96b150d6c41c33c, a35b17af2f3ae8087710391a1c9f4bf7926f252b9169437cdd2d4f3d1d3dcde6]
+    bundles: [golden-level1-pressure-d9c5db18d5189d9a.tar.zst]
+  level1/pressure/reference/size4000000.json:
+    json_sha256: 51171acb7e6015a5139d67b92806d26554bf692f9378e76aac56e6249249b353
+    schema: hpcperf-golden-1
+    blobs: [2c038bae7d25acd05ca91ee858bb8f70843241ba8548877d6c1a2177af7e042e, 8c55c7d221afc017363a1a308df2228936a0ceff078893f8f9b8ccf26bbc771f]
+    bundles: [golden-level1-pressure-d9c5db18d5189d9a.tar.zst]
+  level1/spadd/reference/m10000.json:
+    json_sha256: 32e05d61acd41e7d4cb7be04581a55032419e89d06369556e3d02e978b2f4610
+    schema: hpcperf-golden-1
+    blobs: [98a807e22187e1cfd74ad92218698dd20aff9588b640149415df39f8080ba927]
+    bundles: [golden-level1-spadd-a4b5ceebc18085ed.tar.zst]
+  level1/spadd/reference/m100000.json:
+    json_sha256: 3ac3074d831d92be4297c6e7330f29f9b8f9f5347d7e04496b3d1b119f26ffd8
+    schema: hpcperf-golden-1
+    blobs: [70895a5dee86e1b84dbc0c53554176c13d260f91387c21e186697e8277ceebd4]
+    bundles: [golden-level1-spadd-a4b5ceebc18085ed.tar.zst]
+  level1/spgemm/reference/m10000.json:
+    json_sha256: 3c35080c4a895b76e47dd2b55697c869e6bffaf1fc56df3ba049359b0f8ae996
+    schema: hpcperf-golden-1
+    blobs: [aaa03cebd65c6afbf5d533950eca3cbe125ba2a87b5ca72cc42b76e3d58ccc75]
+    bundles: [golden-level1-spgemm-d5bdc149e4a5af2f.tar.zst]
+  level1/spgemm/reference/m100000.json:
+    json_sha256: 2e32f65f8e1145cbe7283fae1c6eef098b2a76db8807c1c7dedf9df028aaca8b
+    schema: hpcperf-golden-1
+    blobs: [31bf7c0c1ef61e609ab266b1d0aa2b21926a6916628e341cc36ce00fbf8f3201]
+    bundles: [golden-level1-spgemm-d5bdc149e4a5af2f.tar.zst]
+  level1/spmv/reference/probe-real.json:
+    json_sha256: 963fd3583e11e7fbbb70620a29fb09de11fc345948ab0930167fe209260aa704
+    schema: hpcperf-golden-1
+    blobs: [9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
+  level1/spmv/reference/s110503.json:
+    json_sha256: 7106646befb9df63531b9f1bfccd4f220092cd7744b0b394c040b74f6c6330f8
+    schema: hpcperf-golden-1
+    blobs: [996281e1730fb0fa9b5d24bda923731a5fc0c4bc670391dc83e121d3b4a8861d]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
+  level1/spmv/reference/s1768048.json:
+    json_sha256: 1587d9bdeb3d7c604e7860dd61ae77fa53808c2e46f42cd9b9a631d68a98e91f
+    schema: hpcperf-golden-1
+    blobs: [e905134c11395b6261c6f2753816db21b0dfc8a2619dcda3bb00e780d63cd39d]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
+  level1/spmv/reference/s442012.json:
+    json_sha256: 08fea45f14378ba190b02a43bca908f2054f463ae32a566b0092b9d588c244dd
+    schema: hpcperf-golden-1
+    blobs: [3e5f6e2a9cb65a4b1f2091909662716615b8070e6fec28767081f7606c41ab5b]
+    bundles: [golden-level1-spmv-ebd8f22ef8233e96.tar.zst]
+  level1/srad_v1/reference/iter100.json:
+    json_sha256: 603c2a3386feaa8f3c48c045e6c6b8f39825dc6ae35e03c0be3fc9c9517cbeb3
+    schema: hpcperf-golden-1
+    blobs: [76868d23c9fddd737dbbf938d2b2a7c0ffca068844a292846a6891839f13602e]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
+  level1/srad_v1/reference/iter2000.json:
+    json_sha256: 521b7e586310d752ab2462486c18fbb8d70ed2be15c5396d90027572f7f95033
+    schema: hpcperf-golden-1
+    blobs: [4d9d3d2406b2884b9b7c25ade94d5d7027a61369d5e4a03fa32e166deb20af45]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
+  level1/srad_v1/reference/iter500.json:
+    json_sha256: 5f3788c161057ab6744a9448e5e2e71134782f8c370d3ce4cac44a65ae1aaf05
+    schema: hpcperf-golden-1
+    blobs: [5fe05607de5d6f3838df8caea66fb8d158a1494a5849212c744de0efc2e40322]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
+  level1/srad_v1/reference/probe-edges-n20.json:
+    json_sha256: a84128d5cf8a3813996100d0ba91359b1e4f4bb03a423293c66b7658ef7d63c8
+    schema: hpcperf-golden-1
+    blobs: [3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679]
+    bundles: [golden-level1-srad_v1-b57aca3e43fac564.tar.zst]
+  level2/exacmech/reference/bcc-a-1m-1000.json:
+    json_sha256: ab3e21c192073ba3ae007ffc68eccf905cb7b0aa6629c8611a1a18749cbe10b2
+    schema: hpcperf-golden-1
+    blobs: [93e3ad1021082b15a36bdff1f7461e71f55da57503a394807613c4c54d500033]
+    bundles: [golden-level2-exacmech-5b42e72fc6e6eaf9.tar.zst]
+  level2/exacmech/reference/fcc-a-1m-1000.json:
+    json_sha256: dc59e189bbcea0ba7e6dedbde8be3ee9ad07f31063ddc2daa808335123bb258c
+    schema: hpcperf-golden-1
+    blobs: [ba94c9d1c6a08ba0f0042a47d00e50316d74c7f4738cd282a6869b6d019136fd]
+    bundles: [golden-level2-exacmech-5b42e72fc6e6eaf9.tar.zst]
+  level2/exacmech/reference/fcc-a-350k-60.json:
+    json_sha256: ee92218dd8593b38a46e4c77cffc01ca5346209189014d908a4dd56a0fc4ff29
+    schema: hpcperf-golden-1
+    blobs: [acfd65640aa7b2795d971f9f0bf19acd1afdd93a06cb38aee2277e4a2fc6cda7]
+    bundles: [golden-level2-exacmech-5b42e72fc6e6eaf9.tar.zst]
+  level2/kripke/reference/z32-g32-q64.json:
+    json_sha256: 20b291ff0404c5e52b748b766fece6964c1a3542545fbf97a474442eb51c7a06
+    schema: hpcperf-golden-1
+    blobs: [5612ceb055a7139ac22a62296b5bda2b55707a61699881a8199a5c73098530af]
+    bundles: [golden-level2-kripke-aea264dd042a7a9d.tar.zst]
+  level2/kripke/reference/z32-g64-q128-dgz.json:
+    json_sha256: 984e343720cd71ef55e6a1474d351ec5a32f42270f52ad5953c2120da1489768
+    schema: hpcperf-golden-1
+    blobs: [2edb9e487f4b14f39002fab1bba53900242be32ea9492228eb790baa0cf01dcd]
+    bundles: [golden-level2-kripke-aea264dd042a7a9d.tar.zst]
+  level2/kripke/reference/z32-g64-q128.json:
+    json_sha256: 55353832e840cbe0f3e0a9e7fe0cf99aa7c1645d6aea66c5e01bd6a102428092
+    schema: hpcperf-golden-1
+    blobs: [2edb9e487f4b14f39002fab1bba53900242be32ea9492228eb790baa0cf01dcd]
+    bundles: [golden-level2-kripke-aea264dd042a7a9d.tar.zst]
+  level2/kripke/reference/z64-g64-q128.json:
+    json_sha256: 66936285203ebacfb30dc3710ede2a6263effb72596b89eb03119b71136ae72e
+    schema: hpcperf-golden-1
+    blobs: [12f70eff1758c8432bb0f2c154d265e34afa5cd4de83c9fdb31d2a8f8123ba2d]
+    bundles: [golden-level2-kripke-aea264dd042a7a9d.tar.zst]
+  level3/nyx/reference/lya_adiabatic.smoke.json:
+    json_sha256: 49803b88f4fc6f1082deda83dba63592e52475b7012180f1f0abe1cb2b9ddb23
+    schema: hpcperf-nyx-frozen-reference-1
+    blobs: [f60a0b2036f9da15cccfbcce8216e1d7bd644f06670eb0012e453d4d7337e800]
+    bundles: [golden-level3-nyx-fb533b75ce220cbc.tar.zst]
+  level3/nyx/reference/lya_adiabatic.strong.json:
+    json_sha256: b5101193c25f5de29f8f444f47a0b4e6d38a8e53a57c1a4f27280b20afbe9e0d
+    schema: hpcperf-nyx-frozen-reference-1
+    blobs: [4c295484e962727f72ed66b95a32709b16a5833ad85f81746522d7370db344a2]
+    bundles: [golden-level3-nyx-fb533b75ce220cbc.tar.zst]
+  level3/nyx/reference/lya_heatcool.smoke.json:
+    json_sha256: 253c4b2d6e4675776729806618db661c28aab0f2a02d4fbdc04f3900b2371222
+    schema: hpcperf-nyx-frozen-reference-1
+    blobs: [22d5c600259a95cc641edce6ba5049a31664494f68ace8ec893c40f1779baad7]
+    bundles: [golden-level3-nyx-fb533b75ce220cbc.tar.zst]
+  level3/nyx/reference/minisb.smoke.json:
+    json_sha256: 5756562b007d6e2543434ec35337dc47e8bd26bf37e757a4138d07db9fae7d3a
+    schema: hpcperf-nyx-frozen-reference-1
+    blobs: [3a3df750f4c0e011b7f17f91f2938f8d347312d1871524633faf00ae153d16bf]
+    bundles: [golden-level3-nyx-fb533b75ce220cbc.tar.zst]

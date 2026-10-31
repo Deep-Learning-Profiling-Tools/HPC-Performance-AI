@@ -29,14 +29,23 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(nearest_neighbor_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(nearest_neighbor_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    # verify.py runs the benchmark and validates its output against a
-    # CPU reference (see verify.py header for details)
-    add_test(NAME nearest_neighbor_run COMMAND ${Python3_EXECUTABLE}
-             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:nearest_neighbor_cuda> ${CMAKE_CURRENT_BINARY_DIR}/filelist_4 5 30 90)
+    # one plain run of the registry's default input (no CPU reference: verify.py is used only once, offline,
+    # by hpcperf_golden.py make), its output compared with the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME nearest_neighbor_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:nearest_neighbor_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(nearest_neighbor_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
-        FAIL_REGULAR_EXPRESSION "FAIL")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): the default query with -r 42764 (every record), on
+    # which every record must be reported once with its own distance; checked against its own frozen reference, never timed
+    add_test(NAME nearest_neighbor_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} cane4-all --exe $<TARGET_FILE:nearest_neighbor_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe)
+    set_tests_properties(nearest_neighbor_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

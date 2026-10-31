@@ -9,6 +9,7 @@
 // Validation: element-wise comparison of b.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -214,34 +215,44 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(b, d_b, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("b", b, len, "f64");   // tools/golden: the checked output
   cudaFree(d_b); cudaFree(d_x); cudaFree(d_rz);
 #define DFREE(n) cudaFree(dm.n);
   MV3D_ALLOC(DFREE)
 #undef DFREE
 
-  // ------------------------ CPU (upstream Base_Seq) ------------------------
-  Real_ptr b_r, x_r; Ptrs mr; Index_ptr rz_r;
-  host_setup(b_r, x_r, mr, rz_r);
-  set_x_aliases(mr, x_r, domain.jp, domain.kp);
-  {
-    Real_ptr b = b_r;
-#define LOCAL_X(n) Real_ptr x##n = mr.x##n;
-#define LOCAL_M(n) Real_ptr n = mr.n;
-    MV3D_POS(LOCAL_X)
-    MV3D_POS(LOCAL_M)
-#undef LOCAL_X
-#undef LOCAL_M
-    Index_ptr real_zones = rz_r;
-    for (Index_type irep = 0; irep < run_reps; ++irep) {
-      for (Index_type ii = 0; ii < iend; ++ii ) {
-        MATVEC_3D_STENCIL_BODY_INDEX;
-        MATVEC_3D_STENCIL_BODY;
+  bool ok = true;
+  if (hpcperf_skip_verify()) {
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
+    printf("SKIP_VERIFY\n");
+  } else {
+    // ------------------------ CPU (upstream Base_Seq) ------------------------
+    Real_ptr b_r, x_r; Ptrs mr; Index_ptr rz_r;
+    host_setup(b_r, x_r, mr, rz_r);
+    set_x_aliases(mr, x_r, domain.jp, domain.kp);
+    {
+      Real_ptr b = b_r;
+  #define LOCAL_X(n) Real_ptr x##n = mr.x##n;
+  #define LOCAL_M(n) Real_ptr n = mr.n;
+      MV3D_POS(LOCAL_X)
+      MV3D_POS(LOCAL_M)
+  #undef LOCAL_X
+  #undef LOCAL_M
+      Index_ptr real_zones = rz_r;
+      for (Index_type irep = 0; irep < run_reps; ++irep) {
+        for (Index_type ii = 0; ii < iend; ++ii ) {
+          MATVEC_3D_STENCIL_BODY_INDEX;
+          MATVEC_3D_STENCIL_BODY;
+        }
       }
     }
-  }
+    hpcperf_golden_output("b.cpu", b_r, len, "f64");   // the CPU reference (golden make only)
 
-  // ------------------------------ validate ---------------------------------
-  bool ok = compareArrays("b", b_r, b, len, 1.0e-10);
-  printf("%s\n", ok ? "PASS" : "FAIL");
+    // ------------------------------ validate ---------------------------------
+    ok = compareArrays("b", b_r, b, len, 1.0e-10);
+    printf("%s\n", ok ? "PASS" : "FAIL");
+  }
   return ok ? 0 : 1;
 }

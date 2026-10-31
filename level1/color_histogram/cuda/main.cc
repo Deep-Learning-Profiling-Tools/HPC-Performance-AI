@@ -1,6 +1,8 @@
 // Minimal standalone driver for the Hetero-Mark color histogram benchmark (CUDA).
 // Replaces the upstream command-line-option framework; the benchmark class,
-// its CPU reference implementation, and Verify() are unchanged upstream code.
+// its CPU reference implementation, and Verify() are unchanged upstream code (plus the
+// tools/golden capture calls; the CPU reference runs only with HPCPERF_CPU_REFERENCE=1; the
+// input seed is fixed to 1 unless HPCPERF_RANDOM_SEED asks otherwise, common/hpcperf_measure.h).
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -30,7 +32,7 @@ int main(int argc, char **argv) {
   benchmark.SetNumPixel(num_pixels);
   benchmark.SetQuietMode(true);
   runner.SetQuietMode(true);
-  runner.SetVerificationMode(!hpcperf_skip_verify());  // off in measurement mode
+  runner.SetVerificationMode(!hpcperf_skip_verify());  // CPU reference only with HPCPERF_CPU_REFERENCE=1
   if (hpcperf_skip_verify()) printf("SKIP_VERIFY\n");
   // HPCPERF_L1_PHASE_TIMING=1 prints the six-phase summary the upstream
   // BenchmarkRunner already computes (to stderr). Off by default.

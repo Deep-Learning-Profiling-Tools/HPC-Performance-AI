@@ -39,6 +39,8 @@
  */
 
 #include "fir_benchmark.h"
+#include "hpcperf_golden.h"
+#include "hpcperf_measure.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -50,7 +52,10 @@ void FirBenchmark::Initialize() {
   output_ = new float[num_total_data_];
   coeff_ = new float[num_tap_];
 
-  unsigned int seed = time(NULL);
+  // HPC-Performance-AI: a fixed default seed (1) instead of upstream's
+  // `unsigned int seed = time(NULL);`, so the registered inputs are reproducible;
+  // HPCPERF_RANDOM_SEED=time restores the clock seed (common/hpcperf_measure.h)
+  unsigned int seed = hpcperf_input_seed("fir");
 
   // Initialize input data
   for (unsigned int i = 0; i < num_total_data_; i++) {
@@ -65,6 +70,12 @@ void FirBenchmark::Initialize() {
     coeff_[i] =
         static_cast<float>(rand_r(&seed)) / static_cast<float>(RAND_MAX);
   }
+}
+
+// tools/golden: the filtered signal Verify() compares with the CPU FIR (written back
+// block by block by the last timed Run(); a no-op unless HPCPERF_GOLDEN_DUMP is set)
+void FirBenchmark::CaptureGoldenOutputs() {
+  hpcperf_golden_output("output", output_, num_total_data_, "f32");
 }
 
 void FirBenchmark::Verify() {
@@ -84,6 +95,8 @@ void FirBenchmark::Verify() {
       exit(-1);
     }
   }
+  // the CPU reference (golden make only)
+  hpcperf_golden_output("output.cpu", cpu_output, num_total_data_, "f32");
 
   if (!has_error) {
     printf("Passed! %d data points filtered\n", num_total_data_);

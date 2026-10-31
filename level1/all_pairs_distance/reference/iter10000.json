@@ -1,0 +1,157 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "all_pairs_distance",
+  "level": 1,
+  "input_id": "iter10000",
+  "frozen": true,
+  "workload": {
+    "input_id": "iter10000",
+    "params": {
+      "iterations": 10000
+    },
+    "args": [
+      "10000"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "780d6d7fd3587beb14e4f692b5e81ba40c7b126f1b71bd30c45e954dae5eaeb6",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "distance.k1",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's memcmp of the INSTANCES x INSTANCES (224 x 224) int distance matrix of kernel k1 (registers + atomics) with the CPU result CPU() (cuda/main.cu:273); integer, exact",
+        "log": null
+      },
+      {
+        "name": "distance.k2",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's memcmp of the distance matrix of kernel k2 (shared-memory tree reduction) with CPU() (cuda/main.cu:297); integer, exact",
+        "log": null
+      },
+      {
+        "name": "distance.k3",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's memcmp of the distance matrix of kernel k3 (CUB BlockReduce) with CPU() (cuda/main.cu:321); integer, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "distance.k1",
+      "dtype": "i32",
+      "count": 50176,
+      "bytes": 200704,
+      "sha256": "0c6712665a12a403f6673580d37631f0650a08ccd5772f0796a35db477b62eb1",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp of the INSTANCES x INSTANCES (224 x 224) int distance matrix of kernel k1 (registers + atomics) with the CPU result CPU() (cuda/main.cu:273); integer, exact",
+      "stats": {
+        "min": 0.0,
+        "max": 2848.0,
+        "sum": 136418278.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "distance.k2",
+      "dtype": "i32",
+      "count": 50176,
+      "bytes": 200704,
+      "sha256": "0c6712665a12a403f6673580d37631f0650a08ccd5772f0796a35db477b62eb1",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp of the distance matrix of kernel k2 (shared-memory tree reduction) with CPU() (cuda/main.cu:297); integer, exact",
+      "stats": {
+        "min": 0.0,
+        "max": 2848.0,
+        "sum": 136418278.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "distance.k3",
+      "dtype": "i32",
+      "count": 50176,
+      "bytes": 200704,
+      "sha256": "0c6712665a12a403f6673580d37631f0650a08ccd5772f0796a35db477b62eb1",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp of the distance matrix of kernel k3 (CUB BlockReduce) with CPU() (cuda/main.cu:321); integer, exact",
+      "stats": {
+        "min": 0.0,
+        "max": 2848.0,
+        "sum": 136418278.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:15:43Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "0077d885c0b1d5d5a18a66cda868db8c5f84f8f1",
+    "source_clean": true,
+    "binary": "build/all_pairs_distance/cuda/all_pairs_distance_cuda",
+    "binary_sha256": "f22919ede905a72f814b11f8ad129f83865bf0c0b9b05446a3078b79ec94d127",
+    "command": [
+      "build/all_pairs_distance/cuda/all_pairs_distance_cuda",
+      "10000"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 3.081,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/all_pairs_distance/iter10000/run/stdout.log",
+      "log_sha256": "170f59c0643a0e9cffad8ef484390124e31319a061eb0819002c179142701ffc"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

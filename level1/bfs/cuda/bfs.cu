@@ -16,6 +16,7 @@
   Created by Pawan Harish.
  ************************************************************************************/
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -208,6 +209,7 @@ void BFSGraph( int argc, char** argv)
 
 	// copy result from device to host
 	cudaMemcpy( h_cost, d_cost, sizeof(int)*no_of_nodes, cudaMemcpyDeviceToHost) ;
+	hpcperf_golden_output("cost", h_cost, no_of_nodes, "i32");   // tools/golden: the checked output (the hop counts written to result.txt)
 
 	//Store the result into a file
 	FILE *fpo = fopen("result.txt","w");

@@ -99,6 +99,14 @@ class Benchmark {
   virtual void Cleanup() = 0;
 
   /**
+   * HPC-Performance-AI (tools/golden): capture the outputs the CPU check in
+   * Verify() compares, with hpcperf_golden_output. Called by BenchmarkRunner
+   * after the timed repetitions, outside every timed phase, before Verify() and
+   * Cleanup(); a no-op unless HPCPERF_GOLDEN_DUMP is set.
+   */
+  virtual void CaptureGoldenOutputs() {}
+
+  /**
    * Set timer object
    */
   virtual void SetTimer(TimeMeasurement *timer) { timer_ = timer; }

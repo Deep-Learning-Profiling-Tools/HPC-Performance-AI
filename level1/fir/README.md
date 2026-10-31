@@ -43,18 +43,17 @@ cmake --build build/fir/hip
 ./build/fir/cuda/fir_cuda -y 1024 -x 4096
 ```
 
+**Input seed.** Upstream seeds the input generator from the clock (`seed = time(NULL)`), so every run drew another random input. Here the seed is fixed to **1** by default (Hetero-Mark's own fixed seed, `kSeedInitValue = 1` of its `ep` benchmark; upstream ships none for fir); the registered inputs (`inputs.yaml` `params.seed`) and their golden references are defined by it. `HPCPERF_RANDOM_SEED=time` restores upstream's clock seed and `HPCPERF_RANDOM_SEED=<n>` (unsigned 32-bit) picks another one; any other value is refused (exit 2). Every run prints the seed it used (`fir: input seed N (...)`), a non-default one marked `NON-DEFAULT SEED`: such a run is not a registered input, and its golden check fails (its outputs differ). The generator itself (glibc `rand_r`) and its call order are upstream's; see `common/hpcperf_measure.h`.
+
 ## Validation
 
-Built-in (upstream Verify): GPU-filtered signal compared against CPU FIR; prints 'Passed!'.
-
-Run it via:
+Correctness = the filtered signal of the last timed run (captured by `FirBenchmark::CaptureGoldenOutputs`, called by `common/benchmark_runner.cc` after the timed repetitions) within max |a - g| <= 1e-5 - d0 of the frozen B200 golden reference `reference/<input_id>.json` (d0 = the golden's own deviation from the CPU FIR, 1.4e-6 on the default input; rule in `inputs.yaml` `golden:`). The upstream Verify (GPU-filtered signal compared against the CPU FIR, abs 1e-5 per point, prints 'Passed!') validated that reference once and runs only on request (below).
 
 ```bash
-ctest --test-dir build/fir/cuda --output-on-failure
+ctest --test-dir build/fir/cuda --output-on-failure   # golden run of the registry's default input
 ```
 
-
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Correctness switch.** By default the host-side CPU check is skipped and the benchmark prints `SKIP_VERIFY` (tools/timing relies on it); a plain run, ctest, `tools/inputs` and `tools/timing` never run the CPU reference and nothing falls back to it. `HPCPERF_CPU_REFERENCE=1` runs the original CPU check (offline only: `tools/golden/hpcperf_golden.py make` uses it once to validate the golden reference; it refuses a run with a non-default seed); `HPCPERF_SKIP_VERIFY=1` still forces it off. `HPCPERF_GOLDEN_DUMP=<dir>` makes the run capture its outputs. `HPCPERF_RANDOM_SEED=time HPCPERF_CPU_REFERENCE=1` reproduces upstream's behaviour (a new random input, validated against the CPU). See [tools/golden/README.md](../../tools/golden/README.md) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `common/benchmark_runner.cc`: the timed repetitions, not WarmUp/Verify. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

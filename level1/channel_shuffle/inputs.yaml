@@ -13,32 +13,58 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: per-layout timers (NHWC, NCHW) for several kernel variants; no total
 baseline:
-  method: built-in memcmp against the CPU reference; a message is printed only on mismatch
-  reference: this build's first measured run (self baseline); see method
+  method: 'the 24 shuffled outputs (12 (N, C) configurations x NHWC/NCHW) against the frozen B200 golden reference
+    (`check:` / `golden:` below), sha256 only; the upstream CPU reference (common/reference.h) runs only once,
+    offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
     compare:
       rule: absent
-  # the "Average time" line of a layout is printed only after its memcmp against the CPU reference passed
-  # (cuda/main.cu); a run under HPCPERF_SKIP_VERIFY prints neither, so their presence is the evidence that the
-  # built-in check ran (the absence of the failure marker alone is not)
-  - name: nhwc_checked
-    role: required
-    regex: '^Average time of channel shuffle \(NHWC\):'
+  # An aborted sweep is a failure: upstream computes numel as int (cuda/main.cu, "assume no integer overflow"); for
+  # maps of 256x256 and larger it overflows at N=16, C=512, cudaMalloc fails and the program prints "Device memory
+  # allocation failed. Exit" and exits 0 (this is how the deregistered g2-w512-h512 was found never to complete its
+  # sweep). The golden check fails such a run as well: the outputs of the configurations it never reached are missing.
+  - name: sweep_aborted
+    role: diagnostic
+    regex: Device memory allocation failed
     compare:
-      rule: present
-  - name: nchw_checked
-    role: required
-    regex: '^Average time of channel shuffle \(NCHW\):'
-    compare:
-      rule: present
+      rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the outputs
+  # only when every memcmp against the CPU reference passed (the NCHW "Average time" line of the last configuration is
+  # printed only after its comparison passed; any mismatch prints "Failed to pass"). The 24 outputs are 11-30 GB per
+  # run (N * C * W * H floats each), so only their sha256 is recorded (mode hash); they are compared exactly.
+  mode: hash
+  cpu_check:
+    pass_regex: '^Average time of channel shuffle \(NCHW\):'
+    fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
+  outputs:
+  - match: 'Y\.(nhwc|nchw)\.N[0-9]+\.C[0-9]+'
+    count: 24
+    dtype: f32
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference
+      (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture', HPCPERF_GOLDEN_MODE: hash}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 24 outputs (12 (N, C) configurations x NHWC/NCHW) against the frozen B200 golden reference
+    reference/<input_id>.json, byte for byte (sha256), as upstream memcmp''ed them against the CPU reference; an aborted
+    sweep misses outputs and fails; no CPU reference is run'
+  covers: all
+  timeout: 7200
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus the largest map the program can sweep completely and another group count
   # The earlier derived input g2-w512-h512 (feature map 512x512) was deregistered on 2026-09-28: upstream's
-  # main.cu computes `const int numel = N * C * W * H` ("assume no integer overflow", cuda/main.cu:149) and
+  # main.cu computes `const int numel = N * C * W * H` ("assume no integer overflow", cuda/main.cu:151) and
   # the sweep N in {1,4,16,64} x C in {32,128,512} overflows at (N=16, C=512, 512x512); cudaMalloc fails,
   # the program prints "Device memory allocation failed. Exit" and exits 0 after 8 of its 12 configurations.
   # Every measurement of that input ran the truncated sweep and is INVALIDATED (results directory
@@ -116,18 +142,3 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
-check:
-  # the program's own check: one run without HPCPERF_SKIP_VERIFY (the timing runs set it), every GPU result of
-  # every (N, C) combination memcmp'ed against the upstream CPU reference for both layouts.
-  kind: post_run
-  run_env: {HPCPERF_SKIP_VERIFY: null}
-  pass_regex: '^Average time of channel shuffle \(NCHW\):'
-  # An aborted sweep is a failure too: upstream computes numel as int (cuda/main.cu:149, "assume no
-  # integer overflow"); for maps of 256x256 and larger it overflows at N=16, C=512, cudaMalloc fails and
-  # the program prints "Device memory allocation failed. Exit" and exits 0 (this is how the deregistered
-  # g2-w512-h512 was found never to complete its sweep).
-  fail_regex: 'Failed to pass channel shuffle|Device memory allocation failed'
-  basis: exact (memcmp) against the upstream CPU reference inside the program (cuda/main.cu); "Failed to pass ... check" on
-    any mismatch, the "Average time" lines only after a passed comparison
-  covers: all
-  timeout: 7200

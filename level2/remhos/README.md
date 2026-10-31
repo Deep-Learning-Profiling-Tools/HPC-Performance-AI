@@ -150,7 +150,8 @@ configuration supports partial assembly and GPU execution"). Every other
 `-ho/-lo/-fct/-mono` combination -- including all 13 runs of the README
 verification table and all of `autotest/test.sh` -- aborts with
 `Wrong GPU setup.` on a device and can only be run on the CPU (`-d cpu`, the
-default); `validate.sh` runs those on the CPU and says so. With `-d cuda` the
+default); `validate.sh` runs those on the CPU in its offline mode only (see
+"Validation", "Modes"). With `-d cuda` the
 GPU configuration should be combined with `-pa` (partial assembly): full
 assembly on the device works but is far slower than PA on the CPU (periodic
 hexagon row 1 problem: 24.1 s kernel time for FA on the GPU vs 0.52 s PA on
@@ -286,7 +287,77 @@ runs with final `mass` and `max`; "valid if the computed values are all within
 round-off distance from the above reference values") and `autotest/test.sh`
 with `autotest/out_baseline.dat`. None of those runs uses the GPU-capable
 solver combination (see "GPU execution model"), so `validate.sh` checks two
-things, all with `mpirun -np 1`:
+things, all with `mpirun -np 1`.
+
+**Modes (2026-10-27; no CPU reference computation on a default path).** By
+default (`HPCPERF_CPU_REFERENCE` unset or `0`) nothing runs with `-d cpu`:
+
+- Part B runs its four GPU cases with **all four checks**. Check (2) compares
+  the GPU mass / max with the **frozen** CPU-backend values of exactly the
+  command the offline mode would run (`-pa -d cpu`), produced once by the
+  unmodified build (below), at the same tolerances (mass 1e-8, max 1e-6
+  relative), instead of running that command:
+  `reference/validate/cpu-backend-pa.json`, read by
+  `check_cpu_backend_reference.py get`. The file is refused (FAIL, never a
+  CPU fallback) when it is missing or corrupted, when a case's recorded CPU
+  command differs from what `validate.sh` would run, when a mesh's sha256
+  differs from the recorded one, or when its tolerances differ from
+  `validate.sh`'s (the artifact cannot change the rule). Checks (1), (3), (4)
+  are unchanged. One difference in meaning, in the strict direction: the live
+  check compared with the CPU backend of the binary under test, so a source
+  change that moved the CPU and GPU results alike passed it; the frozen values
+  do not follow such a change.
+- Part A is skipped. Its README rows use `-ho 1 -lo 2|4 -fct 2` and
+  `-mono 1 -si 1`, which abort with `Wrong GPU setup.` on a device
+  (`remhos.cpp:399-405`; re-checked 2026-10-27 for rows 1, 3, 5, 7 and 13 with
+  `-d cuda`: all five exit 1 at `remhos.cpp:402` before the first step), so
+  Part A runs only on the CPU backend and executes no device code. Keeping it
+  offline-only loses **no GPU-correctness coverage**; what the default mode
+  no longer re-checks on every run is the CPU backend's reproduction of
+  upstream's table (and with it the CPU-only solver paths `-ho 1`, `-lo 2/4`,
+  `-mono 1` and the problem set-ups of rows 3 (NURBS disc, `-p 1`) and 13
+  (`-p 6`), which no GPU case uses). This is CPU-backend coverage and stays
+  available offline.
+
+Offline mode (`HPCPERF_CPU_REFERENCE` set to `1`, an explicit request only):
+Part A and Part B with the live `-pa -d cpu` run of check (2), unchanged.
+Observed 2026-10-27 (rebuilt binary, GPU 0 shared with other jobs): default
+PASS in 31.6 s, the execve trace (`strace -f -e trace=execve`) shows the four
+`remhos ... -pa -d cuda` runs and no `-d cpu` run, and no `validate-*-cpu.log`
+is written; offline PASS in 261 s (load average ~20 at the time; 135 s on
+2026-10-26).
+
+**Frozen CPU-backend values** (`reference/validate/cpu-backend-pa.json`,
+written once by `check_cpu_backend_reference.py freeze` from the CPU logs of
+the offline run of 2026-10-27; the file records per case the exact command,
+the mesh sha256, the values with their printed digits, mass loss, kernel time
+and the log's sha256 / size / mtime, plus the binary path / sha256 / mtime,
+MFEM `config.mk` sha256, git HEAD, CPU model and launch line; no host name,
+batch job or absolute log location):
+
+| case (`... -ho 3 -lo 5 -fct 2 -pa -d cpu`) | final mass | max | CPU log sha256 |
+| --- | --- | --- | --- |
+| periodic-hexagon `-p 0 -rs 2 -dt 0.005 -tf 10` | 0.3888354884 | 0.8662060299 | 94a2e7e2... |
+| periodic-square `-p 5 -rs 3 -dt 0.005 -tf 0.8` | 0.1623263916 | 0.5904983674 | a261ae36... |
+| periodic-cube `-p 0 -rs 1 -o 2 -dt 0.014 -tf 8` | 0.9607429525 | 0.637056438 | 9182c1d4... |
+| cube01_hex remap `-p 10 -rs 1 -o 2 -dt 0.02 -tf 0.8` | 0.1191358858 | 0.9996101564 | 4362447d... |
+
+Run 2026-10-27 07:59:29Z..08:00:34Z by
+`HPCPERF_CPU_REFERENCE=1 validate.sh CUDA` with `build/level2/remhos/cuda/remhos`
+sha256 6d3e339e... (`build.sh CUDA` of 2026-10-27 from the committed sources);
+logs kept outside the repository in
+`HPC-Performance-AI-results/golden-2026-10-26/validate-frozen-2026-10-27/remhos/`.
+Every value equals the CPU-backend run of 2026-10-26 (the 2026-09 build,
+sha256 c38091f7...) and the table below (2026-09) to all 10 printed digits,
+so the frozen values reproduce a live CPU recomputation exactly (d0 = 0).
+They are the CPU reference's own output, not a GPU golden: no tolerance budget
+is subtracted (`tools/golden/README.md` "Tolerance budget": tol_effective =
+tol - d0 = tol), and the comparison keeps check (2)'s metric and tolerances.
+A different build, compiler or host can legitimately move the CPU backend's
+digits; the frozen values are then a fixed oracle rather than "this machine's
+CPU backend", which is the intended meaning of a frozen reference. HIP: the
+default mode compares a HIP GPU run with the same (CUDA-build) CPU-backend
+values; HIP is untested here.
 
 **Part A -- the build reproduces the upstream reference table (CPU backend).**
 README rows 1, 3, 5, 7 and 13 (2D transport on a periodic hexagon, transport
@@ -338,7 +409,15 @@ B200) gives the same digits as with 1 rank. Final line observed:
 PASS: remhos CUDA (README rows 1,3,5,7,13 reproduced on the CPU; 4 GPU runs of -ho 3 -lo 5 -fct 2 -pa -d cuda match the CPU backend and the README reference masses)
 ```
 
-Logs: `build/level2/remhos/cuda/run/validate-*.log`. Total 57 s.
+That is the offline mode's final line (2026-10-27 as well); the default mode
+ends with
+
+```
+PASS: remhos CUDA (CPU reference skipped (default): 4 GPU runs of -ho 3 -lo 5 -fct 2 -pa -d cuda match the frozen CPU-backend values and the README reference masses; README rows 1,3,5,7,13 (CPU backend only) run offline only)
+```
+
+Logs: `build/level2/remhos/cuda/run/validate-*.log` (default mode: only the
+`*-cuda.log`). Total 57 s (offline, 2026-09).
 
 Reference material that was checked but is *not* used as a pass criterion:
 

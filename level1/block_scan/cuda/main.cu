@@ -26,6 +26,7 @@
  *
  ******************************************************************************/
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <string.h>
 #include <chrono>
@@ -35,13 +36,14 @@
 
 #include <cstdlib>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -58,6 +60,7 @@ using namespace cub;
 int grid_size = 1;
 int repeat = 100;
 bool g_verbose = false;
+bool g_probe = false;   // correctness-probe tile data (InitializeProbe, `--probe`); never a performance input
 
   template <typename T>
 int CompareDeviceResults(T *h_reference, T *d_data, size_t num_items)
@@ -152,6 +155,39 @@ int Initialize(
 
 
 /**
+ * tools/golden correctness probe (`--probe`, registry input probe-randsigned; set-up data only: the kernels, the 18
+ * variants, the grid and the timed launches are unchanged). Upstream's tile h_in[i] = i % 17 is a fixed pattern of
+ * small non-negative values whose prefix sums stay <= 8166: a scan that never reads d_in (the closed form of the
+ * pattern, or the 1025 frozen output values written as constants), a scan in f32 (exact up to 2^24) or in 16-bit
+ * integers (exact up to 32767) reproduces the output of every performance input; and since all 18 variants scan
+ * that same tile, one scan copied into all 18 outputs does too. The probe tile holds signed values uniform in
+ * [-2^21, 2^21) from a splitmix64 stream whose fixed seed differs per variant (a project choice; upstream has no
+ * other tile), so the 18 expected outputs differ from each other; the prefix sums leave the f32 and 16-bit ranges
+ * (-6.2e7 .. 6.6e7; 33 to 961 of the 1024 beyond 2^24 per variant) and every partial sum of 1024 such values lies
+ * in [-2^31, 2^31 - 1024], so no int overflow can occur (on the device or in the host reference below).
+ */
+int InitializeProbe(
+    int *h_in,
+    int *h_reference,
+    int num_items,
+    unsigned long long s)       // per-variant seed
+{
+  int inclusive = 0;
+  for (int i = 0; i < num_items; ++i)
+  {
+    unsigned long long z = (s += 0x9E3779B97F4A7C15ull);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+    z ^= z >> 31;
+    h_in[i] = static_cast<int>(z >> 42) - (1 << 21);    // 22 random bits -> [-2^21, 2^21)
+    h_reference[i] = inclusive;
+    inclusive += h_in[i];
+  }
+  return inclusive;
+}
+
+
+/**
  * Test thread block scan
  */
 template <
@@ -168,7 +204,10 @@ void Test()
   int *h_gpu       = new int[TILE_SIZE + 1];
 
   // Initialize problem and reference output on host
-  int h_aggregate = Initialize(h_in, h_reference, TILE_SIZE);
+  const unsigned long long probe_alg =   // 0 / 1 / 2, independent of the enum's values (CUB vs hipCUB)
+      (ALGORITHM == BLOCK_SCAN_RAKING) ? 0 : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? 1 : 2;
+  const unsigned long long probe_seed = 0x5EED5CA9ull ^ (probe_alg << 32) ^ BLOCK_THREADS;   // per variant
+  int h_aggregate = g_probe ? InitializeProbe(h_in, h_reference, TILE_SIZE, probe_seed) : Initialize(h_in, h_reference, TILE_SIZE);
 
   // Initialize device arrays
   int *d_in           = NULL;
@@ -198,7 +237,7 @@ void Test()
         d_in,
         d_out);
 
-    // Check results for the first warmup run
+    // Check results for the first warmup run (HPCPERF_CPU_REFERENCE=1 only, golden make)
     if (i == 0 && hpcperf_skip_verify()) {
       printf("SKIP_VERIFY\n");
     } else if (i == 0) {
@@ -212,6 +251,15 @@ void Test()
       printf("%s\n", compare ? "FAIL" : "PASS");
     }
   }
+  GPU_CHECK(cudaDeviceSynchronize());
+
+  // tools/golden: poison d_out on the device and in the host copy (all-ones bytes, -1 in every int) after the
+  // warm-up launches (whose first one the CPU check above compares) and before the timed region, outside the ROI
+  // and the chrono timer. Every launch rewrites all TILE_SIZE + 1 ints of d_out, so correct timed launches
+  // overwrite the poison; timed launches that do not run leave -1 in the capture below instead of the identical
+  // result of the warm-up launches.
+  GPU_CHECK(cudaMemset(d_out, 0xFF, sizeof(int) * (TILE_SIZE + 1)));
+  memset(h_gpu, 0xFF, sizeof(int) * (TILE_SIZE + 1));
   GPU_CHECK(cudaDeviceSynchronize());
 
   // Run this several times and average the performance results
@@ -228,6 +276,18 @@ void Test()
   HPCPERF_ROI_END_SYNC();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+  // tools/golden: the checked output of this variant = d_out after the timed launches (the last one), i.e. the
+  // TILE_SIZE exclusive prefix sums followed by the aggregate -- bit-identical to the first warm-up launch's
+  // output that the CPU check compares; a D2H copy after the ROI and the timer
+  GPU_CHECK(cudaMemcpy(h_gpu, d_out, sizeof(int) * (TILE_SIZE + 1), cudaMemcpyDeviceToHost));
+  {
+    char hpcperf_name[96];
+    snprintf(hpcperf_name, sizeof(hpcperf_name), "scan.%s.t%d.i%d",
+             (ALGORITHM == BLOCK_SCAN_RAKING) ? "raking" : (ALGORITHM == BLOCK_SCAN_RAKING_MEMOIZE) ? "raking_memoize" : "warp_scans",
+             BLOCK_THREADS, ITEMS_PER_THREAD);
+    hpcperf_golden_output(hpcperf_name, h_gpu, TILE_SIZE + 1, "i32");
+  }
 
   // Display timing results
   float avg_millis        = elapsed * 1e-6 / repeat;
@@ -247,17 +307,19 @@ void Test()
 
 int main(int argc, char** argv)
 {
-  if (argc != 3) {
+  if (argc != 3 && !(argc == 4 && strcmp(argv[3], "--probe") == 0)) {
     printf("The benchmark evaluates the impacts of the number of threads ");
     printf("per block and the number of items per thread on the performance ");
     printf("of block-level scans\n"); 
-    printf("Usage: %s <grid_size> <repeat>\n", argv[0]);
+    printf("Usage: %s <grid_size> <repeat> [--probe]\n", argv[0]);
     printf("grid_size specifies the number of thread blocks");
     return 1;
   }
 
   grid_size = atoi(argv[1]);
   repeat = atoi(argv[2]);
+  g_probe = (argc == 4);
+  if (g_probe) printf("correctness probe: signed tile values in [-2^21, 2^21) (set-up data only)\n");
 
   // Run tests
   Test<1024, 1, BLOCK_SCAN_RAKING>();

@@ -1,5 +1,6 @@
 #define LIMIT -999
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -170,17 +171,26 @@ void runTest( int argc, char** argv)
 
 	HPCPERF_ROI_END_SYNC();
     cudaMemcpy(output_itemsets, matrix_cuda, sizeof(int) * size, cudaMemcpyDeviceToHost);
-	
+	// tools/golden: the global alignment score of the two sequences, the DP cell (max_rows - 1, max_cols - 1). The
+	// upstream traceback below starts one row and one column earlier (max_rows - 2), so without this value the last DP
+	// row and column -- computed by the kernels -- would not be observed by any checked output (i32, one value)
+	hpcperf_golden_output("score", &output_itemsets[(max_rows - 1) * max_cols + (max_cols - 1)], 1, "i32");
+
 //#define TRACEBACK
 #ifdef TRACEBACK
 	
 	FILE *fpo = fopen("result.txt","w");
 	fprintf(fpo, "print traceback value GPU:\n");
+	// tools/golden: the checked output = the traceback values written to result.txt (i32, in file order)
+	hpcperf_golden_stream hpcperf_tb;
+	hpcperf_golden_begin(&hpcperf_tb, "traceback", "i32");
     
 	for (int i = max_rows - 2,  j = max_rows - 2; i>=0, j>=0;){
 		int nw, n, w, traceback;
 		if ( i == max_rows - 2 && j == max_rows - 2 )
 			fprintf(fpo, "%d ", output_itemsets[ i * max_cols + j]); //print the first element
+		if ( i == max_rows - 2 && j == max_rows - 2 )
+			hpcperf_golden_append(&hpcperf_tb, &output_itemsets[ i * max_cols + j], 1);
 		if ( i == 0 && j == 0 )
            break;
 		if ( i > 0 && j > 0 ){
@@ -214,6 +224,7 @@ void runTest( int argc, char** argv)
             traceback = n;
 			
 		fprintf(fpo, "%d ", traceback);
+		hpcperf_golden_append(&hpcperf_tb, &traceback, 1);
 
 		if(traceback == nw )
 		{i--; j--; continue;}
@@ -228,6 +239,7 @@ void runTest( int argc, char** argv)
 		;
 	}
 	
+	hpcperf_golden_end(&hpcperf_tb);
 	fclose(fpo);
 
 #endif

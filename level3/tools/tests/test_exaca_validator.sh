@@ -84,6 +84,8 @@ $V "$TMP/good.stats.json" --ref "$TMP/ref_nan.json" --tol "$TMP/tol.json" --rank
 B="$TMP/bench"; mkdir -p "$B/references" "$B/src/examples/Substrate" "$B/inputs"; cp "$E/validate.sh" "$E/exaca_check.py" "$B/"; cp "$E/references/"*.json "$E/references/validation_protocol.yaml" "$B/references/"; cp "$ORI" "$B/src/examples/Substrate/GrainOrientationVectors.csv"; cp "$E/inputs/dirsolid.template.json" "$B/inputs/"; echo 'name: exaca' > "$B/benchmark.yaml"
 printf '#!/bin/bash\necho "run.sh: simulated failure"; exit 1\n' > "$B/run.sh"; chmod +x "$B/run.sh"
 mkdir -p "$TMP/fakeroot/level3/tools" "$TMP/fakeroot/level2/tools"; cp -a "$R/level3/tools/." "$TMP/fakeroot/level3/tools/"; cp -a "$R/level2/tools/." "$TMP/fakeroot/level2/tools/"; printf '#!/bin/bash\n' > "$TMP/fakeroot/hpcperf_env.sh"
+# level2/tools/hpcperf_launch_common.sh sources tools/inputs/hpcperf_input_selector.sh (every run.sh's input selector)
+mkdir -p "$TMP/fakeroot/tools/inputs"; cp -a "$R/tools/inputs/." "$TMP/fakeroot/tools/inputs/"
 mkdir -p "$TMP/fakeroot/level3/exaca"; cp -a "$B/." "$TMP/fakeroot/level3/exaca/"
 RD="$TMP/fakeroot/build/level3/exaca/cuda/run/dirsolid.smoke.np1"; mkdir -p "$RD"; cp "$TMP/good.vtk" "$RD/dirsolid_smoke_np1.vtk"; cp "$TMP/np1.json" "$RD/dirsolid_smoke_np1.json"; cp "$TMP/good.stats.json" "$RD/stats.json"; echo "run_id=stale" > "$RD/run_manifest.txt"
 out="$(cd "$TMP/fakeroot/level3/exaca" && HPCPERF_GPUS=1 bash ./validate.sh CUDA 2>&1)"; rc=$?

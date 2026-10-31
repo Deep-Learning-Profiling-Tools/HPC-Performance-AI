@@ -1,0 +1,102 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "color_histogram",
+  "level": 1,
+  "input_id": "x16777216",
+  "frozen": true,
+  "workload": {
+    "input_id": "x16777216",
+    "params": {
+      "pixels": 16777216,
+      "seed": 1
+    },
+    "args": [
+      "-x",
+      "16777216"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "348703e11a3760fac2a3fd37b100b81287a41d5181cdc4086b86c009e323a2c5",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "histogram",
+        "match": null,
+        "count": null,
+        "dtype": "u32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream Verify compares every one of the num_color_ (256) bins with the CPU histogram, cpu_histogram[i] != histogram_[i] fails (common/hist_benchmark.cc:73); captured by HistBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "histogram",
+      "dtype": "u32",
+      "count": 256,
+      "bytes": 1024,
+      "sha256": "e0eb56e82db25e6115436d7b0dee5d3493622aca9bfae8aafa5ec4c0f934ce30",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream Verify compares every one of the num_color_ (256) bins with the CPU histogram, cpu_histogram[i] != histogram_[i] fails (common/hist_benchmark.cc:73); captured by HistBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc)",
+      "stats": {
+        "min": 65536.0,
+        "max": 65536.0,
+        "sum": 16777216.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-27T08:08:23Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "d30669b22b5660908af7c015a7cb6d28b42d5f3d",
+    "source_clean": true,
+    "binary": "build/color_histogram/cuda/color_histogram_cuda",
+    "binary_sha256": "e51fd35a5ede958ee3b880d993465f26184e0f1db7ac68493914b856e5654540",
+    "command": [
+      "build/color_histogram/cuda/color_histogram_cuda",
+      "-x",
+      "16777216"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.576,
+      "pass_line": "Passed.",
+      "pass_regex": "^Passed\\.$",
+      "fail_regex": "^At color [0-9]+, expected to be|NON-DEFAULT SEED",
+      "log": "build/golden-make/color_histogram/x16777216/run/stdout.log",
+      "log_sha256": "32862acd1bfa9549f18276c4a4d1c23218a4188cdeab7415818456bcba35b77c"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "8170415c7162efb90ccac58d2605988cd9f98a2bb93bcacff9cf62a7b46de549",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

@@ -3,7 +3,14 @@
 50 selected small GPU benchmarks extracted from six upstream suites and
 repackaged so each one can be configured, built, run, and validated
 independently of its original suite framework. Extraction preserves upstream
-algorithms, workloads, and correctness semantics.
+algorithms and workloads; the deliberate exceptions (each documented in the benchmark's README and
+commit) are bug fixes -- srad_v1's reduction index (class D), binary_search's query range at
+2^27 elements, bezier_surface's kernel guard and input handling, hotspot_3d's final iterate (the output is
+now the temperature after N steps, upstream returned step N-1), nearest_neighbor's k-nearest selection
+(upstream lost records from k = 364 on) and input handling, backprop's host code -- and correctness
+criteria that replace upstream checks shown to pass wrong results or reject legitimate ones (nbody,
+pagerank, hotspot_3d's per-element gate, lud's residual evaluation, binary_search's verify() on by
+default, nearest_neighbor's record identities, needleman_wunsch's alignment score).
 
 Build and validate (per benchmark, after `source hpcperf_env.sh`):
 
@@ -44,10 +51,19 @@ tools/timing/measure_level1.sh --build-root build/gcc13 all   # 1 warm-up + 5 cl
 python3 tools/timing/summarize.py                             # JSON per run + summary_level1.csv
 ```
 
-Measurement also sets `HPCPERF_SKIP_VERIFY=1` so the CPU reference recomputation
-(minutes for some benchmarks) is not run; it lies outside the ROI either way. NPB
-`is` verifies inside its timed kernels and is recorded as such. ctest never sets
-either variable. See [tools/timing/README.md](../tools/timing/README.md) and
+**Correctness.** 41 benchmarks compare their captured outputs with a frozen B200 golden reference
+(`reference/<input>.json`, raw bytes in the content-addressed golden store; `tools/golden/README.md`);
+several also have correctness-only probe inputs (`purpose: correctness-probe`, never timed). The CPU
+reference implementations stay in the sources and run only with `HPCPERF_CPU_REFERENCE=1`
+(`hpcperf_golden.py make`, once per input) -- no plain run, ctest, registry check or measurement runs
+them. The others: NPB `cg ep ft is mg` (official class values), ao_bench (frozen image hash), lud (the
+residual max|A - L*U| of the captured factors, post-run), gaussian_elimination and graph_coloring
+(property checks). **A fresh clone has no golden store**: until the bundles are published, the
+tolerance-rule golden checks (most ctests) FAIL with "golden blob ... missing" -- restore it with
+`python3 tools/golden/golden_artifacts.py fetch --from <staging dir>` (tools/golden/DISTRIBUTION.md).
+Measurement sets `HPCPERF_SKIP_VERIFY=1`, which now only switches off the remaining property checks
+(graph_coloring, binary_search's `verify()`); they lie outside the ROI either way. NPB `is` verifies
+inside its timed kernels and is recorded as such. See [tools/timing/README.md](../tools/timing/README.md) and
 [tools/timing/roi/README.md](../tools/timing/roi/README.md).
 
 ## Catalog

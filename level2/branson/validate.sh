@@ -3,6 +3,22 @@
 #
 #   ./validate.sh [CUDA|HIP]        (default: CUDA)
 #
+# Two modes (project decision: no CPU reference computation on a default path):
+#   default  (HPCPERF_CPU_REFERENCE unset or 0) -- (A) and (B) below, unchanged, and (C) against a FROZEN
+#     CPU-only reference of exactly this deck and these arguments (inputs/marshak_wave_replicated.xml
+#     --t-stop 0.05 --seed 1234, 1 rank) instead of a live CPU-only build and run:
+#       python3 check_reference.py validate_marshak_gpu.log --deck inputs/marshak_wave_replicated.xml \
+#               --reference-dir reference/validate --expect-param "args=--t-stop 0.05 --seed 1234"
+#     with the same quantities and margins as (C): final-step Post mat E, Absorption E, Exit E and transported
+#     photons within 5 % relative, every cell's T_e within 0.02 absolute, the same number of steps (5).
+#     reference/validate/marshak-t0.05-seed1234.json was frozen ONCE from the CPU-only run of one explicit
+#     offline run of this script (check_log.py freeze, with the binary sha256, launch, dates and log sha256);
+#     it is refused when its deck sha256, arguments or tolerances differ. Nothing is configured, built or run
+#     on the CPU path: no cmake of $R/build/level2/branson/cpu_ref, no CPU-only Branson run.
+#     (validate_marshak_frozen.log)
+#   offline  (HPCPERF_CPU_REFERENCE set to 1: an explicit request only) -- (A), (B) and the original (C)
+#     with the CPU-only reference build and run, unchanged.
+#
 # Three checks, all logged under $R/build/level2/branson/<cuda|hip>/:
 #
 #  (A) upstream unit tests: `ctest -E test_input_1pe` in the GPU build tree
@@ -29,7 +45,7 @@
 #      different photon orderings, so the results agree only statistically;
 #      the seed-to-seed scatter of these quantities is 0.2-0.8 % (energies)
 #      and <= 0.005 (T_e), so 5 % / 0.02 is > 6 sigma yet catches a broken
-#      transport kernel.  (validate_marshak_cpu.log)
+#      transport kernel.  (validate_marshak_cpu.log; offline mode -- default: the frozen reference, above)
 #
 # Prints "PASS: branson <BACKEND> ..." / "FAIL: branson <BACKEND> ..." and
 # exits 0/1.
@@ -62,6 +78,11 @@ CPU_EXE="$CPU_BUILD/BRANSON"
 DECK="$HERE/inputs/marshak_wave_replicated.xml"
 DECK_ARGS=( --t-stop 0.05 --seed 1234 )
 JOBS="${MAKE_JOBS:-4}"
+FROZEN_DIR="$HERE/reference/validate"   # (C), default mode: the frozen CPU-only run of DECK + DECK_ARGS
+case "${HPCPERF_CPU_REFERENCE:-}" in
+    ''|0*) CPU_REF=0 ;;
+    *)     CPU_REF=1 ;;
+esac
 
 fail() { echo "FAIL: branson $BACKEND -- $*"; exit 1; }
 
@@ -114,6 +135,18 @@ check_py gpu "$BUILD/validate_marshak_gpu.log" --steps 5 || fail "GPU physics ch
 echo "   $(grep 'Total transport:' "$BUILD/validate_marshak_gpu.log" | tail -1), $(grep 'FOM' "$BUILD/validate_marshak_gpu.log" | tail -1)"
 
 # ------------------------------------------------ (C) CPU reference cross-check
+if [ "$CPU_REF" -eq 0 ]; then
+    echo "== CPU reference: skipped (default; (C) compares with the frozen CPU-only reference of this deck and arguments)"
+    echo "== (C) GPU vs frozen CPU-only reference: check_reference.py --reference-dir $FROZEN_DIR --expect-param \"args=${DECK_ARGS[*]}\""
+    python3 "$HERE/check_reference.py" "$BUILD/validate_marshak_gpu.log" --deck "$DECK" --reference-dir "$FROZEN_DIR" \
+        --expect-param "args=${DECK_ARGS[*]}" > "$BUILD/validate_marshak_frozen.log" 2>&1
+    rc=$?
+    sed 's/^/   /' "$BUILD/validate_marshak_frozen.log"
+    [ "$rc" -eq 0 ] || fail "GPU vs frozen CPU-only reference comparison failed, exit $rc (log: $BUILD/validate_marshak_frozen.log)"
+    echo "PASS: branson $BACKEND (ctest $NTESTS/$NTESTS excl. test_input_1pe; Marshak 5 steps: rad/mat conservation <= 1e-9 rel; GPU vs frozen CPU-only reference final Post-mat/Absorption/Exit E within 5%, T_e within 0.02; CPU reference not run (default))"
+    exit 0
+fi
+echo "== CPU reference: offline mode (HPCPERF_CPU_REFERENCE requested): (C) with the CPU-only reference build and run"
 if [ ! -x "$CPU_EXE" ]; then
     echo "== (C) building CPU-only reference Branson into $CPU_BUILD"
     if ! cmake -S "$HERE/src" -B "$CPU_BUILD" \

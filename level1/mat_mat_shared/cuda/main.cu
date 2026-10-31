@@ -7,7 +7,9 @@
 // Validation: element-wise comparison of C.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
+#include <cstring>
 
 constexpr Index_type TL_SZ = 16;  // upstream tile size
 
@@ -73,14 +75,32 @@ int main(int argc, char** argv)
   Index_type run_reps = 5;  // upstream default reps
   if (argc > 1) N = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
+  // probe (correctness-probe input, `--probe`; set-up only, the kernel is unchanged): upstream's set-up
+  // A = B = 1 makes every C element equal to N -- a constant fill reproduces the output, and so does any
+  // tiling / indexing / operand-order error that preserves the sum of N ones. The probe initializes A and
+  // B with upstream's own random helpers (DataUtils initDataRandValue for A, values in [0, 1];
+  // initDataRandSign for B, +-0.1-ish with random sign), so A != B and B != A^T.
+  bool probe = false;          // never a performance input
+  if (argc > 3) {
+    if (argc > 4 || strcmp(argv[3], "--probe") != 0) {
+      fprintf(stderr, "usage: %s [N [reps [--probe]]]\n", argv[0]);
+      return 2;
+    }
+    probe = true;
+  }
   const Index_type len = N * N;
   const size_t bytes = len * sizeof(Real_type);
 
   // ------------------------- GPU (upstream Base_CUDA) ----------------------
   resetDataInitCount();
   Real_ptr A; Real_ptr B; Real_ptr C;
-  allocAndInitDataConst(A, len, 1.0);   // upstream setUp order
-  allocAndInitDataConst(B, len, 1.0);
+  if (probe) {                          // upstream setUp order
+    allocAndInitDataRandValue(A, len);
+    allocAndInitDataRandSign(B, len);
+  } else {
+    allocAndInitDataConst(A, len, 1.0);
+    allocAndInitDataConst(B, len, 1.0);
+  }
   allocAndInitDataConst(C, len, 0.0);
 
   Real_ptr dA, dB, dC;
@@ -104,19 +124,26 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("C", C, len, "f64");   // tools/golden: the checked output
   cudaFree(dA); cudaFree(dB); cudaFree(dC);
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
     resetDataInitCount();
     Real_ptr A_r; Real_ptr B_r; Real_ptr C_r;
-    allocAndInitDataConst(A_r, len, 1.0);
-    allocAndInitDataConst(B_r, len, 1.0);
+    if (probe) {
+      allocAndInitDataRandValue(A_r, len);
+      allocAndInitDataRandSign(B_r, len);
+    } else {
+      allocAndInitDataConst(A_r, len, 1.0);
+      allocAndInitDataConst(B_r, len, 1.0);
+    }
     allocAndInitDataConst(C_r, len, 0.0);
     {
       Real_ptr A = A_r; Real_ptr B = B_r; Real_ptr C = C_r;
@@ -152,6 +179,7 @@ int main(int argc, char** argv)
         }
       }
     }
+    hpcperf_golden_output("C.cpu", C_r, len, "f64");   // the CPU reference (golden make only)
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("C", C_r, C, len, 1.0e-10);

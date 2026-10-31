@@ -120,8 +120,13 @@ STABLE_SPREAD = 0.10
 # correctness checks (inputs.yaml `check:`): a checker command run outside any timing
 CHECK_KINDS = ("standalone", "post_run", "none")
 CHECK_SCHEMA = "hpcperf-inputs-check-1"
-TEMPLATE_NAMES = ("exe", "args", "run_dir", "log", "outputs", "bench_dir", "repo", "param", "arg")
-TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|param:[A-Za-z0-9_.-]+|arg:\d+)\}")
+TEMPLATE_NAMES = ("exe", "args", "run_dir", "log", "outputs", "bench_dir", "repo", "input_id", "param", "arg")
+TEMPLATE_RX = re.compile(r"\{(exe|args|run_dir|log|outputs|bench_dir|repo|input_id|param:[A-Za-z0-9_.-]+|arg:\d+)\}")
+# The variables that switch a benchmark's own host-side CPU reference on (tools/golden/hpcperf_golden.h) or make it
+# capture its outputs: no measurement and no correctness check inherits them from the caller's shell -- a check
+# compares against the frozen golden reference and never falls back to the CPU reference.
+# HPCPERF_RANDOM_SEED switches fir / color_histogram to a non-registered (random) input: never inherited either.
+CPU_REFERENCE_VARS = ("HPCPERF_CPU_REFERENCE", "HPCPERF_GOLDEN_DUMP", "HPCPERF_GOLDEN_MODE", "HPCPERF_RANDOM_SEED")
 
 
 class InputError(Exception):
@@ -152,6 +157,15 @@ def load(bench_dir: Path) -> dict:
 
 COVERAGE_STATUS = ("MULTI_INPUT", "SINGLE_INPUT", "BLOCKED")
 INPUT_FORMS = ("runtime", "file", "compile-time")
+# input purpose: a performance input is measured/timed and counts for coverage; a correctness-probe input exists only to
+# detect wrong implementations (e.g. data on which a constant or skipped computation cannot pass) -- it is checked
+# (`check`) and frozen (tools/golden make) like any input, but never measured, never timed, never the default input and
+# never counted for coverage
+PURPOSES = ("performance", "correctness-probe")
+
+
+def is_probe(inp) -> bool:
+    return isinstance(inp, dict) and inp.get("purpose", "performance") == "correctness-probe"
 
 
 TIMING_NONE_STATUS = ("NEEDS_TIMING_SUPPORT", "NO_TIMED_REGION")
@@ -298,6 +312,13 @@ def validate(doc: dict) -> list:
         for f in inp.get("files", []) or []:
             if not (Path(doc["_path"]).parent / f).exists():
                 errs.append(f"input '{i}': referenced file '{f}' does not exist under the benchmark directory")
+        if inp.get("purpose", "performance") not in PURPOSES:
+            errs.append(f"input '{i}': purpose must be one of {PURPOSES}")
+        if is_probe(inp):
+            if not isinstance(inp.get("probe_basis"), str) or not inp["probe_basis"].strip():
+                errs.append(f"input '{i}': a correctness-probe input needs probe_basis (which wrong implementations it detects and why the performance inputs cannot)")
+            if i == doc.get("default_input"):
+                errs.append(f"input '{i}': a correctness-probe input cannot be the default_input")
     if doc["default_input"] not in ids:
         errs.append(f"default_input '{doc['default_input']}' is not a registered input id")
     cov = doc.get("coverage")
@@ -305,7 +326,7 @@ def validate(doc: dict) -> list:
         if not isinstance(cov, dict) or cov.get("status") not in COVERAGE_STATUS:
             errs.append(f"coverage.status must be one of {COVERAGE_STATUS}")
         else:
-            runnable = [i for i in doc["inputs"] if isinstance(i, dict) and i.get("materialized", True) is not False]
+            runnable = [i for i in doc["inputs"] if isinstance(i, dict) and i.get("materialized", True) is not False and not is_probe(i)]
             if cov["status"] == "MULTI_INPUT" and len(runnable) < 2:
                 errs.append("coverage MULTI_INPUT needs at least two runnable (materialized) inputs")
             if cov["status"] == "SINGLE_INPUT" and len(runnable) != 1:
@@ -441,12 +462,12 @@ def check_context(doc, inp, root: Path, bench_dir: Path, run_dir: Path, log=None
         raise InputError(f"binary {exe} not built")
     return {"exe": str(exe), "args": resolve_repo_args(root, inp.get("args") or []), "params": inp.get("params") or {},
             "run_dir": str(run_dir), "log": None if log is None else str(log), "outputs": None if outputs is None else str(outputs),
-            "bench_dir": str(Path(bench_dir).resolve()), "repo": str(root)}
+            "bench_dir": str(Path(bench_dir).resolve()), "repo": str(root), "input_id": inp["id"]}
 
 
 def render_token(tok: str, ctx: dict):
     """One template token. `{args}` alone expands to the input's argument list; every other placeholder
-    ({exe} {run_dir} {log} {outputs} {bench_dir} {repo} {param:NAME} {arg:N}) is substituted in place."""
+    ({exe} {run_dir} {log} {outputs} {bench_dir} {repo} {input_id} {param:NAME} {arg:N}) is substituted in place."""
     if tok == "{args}":
         return list(ctx["args"])
 
@@ -1164,6 +1185,8 @@ def summarize(doc, inp, runs, reps):
 def measure(doc, inp, root: Path, bench_dir: Path, out: Path, warmup: int, reps: int, timeout: int, gpus: int):
     out.mkdir(parents=True, exist_ok=True)
     cmd, env, entry_path = build_command(doc, inp, root, bench_dir, gpus)
+    for k in CPU_REFERENCE_VARS:            # a measured run never runs the CPU reference nor captures outputs
+        env.pop(k, None)
     e2e_boundary = ("process wall of the benchmark binary (fork/exec to exit; includes CUDA context creation)"
                     if doc["entry"]["kind"] == "binary" else
                     "wrapper wall of run.sh (env sourcing, launcher, mpirun, binding audit, application)")
@@ -1326,6 +1349,8 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
         except InputError as ex:
             return finish("ERROR", f"the benchmark cannot be run: {ex}")
         env.pop("HPCPERF_SKIP_VERIFY", None)      # a correctness run is never a skip-verify (timing) run
+        for k in CPU_REFERENCE_VARS:              # nor a CPU-reference run: only run_env may set the capture switches
+            env.pop(k, None)
         for k, v in r["run_env"].items():
             if v is None:
                 env.pop(k, None)
@@ -1337,13 +1362,18 @@ def run_check(doc, inp, root: Path, bench_dir: Path, out: Path, timeout=None, gp
         except OSError as ex:
             return finish("ERROR", f"the benchmark could not be started: {ex}")
         rec["run"] = {"command": cmd, "env_overrides": r["run_env"], "exit_code": rc, "e2e_s": round(wall, 4),
-                      "log": str(log), "log_sha256": sha256_file(log), "skip_verify": False}
+                      "log": str(log), "log_sha256": sha256_file(log), "skip_verify": False,
+                      # the identity of what ran (a binary entry: the benchmark binary; run.sh: the script), so a
+                      # timing record can be bound to the check of the same binary
+                      "entry_sha256": sha256_file(_entry) if _entry is not None else None}
         rec["outputs"] = collect_outputs(r["outputs"], outputs, since=t0 - 0.05)
         if rc != 0:
             return finish("FAIL", f"the benchmark run exited {rc}; its output is not checked")
     if r["command"]:
         env = dict(os.environ)
         env.pop("HPCPERF_SKIP_VERIFY", None)
+        for k in CPU_REFERENCE_VARS:
+            env.pop(k, None)
         env["CUDA_VISIBLE_DEVICES"] = env.get("HPCPERF_CUDA_VISIBLE_DEVICE", "0")
         for k, v in r["env"].items():
             if v is None:
@@ -1548,7 +1578,7 @@ def main(argv=None):
             raise InputError(f"{doc['_path']} is invalid: " + "; ".join(errs))
         if a.cmd == "list":
             for inp in doc["inputs"]:
-                d = " (default)" if inp["id"] == doc["default_input"] else ""
+                d = " (default)" if inp["id"] == doc["default_input"] else " (correctness-probe)" if is_probe(inp) else ""
                 print(f"{inp['id']:32s} {inp['variant']:20s} {inp['source']['kind']:24s} {inp['case']}{d}")
             return 0
         if a.cmd == "show":
@@ -1662,6 +1692,8 @@ def main(argv=None):
             print(status_line(s)); return 0
         if a.cmd == "measure":
             inp = get_input(doc, a.input_id)
+            if is_probe(inp):
+                raise InputError(f"input '{inp['id']}' is a correctness-probe input: it is checked (`check`), never measured")
             root = repo_root(bench_dir)
             meta = measure(doc, inp, root, bench_dir, Path(a.out), a.warmup, a.reps, a.timeout, a.gpus)
             s = meta["summary"]

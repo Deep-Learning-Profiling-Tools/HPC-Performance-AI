@@ -28,14 +28,23 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(hotspot_3d_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(hotspot_3d_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    # verify.py runs the benchmark and validates its output against a
-    # CPU reference (see verify.py header for details)
-    add_test(NAME hotspot_3d_run COMMAND ${Python3_EXECUTABLE}
-             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:hotspot_3d_cuda> 64 8 100 ${CMAKE_CURRENT_SOURCE_DIR}/data/power_64x8 ${CMAKE_CURRENT_SOURCE_DIR}/data/temp_64x8)
+    # one plain run of the registry's default input (no CPU reference), its output compared with
+    # the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME hotspot_3d_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:hotspot_3d_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(hotspot_3d_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
-        FAIL_REGULAR_EXPRESSION "FAIL")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): 50 steps far from steady state (amplified initial
+    # fluctuations, data/temp_64x8_amp10), on which skipped or coarsened time steps are visible; never timed
+    add_test(NAME hotspot_3d_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} g64-l8-i50-amp10 --exe $<TARGET_FILE:hotspot_3d_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe)
+    set_tests_properties(hotspot_3d_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

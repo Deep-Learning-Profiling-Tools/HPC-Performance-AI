@@ -41,10 +41,13 @@ target_include_directories(${_hpcperf_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     # verify.py runs the renderer twice: checks PPM structure, non-degeneracy,
-    # and run-to-run determinism (upstream provides no reference output)
+    # and run-to-run determinism (upstream provides no reference output), then
+    # (--reference) that the image is byte-identical to the frozen reference image
+    # of this input -- the registry's check_ppm.py check
     add_test(NAME ao_bench_run COMMAND ${Python3_EXECUTABLE}
-             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:${_hpcperf_target}> 100)
+             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:${_hpcperf_target}> 100
+             --reference ${CMAKE_CURRENT_SOURCE_DIR}/reference/iter100.sha256)
     set_tests_properties(ao_bench_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
+        PASS_REGULAR_EXPRESSION "PASS: aobench image check"
         FAIL_REGULAR_EXPRESSION "FAIL")
 endif()

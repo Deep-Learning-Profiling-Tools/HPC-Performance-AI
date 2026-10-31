@@ -13,14 +13,47 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: four kernel variants (bs1..bs4) each print their own average; no total
 baseline:
-  method: no built-in PASS line; the program reports mismatches only on failure
-  reference: this build's first measured run (self baseline); see method
+  method: 'the four search results (r of bs1..bs4) against the frozen B200 golden reference (`check:` / `golden:`
+    below), and in the same run upstream''s own property check verify() (a[r] <= z < a[r+1] for every query, a host
+    pass over the GPU output; upstream compiles it only with -DDEBUG, so the unmodified default build checked
+    nothing): it runs by default after each variant''s timed region, exits 1 on a failure, and is off only with
+    HPCPERF_SKIP_VERIFY=1 (tools/timing)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: (FAIL|[Ff]ail|[Mm]ismatch|[Ee]rror)
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once (with HPCPERF_CPU_REFERENCE=1, which this benchmark no
+  # longer needs: verify() runs by default): upstream's verify() checks every result of the four variants on the host
+  # (no CPU recomputation) and the results are frozen only when it printed PASS. Each result is size_t[2 x elements]
+  # (134 MB per variant for n8388608, 2.1 GB for n134217728) and is compared exactly, so only its sha256 is recorded
+  # (mode hash).
+  mode: hash
+  cpu_check: {pass_regex: '^PASS: verify:', fail_regex: 'incorrect result|^FAIL'}
+  outputs:
+  - match: 'r\.bs[1-4]'
+    count: 4
+    dtype: u64
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251,
+      called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2
+      would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct
+      result equals the validated golden bit for bit; integer, exact
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture', HPCPERF_GOLDEN_MODE: hash}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the results of bs1..bs4 byte-identical (sha256) to the frozen B200 golden reference reference/<input_id>.json,
+    which upstream''s property check verify() validated once (the property determines every result uniquely); the
+    checked run also runs verify() itself (a host pass, ~0.1 s per variant at n8388608) and exits 1 when a result
+    violates the property, so the check FAILs (the benchmark run exited 1) independently of the reference'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger element counts
@@ -63,11 +96,21 @@ inputs:
   backends_validated:
   - cuda
 - id: n134217728
+  # Queries from the corrected generator (2026-10-28, README "Input n134217728"). Real_t is float, so above 2^24
+  # a[i] = i and z = rand() % N are rounded; upstream's generator rounds 6 of this input's 268435456 queries (the
+  # integers 2^27-4 .. 2^27-2) to a[aSize-1] = 2^27, for which no r with r+1 < aSize satisfies verify()'s
+  # a[r] <= z < a[r+1] (verify() FAILed all four variants: bs1/bs2 returned N-1, bs3/bs4 N). cuda/main.cu now moves
+  # such a query to the largest float below a[aSize-1] (134217720; its one answer is r = N-4) -- upstream's intent
+  # "upper = n-1" in float. Same element count, rand() stream, a[] and every other query (bit-identical); params
+  # and args unchanged: the correction is part of the benchmark's generator (a no-op for n8388608 and n33554432,
+  # whose queries never reach a[aSize-1]), not an input knob. verify() PASS for all four variants (2026-10-28).
   case: binary-search
   variant: size
   source:
     kind: derived
-    derivation: elements x16
+    derivation: 'elements x16; the 6 of 268435456 queries that upstream''s float generator rounds to a[aSize-1] (no
+      valid answer) are moved to the largest float below it (cuda/main.cu query-range correction, README "Input
+      n134217728")'
   params:
     elements: 134217728
     repeat: 100

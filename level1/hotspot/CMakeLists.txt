@@ -28,14 +28,36 @@ endif()
 
 # tools/timing ROI markers: header-only and a no-op unless measured (tools/timing/roi/README.md)
 target_include_directories(hotspot_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/timing/roi)
+# tools/golden: CPU-reference gate (off by default) and output capture (tools/golden/README.md)
+target_include_directories(hotspot_cuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden)
+
+# correctness-probe input (inputs.yaml g512-p2-t21-pnoise9, purpose: correctness-probe; never timed): the vendored
+# power_512 plus a deterministic random 0..9 W per cell, generated at configure time into <build>/data (data/gen_probe.py);
+# the performance inputs read only the vendored files
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/data/gen_probe.py
+                        ${CMAKE_CURRENT_SOURCE_DIR}/data/power_512 ${CMAKE_CURRENT_BINARY_DIR}/data/power_512_pnoise9
+                RESULT_VARIABLE _probe_rc)
+if(NOT _probe_rc EQUAL 0)
+    message(FATAL_ERROR "hotspot correctness-probe input generation (data/gen_probe.py) failed")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             ${CMAKE_CURRENT_SOURCE_DIR}/data/gen_probe.py ${CMAKE_CURRENT_SOURCE_DIR}/data/power_512)
 
 if(BUILD_TESTING)
-    find_package(Python3 REQUIRED COMPONENTS Interpreter)
-    # verify.py runs the benchmark and validates its output against a
-    # CPU reference (see verify.py header for details)
-    add_test(NAME hotspot_run COMMAND ${Python3_EXECUTABLE}
-             ${CMAKE_CURRENT_SOURCE_DIR}/verify.py $<TARGET_FILE:hotspot_cuda> 512 2 2 ${CMAKE_CURRENT_SOURCE_DIR}/data/temp_512 ${CMAKE_CURRENT_SOURCE_DIR}/data/power_512)
+    # one plain run of the registry's default input (no CPU reference: verify.py is used only once, offline,
+    # by hpcperf_golden.py make), its output compared with the frozen B200 golden reference (reference/<input>.json)
+    add_test(NAME hotspot_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} --exe $<TARGET_FILE:hotspot_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest)
     set_tests_properties(hotspot_run PROPERTIES TIMEOUT 900
-        PASS_REGULAR_EXPRESSION "PASS"
-        FAIL_REGULAR_EXPRESSION "FAIL")
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
+    # correctness probe (inputs.yaml purpose: correctness-probe): 21 steps with a strong random power map, on which
+    # no-ops, skipped iterations, stale blocks/halos, frozen boundaries, dropped terms and f16 state fail; checked
+    # against its own frozen reference, never timed
+    add_test(NAME hotspot_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/golden/hpcperf_golden.py
+             run ${CMAKE_CURRENT_SOURCE_DIR} g512-p2-t21-pnoise9 --exe $<TARGET_FILE:hotspot_cuda> --workdir ${CMAKE_CURRENT_BINARY_DIR}/golden-ctest-probe)
+    set_tests_properties(hotspot_probe PROPERTIES TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASS: golden check"
+        FAIL_REGULAR_EXPRESSION "FAIL: golden check")
 endif()

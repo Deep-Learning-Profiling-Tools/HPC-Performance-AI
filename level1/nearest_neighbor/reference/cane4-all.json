@@ -1,0 +1,181 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "nearest_neighbor",
+  "level": 1,
+  "input_id": "cane4-all",
+  "frozen": true,
+  "workload": {
+    "input_id": "cane4-all",
+    "params": {
+      "db_files": 4,
+      "records": "4 x cane4_*.db",
+      "k": 42764,
+      "lat": 30,
+      "lng": 90
+    },
+    "args": [
+      "build/nearest_neighbor/cuda/filelist_4",
+      "-r",
+      "42764",
+      "-lat",
+      "30",
+      "-lng",
+      "90"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/cane4_0.db": "ab2843d14581a9655484680a01cf8573182e89bb805ab8d0845760425a99de67",
+      "data/cane4_1.db": "c18e97284b8481ec036fa14d7ee6791fc918504f1b99589fa273ff13d79f702b",
+      "data/cane4_2.db": "3562b6d6d99006dfe4d011cfd1e9f3573f356ba6040a6a104d5f0b8cb5596daa",
+      "data/cane4_3.db": "000e9dbc0d8c44aab4052f7f64558d4518dc261bd748c941fbcae969adb9e545"
+    }
+  },
+  "inputs_yaml_sha256": "5799e95524145086f08a709a99ad46626c1d1a00c5aa8bd495c849477ca82937",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "topk_distances",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.0001
+        },
+        "cpu": "topk_distances.cpu",
+        "basis": "verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu, records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation",
+        "log": null
+      },
+      {
+        "name": "topk_records",
+        "match": null,
+        "count": null,
+        "dtype": "u8",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "the k reported records (cuda/nn_cuda.cu, records[i].recString after the ROI, the 48 characters printed before \" --> Distance=\"), sorted bytewise, byte-identical. Exact is sound only because the registered queries have no tie at the k-th distance (verify.py fails a query whose k-th and (k+1)-th distances are within 2x the tolerance: cane4-k5 0.608 / 0.707; cane4-all reports every record), so every correct implementation reports the same set; verify.py checks that the set is a k-nearest set of db records (level1/nearest_neighbor/verify.py)",
+        "log": null
+      },
+      {
+        "name": "topk_record_distances",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 0.0001
+        },
+        "cpu": "topk_record_distances.cpu",
+        "basis": "the distance reported with each record of topk_records (records[i].distance, same order), within verify.py's |g - e| <= 1e-4 (1 + |e|) of that record's own CPU distance (the pairing record <-> distance); tol minus the B200 values' own deviation",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "topk_distances",
+      "dtype": "f32",
+      "count": 42764,
+      "bytes": 171056,
+      "sha256": "cb191f50e4fefee5ed8da7eedd446cfbd112ea7438bc39cb92f1da2243f2e9e8",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 1.177354712368123e-07,
+        "d0_source": "topk_distances.cpu",
+        "tol_effective": 9.988225276907911e-05
+      },
+      "basis": "verify.py's check |g - e| <= 1e-4 (1 + |e|) between the sorted reported top-k distances and the k smallest CPU distances (level1/nearest_neighbor/verify.py:43), here on the binary's float values (cuda/nn_cuda.cu, records[i].distance after the ROI, sorted) instead of the printed %f text; tol minus the B200 values' own deviation",
+      "stats": {
+        "min": 0.1999969482421875,
+        "max": 270.9538879394531,
+        "sum": 4928387.71063292,
+        "nonfinite": 0
+      },
+      "blob": "sha256/cb/cb191f50e4fefee5ed8da7eedd446cfbd112ea7438bc39cb92f1da2243f2e9e8.bin"
+    },
+    {
+      "name": "topk_records",
+      "dtype": "u8",
+      "count": 2052672,
+      "bytes": 2052672,
+      "sha256": "3e3f2dfb165c3c970c94e4c4d8451f4fa7f90685751abe10a3d7474a573d7411",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "the k reported records (cuda/nn_cuda.cu, records[i].recString after the ROI, the 48 characters printed before \" --> Distance=\"), sorted bytewise, byte-identical. Exact is sound only because the registered queries have no tie at the k-th distance (verify.py fails a query whose k-th and (k+1)-th distances are within 2x the tolerance: cane4-k5 0.608 / 0.707; cane4-all reports every record), so every correct implementation reports the same set; verify.py checks that the set is a k-nearest set of db records (level1/nearest_neighbor/verify.py)",
+      "stats": {
+        "min": 32.0,
+        "max": 89.0,
+        "sum": 96295374.0,
+        "nonfinite": 0
+      }
+    },
+    {
+      "name": "topk_record_distances",
+      "dtype": "f32",
+      "count": 42764,
+      "bytes": 171056,
+      "sha256": "33e9234bf83e88df27add3febfb4b57096e60d2b13c6e0977b0d70f125973cc3",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 1.177354712368123e-07,
+        "d0_source": "topk_record_distances.cpu",
+        "tol_effective": 9.988225276907911e-05
+      },
+      "basis": "the distance reported with each record of topk_records (records[i].distance, same order), within verify.py's |g - e| <= 1e-4 (1 + |e|) of that record's own CPU distance (the pairing record <-> distance); tol minus the B200 values' own deviation",
+      "stats": {
+        "min": 0.1999969482421875,
+        "max": 270.9538879394531,
+        "sum": 4928387.71063292,
+        "nonfinite": 0
+      },
+      "blob": "sha256/33/33e9234bf83e88df27add3febfb4b57096e60d2b13c6e0977b0d70f125973cc3.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T23:11:12Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03",
+      "compute_capability": "10.0"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "b3cecf9451f054a63d5b955d02d34d2798069187",
+    "source_clean": true,
+    "binary": "build/nearest_neighbor/cuda/nearest_neighbor_cuda",
+    "binary_sha256": "3f06ec9c69d2f058e8eea0931c8a155b8eb470cfa876053009521c54bc78f494",
+    "command": [
+      "python3",
+      "level1/nearest_neighbor/verify.py",
+      "build/nearest_neighbor/cuda/nearest_neighbor_cuda",
+      "build/nearest_neighbor/cuda/filelist_4",
+      "42764",
+      "30",
+      "90"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 3.281,
+      "pass_line": "PASS: top-42764 nearest-neighbor distances match CPU reference (and the 42764 record identities, each record's own distance and the k-nearest set; k-th / next distance 270.954 / nan)",
+      "pass_regex": "^PASS: top-\\d+ nearest-neighbor distances match CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/nearest_neighbor/cane4-all/run/stdout.log",
+      "log_sha256": "419b264e6935616984063ad497fb8190f2b59f0f254c7ed4ffaa46867c5267ab"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "5d776c11ea848c9ed0b88705afe886209e64b7307b6f72343faec4e9a34cefe2",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed"
+  }
+}

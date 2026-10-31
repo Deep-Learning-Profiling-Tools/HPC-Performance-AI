@@ -13,20 +13,50 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the CUDA port prints no timer (only the error lines and PASS)
 baseline:
-  method: 'added check: identical network trained with the upstream CPU bpnn_train, weights/errors compared (rel
-    1e-3): PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the trained weights (input and hidden layer) against the frozen B200 golden reference (`check:` / `golden:`
+    below); the added check''s CPU training step (upstream bpnn_train on a cloned network, cuda/facetrain.c) runs only
+    once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the weights only
+  # when the added check printed PASS; every later run is compared with those frozen outputs instead.
+  # The check also compares the output/hidden error scalars. Upstream's bpnn_train_cuda (cuda/backprop_cuda.cu:60) never
+  # wrote *eo / *eh, so they were uninitialized in backprop_face (cuda/facetrain.c:70); since 2026-10-27 it returns
+  # them (after the ROI). They are NOT captured: the frozen spec is unchanged.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: input_weights
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-3}
+    cpu: input_weights.cpu
+    basis: the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->input_weights[0..in][0..hid] against the
+      CPU-trained clone (cuda/facetrain.c:63, :102, :113); the check allows 1e-3 minus the B200 output's own deviation
+      from the CPU reference
+  - name: hidden_weights
+    dtype: f32
+    rule: {metric: max_rel1p, tol: 1.0e-3}
+    cpu: hidden_weights.cpu
+    basis: the added check's rel_diff |a - b| / (1 + |b|) <= 1e-3 of net->hidden_weights[0..hid][0..out] against the
+      CPU-trained clone (cuda/facetrain.c:63, :107, :113); the check allows 1e-3 minus the B200 output's own deviation
+      from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'input_weights and hidden_weights against the frozen B200 golden reference reference/<input_id>.json (max |a -
+    g| / (1 + |g|) <= 1e-3 - d0 per matrix, d0 = the golden''s deviation from the CPU-trained clone measured when it was
+    frozen); no CPU reference is run. The error scalars the added check also compares (uninitialized on the GPU path
+    before 2026-10-27) are not part of the golden spec'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream run line plus two larger input layers
@@ -77,6 +107,60 @@ inputs:
     input_layer_size: 524288
   args:
   - '524288'
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-dpn1-n32
+  purpose: correctness-probe
+  probe_basis: >-
+    with upstream's weights in [0, 1] every hidden sum is ~in/4 (16384 for n65536), all 16 hidden units saturate to
+    exactly 1.0f, hidden_delta = 0 and the input-weight update is exactly 0: skipping bpnn_adjust_weights_cuda, the
+    forward kernel (hidden units set to 1) or the whole training step passes every performance input (measured
+    2026-10-27). Here the weights come from upstream's own commented-out alternative dpn1() (symmetric, [-1, 1]) and the
+    input layer is small (32 units, 2 thread blocks): 14 of 16 hidden units are unsaturated, and the skipped weight
+    adjustment, the skipped forward pass and the skipped training step deviate from the result by 7.2e-3, 1.8e-2 and
+    3.2e-2 (max |a - g| / (1 + |g|), tolerance 1e-3)
+  case: backprop-train
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      set-up data only (`--probe`, cuda/facetrain.c setup, cuda/backprop.c bpnn_randomize_weights): input and hidden
+      weights from upstream's commented-out dpn1() instead of rand()/RAND_MAX (same seed 7, same number of rand()
+      calls), input layer 32; the kernels, the host training code and the CPU reference bpnn_train are unchanged
+  params:
+    input_layer_size: 32
+    probe_data: weights dpn1() in [-1, 1]
+  args:
+  - '32'
+  - --probe
+  runtime_config:
+    gpus: 1
+  build_config: null
+  backends_validated:
+  - cuda
+- id: probe-dpn1-n1024
+  purpose: correctness-probe
+  probe_basis: >-
+    as probe-dpn1-n32 (upstream's saturating [0, 1] weights make the input-weight update exactly 0 on every performance
+    input), with an input layer of 1024 units (64 thread blocks, so the multi-block forward reduction and the
+    adjustment of every block's rows are exercised): 5 of 16 hidden units are unsaturated and the skipped weight
+    adjustment, the skipped forward pass and the skipped training step deviate from the result by 7.2e-3, 2.5e-2 and
+    3.5e-2 (max |a - g| / (1 + |g|), tolerance 1e-3)
+  case: backprop-train
+  variant: parameter
+  source:
+    kind: derived
+    derivation: >-
+      set-up data only (`--probe`, as probe-dpn1-n32): weights from upstream's commented-out dpn1(), input layer 1024
+  params:
+    input_layer_size: 1024
+    probe_data: weights dpn1() in [-1, 1]
+  args:
+  - '1024'
+  - --probe
   runtime_config:
     gpus: 1
   build_config: null

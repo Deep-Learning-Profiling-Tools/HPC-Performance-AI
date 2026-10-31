@@ -1,0 +1,107 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "spmv",
+  "level": 1,
+  "input_id": "probe-real",
+  "frozen": true,
+  "workload": {
+    "input_id": "probe-real",
+    "params": {
+      "rows": 110503,
+      "loop": "default",
+      "probe_data": "values uniform [-50, 50), x uniform [-20, 20) (splitmix64)"
+    },
+    "args": [
+      "--probe"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "7bad3619426041df78b6be8c1a0d821c82960493f873d8a73ac2d5679acaf298",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "y",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 1e-08
+        },
+        "cpu": "y.cpu",
+        "basis": "project criterion for the probe (upstream check_errors, l2_rel_sq 1e-5, still gates the one-time CPU validation): |a - g| <= 1e-8 per element. Every row has 10 nonzeros and sum_j |a_ij x_j| <= 6169, so any IEEE f64 evaluation order (FMA or not, any reduction tree, atomics) is within gamma_10 * 6169 = 6.8e-12 of the exact y and two of them within 1.4e-11 (730x below the tolerance); storing values or x in f32 moves y by >= 1.5e-4 (15000x above)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "y",
+      "dtype": "f64",
+      "count": 110503,
+      "bytes": 884024,
+      "sha256": "9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 1e-08,
+        "d0_vs_cpu_reference": 1.3642420526593924e-12,
+        "d0_source": "y.cpu",
+        "tol_effective": 9.99863575794734e-09
+      },
+      "basis": "project criterion for the probe (upstream check_errors, l2_rel_sq 1e-5, still gates the one-time CPU validation): |a - g| <= 1e-8 per element. Every row has 10 nonzeros and sum_j |a_ij x_j| <= 6169, so any IEEE f64 evaluation order (FMA or not, any reduction tree, atomics) is within gamma_10 * 6169 = 6.8e-12 of the exact y and two of them within 1.4e-11 (730x below the tolerance); storing values or x in f32 moves y by >= 1.5e-4 (15000x above)",
+      "stats": {
+        "min": -4649.251250585264,
+        "max": 4557.9223184296725,
+        "sum": -244384.4726982237,
+        "nonfinite": 0
+      },
+      "blob": "sha256/9f/9f751890cc77b9e28841c62d815c271f87fc7d89c328270c7efe23b5cca61437.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T12:54:09Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "48b77642c703a63fc9a294321076e413548a5a13",
+    "source_clean": true,
+    "binary": "build/spmv/cuda/spmv_cuda",
+    "binary_sha256": "4a8ef7a1d5bc2d5d7c0ce14f30cf4cfe79c6edf3cbe19d4c31999e465fe86e24",
+    "command": [
+      "build/spmv/cuda/spmv_cuda",
+      "--probe"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.328,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/spmv/probe-real/run/stdout.log",
+      "log_sha256": "ffd074464fd759860a7eb36791243d3cb5007d56e732d2ed5c2dd0e552ccb2b4"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

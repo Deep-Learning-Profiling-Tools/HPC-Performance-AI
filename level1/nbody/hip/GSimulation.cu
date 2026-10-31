@@ -5,9 +5,11 @@
 // =============================================================
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <hip/hip_runtime.h>
 #include "GSimulation.hpp"
 #include "GSimulationKernels.hpp"
+#include "GSimulationCapture.hpp"
 
 /* Default Constructor for the GSimulation class which sets up the default
  * values for number of particles, number of integration steps, time steo and
@@ -160,6 +162,16 @@ void GSimulation::Start() {
   std::cout << "# Total Time (s)      : " << total_time_ << "\n";
   std::cout << "# Average Performance : " << av << " +- " << dev << "\n";
   std::cout << "===============================\n";
+  // tools/golden: the checked output -- the kinetic energy of the last step (the only quantity
+  // Verify() compares), after the timed loop
+  hpcperf_golden_output("kenergy", &kenergy_, 1, "f32");
+  // tools/golden: the final particle state (positions, velocities), copied back from the device only when
+  // capturing (HPCPERF_GOLDEN_DUMP), after the timed loop and its timer
+  if (hpcperf_golden_active()) {
+    std::vector<Particle> state(n);
+    hipMemcpy(state.data(), p, sizeof(Particle) * n, hipMemcpyDeviceToHost);
+    hpcperf_capture_particle_state(state.data(), n, "pos", "vel");
+  }
 
   hipFree(p);
   hipFree(e);

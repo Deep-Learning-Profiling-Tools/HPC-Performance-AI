@@ -6,6 +6,7 @@
 // initialization. Validation: element-wise comparison of GPU vs CPU result.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 
 // upstream DAXPY.hpp
@@ -57,13 +58,15 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(y, dy, size * sizeof(Real_type), cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("y", y, size, "f64");   // tools/golden: the checked output
   GPU_CHECK(cudaFree(dx));
   GPU_CHECK(cudaFree(dy));
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
   // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -80,6 +83,7 @@ int main(int argc, char** argv)
       }
     }
   }
+  hpcperf_golden_output("y.cpu", y_ref, size, "f64");   // the CPU reference (golden make only)
 
   // ------------------------------ validate ---------------------------------
   ok = compareArrays("y", y_ref, y, size, 1.0e-10);

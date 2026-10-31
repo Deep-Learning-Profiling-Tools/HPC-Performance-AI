@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -7,13 +8,14 @@
 #include <random>
 #include "reference.h"
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -135,6 +137,7 @@ int main(int argc, char* argv[])
   printf("Average kernel execution time %f (ms)\n", time * 1e-6f / repeat);
 
   cudaMemcpy(p, d_p, size_bytes, cudaMemcpyDeviceToHost); 
+  hpcperf_golden_output("p", p, vector_size, "f32");   // tools/golden: the checked output
 
   cudaFree(d_p);
   cudaFree(d_m);
@@ -142,7 +145,8 @@ int main(int argc, char* argv[])
   cudaFree(d_g);
 
   if (hpcperf_skip_verify()) {
-    // measurement mode: reference() re-runs the whole update on the host
+    // default: the CPU reference (reference() re-runs the whole update on the host) is skipped;
+    // correctness = the captured output against the frozen golden reference (tools/golden)
     printf("SKIP_VERIFY\n");
   } else {
   // verify
@@ -157,6 +161,7 @@ int main(int argc, char* argv[])
     vector_size,
     mode,
     decay);
+  hpcperf_golden_output("p.cpu", r, vector_size, "f32");   // the CPU reference (golden make only)
 
   bool ok = true; 
   double cr = 0, cp = 0;

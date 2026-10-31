@@ -35,9 +35,13 @@ Parser semantics (one rule for every mode):
       construction-time only (generate_reference.sh): extracts the frozen reference
       reference/<id>.json from a FINISHED CPU-only run's log -- deck sha256 and seed, the final step's
       energies, T_e table and transported photon count, the per-step counts, the run's provenance
-      (binary sha256, rank count, launch, allocation, start/finish, log sha256 and where the log is
-      kept) and the comparison rule with its basis. Refuses a GPU log, an unfinished run and an
-      existing file (--force overwrites).
+      (binary sha256, rank count, launch, start/finish, log sha256 and where the log is kept, relative to
+      the results directory or the repository) and the comparison rule with its basis. No machine identity:
+      --allocation (host, batch job) is accepted for old callers but never recorded, and a --log-kept-at
+      that names an absolute path is not recorded either (a notice says so; scrub_provenance.py).
+      Refuses a GPU log, an unfinished run and an existing file (--force overwrites). --seed N records
+      the effective seed of a run that overrode the deck's <seed> on the command line (validate.sh's
+      --seed 1234; default: the deck's seed).
 Prints the per-step / per-quantity figures and "   ERROR: ..." lines, then
 "PASS: branson log check ..." / "FAIL: branson log check ..."; exit 0/1 (freeze: the file, exit 0/2).
 """
@@ -56,6 +60,8 @@ TOLERANCE_BASIS = ("validate.sh check C: the seed-to-seed scatter of the final e
                    "the energies' margin. Fixed before any optimized candidate existed; the reference's rank count "
                    "does not enter the criteria (same deck, seed and global photon count).")
 REFERENCE_SCHEMA = "hpcperf-branson-reference-1"
+# an absolute path (/projects/..., /home/..., /tmp/..., ~/...) in free text: a location private to one machine
+ABS_PATH = re.compile(r"(?:^|[\s(\[{=:,;'\"])(?:~|/[A-Za-z0-9._-]+)/")
 
 
 def parse(path):
@@ -149,7 +155,8 @@ def compare_final(g, c, g_label='GPU', c_label='CPU'):
 def freeze(argv):
     """freeze --input-id ID --deck DECK --cpu-log LOG --ranks N --out FILE [--binary-sha256 S] [--build-options S]
     [--launch S] [--allocation S] [--started UTC] [--finished UTC] [--log-kept-at REL] [--upstream-commit C]
-    [--param k=v ...] [--note S] [--generated-by S] [--generated-utc UTC] [--force]"""
+    [--param k=v ...] [--seed N] [--note S] [--generated-by S] [--generated-utc UTC] [--force]
+    --allocation is not recorded (machine identity); --log-kept-at only when it names no absolute path."""
     opts, params, i = {}, {}, 0
     while i < len(argv):
         a = argv[i]
@@ -173,6 +180,8 @@ def freeze(argv):
         sys.exit(f'check_log.py freeze: deck {deck} missing')
     deck_text = open(deck, errors='replace').read()
     seed = re.search(r'<seed>\s*(\d+)\s*</seed>', deck_text)
+    if 'seed' in opts and not re.fullmatch(r'[0-9]+', opts['seed']):
+        sys.exit('check_log.py freeze: --seed must be a non-negative integer')
     steps, text = parse(opts['cpu_log'])
     if not finished(text):
         sys.exit('check_log.py freeze: the CPU run did not finish (no "Photons Per Second (FOM)" line) -- not a reference')
@@ -187,22 +196,31 @@ def freeze(argv):
     if any('Photons' not in s for s in steps):
         sys.exit('check_log.py freeze: a step lacks its "Total Photons transported" line')
     transport_s, fom = totals(text)
+    if opts.get('allocation'):
+        print('note: --allocation is not recorded (host name / batch job are machine identity, not needed to reproduce '
+              'or check the reference)')
+    kept = opts.get('log_kept_at')
+    if kept and ABS_PATH.search(kept):
+        print('note: --log-kept-at names an absolute path -- not recorded (give it relative to the results directory '
+              'or the repository)')
+        kept = None
     here = os.path.dirname(os.path.abspath(__file__))
     deck_rel = os.path.relpath(os.path.abspath(deck), here)
     ref = {
         'schema': REFERENCE_SCHEMA, 'benchmark': 'branson', 'input_id': opts['input_id'],
-        'deck': deck_rel, 'deck_sha256': sha256_file(deck), 'seed': int(seed.group(1)) if seed else None,
+        'deck': deck_rel, 'deck_sha256': sha256_file(deck),
+        'seed': int(opts['seed']) if 'seed' in opts else (int(seed.group(1)) if seed else None),
         'params': params,
         'upstream': {'repo': 'lanl/branson', 'commit': opts.get('upstream_commit')},
         'reference_run': {
             'implementation': ('CPU-only Branson built from the same sources with -DUSE_GPU=OFF: Branson\'s CPU transport, '
                                'independent of the GPU transport kernel (the deck\'s use_gpu_transporter is ignored by that build)'),
             'binary_sha256': opts.get('binary_sha256'), 'build_options': opts.get('build_options'),
-            'mpi_ranks': int(opts['ranks']), 'launch': opts.get('launch'), 'allocation': opts.get('allocation'),
+            'mpi_ranks': int(opts['ranks']), 'launch': opts.get('launch'),
             'started_utc': opts.get('started'), 'finished_utc': opts.get('finished'),
             'total_transport_s': transport_s, 'fom_photons_per_s': fom,
             'log_sha256': sha256_file(opts['cpu_log']), 'log_bytes': os.path.getsize(opts['cpu_log']),
-            'log_kept_at': opts.get('log_kept_at')},
+            'log_kept_at': kept},
         'steps': len(steps),
         'final_step': {'post_mat_e': fin['PostMat'], 'absorption_e': fin['Absorption'], 'exit_e': fin['Exit'],
                        'photons_transported': fin['Photons'], 't_e': fin['Te'] or None},

@@ -1,0 +1,102 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "murmurhash3",
+  "level": 1,
+  "input_id": "k200000",
+  "frozen": true,
+  "workload": {
+    "input_id": "k200000",
+    "params": {
+      "keys": 200000,
+      "repeat": 100
+    },
+    "args": [
+      "200000",
+      "100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "634760b3df88a2591860e78f98d6f49f069bb5cdd0b925cde4933e102b71072a",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "hash",
+        "match": null,
+        "count": null,
+        "dtype": "u64",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's exact comparison of both 64-bit halves of every key's hash, d_out[2*i] != out[i][0] || d_out[2*i+1] != out[i][1] -> FAIL, against the host MurmurHash3_x64_128 (cuda/murmurhash3.cu:244); 2 x numKeys integers, compared byte for byte",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "hash",
+      "dtype": "u64",
+      "count": 400000,
+      "bytes": 3200000,
+      "sha256": "e802ad6e9271499d0a07fd7f76863a30ff4a3c8d3434572baddac672140dea06",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's exact comparison of both 64-bit halves of every key's hash, d_out[2*i] != out[i][0] || d_out[2*i+1] != out[i][1] -> FAIL, against the host MurmurHash3_x64_128 (cuda/murmurhash3.cu:244); 2 x numKeys integers, compared byte for byte",
+      "stats": {
+        "min": 19248020580499.0,
+        "max": 1.8446708140361578e+19,
+        "sum": 3.6903729980032254e+24,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:35:43Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/murmurhash3/cuda/murmurhash3_cuda",
+    "binary_sha256": "d96b5794c5f51753f7c87d24cc1f935ca244faf4357e3672260db0a5a5aab76c",
+    "command": [
+      "build/murmurhash3/cuda/murmurhash3_cuda",
+      "200000",
+      "100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 2.48,
+      "pass_line": "SUCCESS",
+      "pass_regex": "^SUCCESS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/murmurhash3/k200000/run/stdout.log",
+      "log_sha256": "6da6aaaa092982d715d4a5cf03f5858819941c053b4738ea302485df3fb1fb3c"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

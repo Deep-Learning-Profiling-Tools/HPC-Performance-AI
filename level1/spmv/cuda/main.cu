@@ -23,6 +23,7 @@
 // sequential CPU gold standard must be <= 1e-5.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -41,6 +42,7 @@ using Offset  = size_t;
 #define cudaMalloc hipMalloc
 #define cudaFree hipFree
 #define cudaMemcpy hipMemcpy
+#define cudaMemset hipMemset
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaDeviceSynchronize hipDeviceSynchronize
@@ -51,13 +53,14 @@ __device__ inline Scalar shfl_down_width(Scalar v, int delta, int width) {
 #else
 #include <cuda_runtime.h>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 __device__ inline Scalar shfl_down_width(Scalar v, int delta, int width) {
@@ -172,15 +175,41 @@ static void kk_sparseMatrix_generate(Ordinal nrows, Ordinal ncols, Offset& nnz,
   // overwritten by generate_gold_standard before the benchmark runs)
 }
 
+// ---------------------------------------------------------------------------
+// tools/golden correctness probe (`--probe`, registry input probe-real; set-up data only: the kernel, the launch
+// heuristics, the matrix structure and the timed loop are unchanged). Upstream's data are integers (values =
+// colidx + row from generate_gold_standard, x = rand() % 40 - 20), so every product and partial sum of y is an
+// integer far below 2^53: every f64 evaluation order gives y exactly, values and x stay exact when stored in f32
+// (x even in bf16), so no output check can see their precision, and f32 arithmetic changes y by at most 46 at
+// |y| up to 5.3e8. The probe keeps the matrix structure (the same kk_sparseMatrix_generate call and rand()
+// stream) and replaces the numbers by reals with full 53-bit mantissas: values uniform in [-50, 50) -- the range
+// upstream's own kk_sparseMatrix_generate draws (getRandomBounds(50)) before generate_gold_standard overwrites
+// it -- and x uniform in [-20, 20), the range of upstream's integer x, each from its own fixed-seed splitmix64
+// stream (a project choice: upstream's Kokkos XorShift64 pool fill is not reproducible outside Kokkos).
+// ---------------------------------------------------------------------------
+static inline unsigned long long probe_next(unsigned long long& s)
+{
+  unsigned long long z = (s += 0x9E3779B97F4A7C15ull);
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+static inline Scalar probe_uniform(unsigned long long& s, double lo, double hi)
+{
+  return lo + (hi - lo) * (static_cast<double>(probe_next(s) >> 11) * 0x1.0p-53);   // 53 random mantissa bits
+}
+
 int main(int argc, char** argv)
 {
   long long int size = 110503;  // upstream default (a prime number)
   int loop           = 100;     // upstream default
   int vector_length  = -1;
   int team_size      = -1;
+  bool probe = false;            // correctness-probe set-up data (see probe_uniform); never a performance input
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "-s") && i + 1 < argc) size = atoll(argv[++i]);
     if (!strcmp(argv[i], "-l") && i + 1 < argc) loop = atoi(argv[++i]);
+    if (!strcmp(argv[i], "--probe")) probe = true;
   }
   const Ordinal numRows = static_cast<Ordinal>(size);
   const Ordinal numCols = static_cast<Ordinal>(size);
@@ -198,14 +227,25 @@ int main(int argc, char** argv)
   Scalar* h_y_compare = new Scalar[numRows];
   for (int i = 0; i < numCols; i++) h_x[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
   for (int i = 0; i < numRows; i++) h_y[i] = (Scalar)(1.0 * (rand() % 40) - 20.);
+  // probe only; seeds = upstream's value-fill pool seed (13718) and driver srand seed (17312837)
+  unsigned long long probe_values_seed = 13718, probe_x_seed = 17312837;
+  if (probe) {
+    for (int i = 0; i < numCols; i++) h_x[i] = probe_uniform(probe_x_seed, -20.0, 20.0);
+    printf("correctness probe: real-valued matrix values in [-50, 50) and x in [-20, 20) (set-up data only)\n");
+  }
 
   // ----- upstream generate_gold_standard: overwrite values, CPU gold -----
+  // (the CPU gold y is reference work: computed only when the CPU check runs; the value
+  // overwrite is the benchmark's data initialization and always runs)
+  const bool cpu_gold = !hpcperf_skip_verify();
   for (int i = 0; i < numRows; i++) {
     Offset start = rowPtr[i], end = rowPtr[i + 1];
     for (Offset j = start; j < end; j++) values[j] = colInd[j] + i;
+    if (probe) for (Offset j = start; j < end; j++) values[j] = probe_uniform(probe_values_seed, -50.0, 50.0);
+    if (!cpu_gold) continue;
     h_y_compare[i] = 0;
     for (Offset j = start; j < end; j++) {
-      Scalar tmp_val = colInd[j] + i;
+      Scalar tmp_val = probe ? values[j] : colInd[j] + i;   // upstream recomputes colidx + row (= values[j])
       int idx = colInd[j];
       h_y_compare[i] += tmp_val * h_x[idx];
     }
@@ -236,7 +276,8 @@ int main(int argc, char** argv)
 
   int num_errors = 0;
   double total_error = 0.0;
-  if (!hpcperf_skip_verify()) {  // upstream check_errors
+  if (cpu_gold) {  // upstream check_errors
+    hpcperf_golden_output("y.cpu", h_y_compare, numRows, "f64");   // the CPU gold standard (golden make only)
     double error = 0.0, sum = 0.0;
     for (int i = 0; i < numRows; i++) {
       error += (h_y_compare[i] - h_y[i]) * (h_y_compare[i] - h_y[i]);
@@ -246,6 +287,15 @@ int main(int argc, char** argv)
     if ((error / sum) > 1e-5) ++num_errors;
     total_error += error;
   }
+
+  // tools/golden: poison y on the device and in the host copy (all-ones bytes, a NaN in every f64) after the
+  // checked SpMV above and before the timed loop, outside the ROI and the per-launch timer. The kernel writes
+  // every y[iRow] (alpha = 1, beta = 0) and never reads y, so a correct timed loop overwrites the poison
+  // completely; a loop whose SpMV does not run leaves NaN in the capture below instead of the identical result
+  // of the SpMV above.
+  GPU_CHECK(cudaMemset(d_y, 0xFF, numRows * sizeof(Scalar)));
+  memset(h_y, 0xFF, numRows * sizeof(Scalar));
+  GPU_CHECK(cudaDeviceSynchronize());
 
   // ----- upstream benchmark loop -----
   double ave_time = 0.0, max_time = 0.0, min_time = 1.0e32;
@@ -261,6 +311,10 @@ int main(int argc, char** argv)
   }
   HPCPERF_ROI_END_SYNC();
   GPU_CHECK(cudaGetLastError());
+  // tools/golden: y after the timed loop (the result of its last SpMV; bit-identical to the single SpMV
+  // before the loop that the CPU check above compares), copied back and captured after the ROI
+  GPU_CHECK(cudaMemcpy(h_y, d_y, numRows * sizeof(Scalar), cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("y", h_y, numRows, "f64");
 
   // upstream-style performance summary
   double matrix_size = 1.0 * ((nnz * (sizeof(Scalar) + sizeof(Ordinal)) + numRows * sizeof(Offset))) / 1024 / 1024;
@@ -272,6 +326,6 @@ int main(int argc, char** argv)
          2.0 * nnz * loop / ave_time / 1e9, ave_time / loop * 1000, num_errors);
   printf("launch config: vector_length=%d team_size=%d rows_per_team=%d worksets=%d\n",
          vector_length, team_size, rows_per_team, worksets);
-  printf("%s\n", hpcperf_skip_verify() ? "SKIP_VERIFY" : (num_errors == 0 ? "PASS" : "FAIL"));
+  printf("%s\n", !cpu_gold ? "SKIP_VERIFY" : (num_errors == 0 ? "PASS" : "FAIL"));
   return num_errors == 0 ? 0 : 1;
 }

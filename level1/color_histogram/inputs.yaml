@@ -1,5 +1,6 @@
 # Registered inputs of color_histogram (schema hpcperf-inputs-1), read by tools/inputs/hpcperf_inputs.py.
-# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest default is unchanged.
+# Level 1 has no run.sh: the tool runs the binary with the input's arguments; the ctest runs the default input.
+# Every input is generated from the fixed seed 1 (params.seed, common/hpcperf_measure.h; upstream: time(NULL)).
 schema: hpcperf-inputs-1
 benchmark: color_histogram
 level: 1
@@ -14,19 +15,40 @@ timing:
   reason: the port exposes no timing option (upstream's benchmark_runner -t timing mode is not wired into the CLI);
     only the verification line is printed
 baseline:
-  method: 'built-in (upstream Verify): ''Passed.'''
-  reference: this build's first measured run (self baseline); see method
+  method: 'the histogram against the frozen B200 golden reference (`check:` / `golden:` below); the upstream CPU
+    histogram (Verify) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: Passed
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: (FAIL|[Ff]ail)
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the histogram
+  # only when upstream Verify printed 'Passed.'; every later run is compared with that frozen output instead.
+  # The image is generated from the fixed default seed 1 (params.seed; common/hpcperf_measure.h): a run with another
+  # seed (HPCPERF_RANDOM_SEED) prints 'NON-DEFAULT SEED', which make treats as a fail line, and its histogram differs.
+  mode: data
+  cpu_check: {pass_regex: '^Passed\.$', fail_regex: '^At color [0-9]+, expected to be|NON-DEFAULT SEED'}
+  outputs:
+  - name: histogram
+    dtype: u32
+    rule: {metric: exact}
+    cpu: null
+    basis: upstream Verify compares every one of the num_color_ (256) bins with the CPU histogram,
+      cpu_histogram[i] != histogram_[i] fails (common/hist_benchmark.cc:73); captured by
+      HistBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc)
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 256-bin histogram (u32) identical to the frozen B200 golden reference reference/<input_id>.json
+    (upstream Verify is an exact bin-by-bin compare against the CPU histogram); the image comes from the fixed seed 1,
+    a run with another seed fails; no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: three points of the upstream -x size sweep
@@ -35,13 +57,17 @@ inputs:
   case: color-histogram
   variant: default
   source:
-    kind: upstream-parameterized
+    kind: derived
+    derivation: upstream generator (glibc rand_r % 256 per pixel) and upstream run line -x 1048576, with the seed
+      fixed to 1 (params.seed) instead of upstream's time(NULL), which drew another image every run;
+      HPCPERF_RANDOM_SEED=time restores the clock seed (not a registered input)
     upstream:
       repo: NUCAR-DEV/Hetero-Mark
       version: aa685e02705f4be380cba215c6df10b42262a9cd
       path: hist benchmark -x 1048576 (= ctest)
   params:
     pixels: 1048576
+    seed: 1
   args:
   - -x
   - '1048576'
@@ -54,13 +80,17 @@ inputs:
   case: color-histogram
   variant: size
   source:
-    kind: upstream-parameterized
+    kind: derived
+    derivation: upstream generator (glibc rand_r % 256 per pixel) and upstream run line -x 4194304, with the seed
+      fixed to 1 (params.seed) instead of upstream's time(NULL), which drew another image every run;
+      HPCPERF_RANDOM_SEED=time restores the clock seed (not a registered input)
     upstream:
       repo: NUCAR-DEV/Hetero-Mark
       version: aa685e02705f4be380cba215c6df10b42262a9cd
       path: upstream sweep parameter -x, 4 M pixels
   params:
     pixels: 4194304
+    seed: 1
   args:
   - -x
   - '4194304'
@@ -73,13 +103,17 @@ inputs:
   case: color-histogram
   variant: size
   source:
-    kind: upstream-parameterized
+    kind: derived
+    derivation: upstream generator (glibc rand_r % 256 per pixel) and upstream run line -x 16777216, with the seed
+      fixed to 1 (params.seed) instead of upstream's time(NULL), which drew another image every run;
+      HPCPERF_RANDOM_SEED=time restores the clock seed (not a registered input)
     upstream:
       repo: NUCAR-DEV/Hetero-Mark
       version: aa685e02705f4be380cba215c6df10b42262a9cd
       path: upstream sweep parameter -x, 16 M pixels
   params:
     pixels: 16777216
+    seed: 1
   args:
   - -x
   - '16777216'

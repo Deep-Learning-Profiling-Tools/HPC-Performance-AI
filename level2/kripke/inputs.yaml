@@ -17,11 +17,10 @@ timing:
   regex: ^TIMER_DATA:(?:[0-9.eE+-]+,){5}(?P<value>[0-9.eE+-]+)
   select: only
 baseline:
-  method: Kripke has no built-in reference; validate.sh compares the GPU with the Sequential architecture of the
-    same binary. The registry keeps the final particle count, compared with the same-input baseline at validate.sh's
-    KRIPKE_VALIDATE_RTOL 1e-6 (one unit in the last of the 7 printed digits), and the FOM (diagnostic). The registry
-    check (check_sequential.sh) compares all 10 per-iteration counts of the GPU run against a Sequential run of the same
-    problem.
+  method: Kripke has no built-in reference. The registry keeps the final particle count, compared with the same-input
+    baseline at validate.sh's KRIPKE_VALIDATE_RTOL 1e-6 (one unit in the last of the 7 printed digits), and the FOM
+    (diagnostic). The registry check compares all 10 per-iteration counts with the frozen B200 golden reference
+    (tools/golden); the Sequential (CPU) cross-check (check_sequential.sh) runs only once, offline, to validate it.
   reference: this build's first measured run (self baseline); see method
   quantities:
   - name: particle_count_final
@@ -142,14 +141,35 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+golden:
+  binary: build/level2/kripke/cuda/kripke.exe     # what run.sh launches (provenance; rebuilt sources refuse a stale binary)
+  # tools/golden/README.md. The 10 per-iteration particle counts of the B200 GPU run (run.sh through the input) are
+  # frozen once, after the one-time Sequential cross-check of that very run passed (check_sequential.sh, run only by
+  # `hpcperf_golden.py make` with HPCPERF_CPU_REFERENCE=1); every later run is compared with the frozen counts.
+  cpu_check:
+    after_run: true
+    command: [bash, '{bench_dir}/check_sequential.sh', '{log}', --zones, '{param:zones}', --groups, '{param:groups}', --quad, '{param:quad}', --layout, '{param:layout}', --niter, '{param:niter}', CUDA]
+    env: {KRIPKE_SEQ_LOG: '{run_dir}/sequential.log'}
+    pass_regex: '^Kripke CUDA vs Sequential \(.*\): PASS'
+    fail_regex: '^Kripke CUDA vs Sequential \(.*\): FAIL'
+  outputs:
+  - name: particle_count
+    dtype: f64
+    log: {regex: '^\s*iter \d+: particle count=(?P<value>[0-9.eE+-]+),'}
+    rule: {metric: max_rel, tol: 1.0e-6}
+    cpu: {log: {file: '{run_dir}/sequential.log'}}
+    basis: 'check_sequential.sh / validate.sh: |P_gpu - P_seq| / |P_seq| <= KRIPKE_VALIDATE_RTOL 1e-6 for every one of
+      the iterations (one unit in the last of the 7 printed digits); the check allows 1e-6 minus the frozen counts'' own
+      deviation from the Sequential run'
 check:
-  # the GPU run of the registered problem (run.sh through the input), then check_sequential.sh runs the same problem
-  # with --arch Sequential (the host path of the same binary) and compares every iteration's particle count.
+  # the GPU run of the registered problem (run.sh through the input); its 10 per-iteration particle counts against the
+  # frozen B200 golden reference (reference/<input_id>.json). No Sequential (CPU) run.
   kind: post_run
-  command: [bash, '{bench_dir}/check_sequential.sh', '{log}', --zones, '{param:zones}', --groups, '{param:groups}', --quad, '{param:quad}', --layout, '{param:layout}', --niter, '{param:niter}', CUDA]
-  pass_regex: '^Kripke CUDA vs Sequential \(.*\): PASS'
-  fail_regex: '^Kripke CUDA vs Sequential \(.*\): FAIL'
-  basis: '|P_gpu - P_seq| / |P_seq| <= 1e-6 for all 10 iterations (validate.sh KRIPKE_VALIDATE_RTOL, one unit in the last
-    printed digit); Sequential = the independent host architecture of the same code'
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture', --log, '{log}']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'all per-iteration particle counts against the frozen B200 golden reference reference/<input_id>.json:
+    |P - P_golden| / |P_golden| <= 1e-6 - d0 (d0 = the golden''s deviation from the Sequential run when it was frozen;
+    check_sequential.sh''s criterion); the count of iterations must match; no CPU (Sequential) run'
   covers: all
-  timeout: 14400
+  timeout: 3600

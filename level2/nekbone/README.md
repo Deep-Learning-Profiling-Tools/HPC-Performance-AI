@@ -54,7 +54,8 @@ the generated `makenek` (upstream's `test/nek_gpu1/makenek.cuda` with `SOURCE_RO
 `USR_LFLAGS` replaced), the `makefile` upstream's `makenek.inc` generates from `src/makefile.template`,
 `obj/` and `nekbone`. `src/` is never written. `build.sh CPU` builds upstream's `makenek.mpi` variant (no
 `-acc`/`-cuda`: the host code path `cg` / `ax` / `dssum`) into `build/level2/nekbone/cpu/<id>/`; it is the
-reference build of the correctness check and of `validate.sh`, never measured.
+build the frozen references were made from and the reference of `validate.sh`'s offline mode
+(`HPCPERF_CPU_REFERENCE=1`), never measured and never built by a default `validate.sh`.
 
 ## Run (`run.sh [CUDA] [ID]`, `HPCPERF_NEKBONE_INPUT=<id>`)
 
@@ -95,7 +96,22 @@ the device work; the ROI's own synchronise is `cuCtxSynchronize` (tools/timing/r
 
 Upstream's test harness (`test/test_nekbone.py`) builds the serial, OpenACC-device, OpenACC-host and
 CUDA-device variants of `test/nek_gpu1` and asserts that every `cg:` line (residual norm, alpha, beta,
-p^T A p, 5 significant digits) of the GPU runs equals the serial run's. `validate.sh` does the same with
+p^T A p, 5 significant digits) of the GPU runs equals the serial run's.
+
+**Modes (2026-10-26; no CPU reference computation on a default path).** By default
+(`HPCPERF_CPU_REFERENCE` unset or `0`) `validate.sh` builds and runs nothing on the CPU path: only the
+CUDA build of `test/nek_gpu1` runs (built when missing; exit 0, `Avg MFlops`, clean launcher audit, the
+OpenACC `USE_GPU_DIRECT` set-up line), followed by the frozen-reference check of the registered default
+input `python3 tools/inputs/hpcperf_inputs.py check level2/nekbone n16-e32768 --out build/level2/nekbone/validate/frozen-reference-check`
+(its CUDA build is made when missing; the GPU run against `reference/n16-e32768.json` under
+`check_cg.py`'s rule, next section). The log says `CPU reference: skipped (default; frozen reference
+check instead)`. Observed 2026-10-26: PASS (r0 rel 0, xnorm 1.9e-16, xf 5.6e-16, rN/r0 7.648e-12 =
+reference), 126 s (most of it the input's single-threaded upstream set-up), 172 s including both
+CUDA builds; `build/level2/nekbone/cpu/` was not created. The CUDA-vs-CPU comparison on
+`test/nek_gpu1` described next runs only on an explicit offline request (`HPCPERF_CPU_REFERENCE` set
+to `1`), which also builds the CPU variant when missing.
+
+In offline mode `validate.sh` does the same with
 this repository's two builds (`build.sh CUDA nek_gpu1`, `build.sh CPU nek_gpu1`): both run
 `test/nek_gpu1/data.rea`, the `cg:` lines and the solution functionals are compared, the exact equality
 upstream asserts is reported, and the verdict applies the rule of `check_cg.py` (below). Result (dgx003, 2026-10-21): **PASS** -- every `cg:` line of the CUDA run equals the CPU run's (upstream's exact assertion holds: `cg: 0 5.4586E+02`, `cg: 101 4.3425E-09 5.3233E-01 5.6261E-01 6.0577E-17`, second solve `5.6459E+02` / `4.8352E-09`), solution norm `9.33568182365457E+02` and functional `3.51509403984455E+05` to 1e-16 relative; the OpenACC code path run on the host (`-acc=multicore`) gives the same numbers.
@@ -199,6 +215,6 @@ the unused Blue Gene assembly and CUDA kernel variants (`nek_kernel*.cuf`, not b
 ## Status
 
 - Timing SUCCESS 5/5 (ROI = the timed CG solve), stable 5/5 (spread <= 0.5 %), run verification PASS 5/5, scientific
-  correctness PASS 5/5 against frozen CPU-build references; `validate.sh` PASS (CUDA build = CPU build on
-  `test/nek_gpu1` to 1.2e-16). Page rows published 2026-10-21 (`docs/timing/`).
+  correctness PASS 5/5 against frozen CPU-build references; `validate.sh` PASS (offline mode: CUDA build = CPU
+  build on `test/nek_gpu1` to 1.2e-16; the default mode checks the frozen reference of `n16-e32768`). Page rows published 2026-10-21 (`docs/timing/`).
 - Not done: multi-GPU validation, multi-node (site), the multigrid preconditioner (no OpenACC path upstream).

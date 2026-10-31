@@ -1,0 +1,118 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "pagerank",
+  "level": 1,
+  "input_id": "nodes16384-m5",
+  "frozen": true,
+  "workload": {
+    "input_id": "nodes16384-m5",
+    "params": {
+      "nodes": 16384,
+      "avg_out_degree": 16,
+      "max_iterations": 5
+    },
+    "args": [
+      "-i",
+      "build/pagerank/cuda/data/16384.data",
+      "-m",
+      "5"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "1a0ec418ab9b3e5aec9d03090f237631736da4cb2db1e607a7c5cf3908171e11",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "page_rank",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel",
+          "tol": 1e-05
+        },
+        "cpu": "page_rank.cpu",
+        "basis": "the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 1e-5 at 5 iterations, minus the B200 output's own deviation from the CPU reference (a NaN fails). Measured 2026-10-28: legitimate implementations (as for the 500-iteration inputs) <= 4.2e-7; one iteration fewer 6.5e-3, one stale row in the last iteration 4.9e-4, an in-place update >= 1.7e-4, an f16 vector 6.1e-4 fail",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "page_rank",
+      "dtype": "f32",
+      "count": 16384,
+      "bytes": 65536,
+      "sha256": "7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5",
+      "rule": {
+        "metric": "max_rel",
+        "tol": 1e-05,
+        "d0_vs_cpu_reference": 3.1585616920794013e-07,
+        "d0_source": "page_rank.cpu",
+        "tol_effective": 9.684140771996455e-06
+      },
+      "basis": "the metric of upstream Verify (isnan(page_rank_[i]) or fabs(page_rank_[i] - cpu_page_rank[i]) > cpu_page_rank[i] / 1000, common/pr_benchmark.cc:119-120, i.e. max |a - c| / c) with the tolerance 1e-5 at 5 iterations, minus the B200 output's own deviation from the CPU reference (a NaN fails). Measured 2026-10-28: legitimate implementations (as for the 500-iteration inputs) <= 4.2e-7; one iteration fewer 6.5e-3, one stale row in the last iteration 4.9e-4, an in-place update >= 1.7e-4, an f16 vector 6.1e-4 fail",
+      "stats": {
+        "min": 9.784269423107617e-06,
+        "max": 0.00013634479546453804,
+        "sum": 1.000000130722583,
+        "nonfinite": 0
+      },
+      "blob": "sha256/7e/7e0576701fd23f5f6801e0c4058b9743e28051b1ea16cc7df99f4e2074cca1b5.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T11:17:29Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "986f4d4340043e6f3d20a0c533a19423b8352714",
+    "source_clean": true,
+    "binary": "build/pagerank/cuda/pagerank_cuda",
+    "binary_sha256": "d71cddd96e496dc79ce6429b20c36e87f96bbe89a219aa246752765f1b170845",
+    "command": [
+      "build/pagerank/cuda/pagerank_cuda",
+      "-i",
+      "build/pagerank/cuda/data/16384.data",
+      "-m",
+      "5"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.274,
+      "pass_line": "Passed.",
+      "pass_regex": "^Passed\\.$",
+      "fail_regex": "^Error with node",
+      "log": "build/golden-make/pagerank/nodes16384-m5/run/stdout.log",
+      "log_sha256": "d21c9db1ec8b3fc0884f5675a117fbbc02b642ec405c414612df66f959307cb9"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  },
+  "replaces": {
+    "reason": "pagerank criterion tightened (commit 986f4d4): max_rel 3e-5 on the 500-iteration inputs and 1e-5 on the -m 5 probe instead of upstream Verify 1e-3, which passed an f16-stored rank vector (6.2e-4 - 7.7e-4); measured 2026-10-28 on 16 legitimate variants (<= 1.39e-6 / 4.17e-7, >= 20x headroom). Baseline and captured data unchanged.",
+    "previous_made_utc": "2026-10-27T18:46:27Z",
+    "previous_sha256": "e4d720e046d7fe5a7425b429b4b3794f8d491cf3a845307393cd12fcc7ffdad8"
+  }
+}

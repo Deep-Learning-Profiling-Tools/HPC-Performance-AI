@@ -13,19 +13,38 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: 'the program prints no timer, only ''Repeat the kernel execution: 100 times'' and VERIFICATION lines'
 baseline:
-  method: 'built-in: ''VERIFICATION: PASS'' per variant'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the 20 reduction sums (5 kernels x 4 block sizes) against the frozen B200 golden reference (`check:` /
+    `golden:` below); the upstream check (sum == the host checksum of the input) runs only once, offline, to validate
+    that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: verification_pass
-    role: required
-    regex: '^VERIFICATION: PASS$'
-    compare:
-      rule: present
   - name: verification_fail
-    role: required
+    role: diagnostic
     regex: '^VERIFICATION: FAIL'
     compare:
       rule: absent
+golden:
+  # tools/golden/README.md. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes the 20 sums
+  # only when every upstream check printed 'VERIFICATION: PASS'; every later run is compared with them instead.
+  mode: data
+  cpu_check: {pass_regex: '^VERIFICATION: PASS$', fail_regex: '^VERIFICATION: FAIL'}
+  outputs:
+  - match: 'sum\..+'
+    count: 20
+    dtype: i32
+    rule: {metric: exact}
+    basis: 'one int per variant, sum.<kernel>.b<block size> (atomic_reduction, _v2, _v4, _v8, _v16 x block sizes 128,
+      256, 512, 1024): upstream checks sum == checksum, the host sum of the input accumulated while generating it
+      (cuda/reduction.cu:61, :113); integer, exact'
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the 20 reduction sums identical to the frozen B200 golden reference reference/<input_id>.json
+    (upstream compares each with the host checksum by ==); the host checksum is no longer compared by default'
+  covers: all
 coverage:
   status: SINGLE_INPUT
   reason: 'no command-line parameters: array size and repeat count are compile-time constants of the upstream source'

@@ -60,6 +60,10 @@ void BenchmarkRunner::Run() {
   HPCPERF_ROI_END_SYNC();
   time_measurement_->End({"Run"});
 
+  // tools/golden: the outputs of the last timed repetition, captured after the ROI and
+  // before Verify/Cleanup (a no-op unless HPCPERF_GOLDEN_DUMP is set)
+  benchmark_->CaptureGoldenOutputs();
+
   if (verification_mode_) {
     time_measurement_->Start();
     benchmark_->Verify();

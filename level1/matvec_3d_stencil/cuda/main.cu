@@ -9,6 +9,7 @@
 // Validation: element-wise comparison of b.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
 using Index_ptr = Index_type*;
 
@@ -214,6 +215,7 @@ int main(int argc, char** argv)
   GPU_CHECK(cudaDeviceSynchronize());
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(b, d_b, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("b", b, len, "f64");   // tools/golden: the checked output
   cudaFree(d_b); cudaFree(d_x); cudaFree(d_rz);
 #define DFREE(n) cudaFree(dm.n);
   MV3D_ALLOC(DFREE)
@@ -221,8 +223,9 @@ int main(int argc, char** argv)
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
@@ -245,6 +248,7 @@ int main(int argc, char** argv)
         }
       }
     }
+    hpcperf_golden_output("b.cpu", b_r, len, "f64");   // the CPU reference (golden make only)
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("b", b_r, b, len, 1.0e-10);

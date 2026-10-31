@@ -6,7 +6,9 @@
 // Validation: element-wise comparison of GPU vs CPU p_new (and bvc).
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include "rp_common.hpp"
+#include <cstring>
 
 // upstream PRESSURE.hpp
 #define PRESSURE_BODY1 \
@@ -51,18 +53,29 @@ struct Data {
 };
 
 // upstream PRESSURE.cpp setUp (init order preserved)
-static void setUp(Data& d, Index_type size)
+// probe 1 (correctness-probe input probe-randvalue, `--probe`; set-up only, the kernels are unchanged): upstream's
+// data gives p_new = bvc * e_old ~ 0.0117 < p_cut and vnewc >= eosvmax everywhere, so every p_new is clamped to
+// pmin -- a constant fill reproduces the output. The probe initializes vnewc with upstream's own random-value
+// helper (DataUtils initDataRandValue, values in [0, 1], same init count) and scales the cut-offs p_cut and pmin
+// by 1e-2, so about a fifth of the elements (vnewc < eosvmax) keep p_new = bvc * e_old.
+// probe 2 (probe-cutoffs, `--probe-cutoffs`; set-up only): probe 1 plus e_old from initDataRandValue, so
+// p_new = bvc * e_old spreads over [0, 0.1175] and the p_cut test alone decides the elements with
+// pmin <= p_new < p_cut (no other input has one). The helper reseeds srand(4793): e_old == vnewc element-wise.
+static void setUp(Data& d, Index_type size, int probe)
 {
   resetDataInitCount();
   allocAndInitData(d.compression, size);
   allocAndInitData(d.bvc, size);
   allocAndInitDataConst(d.p_new, size, 0.0);
-  allocAndInitData(d.e_old, size);
-  allocAndInitData(d.vnewc, size);
+  if (probe == 2) allocAndInitDataRandValue(d.e_old, size);
+  else            allocAndInitData(d.e_old, size);
+  if (probe) allocAndInitDataRandValue(d.vnewc, size);
+  else       allocAndInitData(d.vnewc, size);
   initData(d.cls);
   initData(d.p_cut);
   initData(d.pmin);
   initData(d.eosvmax);
+  if (probe) { d.p_cut *= 1.0e-2; d.pmin *= 1.0e-2; }
 }
 
 int main(int argc, char** argv)
@@ -71,12 +84,21 @@ int main(int argc, char** argv)
   Index_type run_reps = 700;   // upstream default reps
   if (argc > 1) size = atol(argv[1]);
   if (argc > 2) run_reps = atol(argv[2]);
+  int probe = 0;               // correctness-probe set-up data (see setUp); never a performance input
+  if (argc > 3) {
+    if (argc == 4 && strcmp(argv[3], "--probe") == 0)              probe = 1;
+    else if (argc == 4 && strcmp(argv[3], "--probe-cutoffs") == 0) probe = 2;
+    else {
+      fprintf(stderr, "usage: %s [size [reps [--probe|--probe-cutoffs]]]\n", argv[0]);
+      return 2;
+    }
+  }
   const Index_type ibegin = 0;
   const Index_type iend = size;
   const size_t bytes = size * sizeof(Real_type);
 
   // ------------------------- GPU (upstream Base_CUDA) ----------------------
-  Data g; setUp(g, size);
+  Data g; setUp(g, size, probe);
   Real_ptr d_compression, d_bvc, d_p_new, d_e_old, d_vnewc;
   GPU_CHECK(cudaMalloc(&d_compression, bytes));
   GPU_CHECK(cudaMalloc(&d_bvc, bytes));
@@ -101,17 +123,20 @@ int main(int argc, char** argv)
   HPCPERF_ROI_END();
   GPU_CHECK(cudaMemcpy(g.p_new, d_p_new, bytes, cudaMemcpyDeviceToHost));
   GPU_CHECK(cudaMemcpy(g.bvc, d_bvc, bytes, cudaMemcpyDeviceToHost));
+  hpcperf_golden_output("bvc", g.bvc, size, "f64");   // tools/golden: the checked outputs
+  hpcperf_golden_output("p_new", g.p_new, size, "f64");
   cudaFree(d_compression); cudaFree(d_bvc); cudaFree(d_p_new);
   cudaFree(d_e_old); cudaFree(d_vnewc);
 
   bool ok = true;
   if (hpcperf_skip_verify()) {
-    // Measurement mode: the CPU reference below is correctness machinery, not
-    // part of the timed workload (see rp_common.hpp).
+    // default (hpcperf_skip_verify() = !hpcperf_cpu_reference_enabled(), rp_common.hpp): the
+    // CPU reference below (upstream Base_Seq) is skipped; correctness = the captured outputs
+    // against the frozen golden reference (tools/golden).
     printf("SKIP_VERIFY\n");
   } else {
     // ------------------------ CPU (upstream Base_Seq) ------------------------
-    Data c; setUp(c, size);
+    Data c; setUp(c, size, probe);
     {
       Real_ptr compression = c.compression; Real_ptr bvc = c.bvc;
       Real_ptr p_new = c.p_new; Real_ptr e_old = c.e_old; Real_ptr vnewc = c.vnewc;
@@ -126,6 +151,8 @@ int main(int argc, char** argv)
         }
       }
     }
+    hpcperf_golden_output("bvc.cpu", c.bvc, size, "f64");   // the CPU reference (golden make only)
+    hpcperf_golden_output("p_new.cpu", c.p_new, size, "f64");
 
     // ------------------------------ validate ---------------------------------
     ok = compareArrays("bvc", c.bvc, g.bvc, size, 1.0e-10)

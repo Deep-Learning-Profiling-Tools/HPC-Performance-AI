@@ -38,17 +38,28 @@
  */
 
 #include "hist_benchmark.h"
+#include "hpcperf_golden.h"
+#include "hpcperf_measure.h"
 #include <cstdio>
 #include <cstdlib>
 
 void HistBenchmark::Initialize() {
   pixels_ = new uint32_t[num_pixel_];
-  unsigned int seed = time(NULL);
+  // HPC-Performance-AI: a fixed default seed (1) instead of upstream's
+  // `unsigned int seed = time(NULL);`, so the registered inputs are reproducible;
+  // HPCPERF_RANDOM_SEED=time restores the clock seed (common/hpcperf_measure.h)
+  unsigned int seed = hpcperf_input_seed("color_histogram");
   for (uint32_t i = 0; i < num_pixel_; i++) {
     pixels_[i] = rand_r(&seed) % num_color_;
   }
 
   histogram_ = new uint32_t[num_color_]();
+}
+
+// tools/golden: the histogram Verify() compares bin by bin with the CPU histogram
+// (written back by the last timed Run(); a no-op unless HPCPERF_GOLDEN_DUMP is set)
+void HistBenchmark::CaptureGoldenOutputs() {
+  hpcperf_golden_output("histogram", histogram_, num_color_, "u32");
 }
 
 void HistBenchmark::Verify() {

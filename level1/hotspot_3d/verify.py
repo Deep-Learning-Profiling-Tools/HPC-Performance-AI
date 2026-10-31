@@ -4,6 +4,12 @@
 The benchmark computes the same simulation on the CPU (computeTempCPU) and
 prints 'Accuracy: <rmse>'. This wrapper runs it and enforces a threshold.
 
+The CPU reference runs only when HPCPERF_CPU_REFERENCE=1 is in the environment
+(tools/golden/hpcperf_golden.py make sets it, once, to validate the frozen golden
+reference; see inputs.yaml `golden.cpu_check`). Without it the benchmark prints
+SKIP_VERIFY and no 'Accuracy:' line, and this wrapper reports FAIL. The default
+correctness check of every run is the golden check (inputs.yaml `check:`).
+
 Usage: verify.py <exe> <grid> <layers> <iters> <power_file> <temp_file>
 """
 import subprocess, sys
@@ -19,7 +25,7 @@ for line in r.stdout.splitlines():
     if line.startswith("Accuracy:"):
         acc = float(line.split(":")[1])
 if acc is None:
-    print(f"FAIL: no 'Accuracy:' line in output\n{r.stdout}")
+    print(f"FAIL: no 'Accuracy:' line in output (the CPU reference runs only with HPCPERF_CPU_REFERENCE=1)\n{r.stdout}")
     sys.exit(1)
 if acc > 1e-2:
     print(f"FAIL: accuracy (RMSE vs built-in CPU reference) {acc:.3e} > 1e-2")

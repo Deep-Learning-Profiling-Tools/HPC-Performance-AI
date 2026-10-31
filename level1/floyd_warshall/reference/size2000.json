@@ -1,0 +1,108 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "floyd_warshall",
+  "level": 1,
+  "input_id": "size2000",
+  "frozen": true,
+  "workload": {
+    "input_id": "size2000",
+    "params": {
+      "size": 2000,
+      "reps": 8
+    },
+    "args": [
+      "2000",
+      "8"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "ccfb1570167ba77c5af48bd0c42c478e7f2784e87ef46ec34035408482271b00",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "pout",
+        "match": null,
+        "count": null,
+        "dtype": "f64",
+        "rule": {
+          "metric": "max_rel1p",
+          "tol": 1e-10
+        },
+        "cpu": "pout.cpu",
+        "basis": "the driver's element-wise check of pout (f64[len]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:98); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "pout",
+      "dtype": "f64",
+      "count": 4000000,
+      "bytes": 32000000,
+      "sha256": "e2b2c2b8bb060a00ef81205f99235e1d78fac669659366fcd930fe58230aeef5",
+      "rule": {
+        "metric": "max_rel1p",
+        "tol": 1e-10,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "pout.cpu",
+        "tol_effective": 1e-10
+      },
+      "basis": "the driver's element-wise check of pout (f64[len]) against the upstream Base_Seq CPU reference, max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:98); the check allows 1e-10 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": -0.3999999976550001,
+        "max": 0.1999999988263261,
+        "sum": -602566.3724542562,
+        "nonfinite": 0
+      },
+      "blob": "sha256/e2/e2b2c2b8bb060a00ef81205f99235e1d78fac669659366fcd930fe58230aeef5.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:30:29Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/floyd_warshall/cuda/floyd_warshall_cuda",
+    "binary_sha256": "e4e10a3c7938ad6cbb9e579130246669e8a19d9a39becef71007d63e272381d3",
+    "command": [
+      "build/floyd_warshall/cuda/floyd_warshall_cuda",
+      "2000",
+      "8"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 33.798,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/floyd_warshall/size2000/run/stdout.log",
+      "log_sha256": "14f8fbcabe074b037d42b063288a8635d9af2ae654374d602c01ba6b31ca59ba"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "pathfinder",
+  "level": 1,
+  "input_id": "c100000-r1000-p20",
+  "frozen": true,
+  "workload": {
+    "input_id": "c100000-r1000-p20",
+    "params": {
+      "cols": 100000,
+      "rows": 1000,
+      "pyramid_height": 20
+    },
+    "args": [
+      "100000",
+      "1000",
+      "20"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "7057e6a71ae862f5dabee0541559b03ee736440f2679c4dee2b73a6b625dc315",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "result",
+        "match": null,
+        "count": null,
+        "dtype": "i32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "verify.py compares the printed final DP row exactly with its CPU DP (level1/pathfinder/verify.py:56); the same cols values (cuda/pathfinder.cu result after the final copy-back), integers -> byte-identical",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "result",
+      "dtype": "i32",
+      "count": 100000,
+      "bytes": 400000,
+      "sha256": "bd510b5ec6e992e78a4397405d14919e8e27cb5387f74e870d8337e4a3cf39f9",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "verify.py compares the printed final DP row exactly with its CPU DP (level1/pathfinder/verify.py:56); the same cols values (cuda/pathfinder.cu result after the final copy-back), integers -> byte-identical",
+      "stats": {
+        "min": 1268.0,
+        "max": 1413.0,
+        "sum": 134644631.0,
+        "nonfinite": 0
+      }
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:39:45Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/pathfinder/cuda/pathfinder_cuda",
+    "binary_sha256": "d469e20d165ba1649d0055a4583ca2b43944cc0abd68d1fbbd45cea412fe4f87",
+    "command": [
+      "python3",
+      "level1/pathfinder/verify.py",
+      "build/pathfinder/cuda/pathfinder_cuda",
+      "100000",
+      "1000",
+      "20"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 115.108,
+      "pass_line": "PASS: pathfinder result row matches CPU DP over 1000x100000 wall",
+      "pass_regex": "^PASS: pathfinder result row matches CPU DP",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/pathfinder/c100000-r1000-p20/run/stdout.log",
+      "log_sha256": "ffc2ab2f0d3c0259d02b9925c52086051887ccdbf2e7a224df46ff5e879e779c"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

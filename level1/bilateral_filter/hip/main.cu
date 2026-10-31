@@ -1,4 +1,5 @@
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -129,15 +130,20 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (3x3) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r3", h_dst, img_size, "f32");   // tools/golden: the checked output of the 3x3 filter
 
-  // verify
+  // verify (HPCPERF_CPU_REFERENCE=1 only, golden make; default: the captured outputs against the
+  // frozen golden reference, tools/golden)
   bool ok = true;
+  if (hpcperf_cpu_reference_enabled()) {   // HPCPERF_CPU_REFERENCE=1 only (golden make)
   reference<3>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r3.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;
       break;
     }
+  }
   }
 
   hipDeviceSynchronize();
@@ -155,13 +161,17 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (6x6) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r6", h_dst, img_size, "f32");   // tools/golden: the checked output of the 6x6 filter
 
+  if (hpcperf_cpu_reference_enabled()) {   // HPCPERF_CPU_REFERENCE=1 only (golden make)
   reference<6>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r6.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;
       break;
     }
+  }
   }
 
   hipDeviceSynchronize();
@@ -179,15 +189,19 @@ int main(int argc, char *argv[]) {
   printf("Average kernel execution time (9x9) %f (ms)\n", (time * 1e-6f) / repeat);
 
   hipMemcpy(h_dst, d_dst, img_size * sizeof(float), hipMemcpyDeviceToHost); 
+  hpcperf_golden_output("dst.r9", h_dst, img_size, "f32");   // tools/golden: the checked output of the 9x9 filter
 
+  if (hpcperf_cpu_reference_enabled()) {   // HPCPERF_CPU_REFERENCE=1 only (golden make)
   reference<9>(h_src, r_dst, w, h, a_square, variance_I, variance_spatial);
+  hpcperf_golden_output("dst.r9.cpu", r_dst, img_size, "f32");   // the CPU reference (golden make only)
   for (int i = 0; i < w*h; i++) {
     if (fabsf(r_dst[i] - h_dst[i]) > 1e-3) {
       ok = false;
       break;
     }
   }
-  printf("%s\n", ok ? "PASS" : "FAIL");
+  }
+  printf("%s\n", !hpcperf_cpu_reference_enabled() ? "SKIP_VERIFY" : (ok ? "PASS" : "FAIL"));
 
   free(h_dst);
   free(r_dst);

@@ -294,10 +294,10 @@ It is not evidence for the other applications.
 
 Full matrix: [WORKSPACE_EVIDENCE.md](WORKSPACE_EVIDENCE.md).
 
-This repository's own regression suite (`level3/tools/tests/run_all.sh`, CPU only, no GPU) currently reports
-**247/247 checks passing** in seven groups: harness infrastructure 30, second-batch numerical checkers 21, Nyx
-comparator 33, verdict classes 18, ExaCA validator 19, source-distribution tools 81, release publication and
-anonymous-fetch API mock 45. These are **this project's** harness, validator and publisher tests. They are a
+This repository's own regression suite (`level3/tools/tests/run_all.sh`, CPU only, no GPU) reports
+**302/302 checks passing** (2026-10-28) in six groups: harness infrastructure and second-batch numerical
+checkers 70 (`test_l3_infra`), Nyx comparator and frozen reference 69, verdict classes 18, ExaCA validator 19,
+source-distribution tools 81, release publication and anonymous-fetch API mock 45. These are **this project's** harness, validator and publisher tests. They are a
 different thing from an application's own upstream test suite: ExaCA's upstream unit-test result (30/52 as
 upstream runs them) is **not** part of that number and never counted as a pass here.
 
@@ -312,7 +312,8 @@ Criteria differ per application and are **not** all "upstream official validatio
 * analytic solution: WarpX (`langmuir_multi`);
 * adapted subset of upstream's own regression comparison: LAMMPS thermo columns, SPARTA statistics;
 * cross-rank consistency (same build, different rank counts): all applications, as an additional check;
-* CPU cross-check: where an application provides one;
+* CPU cross-check: where an application provides one -- for Nyx (check [3]) only offline (`HPCPERF_CPU_REFERENCE=1`); by
+  default check [3] compares with a frozen B200 GPU reference validated once against the CPU run ([nyx/README.md](nyx/README.md), "Frozen B200 reference");
 * project-defined statistical protocol: ExaCA's `dirsolid` case only -- upstream provides no reference for it;
   calibration and holdout are separated (`exaca/references/validation_protocol.md`);
 * upstream full-application reference: ExaCA's two **small official** cases inside its own test suite

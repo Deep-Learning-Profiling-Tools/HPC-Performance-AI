@@ -1,0 +1,117 @@
+{
+ "benchmark": "remhos",
+ "cases": {
+  "cube01_hex-remap": {
+   "args": "-m data/cube01_hex.mesh -p 10 -rs 1 -o 2 -dt 0.02 -tf 0.8 -ho 3 -lo 5 -fct 2 -pa -d cpu",
+   "device_banner": "Device configuration: cpu",
+   "final_mass_u": 0.1191358858,
+   "log": "validate-cube01_hex-remap-cpu.log",
+   "log_bytes": 1180,
+   "log_mtime_utc": "2026-10-27T08:00:34Z",
+   "log_sha256": "4362447d53061e98755192c3424d184cb4fd3927fdc08cbac50deee930260482",
+   "mass_loss_u": 0.000594564,
+   "max_value_u": 0.9996101564,
+   "mesh": "data/cube01_hex.mesh",
+   "mesh_sha256": "92f76693107d7271ba43150774acc197bba392c702cb174baf3d3c80ee0fd973",
+   "printed": {
+    "final_mass_u": "0.1191358858",
+    "max_value_u": "0.9996101564"
+   },
+   "total_kernel_time_s": 0.09128989
+  },
+  "periodic-cube": {
+   "args": "-m data/periodic-cube.mesh -p 0 -rs 1 -o 2 -dt 0.014 -tf 8 -ho 3 -lo 5 -fct 2 -pa -d cpu",
+   "device_banner": "Device configuration: cpu",
+   "final_mass_u": 0.9607429525,
+   "log": "validate-periodic-cube-cpu.log",
+   "log_bytes": 1426,
+   "log_mtime_utc": "2026-10-27T08:00:19Z",
+   "log_sha256": "9182c1d40dbe7ca4e257813df88684c44eaf3914a4b87ca998825c4b89b6028f",
+   "mass_loss_u": 1.69087e-12,
+   "max_value_u": 0.637056438,
+   "mesh": "data/periodic-cube.mesh",
+   "mesh_sha256": "899a869fe794808c1938f915ccb46239b58fb41dd4b24f32764d06ef96337659",
+   "printed": {
+    "final_mass_u": "0.9607429525",
+    "max_value_u": "0.637056438"
+   },
+   "total_kernel_time_s": 1.4459227
+  },
+  "periodic-hexagon": {
+   "args": "-m data/periodic-hexagon.mesh -p 0 -rs 2 -dt 0.005 -tf 10 -ho 3 -lo 5 -fct 2 -pa -d cpu",
+   "device_banner": "Device configuration: cpu",
+   "final_mass_u": 0.3888354884,
+   "log": "validate-periodic-hexagon-cpu.log",
+   "log_bytes": 2128,
+   "log_mtime_utc": "2026-10-27T07:59:39Z",
+   "log_sha256": "94a2e7e22af94fe8a74c079a8f65e1c473116af89374e1faa61f101231f283b8",
+   "mass_loss_u": 9.45302e-10,
+   "max_value_u": 0.8662060299,
+   "mesh": "data/periodic-hexagon.mesh",
+   "mesh_sha256": "04ef62da70c547e10aad3d43347ccd95fce284744c97c4d227090c0ff3a7f1d6",
+   "printed": {
+    "final_mass_u": "0.3888354884",
+    "max_value_u": "0.8662060299"
+   },
+   "total_kernel_time_s": 0.90841587
+  },
+  "periodic-square": {
+   "args": "-m data/periodic-square.mesh -p 5 -rs 3 -dt 0.005 -tf 0.8 -ho 3 -lo 5 -fct 2 -pa -d cpu",
+   "device_banner": "Device configuration: cpu",
+   "final_mass_u": 0.1623263916,
+   "log": "validate-periodic-square-cpu.log",
+   "log_bytes": 1238,
+   "log_mtime_utc": "2026-10-27T08:00:00Z",
+   "log_sha256": "a261ae362866d58d266b022f6cf1dea31657c1f66841b3300797f9c72776d4e5",
+   "mass_loss_u": 2.7792e-09,
+   "max_value_u": 0.5904983674,
+   "mesh": "data/periodic-square.mesh",
+   "mesh_sha256": "b8419c487e65241336c6d4e83a4829588d40c2951c742347c2527335d903ae11",
+   "printed": {
+    "final_mass_u": "0.1623263916",
+    "max_value_u": "0.5904983674"
+   },
+   "total_kernel_time_s": 0.22079531
+  }
+ },
+ "generated_by": "level2/remhos/check_cpu_backend_reference.py freeze (construction-time; from the offline run's logs, no rerun)",
+ "generated_utc": "2026-10-27T08:12:36Z",
+ "note": "the CUDA build of 2026-10-27 (build.sh CUDA from the committed, unmodified Remhos sources); every value equals the CPU-backend run of 2026-10-26 (the 2026-09 build, binary sha256 c38091f7...) and the README 'Validation' table of 2026-09 to all 10 printed digits (d0 = 0); validate.sh compares the GPU values with these at its unchanged tolerances",
+ "reference_run": {
+  "binary": "build/level2/remhos/cuda/remhos",
+  "binary_bytes": 181621952,
+  "binary_mtime_utc": "2026-10-27T07:50:49Z",
+  "binary_sha256": "6d3e339e261eb880fa767bdc330f03bf0c68d2befd5a2827490772cb8969ebfc",
+  "build": "level2/remhos/build.sh CUDA (upstream makefile, MFEM v4.10 .deps/install/mfem)",
+  "cpu_model": "INTEL(R) XEON(R) PLATINUM 8570",
+  "finished_utc": "2026-10-27T08:00:34Z",
+  "git_head": "c1d23cc5fc28a4ef8a6a2fbffac5aca69183260a",
+  "implementation": "the CPU backend (MFEM Device 'cpu', host loops of the same mfem::forall kernels) of the CUDA build",
+  "launch": "cd build/level2/remhos/cuda/run && mpirun -np 1 build/level2/remhos/cuda/remhos -no-vis <args> (CUDA_VISIBLE_DEVICES=0; the mesh path absolute, recorded here relative to level2/remhos)",
+  "mfem_config_mk_sha256": "f1e3bf062e7332457a85a19f2c2bbc3569086d4a027fc25ce476c3406fe86527",
+  "mode": "HPCPERF_CPU_REFERENCE=1 bash level2/remhos/validate.sh CUDA (offline mode, the one explicit offline request; Part B check 2's live CPU-backend runs, each after the case's GPU run; PASS)",
+  "remhos_sources_clean": true,
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "redacted_text": [
+    "note: host name"
+   ],
+   "removed": [
+    "host",
+    "log_kept_at",
+    "slurm_job"
+   ],
+   "rule": "hpcperf-provenance-scrub-1",
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  },
+  "started_utc": "2026-10-27T07:59:29Z"
+ },
+ "schema": "hpcperf-remhos-cpu-backend-reference-1",
+ "tolerance_basis": "validate.sh Part B check 2, unchanged: GPU mass within 1e-8 and max within 1e-6 relative of the CPU backend (observed: identical to the 10 printed digits in three cases, 9e-8 in max for periodic-hexagon after 2000 nonlinear FCT steps). The frozen values ARE the CPU backend's output (not a GPU golden), so no budget is subtracted: d0 = 0 (README 'Modes').",
+ "tolerances": {
+  "mass_rel": 1e-08,
+  "max_rel": 1e-06
+ },
+ "used_by": "level2/remhos/validate.sh Part B check 2, default mode (the GPU values vs these frozen CPU-backend values)",
+ "what": "final mass and max value of validate.sh Part B's four cases run on the CPU backend of the same binary (-ho 3 -lo 5 -fct 2 -pa -d cpu, mpirun -np 1): the values the live check 2 compared with until 2026-10-27"
+}

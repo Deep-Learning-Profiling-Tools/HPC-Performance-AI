@@ -16,7 +16,15 @@
 # exercises sweep, LTimes/LPlusTimes, scattering and population end to end.
 # Prints PASS/FAIL, exit 0/1. The Sequential run is a single-core run of the whole problem:
 # its cost grows with zones x groups x quadrature (not established for the registered sizes).
+#
+# OFFLINE ONLY (tools/golden): this is the CPU reference of the registered inputs. It runs only on an explicit
+# request (HPCPERF_CPU_REFERENCE=1), which `tools/golden/hpcperf_golden.py make` sets once per input to validate
+# the frozen golden reference; the registry check compares with that reference and never calls this script.
+# KRIPKE_SEQ_LOG overrides where the Sequential run's log is written.
 set -uo pipefail
+case "${HPCPERF_CPU_REFERENCE:-}" in
+  ''|0*) echo "check_sequential.sh: the Sequential (CPU) reference runs only on an explicit request (HPCPERF_CPU_REFERENCE=1); correctness checks use the frozen golden reference (tools/golden)" >&2; exit 2 ;;
+esac
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SRC_DIR}/../.." && pwd)"
@@ -51,7 +59,7 @@ if [[ ! -x "${EXE}" ]]; then
 fi
 OUT_DIR="${REPO_ROOT}/build/level2/kripke/check"
 mkdir -p "${OUT_DIR}"
-SEQ_LOG="${OUT_DIR}/sequential_${LAYOUT}_${ZONES//,/x}_g${NGROUPS}_q${QUAD}_n${NITER}.log"
+SEQ_LOG="${KRIPKE_SEQ_LOG:-${OUT_DIR}/sequential_${LAYOUT}_${ZONES//,/x}_g${NGROUPS}_q${QUAD}_n${NITER}.log}"
 PROBLEM=( --layout "${LAYOUT}" --groups "${NGROUPS}" --legendre 4 --quad "${QUAD}" --zones "${ZONES}"
           --gset 1 --dset 8 --zset 1,1,1 --niter "${NITER}" )
 

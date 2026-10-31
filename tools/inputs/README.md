@@ -93,7 +93,8 @@ inputs:
 ```
 
 `coverage.status` is checked against the number of *runnable* (materialized)
-inputs: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
+performance inputs -- correctness probes (`purpose: correctness-probe`, below) never
+count: `MULTI_INPUT` needs at least two, `SINGLE_INPUT` means exactly one,
 `BLOCKED` at most one (upstream offers more, the `blocker` says what is missing).
 A benchmark with two or more runnable inputs and further upstream inputs that were
 not added is `MULTI_INPUT` with `upstream_inputs_not_added`.
@@ -146,6 +147,19 @@ per benchmark (level, status, inputs, runnable, cases, size variants,
 upstream/derived/custom, input forms, selector, native timing status, measured
 inputs, correctness status, blocker) plus the SINGLE_INPUT / BLOCKED /
 derived-custom / not-measured lists and the totals.
+
+## Correctness-probe inputs (`purpose: correctness-probe`, 2026-10-27)
+
+An input is a performance input unless it says `purpose: correctness-probe`. A correctness probe exists only to
+detect wrong implementations the performance inputs cannot expose (e.g. upstream set-up data on which a constant fill
+or a skipped kernel produces the right output). It runs through exactly the same kernels; only its set-up data differs
+(selected by its `args`), and the performance inputs stay byte-identical. Rules (enforced by `validate` / the tools):
+
+* `probe_basis` (required): which wrong implementations it detects and why the performance inputs cannot;
+* never the `default_input`; never counted for `coverage` (MULTI_INPUT / SINGLE_INPUT count performance inputs only);
+* `measure` refuses it (exit 1, nothing is run); tools/timing generates no case for it (`gen_registry_cases.py`,
+  `registry_view.py` skip it), so it is never timed and never appears among the registered performance inputs;
+* `check` runs it like any input, and tools/golden `make` freezes its reference like any input (one CPU validation).
 
 ## Runtime measurement (tools/timing)
 
@@ -292,16 +306,17 @@ check:
   reason: <why there is no check>           # kind none only
 ```
 
-* `standalone`: the checker runs the benchmark itself (a `verify.py` that runs the binary and
-  recomputes the result on the CPU, a `validate.sh`); cwd = `<out>/run`.
+* `standalone`: the checker runs the benchmark itself (a checker script, a `validate.sh`); cwd = `<out>/run`.
 * `post_run`: the tool runs the benchmark once in `<out>/run` (stdout -> `stdout.log`; the
-  timing switch `HPCPERF_SKIP_VERIFY` is never set; `run_env` applied), copies the declared
+  timing switch `HPCPERF_SKIP_VERIFY` is never set, the CPU-reference / capture switches
+  `HPCPERF_CPU_REFERENCE`, `HPCPERF_GOLDEN_DUMP`, `HPCPERF_GOLDEN_MODE` of the caller are dropped
+  -- only `run_env` may set the capture -- and `run_env` applied), copies the declared
   `outputs` (paths or globs of files the application writes into shared directories; `new: true`
   = only files modified by this run) into `<out>/outputs`, then runs the checker -- or, without
   a `command`, reads the program's own pass/fail lines from `stdout.log`.
 * Templates: `{exe}` (the binary, or the run.sh entry), `{args}` (the input's whole argument
   list, repository paths made absolute), `{arg:N}`, `{param:NAME}`, `{run_dir}`, `{log}` (the
-  post_run stdout), `{outputs}`, `{bench_dir}`, `{repo}`. `validate` renders every input's block
+  post_run stdout), `{outputs}`, `{bench_dir}`, `{repo}`, `{input_id}`. `validate` renders every input's block
   and refuses unknown parameters, arguments or placeholders.
 * Verdict (`check.json`, schema `hpcperf-inputs-check-1`, with the workload identity, command,
   environment overrides, exit codes, log sha256, outputs with sha256, git head, host / GPU and
@@ -332,8 +347,68 @@ missing file is an error that satisfies nothing, not even `absent`), and the rul
 compares a quantity with a reference constant (`value`) at a relative tolerance (`tol`) -- for
 analytic or upstream-published results (p3_heat3d's closed-form `L2_norm`).
 
+**No CPU reference at run time (2026-10-26, decision of the project owner).** No measurement, no
+check and no optimization candidate runs a benchmark's CPU reference implementation. Where the
+correctness criterion used to be "recompute on the CPU and compare" (Level 1 -- 41 benchmarks carry
+golden references now --, Level 2 Kripke and ExaCMech), the oracle is the frozen B200 golden reference
+of the input (`tools/golden`): the outputs of the unmodified build, frozen once after that CPU
+reference validated them, compared with the benchmark's metric and tolerance minus the golden's own
+measured deviation from the CPU reference (so the criterion is not loosened by the golden). The metric
+and tolerance are upstream's where upstream defines one; where upstream's check was missing or did not
+observe the output, they are project criteria fixed from measured legitimate vs wrong envelopes and
+documented per benchmark (nbody positions/velocities and KE relative 1e-4, pagerank 3e-5 / 1e-5,
+hotspot_3d's max_abs gate, spmv's probe-real, srad_v1's probe, the correctness-probe inputs). The
+validate.sh default paths of Level 2 Branson, Remhos, hipBone and Nekbone and of Level 3 Nyx (check [3])
+changed the same way: frozen references instead of a CPU/Serial rerun (per-application README,
+"Modes"). The CPU references stay in the sources for that one-time validation and run only with an
+explicit `HPCPERF_CPU_REFERENCE=1`; nothing falls back to them. Independent checks (analytic solutions,
+conservation, official reference values, property checks, frozen references made earlier) are
+unchanged.
+
+**Correctness coverage of the inputs without a registered check (reviewed 2026-10-29).** `check` exits 2
+("has no correctness check") for 54 of the 99 Level 2 inputs: 8 say `check: {kind: none}` with a reason,
+46 have no `check:` block at all. Exit 2 means only that no single-run checker is registered: their
+evidence is `compare` of a candidate's log against a working baseline of the unmodified build, through the
+`baseline.quantities` rules (every one of the 54 has at least one required quantity that is not `record`,
+so none rests on execution success or a FOM alone). What those rules verify, by application:
+
+| class | inputs | what `compare` verifies |
+|---|---|---|
+| upstream or analytic criterion | cloverleaf 5, tealeaf 5 (upstream PASS against the expected energy), minibude 3 (upstream reference-energy validation), gamess_ri_mp2 3 (upstream `passed`), p3_heat3d 3 (closed-form L2 norm, `near` 1e-3), sw4lite 2 (error norms against the exact point-source solution), quicksilver 4 (below) | an independent reference, plus exact / relative rules against the baseline |
+| self-baseline regression only | amg2023 5 (iteration count exact), laghos 6 (final step / dt exact, energy rel 1e-8), remhos 5 (final mass / max rel 1e-8), miniem 4 (EM energy rel 1e-4, solution norm rel 1e-8), xsbench 2 (checksum exact), cabanapic 3 (final step exact, field energies rel 0.1), shaw 3 (below) | agreement with the unmodified build; the independent evidence is each application's validate.sh, on its own (usually smaller) deck |
+| conservation / bounds | exampm `dambreak-0.005` (below) | particle count, bounds, volume |
+
+The eight with an explicit `check: none`:
+* exampm `dambreak-0.005`: conservation and bounds of the final state only (particle count equal to the
+  baseline's, positions inside [-0.02, 1.02], sum(J)/N0 within 1 %). A frozen (never evolved) or
+  y-asymmetric final state satisfies these rules, and how far the column collapses has no reference.
+  validate.sh's analytic check uses the FreeFall deck (periodic box, no walls); its dam-break dump check
+  needs evolved dumps, which this input does not write (1990 CFL-limited steps < write_freq 2000; the
+  `check.reason` text says 250 steps, the conclusion holds).
+* quicksilver (all four): upstream's statistical coralBenchmark checks (the four `PASS::` lines, no
+  `FAIL::`) and the last-cycle scalar flux compared exactly with the reference build. The exact rule rests
+  on determinism (the deck seed is not used; each particle's random stream derives from its source index;
+  the flux is printed with 7 digits), so a correct candidate that consumes random numbers differently
+  fails it; no statistical envelope exists. validate.sh runs only the default deck.
+* shaw (all three): the 2-norms of the final velocity and stress states compared exactly with the
+  reference build -- a regression check of the same floating-point arithmetic, not an independent result;
+  a correct candidate that reorders floating-point work fails it. The independent evidence, validate.sh's
+  upstream `fomInnerDomain` regression (CPU gold data, atol 1e-13 / 1e-10), runs the same kernels on a
+  21x51 single-layer mesh with a sinusoidal source, not on the registered PREM / Ricker workloads.
+
+No registered workload of these three applications has an analytic or upstream reference value; none of
+the eight relies on execution success or FOM alone, but only Quicksilver's statistical markers are
+independent of the baseline. A follow-up with exact, implementation-independent checks for five of them (Quicksilver per-cycle event
+accounting identities; ExaMPM deck particle count, y-mirror symmetry, centre of mass below its initial
+height) is prepared outside this branch; SHAW needs an owners' decision (a mirrored-source probe with a
+tolerance, or energy instrumentation). Related finding: exampm `dambreak-0.01` ends with 1,919,998 of
+1,920,000 particles in both 2026-09-28 runs of the unmodified build -- validate.sh's own "count constant"
+criterion would reject that, but the exact count rule compares with a baseline that carries the same loss
+(cause not established; suspected particles leaving the non-periodic box).
+
 Principles (fixed for this project): upstream / native check > upstream reference > exact
-deterministic comparison > same-input unoptimized baseline; a tolerance needs an upstream or
+deterministic comparison > same-input unoptimized baseline (for the CPU-referenced benchmarks the
+frozen B200 golden above, CPU-validated at freeze time, takes the place of the run-time CPU reference); a tolerance needs an upstream or
 numerical basis and is never fitted to a candidate; runtime, FOM, iteration counts, sizes, exit
 0 and "no NaN" are diagnostics, never correctness; a required `record` is never downgraded to
 a diagnostic; correctness instrumentation stays outside the ROI.

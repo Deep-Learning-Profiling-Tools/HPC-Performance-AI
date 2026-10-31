@@ -1,0 +1,355 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "channel_shuffle",
+  "level": 1,
+  "input_id": "g2-w255-h255",
+  "frozen": true,
+  "workload": {
+    "input_id": "g2-w255-h255",
+    "params": {
+      "group": 2,
+      "width": 255,
+      "height": 255,
+      "repeat": 100
+    },
+    "args": [
+      "2",
+      "255",
+      "255",
+      "100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "bbff5f27f785fd9e63dad51c307bff2b0dda9b734963c73589ff0c89f7903426",
+  "spec": {
+    "mode": "hash",
+    "outputs": [
+      {
+        "name": null,
+        "match": "Y\\.(nhwc|nchw)\\.N[0-9]+\\.C[0-9]+",
+        "count": 24,
+        "dtype": "f32",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "Y.nchw.N1.C128",
+      "dtype": "f32",
+      "count": 8323200,
+      "bytes": 33292800,
+      "sha256": "cdf5bbafc6c921ecc2c1cb3f3850763911d7a3ffa82d88f97b0cf54bb78a33e1",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N1.C32",
+      "dtype": "f32",
+      "count": 2080800,
+      "bytes": 8323200,
+      "sha256": "321d6b10b42c225ada880ff751b04382ecd73da4b3bde987b1347b822033a5d9",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N1.C512",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "994317a37a181356041400e44eeaa3ed7e9b0d5013f4ffcc94e12bd3b9c45925",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N16.C128",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "7628fcdd366d1fff8c38d48617fca38f4ab3bdca417e4707af1b0868e5e4b8ff",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N16.C32",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "9401aa79ca4609a51e0cc29a7effed27cd371f5fcd105e2df083bdea083f5310",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N16.C512",
+      "dtype": "f32",
+      "count": 532684800,
+      "bytes": 2130739200,
+      "sha256": "9108099072dca4462aac32a765f4c992d82d78e7401c2c51a682cb9095c71451",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N4.C128",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "a5a7deea826dc29a52d15818c0257078c23e69b38ae16fa2f2ba5831700b5d03",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N4.C32",
+      "dtype": "f32",
+      "count": 8323200,
+      "bytes": 33292800,
+      "sha256": "6cba93aabb232942a3a7efc42e0ff4b7d907e024bd7c080e53eb18b116565676",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N4.C512",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "a631e3e13bc904a1789602c408929aa6d49b22119194c4b89e152621c9d86392",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N64.C128",
+      "dtype": "f32",
+      "count": 532684800,
+      "bytes": 2130739200,
+      "sha256": "7b2a8da0cc36431420884204787fd4c293f4b46d41e572fb89bf4f1bcd798356",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N64.C32",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "1ccb1a2b4675466d46a330ce3ca14392f7f8747199e9db89ef9f74fd007d40c2",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nchw.N64.C512",
+      "dtype": "f32",
+      "count": 2130739200,
+      "bytes": 8522956800,
+      "sha256": "5ad16081cf3f94bf1a2e6659f0ac6491d5be176cd16cdf5bc363af39c41761a5",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N1.C128",
+      "dtype": "f32",
+      "count": 8323200,
+      "bytes": 33292800,
+      "sha256": "275d360b97141c9dc53fefbc19493d728ac224b98fc3cc35a56c0e1859d458c4",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N1.C32",
+      "dtype": "f32",
+      "count": 2080800,
+      "bytes": 8323200,
+      "sha256": "ab677fe06a57bb29bc60b88cdc65616edd0c1759b0e4167e915dea7ef0db334d",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N1.C512",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "899e510259ea7afb9c7385a44a8add218d848611b126cc3ecc18d6d0c95b1f59",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N16.C128",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "50a9f74bd8554b2da1800e0927e270fe1eb137b75e7230b0145ef43b15a3bdf3",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N16.C32",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "6a35aea2d203433a07b935a3e33cb388e30ea4695ba37f96619d22db6065fb47",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N16.C512",
+      "dtype": "f32",
+      "count": 532684800,
+      "bytes": 2130739200,
+      "sha256": "0d78c6a31a6eedec66c39e2ccd9b155988f716d8331dd7148e4cda04aeb97b0e",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N4.C128",
+      "dtype": "f32",
+      "count": 33292800,
+      "bytes": 133171200,
+      "sha256": "97a2c6eaad5fac7cca701802ddb2775fb6599344ba61637d363c2923d7ef4a0e",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N4.C32",
+      "dtype": "f32",
+      "count": 8323200,
+      "bytes": 33292800,
+      "sha256": "57e911c4ec514d3bd43efbf8fd537690dc3873ecb4436a128e2d87a946ce62fa",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N4.C512",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "ca21937eac23adb75daeed89de054dc46402f4bc993254f6d6347a17cc402fa2",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N64.C128",
+      "dtype": "f32",
+      "count": 532684800,
+      "bytes": 2130739200,
+      "sha256": "e79ca3107a216ac9b94ef7f39891acc3558254dc0302b012720d3e61e5b4bfac",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N64.C32",
+      "dtype": "f32",
+      "count": 133171200,
+      "bytes": 532684800,
+      "sha256": "45cc2544344bf11941e97690927ce7293e6346be1033a867b75f61a9d479d195",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    },
+    {
+      "name": "Y.nhwc.N64.C512",
+      "dtype": "f32",
+      "count": 2130739200,
+      "bytes": 8522956800,
+      "sha256": "9e1d0a63c729b185af2a87ad8aab7e67e1bbb588bc268eb663a6154d50c654db",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's memcmp(h_Y, h_Y_ref) of every (N, C) configuration and layout against the CPU reference (cuda/main.cu:183 NHWC, :202 NCHW); a pure permutation of the input, compared byte for byte (sha256)"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-26T06:37:17Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "57f34c7748a87c41278ab9f2e864441dd18a1480",
+    "source_clean": true,
+    "binary": "build/channel_shuffle/cuda/channel_shuffle_cuda",
+    "binary_sha256": "3307ae64bc472f7a59cb495217c23a3c2c5c704d806fce22129a5f9ea6d041bd",
+    "command": [
+      "build/channel_shuffle/cuda/channel_shuffle_cuda",
+      "2",
+      "255",
+      "255",
+      "100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "hash"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 845.334,
+      "pass_line": "Average time of channel shuffle (NCHW): 0.007444 (ms)",
+      "pass_regex": "^Average time of channel shuffle \\(NCHW\\):",
+      "fail_regex": "Failed to pass channel shuffle|Device memory allocation failed",
+      "log": "build/golden-make/channel_shuffle/g2-w255-h255/run/stdout.log",
+      "log_sha256": "ac8493963884d409366b9602496d366bd2bea730b82c47d8107761d877271a45"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "91c1a6eee1ac8f2935c01428f86adb02f9f3aa69af6778505fe8bbe54a9672a9",
+      "hpcperf_golden.h": "3d8b7bdd71e8f360b6b1acceb12706f45978ec3d5c309a7c8d4988898a62138a"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

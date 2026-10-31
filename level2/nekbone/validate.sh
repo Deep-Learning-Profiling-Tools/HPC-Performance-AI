@@ -16,6 +16,18 @@
 # PASS when 2. holds for both solves' r0 and for the timed solve's solution / reduction, every run exits 0 and reaches
 # 'Avg MFlops', the CUDA run's build banner shows the OpenACC/CUDA Fortran path (the 'USE_GPU_DIRECT' line printed only
 # by the ACC build) and the launcher audit is clean.
+#
+# Two modes (project decision: no CPU reference computation on a default path):
+#   default  (HPCPERF_CPU_REFERENCE unset or 0) -- builds and runs NOTHING on the CPU path: only the CUDA build
+#     of test/nek_gpu1 (built when missing) runs, with its GPU-only checks (exit 0, 'Avg MFlops', clean launcher
+#     audit, the OpenACC 'USE_GPU_DIRECT' set-up line); comparisons 1. and 2. are replaced by the frozen-reference
+#     check of the registered default input n16-e32768 (its CUDA build is made by build.sh CUDA when missing):
+#       python3 tools/inputs/hpcperf_inputs.py check level2/nekbone n16-e32768 \
+#               --out build/level2/nekbone/validate/frozen-reference-check
+#     i.e. the GPU run of that input (run.sh) against its frozen CPU-build reference reference/n16-e32768.json
+#     under check_cg.py's recorded rule. Exit 0 = PASS, anything else is a FAIL.
+#   offline  (HPCPERF_CPU_REFERENCE set to 1: an explicit request only) -- the original CUDA-vs-CPU comparison on
+#     test/nek_gpu1 described above (the CPU build is made when missing), unchanged.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R="$(cd "$HERE/../.." && pwd)"
@@ -27,17 +39,31 @@ case "$(printf '%s' "${1:-CUDA}" | tr '[:lower:]' '[:upper:]')" in
     *) echo "usage: $0 [CUDA]" >&2; exit 2 ;;
 esac
 OUT="$R/build/level2/nekbone/validate"; mkdir -p "$OUT"
+FROZEN_INPUT="n16-e32768"   # inputs.yaml default_input
+case "${HPCPERF_CPU_REFERENCE:-}" in
+    ''|0*) CPU_REF=0; VARIANTS="cuda" ;;
+    *)     CPU_REF=1; VARIANTS="cuda cpu" ;;
+esac
 fail=0
-for v in cuda cpu; do
+for v in $VARIANTS; do
     EXE="$R/build/level2/nekbone/$v/nek_gpu1/nekbone"
     if [ ! -x "$EXE" ]; then
         echo "== validate: building test/nek_gpu1 ($v)"
         bash "$HERE/build.sh" "$(printf '%s' "$v" | tr '[:lower:]' '[:upper:]')" nek_gpu1 > "$OUT/build.$v.log" 2>&1 || { echo "FAIL: build.sh ${v^^} nek_gpu1 (see $OUT/build.$v.log)"; exit 1; }
     fi
 done
+if [ "$CPU_REF" -eq 0 ] && [ ! -x "$R/build/level2/nekbone/cuda/$FROZEN_INPUT/nekbone" ]; then
+    echo "== validate: building inputs/$FROZEN_INPUT (cuda) for the frozen reference check"
+    bash "$HERE/build.sh" CUDA "$FROZEN_INPUT" > "$OUT/build.cuda.$FROZEN_INPUT.log" 2>&1 || { echo "FAIL: build.sh CUDA $FROZEN_INPUT (see $OUT/build.cuda.$FROZEN_INPUT.log)"; exit 1; }
+fi
 # shellcheck disable=SC1091
 source "$R/level2/tools/hpcperf_launch_common.sh"
-for v in cuda cpu; do
+if [ "$CPU_REF" -eq 1 ]; then
+    echo "== CPU reference: offline mode (HPCPERF_CPU_REFERENCE requested): CPU build run + CUDA-vs-CPU comparison on test/nek_gpu1"
+else
+    echo "== CPU reference: skipped (default; frozen reference check instead)"
+fi
+for v in $VARIANTS; do
     EXE="$R/build/level2/nekbone/$v/nek_gpu1/nekbone"
     echo "== validate: running test/nek_gpu1 with the $v build"
     ( cd "$HERE/test/nek_gpu1" && "$HPCPERF_LAUNCHER_BIN" --gpus 1 --bind wrapper -- "$EXE" data ) > "$OUT/run.$v.log" 2>&1
@@ -47,6 +73,7 @@ for v in cuda cpu; do
     grep -q 'audit summary: 1 verified, 0 mismatch' "$OUT/run.$v.log" || grep -q 'audit summary:.*0 mismatch' "$OUT/run.$v.log" || { echo "FAIL: launcher audit not clean in the $v run"; fail=1; }
 done
 grep -q 'USE_GPU_DIRECT' "$OUT/run.cuda.log" || { echo "FAIL: the CUDA run shows no OpenACC gather-scatter set-up line (USE_GPU_DIRECT): not the GPU code path"; fail=1; }
+if [ "$CPU_REF" -eq 1 ]; then
 grep -q 'USE_GPU_DIRECT' "$OUT/run.cpu.log" && { echo "FAIL: the CPU build printed the OpenACC set-up line"; fail=1; }
 echo "== cg: lines (cuda | cpu)"
 paste -d'|' <(grep '^cg:' "$OUT/run.cuda.log") <(grep '^cg:' "$OUT/run.cpu.log")
@@ -79,3 +106,13 @@ print(f"  timed solve residual reduction: cuda {rg:.3e} cpu {rc:.3e} (limit 10 x
 sys.exit(0 if ok else 1)
 PY
 if [ $fail -eq 0 ]; then echo "PASS: Nekbone validate (test/nek_gpu1: CUDA build vs CPU build under the check_cg.py rule)"; else echo "FAIL: Nekbone validate"; exit 1; fi
+exit 0
+fi
+echo "== cg: lines (cuda)"
+grep '^cg:' "$OUT/run.cuda.log"
+CHECK_OUT="$OUT/frozen-reference-check"
+echo "== frozen reference check: python3 tools/inputs/hpcperf_inputs.py check level2/nekbone $FROZEN_INPUT --out $CHECK_OUT"
+python3 "$R/tools/inputs/hpcperf_inputs.py" check "$HERE" "$FROZEN_INPUT" --out "$CHECK_OUT"
+rc=$?
+[ $rc -eq 0 ] || { echo "FAIL: frozen reference check $FROZEN_INPUT exited $rc ($CHECK_OUT/check.json)"; fail=1; }
+if [ $fail -eq 0 ]; then echo "PASS: Nekbone validate (test/nek_gpu1: CUDA build on the OpenACC/CUDA path; CPU reference skipped (default), frozen reference check $FROZEN_INPUT PASS under the check_cg.py rule)"; else echo "FAIL: Nekbone validate"; exit 1; fi

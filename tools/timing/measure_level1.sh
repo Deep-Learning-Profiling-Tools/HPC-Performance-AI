@@ -11,8 +11,13 @@
 #   1 warm-up run (discarded) + N clean runs (ROI timed by the markers, no profiler)
 #   + 1 profiled run (device activity clipped to the same markers).
 # The measured time is the ROI: the computation, without process start-up, set-up,
-# warm-up and verification. HPCPERF_SKIP_VERIFY=1 is still set -- not for correctness
-# (verification is outside the ROI) but because the CPU reference can take minutes.
+# warm-up and verification. No CPU reference runs in a measurement: the benchmarks skip it
+# unless HPCPERF_CPU_REFERENCE=1 (tools/golden; never passed through the clean environment,
+# a reserved name for cases), and correctness is the separate golden check (tools/golden).
+# HPCPERF_SKIP_VERIFY=1 is still set: it switches off the checks that are not CPU references
+# (graph_coloring's validity scan, binary_search's verify()) outside the ROI, and also lud's upstream
+# host recomposition, which runs only with HPCPERF_CPU_REFERENCE=1 anyway (lud's default check, the
+# residual of the captured factors, is a separate post-run step a measurement never runs).
 #
 # Options
 #   --build-root DIR    Level 1 build tree (default: build/all or build/gcc13)
@@ -21,7 +26,7 @@
 #   --no-profile        no profiled run (ROI time only)
 #   --collector NAME    auto (default) | nvidia_nsys | none
 #   --backend B         CUDA (default) | HIP (UNTESTED)
-#   --keep-verify       do not set HPCPERF_SKIP_VERIFY
+#   --keep-verify       do not set HPCPERF_SKIP_VERIFY (only the non-CPU-reference checks then run)
 #   --raw-root DIR      raw evidence root (default build/timing)
 #   --results-root DIR  records, CSVs and the web page (default results/timing)
 #   --no-summary        skip the summarize + report step after the runs

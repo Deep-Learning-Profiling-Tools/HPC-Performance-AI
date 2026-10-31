@@ -6,6 +6,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -13,13 +14,14 @@
 #include <cuda.h>
 #include <cub/cub.cuh>
 
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
-// HPCPERF_SKIP_VERIFY=1 skips the host-side correctness check so the measured time
-// reflects the GPU path only; tools/timing/measure_level1.sh sets it, ctest never
-// does. No kernel, data initialization, tolerance or algorithm is touched.
+// HPC-Performance-AI correctness switch. The host-side CPU reference below runs ONLY on an
+// explicit offline request (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it
+// once to validate the frozen golden reference); by default it is skipped and correctness is
+// judged by comparing the captured output (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP) with the
+// frozen B200 golden reference (tools/golden). No kernel, data initialization, tolerance or
+// algorithm is touched.
 static bool hpcperf_skip_verify() {
-  const char* e = getenv("HPCPERF_SKIP_VERIFY");
-  return e != nullptr && *e != '\0' && *e != '0';
+  return !hpcperf_cpu_reference_enabled();
 }
 
 
@@ -175,6 +177,16 @@ __global__ void k3 (const char *data, int *distance) {
   }
 }
 
+// tools/golden: poison the output that k1, k2 and k3 share -- distance_device and the host copy gpu_distance that
+// is captured (all-ones bytes, -1 in every int) -- before each kernel's timed region, outside the ROI and the chrono
+// timer. Every timed iteration clears distance_device and recomputes it, so a correct timed region overwrites the
+// poison; a kernel that does not run leaves -1 in its capture instead of the previous kernel's identical matrix.
+static void hpcperf_poison_distance(int *d, int *h, size_t bytes) {
+  cudaMemset(d, 0xFF, bytes);
+  memset(h, 0xFF, bytes);
+  cudaDeviceSynchronize();
+}
+
 int main(int argc, char **argv) {
 
   if (argc != 2) {
@@ -236,7 +248,7 @@ int main(int argc, char **argv) {
   dimGrid.y = INSTANCES;
 
 
-  /* CPU reference for the three memcmp checks below; skipped in measurement mode */
+  /* CPU reference for the three memcmp checks below; runs only with HPCPERF_CPU_REFERENCE=1 (golden make) */
   auto start = std::chrono::steady_clock::now();
   auto end = start;
   double elapsedTime = 0;
@@ -248,6 +260,7 @@ int main(int argc, char **argv) {
     printf("CPU time: %f (us)\n", elapsedTime);
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
@@ -262,15 +275,17 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k1", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k1
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
@@ -285,15 +300,17 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k2", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k2
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
+  hpcperf_poison_distance(distance_device, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
   start = std::chrono::steady_clock::now();
   HPCPERF_ROI_BEGIN_SYNC();  // tools/timing ROI: this timed GPU region
   for (int n = 0; n < iterations; n++) {
@@ -308,13 +325,14 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(gpu_distance, distance_device,
              INSTANCES * INSTANCES * sizeof(int), cudaMemcpyDeviceToHost);
+  hpcperf_golden_output("distance.k3", gpu_distance, INSTANCES * INSTANCES, "i32");   // tools/golden: the checked output of k3
 
   printf("Average kernel execution time: %f (us)\n", elapsedTime / iterations);
   if (hpcperf_skip_verify()) {
-    printf("SKIP_VERIFY\\n");
+    printf("SKIP_VERIFY\n");
   } else {
     status = memcmp(cpu_distance, gpu_distance, INSTANCES * INSTANCES * sizeof(int));
-    printf("%s\\n", status ? "FAIL" : "PASS");
+    printf("%s\n", status ? "FAIL" : "PASS");
   }
 
   free(cpu_distance);

@@ -6,14 +6,22 @@ working directory, timeout and pass/fail regexes come from
 
     ctest --test-dir <build-root>/level1/<bm> --show-only=json-v1
 
-Nine benchmarks are wrapped by a repo-authored verify.py in their add_test()
-command. Timing those would measure the Python CPU reference, not the GPU work,
-so the table records the INNER argv the wrapper would exec. That argv is
-obtained by importing the wrapper with subprocess.run monkey-patched -- the
-wrapper performs its own argv transformation (four of them rewrite arguments),
-so nothing is guessed and the wrappers stay unmodified.
+Three benchmarks (ao_bench, gaussian_elimination, lud) are still wrapped by a
+repo-authored verify.py in their add_test() command (nine before 2026-10-26; the
+other six now run the golden runner below). Timing those would measure the
+wrapper's checks, not the GPU work, so the table records the INNER argv the
+wrapper would exec. That argv is obtained by importing the wrapper with
+subprocess.run monkey-patched -- the wrapper performs its own argv transformation
+(gaussian_elimination's rewrites its arguments), so nothing is guessed and the
+wrappers stay unmodified.
 
-Every ctest test becomes one case. A benchmark with a single test gets the case
+Since 2026-10-26 most ctests run tools/golden/hpcperf_golden.py run <bench_dir> [<input>] --exe <binary>
+(one plain run of the registry's default input, compared with the frozen golden reference). For those
+the table records the binary with the registry input's arguments -- what the runner execs (wrapper
+"golden"); the registry is read through tools/inputs/hpcperf_inputs.py, nothing is executed.
+
+Every ctest test becomes one case, except a golden ctest of a correctness-probe input (inputs.yaml
+`purpose: correctness-probe`), which is never timed. A benchmark with a single (timed) test gets the case
 name "default"; one with several gets one case per test, named after the test (a
 benchmark that gains a second input is measured, not silently dropped). Extra inputs
 that ctest does not know about go in cases/level1_extra.tsv (hand-written).
@@ -46,7 +54,9 @@ HEADER = f"""\
 # tools/timing/gen_cases.py --build-root <dir> --check   verifies this file against a build tree.
 # exe/args/cwd use {{REPO}} (repository root) and {{BUILD}} (build root) placeholders; "-" = empty field.
 # wrapper: direct = ctest runs the binary; verify.py = ctest runs a Python checker and this
-#          row records the inner argv that checker execs (the binary is measured directly).
+#          row records the inner argv that checker execs (the binary is measured directly);
+#          golden = ctest runs tools/golden/hpcperf_golden.py run, the row records the binary with
+#          the registry input's arguments that runner execs.
 #{chr(9).join(COLUMNS)}
 """
 
@@ -87,6 +97,52 @@ def inner_argv_of_wrapper(wrapper_path, wrapper_argv):
     if "argv" in captured:
         return captured["argv"]
     raise RuntimeError(f"{wrapper_path}: wrapper never called subprocess.run")
+
+
+def inner_argv_of_golden(golden_argv, test_dir=None):
+    """The argv `hpcperf_golden.py run <bench_dir> [<input_id>] --exe <binary> ...` execs: the binary with the
+    registry input's arguments (repository paths made absolute, as the runner does). Nothing is executed.
+    A registry argument that names a configure-time file of the benchmark's own build directory
+    (build/<bench>/cuda/<file>, e.g. aes / pagerank data, nearest_neighbor's file list) is mapped to the same
+    file of THIS ctest's build directory when it exists there, as ctest's own command did before."""
+    sys.path.insert(0, os.path.join(REPO, "tools", "inputs"))
+    import hpcperf_inputs as hi
+    a = list(golden_argv)
+    if len(a) < 3 or a[1] != "run":
+        raise RuntimeError(f"unexpected golden ctest command: {a}")
+    bench_dir = a[2]
+    input_id = a[3] if len(a) > 3 and not a[3].startswith("--") else None
+    if "--exe" not in a:
+        raise RuntimeError(f"golden ctest command without --exe: {a}")
+    exe = a[a.index("--exe") + 1]
+    doc = hi.load(hi.Path(bench_dir))
+    inp = hi.get_input(doc, input_id or doc["default_input"])
+    root = hi.repo_root(hi.Path(bench_dir))
+    args = hi.resolve_repo_args(root, inp.get("args", []) or [])
+    own = os.path.join(str(root), "build", doc["benchmark"], "cuda") + os.sep
+    if test_dir:
+        mapped = []
+        for x in args:
+            if x.startswith(own) and os.path.exists(os.path.join(test_dir, x[len(own):])):
+                x = os.path.join(test_dir, x[len(own):])
+            mapped.append(x)
+        args = mapped
+    return [exe] + args
+
+
+def is_probe_test(test):
+    """True for a golden ctest of a correctness-probe input (inputs.yaml `purpose: correctness-probe`): such a
+    test checks correctness only and is never timed, so it gets no case (and does not count when deciding
+    whether a benchmark has a single test, i.e. whether its case is named "default")."""
+    command = list(test.get("command", []))
+    if len(command) < 4 or os.path.basename(command[1]) != "hpcperf_golden.py" or command[2] != "run":
+        return False
+    sys.path.insert(0, os.path.join(REPO, "tools", "inputs"))
+    import hpcperf_inputs as hi
+    a = command[1:]
+    input_id = a[3] if len(a) > 3 and not a[3].startswith("--") else None
+    doc = hi.load(hi.Path(a[2]))
+    return hi.is_probe(hi.get_input(doc, input_id or doc["default_input"]))
 
 
 def resolve_ctest(build_root):
@@ -188,7 +244,7 @@ def build_rows(build_root):
         raise RuntimeError(f"no benchmark build directories under {build_root}")
     for bm, test_dir in dirs.items():
         payload = ctest_show(ctest, test_dir)
-        tests = payload.get("tests", [])
+        tests = [t for t in payload.get("tests", []) if not is_probe_test(t)]   # correctness probes: never timed
         for test in tests:
             rows.append(_row(bm, test, test_dir, build_root, single=len(tests) == 1))
     return rows
@@ -211,6 +267,9 @@ def _row(bm, test, test_dir, build_root, single):
     if len(command) >= 2 and os.path.basename(command[1]) == "verify.py":
         wrapper = "verify.py"
         command = inner_argv_of_wrapper(command[1], command[1:])
+    elif len(command) >= 3 and os.path.basename(command[1]) == "hpcperf_golden.py":
+        wrapper = "golden"
+        command = inner_argv_of_golden(command[1:], os.path.abspath(test_dir))
 
     return {
         "app": bm,
@@ -260,8 +319,10 @@ def main():
 
     with open(args.out, "w") as f:
         f.write(text)
-    wrapped = sum(1 for r in rows if r["wrapper"] != "direct")
-    print(f"gen_cases: wrote {args.out} ({len(rows)} cases, {wrapped} via verify.py)")
+    kinds = {}
+    for r in rows:
+        kinds[r["wrapper"]] = kinds.get(r["wrapper"], 0) + 1
+    print(f"gen_cases: wrote {args.out} ({len(rows)} cases: " + ", ".join(f"{v} {k}" for k, v in sorted(kinds.items())) + ")")
     return 0
 
 

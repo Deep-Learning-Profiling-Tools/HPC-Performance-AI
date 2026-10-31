@@ -1,0 +1,113 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "fir",
+  "level": 1,
+  "input_id": "y4096-x4096",
+  "frozen": true,
+  "workload": {
+    "input_id": "y4096-x4096",
+    "params": {
+      "blocks": 4096,
+      "block_size": 4096,
+      "seed": 1
+    },
+    "args": [
+      "-y",
+      "4096",
+      "-x",
+      "4096"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "66e33fb2c284924345ee4b095961e3d95c97764fc2a13abe27a348337ebce3b0",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "output",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 1e-05
+        },
+        "cpu": "output.cpu",
+        "basis": "upstream Verify fails on std::abs(cpu_output[i] - output_[i]) > 1e-5 for every one of the num_total_data_ = blocks * block_size points (common/fir_benchmark.cc:91); captured by FirBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc); the check allows 1e-5 minus the B200 output's own deviation from the CPU reference",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "f32",
+      "count": 16777216,
+      "bytes": 67108864,
+      "sha256": "20fafcbd3922a3c9ac7aeb935bdf5291de7d8e3d9861457869ba8395528272fe",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 1e-05,
+        "d0_vs_cpu_reference": 1.430511474609375e-06,
+        "d0_source": "output.cpu",
+        "tol_effective": 8.569488525390626e-06
+      },
+      "basis": "upstream Verify fails on std::abs(cpu_output[i] - output_[i]) > 1e-5 for every one of the num_total_data_ = blocks * block_size points (common/fir_benchmark.cc:91); captured by FirBenchmark::CaptureGoldenOutputs after the timed Run()s (common/benchmark_runner.cc); the check allows 1e-5 minus the B200 output's own deviation from the CPU reference",
+      "stats": {
+        "min": 0.07705210149288177,
+        "max": 6.103839874267578,
+        "sum": 57358332.60766344,
+        "nonfinite": 0
+      },
+      "blob": "sha256/20/20fafcbd3922a3c9ac7aeb935bdf5291de7d8e3d9861457869ba8395528272fe.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-27T08:07:53Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "d30669b22b5660908af7c015a7cb6d28b42d5f3d",
+    "source_clean": true,
+    "binary": "build/fir/cuda/fir_cuda",
+    "binary_sha256": "88eb34c7b2235e2d18bd4e37fbc6ff24006f41917b1d1fd8ac32e6f467dd6790",
+    "command": [
+      "build/fir/cuda/fir_cuda",
+      "-y",
+      "4096",
+      "-x",
+      "4096"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 2.679,
+      "pass_line": "Passed! 16777216 data points filtered",
+      "pass_regex": "^Passed! [0-9]+ data points filtered",
+      "fail_regex": "^At position [0-9]+, expected|NON-DEFAULT SEED",
+      "log": "build/golden-make/fir/y4096-x4096/run/stdout.log",
+      "log_sha256": "3063c1c4ecc8ef4a411c8c9467e3b52dcf07736f10d758accb16cb78a4f35a72"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "8170415c7162efb90ccac58d2605988cd9f98a2bb93bcacff9cf62a7b46de549",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

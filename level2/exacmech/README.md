@@ -138,7 +138,7 @@ releases up to roughly v2025.09.
 cd /projects/kzhou6/bcui2/research/HPC-Performance-AI && source hpcperf_env.sh
 level2/exacmech/build.sh            # CUDA (default); arch detected via nvidia-smi, override HPCPERF_CUDA_ARCH=100
 level2/exacmech/run.sh              # 1,000,000 random orientations x 1000 steps, evptn_FCC_A, device GPU (~9.5 s)
-level2/exacmech/validate.sh         # GPU vs CPU-device run of upstream's cases/option_cpu.txt (50k x 60), PASS/FAIL
+level2/exacmech/validate.sh         # GPU run + frozen golden check (default); GPU vs CPU-device run only with HPCPERF_CPU_REFERENCE set to 1
 level2/exacmech/build.sh HIP        # HIP (needs hipcc + HIP builds of RAJA/Umpire/CHAI; HPCPERF_HIP_ARCH=gfx942)
 ```
 
@@ -195,9 +195,25 @@ other jobs, so times vary somewhat between runs.
 
 ## Validation
 
+**Modes (2026-10-26; no CPU reference computation on a default path).** By default
+(`HPCPERF_CPU_REFERENCE` unset or `0`) `validate.sh` runs nothing on the CPU: only the GPU copy of
+the deck below (all 60 steps, exit 0), then the frozen-reference check of the registered default
+input
+`python3 tools/inputs/hpcperf_inputs.py check level2/exacmech fcc-a-1m-1000 --out build/level2/exacmech/validate/frozen-reference-check`
+(that input's GPU run against its frozen B200 golden reference, `tools/golden`). A missing
+reference is a FAIL, never a fallback to the CPU/OpenMP device. The log says
+`CPU reference: skipped (default; frozen reference check instead)`. Observed 2026-10-26, before
+the references were made (3a4488a): FAIL in 15.7 s -- `no frozen reference
+level2/exacmech/reference/fcc-a-1m-1000.json`. Since 3a4488a the three registered inputs have frozen
+references (`reference/`); the registry check of fcc-a-1m-1000 PASSes against the reference made
+2026-10-26 (observed 2026-10-28, 12.1 s; fcc-a-350k-60 and bcc-a-1m-1000 PASS as well). The
+GPU-vs-CPU comparison described below runs only on an explicit offline request
+(`HPCPERF_CPU_REFERENCE` set to `1`, e.g. by `tools/golden/hpcperf_golden.py make`); observed then:
+PASS, max |gpu-ref| = 0, 19.8 s.
+
 Upstream ships no reference outputs (the miniapp's own comment says the per-step stress print is
 there "to make sure things are correct between the different runs" of the CPU, OpenMP and GPU
-paths), so `validate.sh` implements exactly that cross-check with upstream's own deck
+paths), so `validate.sh` (offline mode) implements exactly that cross-check with upstream's own deck
 `miniapp/cases/option_cpu.txt`: 50,000 random orientations (seed 42; the quaternions are generated
 on the host with `std::minstd_rand0`, identically for every device), `evptn_FCC_A`, `cases/props.txt`,
 dt = 0.00025, 60 steps, `diag(-0.5,-0.5,1.0)`. The same binary runs the deck once with device `GPU`
@@ -258,6 +274,8 @@ Reproduce the toolchain from the repository root: `./setup_env.sh` then
 ## Status
 
 CUDA: Working (configure + build + run + validate all passed on the B200 via `build.sh`, `run.sh`,
-`validate.sh` from a fresh shell; build 1m48s, run 9.5 s, validate PASS with max |gpu-cpu| = 0).
+`validate.sh` from a fresh shell; build 1m48s, run 9.5 s, validate PASS with max |gpu-cpu| = 0 --
+recorded when `validate.sh` still compared against the CPU/OpenMP device; the default `validate.sh`
+now checks the frozen B200 reference, see "Modes" above).
 HIP: source and build configuration present (`build.sh HIP`, `-DENABLE_HIP=ON`), untested -- no
 ROCm/hipcc on this machine, and HIP builds of RAJA/camp, Umpire and CHAI would be needed as well.

@@ -180,6 +180,11 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
 												);
 
   HPCPERF_ROI_END_SYNC();
+  /* [HPC-Performance-AI] return the output/hidden errors computed above, as the CPU bpnn_train
+   * (backprop.c) does; upstream never wrote *eo / *eh, so the added check (facetrain.c) compared
+   * uninitialized values. Host scalars after the ROI: no kernel, weight or timed work changes. */
+  *eo = out_err;
+  *eh = hid_err;
   cudaMemcpy(net->input_units, input_cuda, (in + 1) * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(input_weights_one_dim, input_hidden_cuda, (in + 1) * (hid + 1) * sizeof(float), cudaMemcpyDeviceToHost);
     

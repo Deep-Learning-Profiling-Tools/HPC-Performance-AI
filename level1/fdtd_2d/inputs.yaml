@@ -13,19 +13,53 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the standalone port prints only PASS/FAIL; upstream RAJAPerf's kernel timer is not ported
 baseline:
-  method: 'added driver: upstream Base_Seq CPU variant compared element-wise (rel tol 1e-10): PASS/FAIL'
-  reference: this build's first measured run (self baseline); see method
+  method: 'the outputs hz, ex and ey against the frozen B200 golden reference (`check:` / `golden:` below); the added
+    driver''s upstream Base_Seq CPU reference (element-wise, rel tol 1e-10) runs only once, offline, to validate that
+    reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
-  - name: pass_marker
-    role: required
-    regex: ^PASS$
-    compare:
-      rule: present
   - name: fail_marker
-    role: required
+    role: diagnostic
     regex: ^FAIL$
     compare:
       rule: absent
+golden:
+  # tools/golden. make runs the unmodified build once with HPCPERF_CPU_REFERENCE=1 and freezes hz, ex and ey only when the
+  # driver's CPU check printed PASS; every later run is compared with those frozen outputs instead.
+  mode: data
+  cpu_check: {pass_regex: '^PASS$', fail_regex: '^FAIL$'}
+  outputs:
+  - name: hz
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: hz.cpu
+    basis: the driver's element-wise check of hz (f64[len]) against the upstream Base_Seq CPU reference,
+      max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:158); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU reference
+  - name: ex
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: ex.cpu
+    basis: the driver's element-wise check of ex (f64[len]) against the upstream Base_Seq CPU reference,
+      max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:159); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU reference
+  - name: ey
+    dtype: f64
+    rule: {metric: max_rel1p, tol: 1.0e-10}
+    cpu: ey.cpu
+    basis: the driver's element-wise check of ey (f64[len]) against the upstream Base_Seq CPU reference,
+      max |g - r| / (1 + |r|) <= 1e-10 (common/rp_common.hpp:121-124 compareArrays, cuda/main.cu:160); the check
+      allows 1e-10 minus the B200 output's own deviation from the CPU reference
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'hz, ex and ey against the frozen B200 golden reference reference/<input_id>.json (max |a - g| / (1 + |g|) <= 1e-10
+    - d0 per output, d0 = the golden''s deviation from the upstream Base_Seq CPU reference measured when it was
+    frozen); no CPU reference is run'
+  covers: all
 coverage:
   status: MULTI_INPUT
   reason: upstream default size plus larger sizes through the port's size argument (upstream --size)

@@ -35,6 +35,7 @@
 // accordingly in parallel.
 //
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <math.h>
 #include <string.h>
 #include <chrono>
@@ -212,13 +213,20 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Bitonic sort (parallel)..\n";
   ParallelBitonicSort(data_gpu, n);
+  hpcperf_golden_output("sorted", data_gpu, size, "i32");   // tools/golden: the checked output (after the D2H copy)
 
-  std::cout << "Bitonic sort (serial)..\n";
-  BitonicSort(data_cpu, n);
+  if (!hpcperf_cpu_reference_enabled()) {
+    // default: the CPU reference (serial BitonicSort) is skipped; correctness = the captured
+    // sorted array against the frozen golden reference (tools/golden)
+    std::cout << "SKIP_VERIFY" << std::endl;
+  } else {
+    std::cout << "Bitonic sort (serial)..\n";
+    BitonicSort(data_cpu, n);
 
-  // Verify
-  int unequal = memcmp(data_gpu, data_cpu, size_bytes);
-  std::cout << (unequal ? "FAIL" : "PASS") << std::endl;
+    // Verify
+    int unequal = memcmp(data_gpu, data_cpu, size_bytes);
+    std::cout << (unequal ? "FAIL" : "PASS") << std::endl;
+  }
 
   // Clean CPU memory.
   free(data_cpu);

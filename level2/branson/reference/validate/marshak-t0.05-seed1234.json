@@ -1,0 +1,98 @@
+{
+ "benchmark": "branson",
+ "deck": "inputs/marshak_wave_replicated.xml",
+ "deck_sha256": "9519455d5272e2991ce90f5438f04f4b9f1096efece5795c251788f11987570b",
+ "final_step": {
+  "absorption_e": 6.8509194e-05,
+  "exit_e": 7.4756553e-05,
+  "photons_transported": 50578,
+  "post_mat_e": 0.00020108072,
+  "t_e": [
+   0.92196428,
+   0.78699587,
+   0.081847071,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01,
+   0.01
+  ]
+ },
+ "generated_by": "level2/branson/check_log.py freeze (construction-time; from the CPU-only run of one explicit offline validate.sh run, no rerun)",
+ "generated_utc": "2026-10-27T08:04:01Z",
+ "input_id": "validate-marshak-t0.05-seed1234",
+ "note": "validate.sh check C's CPU-only run (deck inputs/marshak_wave_replicated.xml with --t-stop 0.05 --seed 1234: 5 steps, 50 k photons/step, 25-cell T_e table), frozen for validate.sh's default mode; NOT a registered input (registered marshak-wave-replicated is the deck as shipped: t_stop 0.01, seed 14706, 1 step -- reference/marshak-wave-replicated.json). Every per-step quantity and T_e equals the CPU-only run of 2026-09-01 (another cpu_ref binary, sha256 637ce4ae...): d0 = 0",
+ "params": {
+  "args": "--t-stop 0.05 --seed 1234",
+  "photons": "50000",
+  "seed": "1234",
+  "t_stop": "0.05"
+ },
+ "per_step_photons_transported": [
+  50015,
+  49975,
+  50308,
+  50541,
+  50578
+ ],
+ "reference_run": {
+  "binary_sha256": "4b29fd3325f1cca66d14331cce38c72f587f29bf69986a89fba127e8776beec0",
+  "build_options": "validate.sh (C) offline build into build/level2/branson/cpu_ref: cmake -DCMAKE_BUILD_TYPE=Release -DUSE_GPU=OFF -DUSE_CUDA=OFF -DUSE_HIP=OFF -DUSE_UMPIRE=OFF -DUSE_CALIPER=OFF -DBUILD_TESTING=OFF on level2/branson/src (the GPU build's sources, unmodified at git HEAD 9544e6e; project toolchain hpcperf_env.sh, conda GCC 13.3, Open MPI 5.0.10; CPATH tools/timing/roi), built 2026-10-27T08:01:39Z",
+  "finished_utc": "2026-10-27T08:01:47Z",
+  "fom_photons_per_s": 29938.022,
+  "implementation": "CPU-only Branson built from the same sources with -DUSE_GPU=OFF: Branson's CPU transport, independent of the GPU transport kernel (the deck's use_gpu_transporter is ignored by that build)",
+  "launch": "mpirun -np 1 --bind-to none build/level2/branson/cpu_ref/BRANSON inputs/marshak_wave_replicated.xml --t-stop 0.05 --seed 1234 (validate.sh check C, offline mode HPCPERF_CPU_REFERENCE=1)",
+  "log_bytes": 14927,
+  "log_sha256": "46d7a475e2576f8988bdfc6d116b1b4f19adeb989774b02fce87034f2ae2383e",
+  "mpi_ranks": 1,
+  "scrubbed": {
+   "by": "tools/golden/scrub_provenance.py",
+   "removed": [
+    "allocation",
+    "log_kept_at"
+   ],
+   "rule": "hpcperf-provenance-scrub-1",
+   "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+  },
+  "started_utc": "2026-10-27T08:01:39Z",
+  "total_transport_s": 1.670117
+ },
+ "rule": {
+  "absorption_e": "rel <= 0.05 (final step)",
+  "exit_e": "rel <= 0.05 (final step)",
+  "photons_transported": "rel <= 0.05 (final step, the last \"Total Photons transported\" line)",
+  "post_mat_e": "rel <= 0.05 (final step)",
+  "steps": "the candidate run must complete the same number of steps and print the FOM line",
+  "t_e": "abs <= 0.02 per cell of the final step (when the deck prints the table)"
+ },
+ "schema": "hpcperf-branson-reference-1",
+ "seed": 1234,
+ "steps": 5,
+ "tolerance_basis": "validate.sh check C: the seed-to-seed scatter of the final energies is 0.2-0.8 % and of the front-cell T_e <= 0.006, so 5 % relative / 0.02 absolute is > 6 sigma of the Monte Carlo scatter yet far below any transport error; the transported photon count (a tally of the transport) uses the energies' margin. Fixed before any optimized candidate existed; the reference's rank count does not enter the criteria (same deck, seed and global photon count).",
+ "tolerances": {
+  "energy_rel": 0.05,
+  "photons_rel": 0.05,
+  "t_e_abs": 0.02
+ },
+ "upstream": {
+  "commit": "eed7f71699e9e2d7afc96a849c9c9b2a215cb1dd",
+  "repo": "lanl/branson"
+ }
+}

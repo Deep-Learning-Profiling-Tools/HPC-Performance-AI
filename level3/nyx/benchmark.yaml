@@ -45,7 +45,11 @@ inputs:
 - src/Exec/LyA/64sssss_20mpc.nyx
 - src/Exec/LyA/TREECOOL_middle
 - src/Exec/Scaling/inputs
-references: []
+references:
+- reference/minisb.smoke.json
+- reference/lya_adiabatic.smoke.json
+- reference/lya_adiabatic.strong.json
+- reference/lya_heatcool.smoke.json
 source_version: hpcperf-l3-v1
 source_tree_sha256: 71b64ddffc1e5c5fe9cd49173aba10d955f26082c6079a3a4548f2d9a6002120
 source_artifact:

@@ -13,8 +13,9 @@ timing:
   status: NEEDS_TIMING_SUPPORT
   reason: the CUDA port prints no timer
 baseline:
-  method: no built-in check line
-  reference: this build's first measured run (self baseline); see method
+  method: 'no built-in check line; the final DP row against the frozen B200 golden reference (`check:` / `golden:` below);
+    verify.py (CPU DP over the reproduced wall) runs only once, offline, to validate that reference (tools/golden make)'
+  reference: reference/<input_id>.json (frozen golden reference; tools/golden)
   quantities:
   - name: no_error
     role: required
@@ -85,3 +86,27 @@ inputs:
   build_config: null
   backends_validated:
   - cuda
+golden:
+  # tools/golden/README.md. make runs verify.py once with HPCPERF_CPU_REFERENCE=1 and HPCPERF_GOLDEN_DUMP: verify.py runs
+  # the unmodified binary (which captures the final DP row it prints) and recomputes the minimum-path DP in pure Python
+  # from a glibc rand() reproduction of the wall; the capture is frozen only when verify.py printed PASS.
+  mode: data
+  cpu_check:
+    command: [python3, '{bench_dir}/verify.py', '{exe}', '{arg:0}', '{arg:1}', '{arg:2}']
+    pass_regex: '^PASS: pathfinder result row matches CPU DP'
+    fail_regex: '^FAIL'
+  outputs:
+  - name: result
+    dtype: i32
+    rule: {metric: exact}
+    basis: verify.py compares the printed final DP row exactly with its CPU DP (level1/pathfinder/verify.py:56); the same
+      cols values (cuda/pathfinder.cu result after the final copy-back), integers -> byte-identical
+check:
+  kind: post_run
+  run_env: {HPCPERF_GOLDEN_DUMP: '{run_dir}/golden-capture'}
+  command: [python3, '{repo}/tools/golden/hpcperf_golden.py', check, '{bench_dir}', '{input_id}', --dump, '{run_dir}/golden-capture']
+  pass_regex: '^PASS: golden check'
+  fail_regex: '^FAIL: golden check'
+  basis: 'the final DP row byte-identical to the frozen B200 golden reference reference/<input_id>.json (made once and
+    validated there by verify.py''s CPU DP, exact); no CPU reference is run'
+  covers: all

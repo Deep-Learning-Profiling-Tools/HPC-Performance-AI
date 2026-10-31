@@ -206,6 +206,23 @@ of `nohsquare` to 3e-7 after 7677 cycles). No per-zone criterion exists for the
 full run, so the registered input stops at cycle 6000, where the agreement is
 5e-7 and the 1e-5 rule applies with its margin.
 
+**Run-to-run variation of `nohpoly-hex251-6000cycles` (found 2026-10-29; open, no rule change).** The
+1e-5 basis above compares the CPU build with one GPU run and assumes that GPU runs repeat. On this deck
+they do not: in 43 runs of the unmodified CUDA build on 2026-10-29 (16 on GPU 0, 27 on GPU 1, one at a
+time) every run wrote a different `.xy`, while the dt / cycle sequence stayed identical to the last
+printed digit. 37 runs PASS with a largest deviation of 6.0e-8 .. 1.8e-7; 6 runs (1 of 16 on GPU 0, 5 of
+27 on GPU 1) land on a second, discrete outcome -- the same zr / ze / zp deviations 2.761e-5 / 1.837e-5
+/ 4.916e-5 in 5 / 3 / 9 zones every time -- and the registry check FAILs them. The other decks are
+deterministic (sedovbig, leblancbig, nohsquare: 10 runs each, byte-identical). So this input's check
+rejects a correct build in about one run in seven. The source of the nondeterminism is not identified:
+the point gather is deterministic (stable-sorted inverse map, fixed order), the only atomic is the
+negative-volume counter; on a 20-cycle copy of the deck compute-sanitizer racecheck finds no hazard and
+initcheck no error, while memcheck stops at a one-element out-of-bounds read in `gpuInvMap`
+(`mapspkey[i-1]` at i = 0; the value is not used) -- an upstream defect that cannot cause the variation.
+Options for the owners: find the nondeterministic step; re-base the rule on the measured GPU spread
+including the second outcome (e.g. 1.5e-4, still 7-70 x below the 1e-3 .. 1e-2 of a wrong method); or
+stop the input earlier. Until then a FAIL of this one input needs a repeat before it counts.
+
 **Leblanc meshes that fail on the GPU (upstream, not fixed here).** Master's
 `leblancx4` (640 x 5760) and a derived 320 x 2880 Leblanc mesh abort at the
 first cycle: `an illegal memory access was encountered` in the GPU kernels,

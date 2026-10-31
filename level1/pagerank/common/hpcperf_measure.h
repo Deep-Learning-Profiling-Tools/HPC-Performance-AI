@@ -1,25 +1,24 @@
 #ifndef HPCPERF_MEASURE_H
 #define HPCPERF_MEASURE_H
 //
-// HPC-Performance-AI measurement switch (default OFF, nothing changes without it).
+// HPC-Performance-AI correctness switch.
 //
 // This benchmark validates by recomputing the GPU result on the CPU
 // (BenchmarkRunner::Run -> Verify(), gated upstream by verification_mode_).
-// That recomputation is correctness machinery, not part of the workload being
-// timed, so tools/timing/measure_level1.sh sets HPCPERF_SKIP_VERIFY=1 and this
-// driver then leaves verification off. ctest never sets the variable, so the
-// default path -- and every correctness result -- is unchanged.
+// That CPU reference runs ONLY on an explicit offline request
+// (HPCPERF_CPU_REFERENCE=1; tools/golden/hpcperf_golden.py make uses it once to
+// validate the frozen golden reference); by default verification stays off, the
+// driver prints SKIP_VERIFY, and correctness is judged by comparing the outputs
+// captured by CaptureGoldenOutputs() (hpcperf_golden_output, HPCPERF_GOLDEN_DUMP)
+// with the frozen B200 golden reference (tools/golden).
 //
-// Upstream code (common/benchmark_runner.*, common/*_benchmark.cc) is untouched.
+// No kernel, data initialization, tolerance or algorithm is touched.
 //
 #include <cstdlib>
+#include "hpcperf_golden.h"
 
 inline bool hpcperf_skip_verify() {
-  static const bool skip = []() {
-    const char* e = std::getenv("HPCPERF_SKIP_VERIFY");
-    return e != nullptr && *e != '\0' && *e != '0';
-  }();
-  return skip;
+  return !hpcperf_cpu_reference_enabled();
 }
 
 #endif  // HPCPERF_MEASURE_H

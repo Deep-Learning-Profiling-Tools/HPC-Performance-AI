@@ -30,6 +30,15 @@ Nothing is hardcoded to the B200: `build.sh` detects the GPU compute
 capability (`HPCPERF_CUDA_ARCH` overrides it), and all scripts work from any
 cwd and any clone path.
 
+No `validate.sh`, registry check or measurement recomputes a CPU reference
+by default (since 2026-10-26/27): where the check used to rerun the
+application on the CPU / a Serial or OpenMP backend (Kripke, ExaCMech,
+Branson, Remhos, hipBone, Nekbone) it now compares with a frozen reference
+committed in `level2/<name>/reference/` (B200 golden references through
+`tools/golden`, which need the golden store -- `tools/golden/DISTRIBUTION.md`
+-- or frozen CPU-build values); the CPU comparison runs only offline with
+`HPCPERF_CPU_REFERENCE=1`. Each README's "Modes" paragraph has the details.
+
 ## Additional environment for Level 2
 
 Everything below is installed inside the clone, next to the Level 1 toolchain

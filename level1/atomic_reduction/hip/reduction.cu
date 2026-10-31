@@ -21,6 +21,7 @@
  */
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -77,7 +78,14 @@ int main(int argc, char** argv)
   int sum;
   double times;
 
+// tools/golden: before each variant's timed region (outside the ROI and the chrono timer) the output `out` that all
+// 20 variants share and its captured host copy `sum` are poisoned (all-ones bytes, -1). Every timed iteration clears
+// `out` and recomputes it, so a correct variant overwrites the poison; a variant that does not run leaves -1 in its
+// capture instead of the previous variant's identical sum.
 #define benchmark(kernel_name, grid_size) \
+    hipMemset(out, 0xFF, sizeof(int)); \
+    sum = -1; \
+    hipDeviceSynchronize(); \
     t1 = std::chrono::high_resolution_clock::now(); \
     HPCPERF_ROI_BEGIN_SYNC(); \
     for(int i=0;i<N;i++) { \
@@ -91,7 +99,14 @@ int main(int argc, char** argv)
     std::cout << "Thread block size: " <<  block_size << ", "; \
     std::cout << "The average performance of reduction is "<< 1.0E-09 * GB/times<<" GBytes/sec"<<std::endl; \
     hipMemcpy(&sum,out,sizeof(int),hipMemcpyDeviceToHost); \
-    if(sum==checksum) \
+    { /* tools/golden: the checked output (one int per kernel variant and block size) */ \
+      char hpcperf_name[96]; \
+      snprintf(hpcperf_name, sizeof(hpcperf_name), "sum.%s.b%d", #kernel_name, block_size); \
+      hpcperf_golden_output(hpcperf_name, &sum, 1, "i32"); \
+    } \
+    if(!hpcperf_cpu_reference_enabled()) /* default: no host check; golden comparison (tools/golden) */ \
+      std::cout<<"SKIP_VERIFY"<<std::endl<<std::endl; \
+    else if(sum==checksum) \
       std::cout<<"VERIFICATION: PASS"<<std::endl<<std::endl; \
     else \
       std::cout<<"VERIFICATION: FAIL!!"<<std::endl<<std::endl; \

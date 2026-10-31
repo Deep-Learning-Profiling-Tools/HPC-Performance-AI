@@ -45,7 +45,7 @@ cmake --build build/burgers_equation/hip
 
 ## Validation
 
-Built-in: GPU solution field compared against the upstream CPU implementation; prints PASS/FAIL.
+Golden reference (tools/golden): a plain run captures the GPU solution fields `du` and `dv` (f64, dim_x * dim_y each; `HPCPERF_GOLDEN_DUMP`) and `hpcperf_golden.py check` compares them with the frozen B200 reference `reference/<input>.json`: max |a - g| <= 1e-6 - d0 per field, i.e. upstream's tolerance against the serial CPU solver minus the golden's own deviation d0 from that solver (measured once when the reference was frozen). The serial CPU solver itself (prints PASS/FAIL) runs only on the explicit offline request below. ctest runs `hpcperf_golden.py run` on the registry's default input (`x8200-y8100-t100`, the former ctest arguments); the `check:` block of `inputs.yaml` does the same for every registered input.
 
 Run it via:
 
@@ -54,7 +54,9 @@ ctest --test-dir build/burgers_equation/cuda --output-on-failure
 ```
 
 
-**Measurement switch.** `HPCPERF_SKIP_VERIFY=1` skips the host-side check above so `tools/timing/measure_level1.sh` can time the GPU path alone; the benchmark then prints `SKIP_VERIFY` and exits 0. Default (unset) behaviour, and therefore ctest, is unchanged. See [tools/timing/README.md](../../tools/timing/README.md).
+**Correctness probe (`probe-x820-y810-t100`).** Upstream's initial condition gives `u` and `v` the same hat and the two equations are identical when `u == v`, so `du == dv` bit for bit on every performance input (the frozen references carry the same sha256 for both): computing `u` and copying it to `v`, or swapping `u` and `v` in the advection terms of `v`, passes them. The registry's correctness-probe input `probe-x820-y810-t100` (`burgers_equation_cuda 820 810 100 --probe`; `inputs.yaml` `purpose: correctness-probe`: never timed, never the default) runs the same four kernels on a 1/10-per-axis grid of the upstream run with a non-symmetric initial condition, set in set-up only (`probe_initial_v`, after upstream's initialisation and identically before the serial CPU solver): `v`'s hat moved by +0.25 in x (2 on 0.75 < x < 1.25, 0.5 < y < 1), `u` unchanged. Measured 2026-10-27 on the B200: `u` copied to `v` fails it (max abs err `dv` 1.0, `du` 1.7e-2), the swapped advection velocities fail it (`dv` 1.7e-2), `--fmad=false` passes (2.2e-16); the CPU solver's deviation is 2.2e-16. ctest `burgers_equation_probe` runs it against its frozen reference `reference/probe-x820-y810-t100.json`. The HIP port carries the same set-up switch (untested: no ROCm).
+
+**CPU reference switch.** By default the host-side CPU check is skipped: the benchmark prints `SKIP_VERIFY` (never PASS/FAIL) and its correctness is the golden check above. `HPCPERF_CPU_REFERENCE=1` runs the CPU reference (offline only: `hpcperf_golden.py make` uses it once to validate a new golden reference; no measurement, check or ctest path sets it, and nothing falls back to it); `HPCPERF_SKIP_VERIFY=1` (tools/timing) keeps it off as well. See [tools/golden](../../tools/golden/) and [tools/timing/README.md](../../tools/timing/README.md).
 
 **Measurement markers.** The region of interest `tools/timing` measures is marked with `hpcperf_roi.h` in `cuda/main.cu` and the HIP port: each region the benchmark's own timer measures around its kernel launches. Pure insertions; a no-op unless measuring, so ctest is unaffected. Placement rule: [tools/timing/roi/README.md](../../tools/timing/roi/README.md).
 

@@ -95,6 +95,8 @@ def level1_rows():
             raise C.CaseError(f"level1/{app}: Level 1 registry entries must be binaries")
         d_to = int(defaults[app]["timeout_s"] or 0) if app in defaults else 0
         for inp in doc["inputs"]:
+            if inp.get("purpose", "performance") == "correctness-probe":
+                continue   # checked, never timed
             exe = inp.get("binary") or doc["entry"]["path"]
             env = ";".join(f"{k}={v}" for k, v in (inp.get("env") or {}).items())
             rows.append({"app": app, "case": inp["id"], "input_id": inp["id"],
@@ -116,6 +118,8 @@ def level2_rows():
         a_to = int(apps[app]["timeout_s"] or 0)
         knobs = sorted({str(k) for i in doc["inputs"] for k in (i.get("env") or {})})
         for inp in doc["inputs"]:
+            if inp.get("purpose", "performance") == "correctness-probe":
+                continue   # checked, never timed
             gpus = (inp.get("runtime_config") or {}).get("gpus", 1)
             rows.append({"app": app, "case": inp["id"], "input_id": inp["id"],
                          "materialized": "1" if inp.get("materialized", True) is not False else "0",
@@ -138,6 +142,8 @@ def level3_rows():
         a_to = int(apps[app]["timeout_s"] or 0)
         knobs = sorted({str(k) for i in doc["inputs"] for k in (i.get("env") or {})})
         for inp in doc["inputs"]:
+            if inp.get("purpose", "performance") == "correctness-probe":
+                continue   # checked, never timed
             rc = inp.get("runtime_config") or {}
             gpus = rc.get("gpus", 1)
             if rc.get("ranks") not in (None, gpus):

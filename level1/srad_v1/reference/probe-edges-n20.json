@@ -1,0 +1,120 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "srad_v1",
+  "level": 1,
+  "input_id": "probe-edges-n20",
+  "frozen": true,
+  "workload": {
+    "input_id": "probe-edges-n20",
+    "params": {
+      "iterations": 20,
+      "lambda": 0.5,
+      "rows": 502,
+      "cols": 458
+    },
+    "args": [
+      "20",
+      "0.5",
+      "502",
+      "458",
+      "level1/srad_v1/data/probe_edges.pgm"
+    ],
+    "env": {},
+    "files_sha256": {
+      "data/probe_edges.pgm": "cccd28bc13977a0353d9176fcc24ab5d4a367b660936d403a3df1c6bcc708aeb"
+    }
+  },
+  "inputs_yaml_sha256": "b366003f95862b126d74be8d20f43d1476bb0394c6f3d4dabe2d9a9ffa5a5733",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "image",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 1.0
+        },
+        "cpu": "image.cpu",
+        "basis": "the float image (before write_graphics truncates it) within 1 grey level of the frozen B200 output (tol 1 - d0, d0 = max |B200 - verify.py's CPU reference|). |a - g| <= 1 implies |trunc a - trunc g| <= 1 at every pixel, so the rule is stricter than verify.py's own check (max <= 3, <= 0.1 % of the pixels off by more than 1; verify.py:78-81), which make still requires of the CPU validation. Measured 2026-10-28: legitimate variants within 0.11 (9x below the limit), the closest wrong candidate (an fp16 image) 1.51, a stale q0sqr 7.3. The performance inputs' share clause (pixels off by >= 1) is not used here -- legitimate float32 summation orders of the statistic move up to 0.14 % of this image's pixels across an integer (Rodinia 3.1 OpenMP) while staying within 0.11 grey levels (README \"Correctness probe\")",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "image",
+      "dtype": "f32",
+      "count": 229916,
+      "bytes": 919664,
+      "sha256": "3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 1.0,
+        "d0_vs_cpu_reference": 0.00096893310546875,
+        "d0_source": "image.cpu",
+        "tol_effective": 0.9990310668945312
+      },
+      "basis": "the float image (before write_graphics truncates it) within 1 grey level of the frozen B200 output (tol 1 - d0, d0 = max |B200 - verify.py's CPU reference|). |a - g| <= 1 implies |trunc a - trunc g| <= 1 at every pixel, so the rule is stricter than verify.py's own check (max <= 3, <= 0.1 % of the pixels off by more than 1; verify.py:78-81), which make still requires of the CPU validation. Measured 2026-10-28: legitimate variants within 0.11 (9x below the limit), the closest wrong candidate (an fp16 image) 1.51, a stale q0sqr 7.3. The performance inputs' share clause (pixels off by >= 1) is not used here -- legitimate float32 summation orders of the statistic move up to 0.14 % of this image's pixels across an integer (Rodinia 3.1 OpenMP) while staying within 0.11 grey levels (README \"Correctness probe\")",
+      "stats": {
+        "min": 39.47506332397461,
+        "max": 217.15098571777344,
+        "sum": 14554705.371635437,
+        "nonfinite": 0
+      },
+      "blob": "sha256/3a/3a5425c4c270177f92921a571cfe2da0037569d2eb57d70bb8cb17860c412679.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T11:07:29Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "567408678c701febb41b65a269eaf8a802d0ff36",
+    "source_clean": true,
+    "binary": "build/srad_v1/cuda/srad_v1_cuda",
+    "binary_sha256": "47a1912ab94baf2a06f6b9eb0536d4705acba09340d9149e0f3039652498b9dc",
+    "command": [
+      "python3",
+      "level1/srad_v1/verify.py",
+      "build/srad_v1/cuda/srad_v1_cuda",
+      "20",
+      "0.5",
+      "502",
+      "458",
+      "level1/srad_v1/data/probe_edges.pgm"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 1.876,
+      "pass_line": "PASS: srad output image matches CPU reference (max pixel diff 1, frac>1 0.0000%)",
+      "pass_regex": "^PASS: srad output image matches CPU reference",
+      "fail_regex": "^FAIL",
+      "log": "build/golden-make/srad_v1/probe-edges-n20/run/stdout.log",
+      "log_sha256": "b46c22e647b44fa1ceb7dbad3dcd4761db6c4bb5781dc3e7183574c967c8f231"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

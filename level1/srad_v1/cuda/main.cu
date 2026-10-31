@@ -22,6 +22,7 @@
 //====================================================================================================100
 
 #include "hpcperf_roi.h"
+#include "hpcperf_golden.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -438,6 +439,7 @@ int main(int argc, char *argv []){
 	cudaMemcpy(image, d_I, mem_size, cudaMemcpyDeviceToHost);
 
 	checkCUDAError("copy back");
+	hpcperf_golden_output("image", image, Ne, "f32");   // tools/golden: the checked output (the float image before write_graphics truncates it; column-major Nr x Nc)
 
 	time10 = get_time();
 

@@ -1,0 +1,129 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "binary_search",
+  "level": 1,
+  "input_id": "n134217728",
+  "frozen": true,
+  "workload": {
+    "input_id": "n134217728",
+    "params": {
+      "elements": 134217728,
+      "repeat": 100
+    },
+    "args": [
+      "134217728",
+      "100"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "52832f1f540dcc3d8985d3c8de5124c524ef257bb8aa8f1ada8a1f4740c6b9ef",
+  "spec": {
+    "mode": "hash",
+    "outputs": [
+      {
+        "name": null,
+        "match": "r\\.bs[1-4]",
+        "count": 4,
+        "dtype": "u64",
+        "rule": {
+          "metric": "exact"
+        },
+        "cpu": null,
+        "basis": "upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251, called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2 would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct result equals the validated golden bit for bit; integer, exact",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "r.bs1",
+      "dtype": "u64",
+      "count": 268435456,
+      "bytes": 2147483648,
+      "sha256": "319b33ea633ef3875fff4cc70043dad7aa17e33880fc198bf2acb054c27d365b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251, called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2 would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct result equals the validated golden bit for bit; integer, exact"
+    },
+    {
+      "name": "r.bs2",
+      "dtype": "u64",
+      "count": 268435456,
+      "bytes": 2147483648,
+      "sha256": "319b33ea633ef3875fff4cc70043dad7aa17e33880fc198bf2acb054c27d365b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251, called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2 would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct result equals the validated golden bit for bit; integer, exact"
+    },
+    {
+      "name": "r.bs3",
+      "dtype": "u64",
+      "count": 268435456,
+      "bytes": 2147483648,
+      "sha256": "319b33ea633ef3875fff4cc70043dad7aa17e33880fc198bf2acb054c27d365b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251, called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2 would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct result equals the validated golden bit for bit; integer, exact"
+    },
+    {
+      "name": "r.bs4",
+      "dtype": "u64",
+      "count": 268435456,
+      "bytes": 2147483648,
+      "sha256": "319b33ea633ef3875fff4cc70043dad7aa17e33880fc198bf2acb054c27d365b",
+      "rule": {
+        "metric": "exact"
+      },
+      "basis": "upstream's verify() -- every r[i] satisfies a[r] <= z[i] < a[r+1], r+1 < aSize (cuda/main.cu:233-251, called for bs1..bs4 at :301-319). For the non-decreasing a[] the property has at most one solution (r1 < r2 would need a[r1+1] > z >= a[r2] >= a[r1+1]), also where float rounding repeats values of a[], so a correct result equals the validated golden bit for bit; integer, exact"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T10:40:37Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "1e2d8e0c878846cfa8942a6900a86458819f4d6f",
+    "source_clean": true,
+    "binary": "build/binary_search/cuda/binary_search_cuda",
+    "binary_sha256": "9013658598f4be74c37fe5a691588f8d76601e59a0ba4e11f2f9dfc54325dc2e",
+    "command": [
+      "build/binary_search/cuda/binary_search_cuda",
+      "134217728",
+      "100"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "hash"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 71.809,
+      "pass_line": "PASS: verify: a[r] <= z < a[r+1] for all 268435456 queries of bs1, bs2, bs3, bs4",
+      "pass_regex": "^PASS: verify:",
+      "fail_regex": "incorrect result|^FAIL",
+      "log": "build/golden-make/binary_search/n134217728/run/stdout.log",
+      "log_sha256": "9db3be3e717b08e58842324545d4b182ba8091802e958837c412af9301ce5fa1"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "169e4f0d7da831138ad80b531bf635ac924072eda3f4141ce4f8fc59e44abc84",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  }
+}

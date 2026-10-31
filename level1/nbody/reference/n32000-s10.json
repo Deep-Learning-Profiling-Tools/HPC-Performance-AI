@@ -1,0 +1,183 @@
+{
+  "schema": "hpcperf-golden-1",
+  "benchmark": "nbody",
+  "level": 1,
+  "input_id": "n32000-s10",
+  "frozen": true,
+  "workload": {
+    "input_id": "n32000-s10",
+    "params": {
+      "particles": 32000,
+      "steps": 10
+    },
+    "args": [
+      "32000",
+      "10"
+    ],
+    "env": {},
+    "files_sha256": {}
+  },
+  "inputs_yaml_sha256": "9d1ddd96a325adec800386ddfcc635e31422eefb2eab746ae6e60bf39560ab08",
+  "spec": {
+    "mode": "data",
+    "outputs": [
+      {
+        "name": "kenergy",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_rel",
+          "tol": 0.0001
+        },
+        "cpu": "kenergy.cpu",
+        "basis": "the final kinetic energy (the program's own reduction over all particles) relative to the CPU reference's. Upstream's check fabsf(kenergy_ - ref_kenergy_) < 1e-3f (common/GSimulationReference.hpp:105) is 1 f32 ulp at n16000 and bit equality at n32000/n64000 and fails 16 to 29 of 38 legitimate reimplementations; relative 1e-4, measured 2026-10-28 (README \"Validation\"; legitimate reductions <= 1.0e-5, the energy summed over half the particles 0.5, from the previous step's velocities 0.2, a 0.1% wrong time step 2.2e-3 to 3.1e-3)",
+        "log": null
+      },
+      {
+        "name": "pos",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 0.0001
+        },
+        "cpu": "pos.cpu",
+        "basis": "not compared by upstream; the final positions within 1e-4 of the unit box they start in, measured 2026-10-28 (README \"Validation\"; legitimate reimplementations <= 1.3e-6 at n64000, the last position update skipped >= 2.1e-3)",
+        "log": null
+      },
+      {
+        "name": "vel",
+        "match": null,
+        "count": null,
+        "dtype": "f32",
+        "rule": {
+          "metric": "max_abs",
+          "tol": 8.5e-06
+        },
+        "cpu": "vel.cpu",
+        "basis": "not compared by upstream; the final velocities within 1e-4 of the input's max |v| (golden 0.02057 / 0.08552 / 0.41395 at n16000 / n32000 / n64000, rounded down), measured 2026-10-28 (README \"Validation\"; legitimate reimplementations <= 5.8e-6 of max |v|, fp16-rounded positions in the force >= 4.8e-4)",
+        "log": null
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "kenergy",
+      "dtype": "f32",
+      "count": 1,
+      "bytes": 4,
+      "sha256": "9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04",
+      "rule": {
+        "metric": "max_rel",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 0.0,
+        "d0_source": "kenergy.cpu",
+        "tol_effective": 0.0001
+      },
+      "basis": "the final kinetic energy (the program's own reduction over all particles) relative to the CPU reference's. Upstream's check fabsf(kenergy_ - ref_kenergy_) < 1e-3f (common/GSimulationReference.hpp:105) is 1 f32 ulp at n16000 and bit equality at n32000/n64000 and fails 16 to 29 of 38 legitimate reimplementations; relative 1e-4, measured 2026-10-28 (README \"Validation\"; legitimate reductions <= 1.0e-5, the energy summed over half the particles 0.5, from the previous step's velocities 0.2, a 0.1% wrong time step 2.2e-3 to 3.1e-3)",
+      "stats": {
+        "min": 1098578.875,
+        "max": 1098578.875,
+        "sum": 1098578.875,
+        "nonfinite": 0
+      },
+      "blob": "sha256/9c/9c1c768a92275a39a3aac64ba64fbd4c26558d920af2f034652171c674909c04.bin"
+    },
+    {
+      "name": "pos",
+      "dtype": "f32",
+      "count": 96000,
+      "bytes": 384000,
+      "sha256": "4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 0.0001,
+        "d0_vs_cpu_reference": 1.1920928955078125e-07,
+        "d0_source": "pos.cpu",
+        "tol_effective": 9.988079071044922e-05
+      },
+      "basis": "not compared by upstream; the final positions within 1e-4 of the unit box they start in, measured 2026-10-28 (README \"Validation\"; legitimate reimplementations <= 1.3e-6 at n64000, the last position update skipped >= 2.1e-3)",
+      "stats": {
+        "min": 0.018226364627480507,
+        "max": 0.9807286262512207,
+        "sum": 47987.88431558013,
+        "nonfinite": 0
+      },
+      "blob": "sha256/4b/4b9c343b529889a0fa56e3e5cc113569a8f56366cb3ebe239686b3f602701bc5.bin"
+    },
+    {
+      "name": "vel",
+      "dtype": "f32",
+      "count": 96000,
+      "bytes": 384000,
+      "sha256": "09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502",
+      "rule": {
+        "metric": "max_abs",
+        "tol": 8.5e-06,
+        "d0_vs_cpu_reference": 2.2351741790771484e-08,
+        "d0_source": "vel.cpu",
+        "tol_effective": 8.477648258209228e-06
+      },
+      "basis": "not compared by upstream; the final velocities within 1e-4 of the input's max |v| (golden 0.02057 / 0.08552 / 0.41395 at n16000 / n32000 / n64000, rounded down), measured 2026-10-28 (README \"Validation\"; legitimate reimplementations <= 5.8e-6 of max |v|, fp16-rounded positions in the force >= 4.8e-4)",
+      "stats": {
+        "min": -0.08551917970180511,
+        "max": 0.08515123277902603,
+        "sum": -7.619494867646921,
+        "nonfinite": 0
+      },
+      "blob": "sha256/09/09d04abfafe001818e6e3a45f2cb047cabd42a0ea5195bcbf3785a2eb824e502.bin"
+    }
+  ],
+  "provenance": {
+    "made_utc": "2026-10-28T11:21:24Z",
+    "gpu": {
+      "name": "NVIDIA B200",
+      "driver": "595.58.03"
+    },
+    "cuda_toolkit": "13.2.1",
+    "git_head": "b712bed740c3aed9de3950ccbc83cb39438bb767",
+    "source_clean": true,
+    "binary": "build/nbody/cuda/nbody_cuda",
+    "binary_sha256": "c20521e2303be176afa528d023220df1b67268ad5ac9e260c18e3bded5fcb097",
+    "command": [
+      "build/nbody/cuda/nbody_cuda",
+      "32000",
+      "10"
+    ],
+    "gpu_run": null,
+    "env": {
+      "HPCPERF_CPU_REFERENCE": "1",
+      "HPCPERF_GOLDEN_MODE": "data"
+    },
+    "cpu_validation": {
+      "exit_code": 0,
+      "wall_s": 30.682,
+      "pass_line": "PASS",
+      "pass_regex": "^PASS$",
+      "fail_regex": "^FAIL$",
+      "log": "build/golden-make/nbody/n32000-s10/run/stdout.log",
+      "log_sha256": "d499a60ff40692ed9ae03751d09f19ec22b5c24b69530667bfc4c53d0ae8d214"
+    },
+    "tool_sha256": {
+      "hpcperf_golden.py": "ea58206f31e06c2f3d7f9f12d12f42b4669332c8dd27f0b8595652b092f84c9d",
+      "hpcperf_golden.h": "045931e42902827f6e54fa731378edef93480e457f4752b22a9890283bd131c3"
+    },
+    "store": "blobs of tolerance outputs: $HPCPERF_GOLDEN_STORE (default <repo>/.golden-store), content-addressed",
+    "scrubbed": {
+      "by": "tools/golden/scrub_provenance.py",
+      "rule": "hpcperf-provenance-scrub-1",
+      "removed": [
+        "gpu.uuid",
+        "host"
+      ],
+      "why": "machine identity (host name, GPU UUID / index, batch job, private log location) is not needed to reproduce or check this reference; the platform (GPU model, driver, CUDA Toolkit), git head, sha256 values and every comparison datum are unchanged"
+    }
+  },
+  "replaces": {
+    "reason": "nbody: the golden check now also compares the final particle state (pos, vel: 3 x n f32 each, copied from the device after the timed loop only when HPCPERF_GOLDEN_DUMP is set) and the kinetic-energy rule changes from upstream's max_abs 1e-3 (1 f32 ulp at n16000, bit equality at n32000/n64000: it failed 16/18/29 of 38 legitimate reimplementations and passed a skipped last position update, a mirrored state and a printed constant energy) to max_rel 1e-4; per-input rules pos max_abs 1e-4, vel max_abs 1e-4 x max|v| (2.0e-6 / 8.5e-6 / 4.1e-5). Criterion expansion approved by the owners; evidence level1/nbody/README.md \"Validation\" (2026-10-28: legitimate <= 0.10 of the limits, wrong >= 4.9).",
+    "previous_made_utc": "2026-10-26T06:36:53Z",
+    "previous_sha256": "e7488a9eff4498bb6e53b356dd9e14b21a9a7f23ff2f18447bd56cab81653fa7"
+  }
+}
